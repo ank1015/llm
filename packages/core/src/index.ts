@@ -31,5 +31,8 @@ export { completeDeepSeek, streamDeepSeek } from "./providers/deepseek/index.js"
 export { completeZai, streamZai } from "./providers/zai/index.js";
 export { completeKimi, streamKimi } from "./providers/kimi/index.js";
 
+// LLM - Central entry point (dispatches to providers)
+export { complete, stream } from "./llm/index.js";
+
 // Re-export types from @ank1015/llm-types for convenience
 export type * from "@ank1015/llm-types";

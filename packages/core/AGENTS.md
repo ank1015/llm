@@ -16,6 +16,10 @@ src/
   index.ts              — Public exports
   models.ts             — Model utilities (getModel, getModels, calculateCost)
   models.generated.ts   — Model definitions (auto-generated, do not edit manually)
+  llm/
+    index.ts            — LLM module exports
+    complete.ts         — Central complete() dispatcher
+    stream.ts           — Central stream() dispatcher
   utils/
     index.ts            — Utility exports
     event-stream.ts     — EventStream and AssistantMessageEventStream classes
@@ -59,6 +63,8 @@ src/
 
 ## Key Exports
 
+- `complete(model, context, options, id)` — Central completion dispatcher (use this!)
+- `stream(model, context, options, id)` — Central streaming dispatcher (use this!)
 - `MODELS` — All supported model definitions by provider
 - `getModel(api, modelId)` — Get a specific model
 - `getModels(api)` — Get all models for a provider
