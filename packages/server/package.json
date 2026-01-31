@@ -1,0 +1,43 @@
+{
+  "name": "@ank1015/llm-server",
+  "version": "0.0.1",
+  "description": "HTTP server for LLM SDK",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "lint": "echo 'No linter configured yet'",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@ank1015/llm-core": "workspace:^",
+    "@ank1015/llm-types": "workspace:^",
+    "hono": "^4.7.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "vitest": "^2.1.0"
+  },
+  "keywords": [
+    "llm",
+    "server",
+    "hono",
+    "api"
+  ],
+  "license": "MIT"
+}
