@@ -5,10 +5,12 @@ HTTP server for LLM SDK built with Hono.
 ## Commands
 
 - `pnpm build` — Compile TypeScript to dist/
-- `pnpm dev` — Run dev server with hot reload (tsx)
-- `pnpm start` — Run production server
+- `pnpm dev` — Run dev server with hot reload (tsx) on port 3001
+- `pnpm start` — Run production server on port 3001
 - `pnpm test` — Run tests with Vitest
 - `pnpm typecheck` — Type-check without emitting
+
+Set `PORT` environment variable to change the default port.
 
 ## Structure
 

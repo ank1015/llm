@@ -7,9 +7,20 @@ TypeScript SDK monorepo for LLM interactions.
 ```bash
 pnpm install          # Install dependencies
 pnpm build            # Build all packages
+pnpm build:packages   # Build SDK packages only (excludes dashboard)
 pnpm test             # Run all tests
+pnpm test:unit        # Run unit tests only
+pnpm test:integration # Run integration tests only
 pnpm typecheck        # Type-check all packages
 pnpm clean            # Remove all build artifacts
+
+# Development
+pnpm dev:server       # Start API server (port 3001)
+pnpm dev:dashboard    # Start dashboard (port 3000)
+
+# Production
+pnpm start:server     # Start API server
+pnpm start:dashboard  # Start dashboard
 ```
 
 ## Architecture
