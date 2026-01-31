@@ -30,6 +30,11 @@ src/
       complete.ts       — Non-streaming completion
       stream.ts         — Streaming completion
       utils.ts          — Provider-specific utilities
+    openai/             — OpenAI provider
+      index.ts          — Provider exports
+      complete.ts       — Non-streaming completion
+      stream.ts         — Streaming completion
+      utils.ts          — Provider-specific utilities
 ```
 
 ## Key Exports
@@ -39,6 +44,7 @@ src/
 - `getModels(api)` — Get all models for a provider
 - `calculateCost(model, usage)` — Calculate cost from token usage
 - `completeAnthropic` / `streamAnthropic` — Anthropic provider functions
+- `completeOpenAI` / `streamOpenAI` — OpenAI provider functions
 - `EventStream` / `AssistantMessageEventStream` — Streaming utilities
 
 ## Conventions

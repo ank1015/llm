@@ -29,6 +29,9 @@ importers:
       ajv-formats:
         specifier: ^3.0.1
         version: 3.0.1(ajv@8.17.1)
+      openai:
+        specifier: ^6.17.0
+        version: 6.17.0(ws@8.19.0)
       partial-json:
         specifier: ^0.1.7
         version: 0.1.7
