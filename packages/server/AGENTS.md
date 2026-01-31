@@ -22,6 +22,7 @@ src/
   routes/
     index.ts            — Route exports
     messages.ts         — /messages/complete and /messages/stream endpoints
+    keys.ts             — /keys API key management endpoints
 tests/
   unit/
     services/           — Service unit tests
@@ -52,6 +53,23 @@ Events:
 - `toolcall_start`, `toolcall_delta`, `toolcall_end`
 - `done`, `error`
 - `message` — Final BaseAssistantMessage
+
+### GET /keys
+List all providers with stored API keys.
+
+### GET /keys/:api
+Check if an API key exists for a provider (does not return the key).
+
+### POST /keys/:api
+Add an API key for a provider.
+Request body: `{ "apiKey": "sk-..." }`
+
+### PUT /keys/:api
+Update an API key for a provider (alias for POST).
+Request body: `{ "apiKey": "sk-..." }`
+
+### DELETE /keys/:api
+Remove an API key for a provider.
 
 ## Key Exports
 

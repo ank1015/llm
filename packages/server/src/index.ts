@@ -10,7 +10,7 @@ import { Hono } from "hono";
 export { KeyService, DbService } from "./services/index.js";
 
 // Routes
-import { messagesRoutes } from "./routes/index.js";
+import { messagesRoutes, keysRoutes } from "./routes/index.js";
 
 export const app = new Hono();
 
@@ -21,6 +21,7 @@ app.get("/health", (c) => {
 
 // Mount routes
 app.route("/messages", messagesRoutes);
+app.route("/keys", keysRoutes);
 
 // Default export for direct execution
 export default app;
