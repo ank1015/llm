@@ -19,7 +19,39 @@ src/
     index.ts            — Service exports
     keys.ts             — API key management (encrypted storage)
     db.ts               — SQLite database for usage tracking
+  routes/
+    index.ts            — Route exports
+    messages.ts         — /messages/complete and /messages/stream endpoints
+tests/
+  unit/
+    services/           — Service unit tests
 ```
+
+## Endpoints
+
+### GET /health
+Health check endpoint.
+
+### POST /messages/complete
+Non-streaming completion. Returns `BaseAssistantMessage`.
+
+Request body: `MessageRequest`
+- `api` — Provider (anthropic, openai, google, etc.)
+- `modelId` — Model identifier
+- `messages` — Conversation messages
+- `systemPrompt?` — System instructions
+- `tools?` — Available tools
+- `providerOptions?` — Provider-specific options
+
+### POST /messages/stream
+Streaming completion using SSE. Returns events followed by final message.
+
+Events:
+- `start`, `text_start`, `text_delta`, `text_end`
+- `thinking_start`, `thinking_delta`, `thinking_end`
+- `toolcall_start`, `toolcall_delta`, `toolcall_end`
+- `done`, `error`
+- `message` — Final BaseAssistantMessage
 
 ## Key Exports
 
@@ -55,12 +87,33 @@ Methods:
 - `deleteMessage(id)` — Delete a message
 - `getUsageStats(options)` — Get usage statistics
 
+## Error Handling
+
+All endpoints return structured errors:
+```json
+{
+  "error": true,
+  "code": "API_KEY_NOT_FOUND",
+  "message": "API key not found for provider: anthropic",
+  "details": { "provider": "anthropic" }
+}
+```
+
+Error codes:
+- `API_KEY_NOT_FOUND` (401) — No API key for provider
+- `MODEL_NOT_FOUND` (404) — Model not found
+- `INVALID_REQUEST` (400) — Bad request body
+- `PROVIDER_ERROR` (502) — Error from LLM provider
+- `CONTEXT_OVERFLOW` (413) — Input exceeds context window
+- `RATE_LIMIT` (429) — Rate limit exceeded
+
 ## Conventions
 
 - Use Hono for routing and middleware
 - Export app for testing and composition
 - Services are singletons with lazy initialization
-- Keep routes in separate files as the app grows
+- Routes in `routes/` directory
+- All responses saved to DbService
 
 ## Dependencies
 

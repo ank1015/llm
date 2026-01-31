@@ -18,6 +18,8 @@ src/
   message.ts        — Message types (UserMessage, BaseAssistantMessage, etc.)
   model.ts          — Model and Provider types
   tool.ts           — Tool definition and Context types
+  request.ts        — API request types (MessageRequest)
+  errors.ts         — Error types and classes (LLMError, etc.)
   providers/        — Provider-specific types
     index.ts        — Re-exports and type maps
     anthropic.ts    — Anthropic types
@@ -35,14 +37,18 @@ src/
 - `Message` — Union of UserMessage | ToolResultMessage | BaseAssistantMessage | CustomMessage
 - `Model<TApi>` — Generic model definition with provider-specific typing
 - `Tool` — Tool definition with TypeBox schema parameters
+- `MessageRequest` — Request body for /messages endpoints
+- `LLMError` — Base error class with code, message, and status code
+- `LLMErrorCode` — Error codes (API_KEY_NOT_FOUND, MODEL_NOT_FOUND, etc.)
 
 ## Conventions
 
-- Types only — No runtime code (except `KnownApis` const and `isValidApi` type guard)
+- Types only — No runtime code (except `KnownApis`, `isValidApi`, and error classes)
 - Export all public types from `src/index.ts`
 - Use discriminated unions for variant types
 - Use JSDoc comments on all exports
 - Provider types extend/omit from official SDK types
+- Error classes extend `LLMError` base class
 
 ## Dependencies
 

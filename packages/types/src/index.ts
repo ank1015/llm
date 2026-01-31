@@ -55,3 +55,18 @@ export type {
 // Tool types
 export type { Tool, Context } from "./tool.js";
 
+// Request types
+export type { MessageRequest, SimpleMessageRequest } from "./request.js";
+
+// Error types
+export type { LLMErrorCode, LLMErrorResponse } from "./errors.js";
+export {
+	LLMError,
+	ApiKeyNotFoundError,
+	ModelNotFoundError,
+	InvalidRequestError,
+	ProviderError,
+	RateLimitError,
+	ContextOverflowError,
+	StreamError,
+} from "./errors.js";
