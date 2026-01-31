@@ -35,6 +35,11 @@ src/
       complete.ts       — Non-streaming completion
       stream.ts         — Streaming completion
       utils.ts          — Provider-specific utilities
+    google/             — Google/Gemini provider
+      index.ts          — Provider exports
+      complete.ts       — Non-streaming completion
+      stream.ts         — Streaming completion
+      utils.ts          — Provider-specific utilities
 ```
 
 ## Key Exports
@@ -45,6 +50,7 @@ src/
 - `calculateCost(model, usage)` — Calculate cost from token usage
 - `completeAnthropic` / `streamAnthropic` — Anthropic provider functions
 - `completeOpenAI` / `streamOpenAI` — OpenAI provider functions
+- `completeGoogle` / `streamGoogle` — Google/Gemini provider functions
 - `EventStream` / `AssistantMessageEventStream` — Streaming utilities
 
 ## Conventions

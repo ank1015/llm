@@ -23,6 +23,12 @@ importers:
       '@anthropic-ai/sdk':
         specifier: ^0.72.1
         version: 0.72.1
+      '@google/genai':
+        specifier: ^1.39.0
+        version: 1.39.0
+      '@sinclair/typebox':
+        specifier: ^0.34.48
+        version: 0.34.48
       ajv:
         specifier: ^8.17.1
         version: 8.17.1
