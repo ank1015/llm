@@ -28,6 +28,7 @@ export { completeAnthropic, streamAnthropic } from "./providers/anthropic/index.
 export { completeOpenAI, streamOpenAI } from "./providers/openai/index.js";
 export { completeGoogle, streamGoogle, GoogleThinkingLevel } from "./providers/google/index.js";
 export { completeDeepSeek, streamDeepSeek } from "./providers/deepseek/index.js";
+export { completeKimi, streamKimi } from "./providers/kimi/index.js";
 
 // Re-export types from @ank1015/llm-types for convenience
 export type * from "@ank1015/llm-types";

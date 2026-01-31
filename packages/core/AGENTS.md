@@ -45,6 +45,11 @@ src/
       complete.ts       — Non-streaming completion
       stream.ts         — Streaming completion
       utils.ts          — Provider-specific utilities
+    kimi/               — Kimi/Moonshot provider
+      index.ts          — Provider exports
+      complete.ts       — Non-streaming completion
+      stream.ts         — Streaming completion
+      utils.ts          — Provider-specific utilities
 ```
 
 ## Key Exports
@@ -57,6 +62,7 @@ src/
 - `completeOpenAI` / `streamOpenAI` — OpenAI provider functions
 - `completeGoogle` / `streamGoogle` — Google/Gemini provider functions
 - `completeDeepSeek` / `streamDeepSeek` — DeepSeek provider functions
+- `completeKimi` / `streamKimi` — Kimi/Moonshot provider functions
 - `EventStream` / `AssistantMessageEventStream` — Streaming utilities
 
 ## Conventions
