@@ -50,6 +50,11 @@ src/
       complete.ts       — Non-streaming completion
       stream.ts         — Streaming completion
       utils.ts          — Provider-specific utilities
+    zai/                — Z.AI provider
+      index.ts          — Provider exports
+      complete.ts       — Non-streaming completion
+      stream.ts         — Streaming completion
+      utils.ts          — Provider-specific utilities
 ```
 
 ## Key Exports
@@ -63,6 +68,7 @@ src/
 - `completeGoogle` / `streamGoogle` — Google/Gemini provider functions
 - `completeDeepSeek` / `streamDeepSeek` — DeepSeek provider functions
 - `completeKimi` / `streamKimi` — Kimi/Moonshot provider functions
+- `completeZai` / `streamZai` — Z.AI provider functions
 - `EventStream` / `AssistantMessageEventStream` — Streaming utilities
 
 ## Conventions
