@@ -6,7 +6,9 @@ Core SDK for LLM interactions with multiple providers.
 
 - `pnpm build` — Compile TypeScript to dist/
 - `pnpm dev` — Watch mode compilation
-- `pnpm test` — Run tests with Vitest
+- `pnpm test` — Run all tests
+- `pnpm test tests/unit` — Run unit tests only
+- `pnpm test tests/integration` — Run integration tests (requires API keys)
 - `pnpm typecheck` — Type-check without emitting
 
 ## Structure
@@ -59,6 +61,18 @@ src/
       complete.ts       — Non-streaming completion
       stream.ts         — Streaming completion
       utils.ts          — Provider-specific utilities
+tests/
+  unit/                 — Unit tests (no API calls)
+    llm/                — Central dispatcher tests
+    providers/          — Provider utility tests
+    utils/              — Utility function tests
+  integration/          — Integration tests (require API keys)
+    anthropic/          — Anthropic API tests
+    openai/             — OpenAI API tests
+    google/             — Google/Gemini API tests
+    deepseek/           — DeepSeek API tests
+    kimi/               — Kimi API tests
+    zai/                — Z.AI API tests
 ```
 
 ## Key Exports
