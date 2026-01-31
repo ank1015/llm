@@ -16,7 +16,8 @@ pnpm clean            # Remove all build artifacts
 
 ```
 packages/
-  core/               # @ank1015/llm-core - Core SDK types and utilities
+  core/               # @ank1015/llm-core - Core SDK utilities
+  types/              # @ank1015/llm-types - Shared type definitions
 ```
 
 ## Conventions
@@ -35,6 +36,7 @@ packages/
 
 ## Package Guide
 
+- [packages/types/AGENTS.md](packages/types/AGENTS.md) — Type definitions
 - [packages/core/AGENTS.md](packages/core/AGENTS.md) — Core SDK
 
 ## Boundaries
