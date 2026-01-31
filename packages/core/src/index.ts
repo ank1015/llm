@@ -4,4 +4,23 @@
  * Core SDK for LLM interactions.
  */
 
-export const VERSION = '0.0.1';
+export const VERSION = "0.0.1";
+
+// Models
+export { MODELS } from "./models.generated.js";
+export { getProviders, getModel, getModels, calculateCost } from "./models.js";
+
+// Utilities
+export {
+	EventStream,
+	AssistantMessageEventStream,
+	parseStreamingJson,
+	isContextOverflow,
+	getOverflowPatterns,
+	sanitizeSurrogates,
+	validateToolCall,
+	validateToolArguments,
+} from "./utils/index.js";
+
+// Re-export types from @ank1015/llm-types for convenience
+export type * from "@ank1015/llm-types";

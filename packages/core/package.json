@@ -31,5 +31,11 @@
     "sdk",
     "ai"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@ank1015/llm-types": "workspace:^",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "partial-json": "^0.1.7"
+  }
 }
