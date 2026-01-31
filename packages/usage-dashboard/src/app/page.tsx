@@ -1,65 +1,199 @@
-import Image from "next/image";
+"use client";
+
+import { useState, useEffect } from "react";
+
+const API_BASE = "http://localhost:3001";
+
+const PROVIDERS = [
+	{ id: "anthropic", name: "Anthropic", placeholder: "sk-ant-..." },
+	{ id: "openai", name: "OpenAI", placeholder: "sk-..." },
+	{ id: "google", name: "Google", placeholder: "AIza..." },
+	{ id: "deepseek", name: "DeepSeek", placeholder: "sk-..." },
+	{ id: "kimi", name: "Kimi", placeholder: "sk-..." },
+	{ id: "zai", name: "Z.AI", placeholder: "sk-..." },
+] as const;
+
+type ProviderId = (typeof PROVIDERS)[number]["id"];
+
+interface KeyStatus {
+	exists: boolean;
+	loading: boolean;
+	saving: boolean;
+	error: string | null;
+}
 
 export default function Home() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
-  );
+	const [keyStatuses, setKeyStatuses] = useState<Record<ProviderId, KeyStatus>>(() =>
+		Object.fromEntries(
+			PROVIDERS.map((p) => [p.id, { exists: false, loading: true, saving: false, error: null }])
+		) as Record<ProviderId, KeyStatus>
+	);
+	const [keyInputs, setKeyInputs] = useState<Record<ProviderId, string>>(() =>
+		Object.fromEntries(PROVIDERS.map((p) => [p.id, ""])) as Record<ProviderId, string>
+	);
+
+	useEffect(() => {
+		PROVIDERS.forEach((provider) => {
+			checkKeyStatus(provider.id);
+		});
+	}, []);
+
+	async function checkKeyStatus(providerId: ProviderId) {
+		try {
+			const response = await fetch(`${API_BASE}/keys/${providerId}`);
+			const data = await response.json();
+			setKeyStatuses((prev) => ({
+				...prev,
+				[providerId]: { ...prev[providerId], exists: data.exists, loading: false, error: null },
+			}));
+		} catch {
+			setKeyStatuses((prev) => ({
+				...prev,
+				[providerId]: { ...prev[providerId], loading: false, error: "Failed to check status" },
+			}));
+		}
+	}
+
+	async function saveKey(providerId: ProviderId) {
+		const apiKey = keyInputs[providerId];
+		if (!apiKey.trim()) return;
+
+		setKeyStatuses((prev) => ({
+			...prev,
+			[providerId]: { ...prev[providerId], saving: true, error: null },
+		}));
+
+		try {
+			const response = await fetch(`${API_BASE}/keys/${providerId}`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ apiKey }),
+			});
+
+			if (!response.ok) {
+				const data = await response.json();
+				throw new Error(data.message || "Failed to save");
+			}
+
+			setKeyStatuses((prev) => ({
+				...prev,
+				[providerId]: { ...prev[providerId], exists: true, saving: false },
+			}));
+			setKeyInputs((prev) => ({ ...prev, [providerId]: "" }));
+		} catch (err) {
+			setKeyStatuses((prev) => ({
+				...prev,
+				[providerId]: {
+					...prev[providerId],
+					saving: false,
+					error: err instanceof Error ? err.message : "Failed to save",
+				},
+			}));
+		}
+	}
+
+	async function deleteKey(providerId: ProviderId) {
+		setKeyStatuses((prev) => ({
+			...prev,
+			[providerId]: { ...prev[providerId], saving: true, error: null },
+		}));
+
+		try {
+			const response = await fetch(`${API_BASE}/keys/${providerId}`, {
+				method: "DELETE",
+			});
+
+			if (!response.ok && response.status !== 404) {
+				const data = await response.json();
+				throw new Error(data.message || "Failed to delete");
+			}
+
+			setKeyStatuses((prev) => ({
+				...prev,
+				[providerId]: { ...prev[providerId], exists: false, saving: false },
+			}));
+		} catch (err) {
+			setKeyStatuses((prev) => ({
+				...prev,
+				[providerId]: {
+					...prev[providerId],
+					saving: false,
+					error: err instanceof Error ? err.message : "Failed to delete",
+				},
+			}));
+		}
+	}
+
+	return (
+		<div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 py-12 px-4">
+			<main className="max-w-2xl mx-auto">
+				<h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-50 mb-2">LLM Usage Dashboard</h1>
+				<p className="text-zinc-600 dark:text-zinc-400 mb-8">Manage your API keys for different providers.</p>
+
+				<div className="space-y-4">
+					{PROVIDERS.map((provider) => {
+						const status = keyStatuses[provider.id];
+						const input = keyInputs[provider.id];
+
+						return (
+							<div
+								key={provider.id}
+								className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 p-4"
+							>
+								<div className="flex items-center justify-between mb-3">
+									<div className="flex items-center gap-3">
+										<h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+											{provider.name}
+										</h2>
+										{status.loading ? (
+											<span className="text-xs text-zinc-400">Loading...</span>
+										) : status.exists ? (
+											<span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+												Key Set
+											</span>
+										) : (
+											<span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+												Not Set
+											</span>
+										)}
+									</div>
+								</div>
+
+								<div className="flex gap-2">
+									<input
+										type="password"
+										placeholder={status.exists ? "Enter new key to update..." : provider.placeholder}
+										value={input}
+										onChange={(e) =>
+											setKeyInputs((prev) => ({ ...prev, [provider.id]: e.target.value }))
+										}
+										className="flex-1 px-3 py-2 text-sm rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+										disabled={status.saving}
+									/>
+									<button
+										onClick={() => saveKey(provider.id)}
+										disabled={!input.trim() || status.saving}
+										className="px-4 py-2 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+									>
+										{status.saving ? "..." : "Save"}
+									</button>
+									{status.exists && (
+										<button
+											onClick={() => deleteKey(provider.id)}
+											disabled={status.saving}
+											className="px-4 py-2 text-sm font-medium rounded-md bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+										>
+											Delete
+										</button>
+									)}
+								</div>
+
+								{status.error && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{status.error}</p>}
+							</div>
+						);
+					})}
+				</div>
+			</main>
+		</div>
+	);
 }
