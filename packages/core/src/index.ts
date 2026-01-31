@@ -27,6 +27,7 @@ export type { CompleteFunction, StreamFunction } from "./utils/index.js";
 export { completeAnthropic, streamAnthropic } from "./providers/anthropic/index.js";
 export { completeOpenAI, streamOpenAI } from "./providers/openai/index.js";
 export { completeGoogle, streamGoogle, GoogleThinkingLevel } from "./providers/google/index.js";
+export { completeDeepSeek, streamDeepSeek } from "./providers/deepseek/index.js";
 
 // Re-export types from @ank1015/llm-types for convenience
 export type * from "@ank1015/llm-types";

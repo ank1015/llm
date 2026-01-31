@@ -40,6 +40,11 @@ src/
       complete.ts       — Non-streaming completion
       stream.ts         — Streaming completion
       utils.ts          — Provider-specific utilities
+    deepseek/           — DeepSeek provider
+      index.ts          — Provider exports
+      complete.ts       — Non-streaming completion
+      stream.ts         — Streaming completion
+      utils.ts          — Provider-specific utilities
 ```
 
 ## Key Exports
@@ -51,6 +56,7 @@ src/
 - `completeAnthropic` / `streamAnthropic` — Anthropic provider functions
 - `completeOpenAI` / `streamOpenAI` — OpenAI provider functions
 - `completeGoogle` / `streamGoogle` — Google/Gemini provider functions
+- `completeDeepSeek` / `streamDeepSeek` — DeepSeek provider functions
 - `EventStream` / `AssistantMessageEventStream` — Streaming utilities
 
 ## Conventions
