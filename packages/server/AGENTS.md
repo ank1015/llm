@@ -136,4 +136,4 @@ Error codes:
 ## Dependencies
 
 - Depends on: @ank1015/llm-core, @ank1015/llm-types
-- Depended on by: (none yet)
+- Depended on by: @ank1015/llm-usage-dashboard

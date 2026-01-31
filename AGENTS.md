@@ -20,6 +20,7 @@ packages/
   core/               # @ank1015/llm-core - Core SDK utilities
   sdk/                # @ank1015/llm-sdk - Unified SDK (facade for types + core)
   server/             # @ank1015/llm-server - HTTP server (Hono)
+  usage-dashboard/    # @ank1015/llm-usage-dashboard - Next.js usage dashboard
 ```
 
 ## Conventions
@@ -42,6 +43,7 @@ packages/
 - [packages/core/AGENTS.md](packages/core/AGENTS.md) — Core SDK
 - [packages/sdk/AGENTS.md](packages/sdk/AGENTS.md) — Unified SDK facade
 - [packages/server/AGENTS.md](packages/server/AGENTS.md) — HTTP server
+- [packages/usage-dashboard/AGENTS.md](packages/usage-dashboard/AGENTS.md) — Usage dashboard
 
 ## Boundaries
 
