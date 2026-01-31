@@ -111,4 +111,4 @@ tests/
 ## Dependencies
 
 - Depends on: @ank1015/llm-types
-- Depended on by: (none yet)
+- Depended on by: @ank1015/llm-sdk, @ank1015/llm-server

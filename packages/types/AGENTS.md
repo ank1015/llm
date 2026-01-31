@@ -53,4 +53,4 @@ src/
 ## Dependencies
 
 - Depends on: (none — uses SDK types as devDependencies)
-- Depended on by: @ank1015/llm-core
+- Depended on by: @ank1015/llm-core, @ank1015/llm-sdk

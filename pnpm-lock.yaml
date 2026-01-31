@@ -46,6 +46,15 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@25.1.0)
 
+  packages/sdk:
+    dependencies:
+      '@ank1015/llm-core':
+        specifier: workspace:^
+        version: link:../core
+      '@ank1015/llm-types':
+        specifier: workspace:^
+        version: link:../types
+
   packages/server:
     dependencies:
       '@ank1015/llm-core':

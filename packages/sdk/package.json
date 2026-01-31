@@ -1,0 +1,38 @@
+{
+  "name": "@ank1015/llm-sdk",
+  "version": "0.0.1",
+  "description": "Unified SDK for LLM interactions with multiple providers",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "echo 'No linter configured yet'",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "keywords": [
+    "llm",
+    "sdk",
+    "ai",
+    "anthropic",
+    "openai",
+    "google",
+    "gemini"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@ank1015/llm-types": "workspace:^",
+    "@ank1015/llm-core": "workspace:^"
+  }
+}

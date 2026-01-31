@@ -18,6 +18,7 @@ pnpm clean            # Remove all build artifacts
 packages/
   types/              # @ank1015/llm-types - Shared type definitions
   core/               # @ank1015/llm-core - Core SDK utilities
+  sdk/                # @ank1015/llm-sdk - Unified SDK (facade for types + core)
   server/             # @ank1015/llm-server - HTTP server (Hono)
 ```
 
@@ -39,6 +40,7 @@ packages/
 
 - [packages/types/AGENTS.md](packages/types/AGENTS.md) — Type definitions
 - [packages/core/AGENTS.md](packages/core/AGENTS.md) — Core SDK
+- [packages/sdk/AGENTS.md](packages/sdk/AGENTS.md) — Unified SDK facade
 - [packages/server/AGENTS.md](packages/server/AGENTS.md) — HTTP server
 
 ## Boundaries
