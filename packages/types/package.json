@@ -26,5 +26,10 @@
     "types",
     "typescript"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "@anthropic-ai/sdk": "^0.72.1",
+    "@google/genai": "^1.39.0",
+    "openai": "^6.17.0"
+  }
 }
