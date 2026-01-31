@@ -21,6 +21,10 @@ export {
 	validateToolCall,
 	validateToolArguments,
 } from "./utils/index.js";
+export type { CompleteFunction, StreamFunction } from "./utils/index.js";
+
+// Providers
+export { completeAnthropic, streamAnthropic } from "./providers/anthropic/index.js";
 
 // Re-export types from @ank1015/llm-types for convenience
 export type * from "@ank1015/llm-types";

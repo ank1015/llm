@@ -20,6 +20,9 @@ importers:
       '@ank1015/llm-types':
         specifier: workspace:^
         version: link:../types
+      '@anthropic-ai/sdk':
+        specifier: ^0.72.1
+        version: 0.72.1
       ajv:
         specifier: ^8.17.1
         version: 8.17.1
