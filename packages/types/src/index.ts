@@ -31,3 +31,27 @@ export type {
 	ApiOptionsMap,
 	OptionsForApi,
 } from "./providers/index.js";
+
+// Model types
+export type { Model, Provider } from "./model.js";
+
+// Message types
+export type {
+	StopReason,
+	AssistantResponseContent,
+	AssistantThinkingContent,
+	AssistantToolCall,
+	AssistantResponse,
+	Usage,
+	UserMessage,
+	ToolResultMessage,
+	BaseAssistantMessage,
+	CustomMessage,
+	Message,
+	BaseAssistantEventMessage,
+	BaseAssistantEvent,
+} from "./message.js";
+
+// Tool types
+export type { Tool, Context } from "./tool.js";
+
