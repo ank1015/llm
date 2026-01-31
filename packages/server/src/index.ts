@@ -6,6 +6,9 @@
 
 import { Hono } from "hono";
 
+// Services
+export { KeyService, DbService } from "./services/index.js";
+
 export const app = new Hono();
 
 // Health check endpoint

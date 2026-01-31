@@ -27,9 +27,11 @@
   "dependencies": {
     "@ank1015/llm-core": "workspace:^",
     "@ank1015/llm-types": "workspace:^",
+    "better-sqlite3": "^12.6.2",
     "hono": "^4.7.0"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "tsx": "^4.19.0",
     "vitest": "^2.1.0"
   },
