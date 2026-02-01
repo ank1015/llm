@@ -57,7 +57,7 @@ const defaultConversationState: AgentState = {
   },
 };
 
-const defaultMessageTransformer = (messages: Message[]) => {
+const defaultMessageTransformer = (messages: Message[]): Message[] => {
   return messages.slice(); // Return a copy to avoid mutation of original array
 };
 
@@ -113,19 +113,19 @@ export class Conversation {
     return () => this.listeners.delete(fn);
   }
 
-  private emit(e: AgentEvent) {
+  private emit(e: AgentEvent): void {
     for (const listener of this.listeners) {
       listener(e);
     }
   }
 
-  setStreamAssistantMessage(stream: boolean) {
+  setStreamAssistantMessage(stream: boolean): void {
     this.streamAssistantMessage = stream;
     // Recreate runner with updated streaming setting
     this.runner = new DefaultAgentRunner(this.client, { streamAssistantMessage: stream });
   }
 
-  setCostLimit(limit: number) {
+  setCostLimit(limit: number): void {
     this._state.costLimit = limit;
   }
 
@@ -133,7 +133,7 @@ export class Conversation {
     return this._state.costLimit;
   }
 
-  setContextLimit(limit: number) {
+  setContextLimit(limit: number): void {
     this._state.contextLimit = limit;
   }
 
@@ -142,15 +142,15 @@ export class Conversation {
   }
 
   // State mutators - update internal state without emitting events
-  setSystemPrompt(v: string) {
+  setSystemPrompt(v: string): void {
     this._state.systemPrompt = v;
   }
 
-  setProvider<TApi extends Api>(provider: Provider<TApi>) {
+  setProvider<TApi extends Api>(provider: Provider<TApi>): void {
     this._state.provider = provider;
   }
 
-  setQueueMode(mode: 'all' | 'one-at-a-time') {
+  setQueueMode(mode: 'all' | 'one-at-a-time'): void {
     this.queueMode = mode;
   }
 
@@ -158,15 +158,15 @@ export class Conversation {
     return this.queueMode;
   }
 
-  setTools(t: typeof this._state.tools) {
+  setTools(t: typeof this._state.tools): void {
     this._state.tools = t;
   }
 
-  replaceMessages(ms: Message[]) {
+  replaceMessages(ms: Message[]): void {
     this._state.messages = ms.slice();
   }
 
-  appendMessage(m: Message) {
+  appendMessage(m: Message): void {
     this._state.messages = [...this._state.messages, m];
     if (m.role === 'assistant') {
       this._state.usage.totalTokens = m.usage.totalTokens;
@@ -175,7 +175,7 @@ export class Conversation {
     }
   }
 
-  appendMessages(ms: Message[]) {
+  appendMessages(ms: Message[]): void {
     this._state.messages = [...this._state.messages, ...ms];
     for (const m of ms) {
       if (m.role === 'assistant') {
@@ -186,7 +186,7 @@ export class Conversation {
     }
   }
 
-  async queueMessage(m: Message) {
+  async queueMessage(m: Message): Promise<void> {
     // Transform message and queue it for injection at next turn
     const transformed = await this.messageTransformer([m]);
     const queuedMessage: QueuedMessage<Message> = { original: m };
@@ -196,18 +196,18 @@ export class Conversation {
     this.messageQueue.push(queuedMessage);
   }
 
-  clearMessageQueue() {
+  clearMessageQueue(): void {
     this.messageQueue = [];
   }
 
-  clearMessages() {
+  clearMessages(): void {
     this._state.messages = [];
   }
 
   /**
    * Remove all event listeners.
    */
-  clearListeners() {
+  clearListeners(): void {
     this.listeners.clear();
   }
 
@@ -245,7 +245,7 @@ export class Conversation {
     return true;
   }
 
-  abort() {
+  abort(): void {
     this.abortController?.abort();
   }
 
@@ -260,7 +260,7 @@ export class Conversation {
   /**
    * Clear all messages and state. Aborts any running prompt.
    */
-  reset() {
+  reset(): void {
     // Abort any running prompt first
     this.abortController?.abort();
     delete this.abortController;
@@ -282,7 +282,7 @@ export class Conversation {
    * Internal cleanup after agent loop completes (success, error, or abort).
    * Always called in finally block to ensure consistent state.
    */
-  private _cleanup() {
+  private _cleanup(): void {
     this._state.isStreaming = false;
     this._state.pendingToolCalls.clear();
     delete this.abortController;
@@ -295,7 +295,7 @@ export class Conversation {
    * Append custom message to messages.
    * Custom messages are inserted after running prompt resolves
    */
-  async addCustomMessage(message: Record<string, any>) {
+  async addCustomMessage(message: Record<string, unknown>): Promise<void> {
     const messageId = generateUUID();
     // emit message start event
     const customMessage: CustomMessage = {
@@ -354,7 +354,11 @@ export class Conversation {
    * Prepare for running the agent loop.
    * Returns the config, transformed messages, and abort signal.
    */
-  private async _prepareRun() {
+  private async _prepareRun(): Promise<{
+    llmMessages: Message[];
+    cfg: AgentLoopConfig;
+    signal: AbortSignal;
+  }> {
     const model = this._state.provider.model;
     if (!model) {
       throw new Error('No model configured');

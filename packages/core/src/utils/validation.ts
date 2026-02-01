@@ -3,7 +3,8 @@ import addFormatsModule from 'ajv-formats';
 
 import type { Tool, AssistantToolCall } from '@ank1015/llm-types';
 
-// Handle both default and named exports
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// Handle both default and named exports (CJS/ESM interop)
 const Ajv = (AjvModule as any).default || AjvModule;
 const addFormats = (addFormatsModule as any).default || addFormatsModule;
 
@@ -15,6 +16,7 @@ const isBrowserExtension =
 // Create a singleton AJV instance with formats (only if not in browser extension)
 // AJV requires 'unsafe-eval' CSP which is not allowed in Manifest V3
 let ajv: any = null;
+/* eslint-enable @typescript-eslint/no-explicit-any */
 if (!isBrowserExtension) {
   try {
     ajv = new Ajv({
@@ -75,6 +77,7 @@ export function validateToolArguments(
   // Format validation errors nicely
   const errors =
     validate.errors
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ?.map((err: any) => {
         const path = err.instancePath
           ? err.instancePath.substring(1)

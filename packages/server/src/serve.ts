@@ -10,6 +10,7 @@ import app from './index.js';
 
 const port = Number(process.env.PORT) || 3001;
 
+// eslint-disable-next-line no-console
 console.log(`Starting server on http://localhost:${port}`);
 
 serve({

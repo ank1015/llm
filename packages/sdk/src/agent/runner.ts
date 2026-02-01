@@ -65,6 +65,7 @@ export class DefaultAgentRunner implements AgentRunner {
     this.streamAssistantMessage = options.streamAssistantMessage ?? true;
   }
 
+  // eslint-disable-next-line sonarjs/cognitive-complexity
   async run(
     config: AgentLoopConfig,
     initialMessages: Message[],
@@ -78,7 +79,7 @@ export class DefaultAgentRunner implements AgentRunner {
 
     let hasMoreToolCalls = true;
     let firstTurn = true;
-    let queuedMessages: QueuedMessage<any>[] = (await config.getQueuedMessages()) || [];
+    let queuedMessages: QueuedMessage<unknown>[] = (await config.getQueuedMessages()) || [];
 
     // Track accumulated cost within this run execution if budget is provided
     let currentRunCost = 0;
@@ -322,7 +323,7 @@ export class DefaultAgentRunner implements AgentRunner {
     tool: AgentTool | undefined,
     toolCall: AssistantToolCall,
     signal: AbortSignal,
-    onUpdate: (partialResult: AgentToolResult<any>) => void,
+    onUpdate: (partialResult: AgentToolResult<unknown>) => void,
     context: ToolExecutionContext
   ): Promise<{
     result: AgentToolResult<unknown>;

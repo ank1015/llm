@@ -35,12 +35,12 @@ export interface Attachment {
 }
 
 // Callback for streaming tool execution updates
-export type AgentToolUpdateCallback<T = any> = (partialResult: AgentToolResult<T>) => void;
+export type AgentToolUpdateCallback<T = unknown> = (partialResult: AgentToolResult<T>) => void;
 
 // AgentTool extends Tool but adds the execute function
 export interface AgentTool<
   TParameters extends TSchema = TSchema,
-  TDetails = any,
+  TDetails = unknown,
 > extends Tool<TParameters> {
   // A human-readable label for the tool to be displayed in UI
   label: string;
@@ -119,21 +119,21 @@ export type AgentEvent =
       message: Message;
     }
   // Emitted when a tool execution starts
-  | { type: 'tool_execution_start'; toolCallId: string; toolName: string; args: any }
+  | { type: 'tool_execution_start'; toolCallId: string; toolName: string; args: unknown }
   // Emitted when a tool execution produces output (streaming)
   | {
       type: 'tool_execution_update';
       toolCallId: string;
       toolName: string;
-      args: any;
-      partialResult: AgentToolResult<any>;
+      args: unknown;
+      partialResult: AgentToolResult<unknown>;
     }
   // Emitted when a tool execution completes
   | {
       type: 'tool_execution_end';
       toolCallId: string;
       toolName: string;
-      result: AgentToolResult<any>;
+      result: AgentToolResult<unknown>;
       isError: boolean;
     }
   // Emitted when a full turn completes

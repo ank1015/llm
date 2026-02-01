@@ -114,6 +114,32 @@ export default [
     },
   },
 
+  // Provider files - complex streaming logic
+  {
+    files: ['**/providers/**/stream.ts', '**/providers/**/utils.ts'],
+    rules: {
+      'sonarjs/cognitive-complexity': 'off',
+      '@typescript-eslint/explicit-function-return-type': 'off',
+      '@typescript-eslint/no-explicit-any': 'off',
+    },
+  },
+
+  // React components - return types inferred from JSX
+  {
+    files: ['**/*.tsx'],
+    rules: {
+      '@typescript-eslint/explicit-function-return-type': 'off',
+    },
+  },
+
+  // SDK stream - complex SSE parsing
+  {
+    files: ['**/sdk/src/llm/stream.ts'],
+    rules: {
+      'sonarjs/cognitive-complexity': 'off',
+    },
+  },
+
   // Prettier - must be last to override formatting rules
   prettier,
 ];
