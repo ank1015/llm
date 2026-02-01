@@ -1,3 +1,12 @@
+import {
+  buildParams,
+  createClient,
+  getAssistantStopReason,
+  getResponseAssistantResponse,
+  getResponseUsage,
+} from './utils.js';
+
+import type { CompleteFunction } from '../../utils/types.js';
 import type {
   AssistantResponseContent,
   AssistantThinkingContent,
@@ -8,14 +17,6 @@ import type {
   Usage,
 } from '@ank1015/llm-types';
 import type { ChatCompletion } from 'openai/resources/chat/completions.js';
-import {
-  buildParams,
-  createClient,
-  getAssistantStopReason,
-  getResponseAssistantResponse,
-  getResponseUsage,
-} from './utils.js';
-import type { CompleteFunction } from '../../utils/types.js';
 
 export const completeKimi: CompleteFunction<'kimi'> = async (
   model: Model<'kimi'>,

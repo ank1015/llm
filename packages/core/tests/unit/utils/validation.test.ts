@@ -1,7 +1,9 @@
-import type { AssistantToolCall, Tool } from '@ank1015/llm-types';
 import { Type } from '@sinclair/typebox';
 import { describe, expect, it } from 'vitest';
+
 import { validateToolArguments, validateToolCall } from '../../../src/utils/validation.js';
+
+import type { AssistantToolCall, Tool } from '@ank1015/llm-types';
 
 // Helper to create a tool definition
 function createTool<T>(name: string, parameters: T): Tool {

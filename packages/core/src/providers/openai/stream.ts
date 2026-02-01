@@ -1,13 +1,21 @@
-import {
-  type AssistantResponseContent,
-  type AssistantThinkingContent,
-  type AssistantToolCall,
-  type BaseAssistantEventMessage,
-  type BaseAssistantMessage,
-  type Context,
-  type Model,
-  type OpenAIProviderOptions,
-  type TextContent,
+import { calculateCost } from '../../models.js';
+import { AssistantMessageEventStream } from '../../utils/event-stream.js';
+import { parseStreamingJson } from '../../utils/json-parse.js';
+import { validateToolArguments } from '../../utils/validation.js';
+
+import { buildParams, createClient, mapStopReason } from './utils.js';
+
+import type { StreamFunction } from '../../utils/types.js';
+import type {
+  AssistantResponseContent,
+  AssistantThinkingContent,
+  AssistantToolCall,
+  BaseAssistantEventMessage,
+  BaseAssistantMessage,
+  Context,
+  Model,
+  OpenAIProviderOptions,
+  TextContent,
 } from '@ank1015/llm-types';
 import type {
   Response,
@@ -16,12 +24,6 @@ import type {
   ResponseOutputMessage,
   ResponseReasoningItem,
 } from 'openai/resources/responses/responses.js';
-import { calculateCost } from '../../models.js';
-import { parseStreamingJson } from '../../utils/json-parse.js';
-import { validateToolArguments } from '../../utils/validation.js';
-import { buildParams, createClient, mapStopReason } from './utils.js';
-import type { StreamFunction } from '../../utils/types.js';
-import { AssistantMessageEventStream } from '../../utils/event-stream.js';
 
 export const streamOpenAI: StreamFunction<'openai'> = (
   model: Model<'openai'>,
@@ -350,9 +352,7 @@ export const streamOpenAI: StreamFunction<'openai'> = (
         }
         // Handle errors
         else if (event.type === 'error') {
-          throw new Error(
-            `OpenAI API Error (${event.code}): ${event.message}` || 'Unknown OpenAI error'
-          );
+          throw new Error(`OpenAI API Error (${event.code}): ${event.message}`);
         } else if (event.type === 'response.failed') {
           throw new Error('OpenAI response failed without error details');
         }

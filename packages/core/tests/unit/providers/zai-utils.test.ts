@@ -1,15 +1,7 @@
-import type {
-  BaseAssistantMessage,
-  Context,
-  Model,
-  Tool,
-  ToolResultMessage,
-  UserMessage,
-} from '@ank1015/llm-types';
 import { Type } from '@sinclair/typebox';
 import OpenAI from 'openai';
-import type { ChatCompletion } from 'openai/resources/chat/completions.js';
 import { afterEach, describe, expect, it } from 'vitest';
+
 import {
   buildParams,
   buildZaiMessages,
@@ -21,6 +13,16 @@ import {
   getResponseUsage,
   mapStopReason,
 } from '../../../src/providers/zai/utils.js';
+
+import type {
+  BaseAssistantMessage,
+  Context,
+  Model,
+  Tool,
+  ToolResultMessage,
+  UserMessage,
+} from '@ank1015/llm-types';
+import type { ChatCompletion } from 'openai/resources/chat/completions.js';
 
 describe('Z.AI Utils', () => {
   describe('createClient', () => {

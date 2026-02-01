@@ -1,17 +1,23 @@
 import { getModel, generateUUID } from '@ank1015/llm-core';
-import { Api, CustomMessage, Message, ToolResultMessage } from '@ank1015/llm-types';
-import {
+
+import { DefaultLLMClient } from '../llm/llm-client.js';
+
+import { DefaultAgentRunner } from './runner.js';
+import { buildUserMessage } from './utils.js';
+
+import type { AgentRunner, AgentRunnerCallbacks } from './runner.js';
+import type { LLMClient } from '../llm/llm-client.js';
+import type {
+  Api,
+  CustomMessage,
+  Message,
   AgentEvent,
   AgentLoopConfig,
   AgentState,
-  AgentTool,
   Attachment,
   Provider,
   QueuedMessage,
 } from '@ank1015/llm-types';
-import { LLMClient, DefaultLLMClient } from '../llm/llm-client.js';
-import { buildUserMessage } from './utils.js';
-import { AgentRunner, AgentRunnerCallbacks, DefaultAgentRunner } from './runner.js';
 
 export interface AgentOptions {
   initialState?: Partial<AgentState>;

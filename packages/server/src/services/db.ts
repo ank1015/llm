@@ -5,10 +5,12 @@
  * Messages are stored in ~/.llm/global/usages/messages.db
  */
 
-import Database from 'better-sqlite3';
 import { existsSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+
+import Database from 'better-sqlite3';
+
 import type { Api, BaseAssistantMessage } from '@ank1015/llm-types';
 
 /** Directory for storing database */

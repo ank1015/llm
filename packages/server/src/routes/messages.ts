@@ -4,10 +4,7 @@
  * Endpoints for /messages/complete and /messages/stream
  */
 
-import { Hono } from 'hono';
-import { streamSSE } from 'hono/streaming';
 import { complete, stream, getModel, isContextOverflow } from '@ank1015/llm-core';
-import type { Api, MessageRequest, Context } from '@ank1015/llm-types';
 import {
   ApiKeyNotFoundError,
   ModelNotFoundError,
@@ -16,7 +13,12 @@ import {
   ContextOverflowError,
   LLMError,
 } from '@ank1015/llm-types';
+import { Hono } from 'hono';
+import { streamSSE } from 'hono/streaming';
+
 import { KeyService, DbService } from '../services/index.js';
+
+import type { Api, MessageRequest, Context } from '@ank1015/llm-types';
 
 const app = new Hono();
 

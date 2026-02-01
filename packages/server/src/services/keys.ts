@@ -9,6 +9,7 @@ import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'node:
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+
 import type { Api } from '@ank1015/llm-types';
 
 /** Directory for storing encrypted keys */

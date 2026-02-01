@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { parseStreamingJson } from '../../../src/utils/json-parse.js';
 
 describe('parseStreamingJson', () => {

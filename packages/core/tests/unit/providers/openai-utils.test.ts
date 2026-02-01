@@ -1,15 +1,7 @@
-import type {
-  BaseAssistantMessage,
-  Context,
-  Model,
-  Tool,
-  ToolResultMessage,
-  UserMessage,
-} from '@ank1015/llm-types';
 import { Type } from '@sinclair/typebox';
 import OpenAI from 'openai';
-import type { EasyInputMessage, Response } from 'openai/resources/responses/responses.js';
 import { afterEach, describe, expect, it } from 'vitest';
+
 import {
   buildOpenAIMessages,
   buildParams,
@@ -19,6 +11,16 @@ import {
   getResponseUsage,
   mapStopReason,
 } from '../../../src/providers/openai/utils.js';
+
+import type {
+  BaseAssistantMessage,
+  Context,
+  Model,
+  Tool,
+  ToolResultMessage,
+  UserMessage,
+} from '@ank1015/llm-types';
+import type { EasyInputMessage, Response } from 'openai/resources/responses/responses.js';
 
 describe('OpenAI Utils', () => {
   describe('createClient', () => {

@@ -1,5 +1,3 @@
-import type { Context, GoogleProviderOptions, Model, StopReason, Usage } from '@ank1015/llm-types';
-import type { GenerateContentResponse } from '@google/genai';
 import {
   buildParams,
   createClient,
@@ -7,7 +5,10 @@ import {
   getResponseAssistantResponse,
   getResponseUsage,
 } from './utils.js';
+
 import type { CompleteFunction } from '../../utils/types.js';
+import type { Context, GoogleProviderOptions, Model, StopReason, Usage } from '@ank1015/llm-types';
+import type { GenerateContentResponse } from '@google/genai';
 
 export const completeGoogle: CompleteFunction<'google'> = async (
   model: Model<'google'>,

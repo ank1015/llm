@@ -1,8 +1,12 @@
-import { describe, it, expect } from 'vitest';
-import { Conversation } from '../../../src/agent/conversation.js';
 import { MODELS } from '@ank1015/llm-core';
+import { Content } from '@ank1015/llm-types';
+import { describe, it, expect } from 'vitest';
+
+import { Conversation } from '../../../src/agent/conversation.js';
+
 import { calculateTool, getCurrentTimeTool } from './tools/index.js';
-import { TextContent, Content, BaseAssistantMessage, Api, AgentEvent } from '@ank1015/llm-types';
+
+import type { TextContent, BaseAssistantMessage, Api, AgentEvent } from '@ank1015/llm-types';
 
 describe('Google Conversation Integration', () => {
   it('should use calculator tool correctly', async () => {

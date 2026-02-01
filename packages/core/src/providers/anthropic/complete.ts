@@ -1,3 +1,12 @@
+import {
+  buildParams,
+  createClient,
+  getResponseAssistantResponse,
+  getResponseUsage,
+  mapStopReason,
+} from './utils.js';
+
+import type { CompleteFunction } from '../../utils/types.js';
 import type {
   AnthropicProviderOptions,
   Context,
@@ -6,14 +15,6 @@ import type {
   Usage,
 } from '@ank1015/llm-types';
 import type { Message } from '@anthropic-ai/sdk/resources/messages.js';
-import {
-  buildParams,
-  createClient,
-  getResponseAssistantResponse,
-  getResponseUsage,
-  mapStopReason,
-} from './utils.js';
-import type { CompleteFunction } from '../../utils/types.js';
 
 export const completeAnthropic: CompleteFunction<'anthropic'> = async (
   model: Model<'anthropic'>,

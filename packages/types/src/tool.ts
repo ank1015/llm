@@ -4,8 +4,8 @@
  * Defines tool/function calling types for LLM interactions.
  */
 
-import type { TSchema } from '@sinclair/typebox';
 import type { Message } from './message.js';
+import type { TSchema } from '@sinclair/typebox';
 
 /**
  * Tool definition with TypeBox schema for parameters.

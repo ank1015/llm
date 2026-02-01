@@ -2,10 +2,12 @@
  * Unit tests for SDK stream function
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { stream } from '../../../src/llm/stream.js';
-import { setServerUrl } from '../../../src/config.js';
 import * as core from '@ank1015/llm-core';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+import { setServerUrl } from '../../../src/config.js';
+import { stream } from '../../../src/llm/stream.js';
+
 import type { Model, Context, BaseAssistantMessage, BaseAssistantEvent } from '@ank1015/llm-types';
 
 // Mock the core stream function

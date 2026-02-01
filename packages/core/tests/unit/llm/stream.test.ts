@@ -1,6 +1,16 @@
-import type { Context, Model } from '@ank1015/llm-types';
-import { EventStream, AssistantMessageEventStream } from '../../../src/utils/event-stream.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { stream } from '../../../src/llm/stream.js';
+import { streamAnthropic } from '../../../src/providers/anthropic/stream.js';
+import { streamDeepSeek } from '../../../src/providers/deepseek/stream.js';
+import { streamGoogle } from '../../../src/providers/google/stream.js';
+import { streamKimi } from '../../../src/providers/kimi/stream.js';
+import { streamOpenAI } from '../../../src/providers/openai/stream.js';
+import { streamZai } from '../../../src/providers/zai/stream.js';
+import { EventStream } from '../../../src/utils/event-stream.js';
+
+import type { AssistantMessageEventStream } from '../../../src/utils/event-stream.js';
+import type { Context, Model } from '@ank1015/llm-types';
 
 // Mock all provider stream functions
 vi.mock('../../../src/providers/anthropic/stream.js', () => ({
@@ -21,14 +31,6 @@ vi.mock('../../../src/providers/zai/stream.js', () => ({
 vi.mock('../../../src/providers/kimi/stream.js', () => ({
   streamKimi: vi.fn(),
 }));
-
-import { stream } from '../../../src/llm/stream.js';
-import { streamAnthropic } from '../../../src/providers/anthropic/stream.js';
-import { streamDeepSeek } from '../../../src/providers/deepseek/stream.js';
-import { streamGoogle } from '../../../src/providers/google/stream.js';
-import { streamKimi } from '../../../src/providers/kimi/stream.js';
-import { streamOpenAI } from '../../../src/providers/openai/stream.js';
-import { streamZai } from '../../../src/providers/zai/stream.js';
 
 // Helper to create mock model
 function createMockModel<T extends string>(api: T): Model<any> {

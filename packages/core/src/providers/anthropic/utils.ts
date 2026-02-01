@@ -1,3 +1,8 @@
+import Anthropic from '@anthropic-ai/sdk';
+
+import { calculateCost } from '../../models.js';
+import { sanitizeSurrogates } from '../../utils/sanitize-unicode.js';
+
 import type {
   AnthropicProviderOptions,
   AssistantResponse,
@@ -9,7 +14,6 @@ import type {
   Tool,
   Usage,
 } from '@ank1015/llm-types';
-import Anthropic from '@anthropic-ai/sdk';
 import type { RedactedThinkingBlock, ThinkingBlock } from '@anthropic-ai/sdk/resources';
 import type {
   Message as AnthropicMessage,
@@ -23,8 +27,6 @@ import type {
   ToolUseBlock,
   ToolUseBlockParam,
 } from '@anthropic-ai/sdk/resources/messages.js';
-import { calculateCost } from '../../models.js';
-import { sanitizeSurrogates } from '../../utils/sanitize-unicode.js';
 
 export function createClient(
   model: Model<'anthropic'>,

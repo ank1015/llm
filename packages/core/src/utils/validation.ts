@@ -1,11 +1,11 @@
 import AjvModule from 'ajv';
 import addFormatsModule from 'ajv-formats';
 
+import type { Tool, AssistantToolCall } from '@ank1015/llm-types';
+
 // Handle both default and named exports
 const Ajv = (AjvModule as any).default || AjvModule;
 const addFormats = (addFormatsModule as any).default || addFormatsModule;
-
-import type { Tool, AssistantToolCall } from '@ank1015/llm-types';
 
 // Detect if we're in a browser extension environment with strict CSP
 // Chrome extensions with Manifest V3 don't allow eval/Function constructor

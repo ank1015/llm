@@ -1,3 +1,8 @@
+import OpenAI from 'openai';
+
+import { calculateCost } from '../../models.js';
+import { sanitizeSurrogates } from '../../utils/sanitize-unicode.js';
+
 import type {
   AssistantResponse,
   BaseAssistantMessage,
@@ -10,7 +15,6 @@ import type {
   Tool,
   Usage,
 } from '@ank1015/llm-types';
-import OpenAI from 'openai';
 import type {
   ChatCompletion,
   ChatCompletionAssistantMessageParam,
@@ -20,8 +24,6 @@ import type {
   ChatCompletionTool,
   ChatCompletionToolMessageParam,
 } from 'openai/resources/chat/completions.js';
-import { calculateCost } from '../../models.js';
-import { sanitizeSurrogates } from '../../utils/sanitize-unicode.js';
 
 // Extended types for Kimi-specific fields
 interface KimiMessage {

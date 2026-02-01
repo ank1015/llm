@@ -1,6 +1,8 @@
-import type { Api, BaseAssistantMessage, Model, Usage } from '@ank1015/llm-types';
 import { describe, expect, it } from 'vitest';
+
 import { getOverflowPatterns, isContextOverflow } from '../../../src/utils/overflow.js';
+
+import type { Api, BaseAssistantMessage, Model, Usage } from '@ank1015/llm-types';
 
 // Helper to create a mock assistant message
 function createMessage(

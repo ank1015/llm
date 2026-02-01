@@ -1,21 +1,23 @@
-import {
-  type AssistantResponseContent,
-  type AssistantThinkingContent,
-  type AssistantToolCall,
-  type BaseAssistantEventMessage,
-  type BaseAssistantMessage,
-  type Context,
-  type Model,
-  type TextContent,
-  type ZaiProviderOptions,
-} from '@ank1015/llm-types';
-import type { ChatCompletion } from 'openai/resources/chat/completions.js';
 import { calculateCost } from '../../models.js';
+import { AssistantMessageEventStream } from '../../utils/event-stream.js';
 import { parseStreamingJson } from '../../utils/json-parse.js';
 import { validateToolArguments } from '../../utils/validation.js';
+
 import { buildParams, createClient, getMockZaiMessage, mapStopReason } from './utils.js';
+
 import type { StreamFunction } from '../../utils/types.js';
-import { AssistantMessageEventStream } from '../../utils/event-stream.js';
+import type {
+  AssistantResponseContent,
+  AssistantThinkingContent,
+  AssistantToolCall,
+  BaseAssistantEventMessage,
+  BaseAssistantMessage,
+  Context,
+  Model,
+  TextContent,
+  ZaiProviderOptions,
+} from '@ank1015/llm-types';
+import type { ChatCompletion } from 'openai/resources/chat/completions.js';
 
 // Extended types for Z.AI-specific streaming fields
 interface ZaiChunkDelta {

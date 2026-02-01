@@ -1,4 +1,6 @@
-import {
+import { generateUUID } from '@ank1015/llm-core';
+
+import type {
   AssistantToolCall,
   AgentToolResult,
   Attachment,
@@ -6,7 +8,6 @@ import {
   ToolResultMessage,
   UserMessage,
 } from '@ank1015/llm-types';
-import { generateUUID } from '@ank1015/llm-core';
 
 /**
  * Builds a UserMessage from text input and optional attachments.

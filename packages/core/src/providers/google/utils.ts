@@ -1,3 +1,17 @@
+import {
+  type ContentListUnion,
+  FinishReason,
+  type GenerateContentConfig,
+  type GenerateContentParameters,
+  type GenerateContentResponse,
+  GoogleGenAI,
+  type Part,
+  type ToolListUnion,
+} from '@google/genai';
+
+import { calculateCost } from '../../models.js';
+import { sanitizeSurrogates } from '../../utils/sanitize-unicode.js';
+
 import type {
   AssistantResponse,
   BaseAssistantMessage,
@@ -9,19 +23,7 @@ import type {
   Tool,
   Usage,
 } from '@ank1015/llm-types';
-import {
-  type ContentListUnion,
-  FinishReason,
-  type GenerateContentConfig,
-  type GenerateContentParameters,
-  type GenerateContentResponse,
-  GoogleGenAI,
-  type Part,
-  type ToolListUnion,
-} from '@google/genai';
 import type { TSchema } from '@sinclair/typebox';
-import { calculateCost } from '../../models.js';
-import { sanitizeSurrogates } from '../../utils/sanitize-unicode.js';
 
 export function createClient(model: Model<'google'>, apiKey: string): GoogleGenAI {
   if (!apiKey) {

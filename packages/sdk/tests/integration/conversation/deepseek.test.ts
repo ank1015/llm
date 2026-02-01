@@ -1,10 +1,13 @@
-import { describe, it, expect } from 'vitest';
-import { Conversation } from '../../../src/agent/conversation.js';
 import { MODELS } from '@ank1015/llm-core';
+import { Content } from '@ank1015/llm-types';
+import { describe, it, expect } from 'vitest';
+
+import { Conversation } from '../../../src/agent/conversation.js';
+
 import { calculateTool, getCurrentTimeTool } from './tools/index.js';
-import {
+
+import type {
   TextContent,
-  Content,
   BaseAssistantMessage,
   Api,
   BaseAssistantEvent,

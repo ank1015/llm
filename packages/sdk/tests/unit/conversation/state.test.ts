@@ -1,7 +1,9 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { Conversation } from '../../../src/agent/conversation.js';
 import { getModel } from '@ank1015/llm-core';
-import { Message, UserMessage, TextContent } from '@ank1015/llm-types';
+import { describe, it, expect, beforeEach } from 'vitest';
+
+import { Conversation } from '../../../src/agent/conversation.js';
+
+import type { Message, UserMessage, TextContent } from '@ank1015/llm-types';
 
 describe('Conversation State Management', () => {
   let conversation: Conversation;

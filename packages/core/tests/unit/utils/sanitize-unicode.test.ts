@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { sanitizeSurrogates } from '../../../src/utils/sanitize-unicode.js';
 
 describe('sanitizeSurrogates', () => {

@@ -1,12 +1,16 @@
 import type { Model } from "@ank1015/llm-types";
 
+const openaiBaseUrl = `https://api.openai.com/v1`;
+const googleBaseUrl = `https://generativelanguage.googleapis.com/v1beta`;
+const anthropicBaseUrl = `https://api.anthropic.com`
+
 export const MODELS = {
 	openai: {
 		"gpt-5.2": {
 			id: "gpt-5.2",
 			name: "GPT-5.2",
 			api: "openai",
-			baseUrl: "https://api.openai.com/v1",
+			baseUrl: openaiBaseUrl,
 			reasoning: true,
 			input: ["text", "image", "file"],
 			cost: {
@@ -23,7 +27,7 @@ export const MODELS = {
 			id: "gpt-5.2-codex",
 			name: "GPT-5.2-Codex",
 			api: "openai",
-			baseUrl: "https://api.openai.com/v1",
+			baseUrl: openaiBaseUrl,
 			reasoning: true,
 			input: ["text", "image", "file"],
 			cost: {
@@ -40,7 +44,7 @@ export const MODELS = {
 			id: "gpt-5.2-pro",
 			name: "GPT-5.2 Pro",
 			api: "openai",
-			baseUrl: "https://api.openai.com/v1",
+			baseUrl: openaiBaseUrl,
 			reasoning: true,
 			input: ["text", "image", "file"],
 			cost: {
@@ -57,7 +61,7 @@ export const MODELS = {
 			id: "gpt-5.1-codex-max",
 			name: "GPT-5.1 Codex Max",
 			api: "openai",
-			baseUrl: "https://api.openai.com/v1",
+			baseUrl: openaiBaseUrl,
 			reasoning: true,
 			input: ["text", "image", "file"],
 			cost: {
@@ -74,7 +78,7 @@ export const MODELS = {
 			id: "gpt-5-mini",
 			name: "GPT-5 Mini",
 			api: "openai",
-			baseUrl: "https://api.openai.com/v1",
+			baseUrl: openaiBaseUrl,
 			reasoning: true,
 			input: ["text", "image", "file"],
 			cost: {
@@ -91,7 +95,7 @@ export const MODELS = {
 			id: "gpt-5-nano",
 			name: "GPT-5 Nano",
 			api: "openai",
-			baseUrl: "https://api.openai.com/v1",
+			baseUrl: openaiBaseUrl,
 			reasoning: true,
 			input: ["text", "image", "file"],
 			cost: {
@@ -108,7 +112,7 @@ export const MODELS = {
 			id: "gpt-5",
 			name: "GPT-5",
 			api: "openai",
-			baseUrl: "https://api.openai.com/v1",
+			baseUrl: openaiBaseUrl,
 			reasoning: true,
 			input: ["text", "image", "file"],
 			cost: {
@@ -127,7 +131,7 @@ export const MODELS = {
 			id: "gemini-3-pro-preview",
 			name: "Gemini 3 Pro Preview",
 			api: "google",
-			baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+			baseUrl: googleBaseUrl,
 			reasoning: true,
 			input: ["text", "image", "file"],
 			cost: {
@@ -144,7 +148,7 @@ export const MODELS = {
 			id: "gemini-3-flash-preview",
 			name: "Gemini 3 Flash Preview",
 			api: "google",
-			baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+			baseUrl: googleBaseUrl,
 			reasoning: true,
 			input: ["text", "image", "file"],
 			cost: {
@@ -161,7 +165,7 @@ export const MODELS = {
 			id: "gemini-3-pro-image-preview",
 			name: "Gemini 3 Pro Image Preview",
 			api: "google",
-			baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+			baseUrl: googleBaseUrl,
 			reasoning: true,
 			input: ["text", "image"],
 			cost: {
@@ -199,7 +203,7 @@ export const MODELS = {
 			id: "claude-haiku-4-5",
 			name: "Claude Haiku 4.5 (latest)",
 			api: "anthropic",
-			baseUrl: "https://api.anthropic.com",
+			baseUrl: anthropicBaseUrl,
 			reasoning: true,
 			input: ["text", "image"],
 			cost: {
@@ -216,7 +220,7 @@ export const MODELS = {
 			id: "claude-opus-4-5",
 			name: "Claude Opus 4.5 (latest)",
 			api: "anthropic",
-			baseUrl: "https://api.anthropic.com",
+			baseUrl: anthropicBaseUrl,
 			reasoning: true,
 			input: ["text", "image"],
 			cost: {
@@ -233,7 +237,7 @@ export const MODELS = {
 			id: "claude-sonnet-4-5",
 			name: "Claude Sonnet 4.5 (latest)",
 			api: "anthropic",
-			baseUrl: "https://api.anthropic.com",
+			baseUrl: anthropicBaseUrl,
 			reasoning: true,
 			input: ["text", "image"],
 			cost: {
@@ -256,9 +260,9 @@ export const MODELS = {
 			reasoning: true,
 			input: ["text"],
 			cost: {
-				input: 0.43, // TODO: Fill in pricing
-				output: 1.75, // TODO: Fill in pricing
-				cacheRead: 0.08, // TODO: Fill in pricing
+				input: 0.43, 
+				output: 1.75, 
+				cacheRead: 0.08,
 				cacheWrite: 0,
 			},
 			contextWindow: 200000,

@@ -1,15 +1,7 @@
-import type {
-  BaseAssistantMessage,
-  Context,
-  Model,
-  Tool,
-  ToolResultMessage,
-  UserMessage,
-} from '@ank1015/llm-types';
 import { Type } from '@sinclair/typebox';
 import OpenAI from 'openai';
-import type { ChatCompletion } from 'openai/resources/chat/completions.js';
 import { afterEach, describe, expect, it } from 'vitest';
+
 import {
   buildKimiMessages,
   buildParams,
@@ -21,6 +13,16 @@ import {
   getResponseUsage,
   mapStopReason,
 } from '../../../src/providers/kimi/utils.js';
+
+import type {
+  BaseAssistantMessage,
+  Context,
+  Model,
+  Tool,
+  ToolResultMessage,
+  UserMessage,
+} from '@ank1015/llm-types';
+import type { ChatCompletion } from 'openai/resources/chat/completions.js';
 
 describe('Kimi Utils', () => {
   describe('createClient', () => {

@@ -7,7 +7,9 @@
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
+
 import { stream, getModel, setServerUrl } from '../../src/index.js';
+
 import type { Context, BaseAssistantEvent } from '@ank1015/llm-types';
 
 describe('stream integration', () => {

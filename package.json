@@ -3,6 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "description": "LLM SDK monorepo",
+  "type": "module",
   "scripts": {
     "build": "turbo run build",
     "build:packages": "turbo run build --filter=@ank1015/llm-types --filter=@ank1015/llm-core --filter=@ank1015/llm-sdk --filter=@ank1015/llm-server",
@@ -15,13 +16,21 @@
     "test:unit": "turbo run test -- tests/unit",
     "test:integration": "turbo run test -- tests/integration",
     "typecheck": "turbo run typecheck",
-    "lint": "turbo run lint",
+    "lint": "eslint packages/",
+    "lint:fix": "eslint packages/ --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "clean": "turbo run clean && rm -rf node_modules",
     "prepare": "husky"
   },
   "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.54.0",
+    "@typescript-eslint/parser": "^8.54.0",
+    "eslint": "^9",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-sonarjs": "^3.0.6",
+    "eslint-plugin-unicorn": "^62.0.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
     "prettier": "^3.8.1",
@@ -31,9 +40,5 @@
   "packageManager": "pnpm@9.15.0",
   "engines": {
     "node": ">=20.0.0"
-  },
-  "lint-staged": {
-    "*.{ts,tsx,js,jsx,json,md,css}": "prettier --write",
-    "*.{ts,tsx}": "pnpm typecheck"
   }
 }

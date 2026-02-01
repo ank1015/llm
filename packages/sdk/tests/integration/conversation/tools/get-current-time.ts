@@ -1,4 +1,5 @@
 import { type Static, Type } from '@sinclair/typebox';
+
 import type { AgentTool, AgentToolResult } from '@ank1015/llm-types';
 
 export interface GetCurrentTimeResult extends AgentToolResult<{ utcTimestamp: number }> {}

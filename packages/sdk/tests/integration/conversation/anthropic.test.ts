@@ -1,9 +1,12 @@
+import { MODELS, Content } from '@ank1015/llm-core';
 import { describe, it, expect } from 'vitest';
+
 import { Conversation } from '../../../src/agent/conversation.js';
-import { MODELS } from '@ank1015/llm-core';
+
 import { calculateTool, getCurrentTimeTool } from './tools/index.js';
-import { TextContent, Content, BaseAssistantMessage, Api } from '@ank1015/llm-core';
-import { AgentEvent } from '@ank1015/llm-types';
+
+import type { TextContent, BaseAssistantMessage, Api } from '@ank1015/llm-core';
+import type { AgentEvent } from '@ank1015/llm-types';
 
 describe('Anthropic Conversation Integration', () => {
   it('should use calculator tool correctly', async () => {

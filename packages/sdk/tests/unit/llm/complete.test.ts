@@ -2,10 +2,12 @@
  * Unit tests for SDK complete function
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { complete } from '../../../src/llm/complete.js';
-import { setServerUrl } from '../../../src/config.js';
 import * as core from '@ank1015/llm-core';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+import { setServerUrl } from '../../../src/config.js';
+import { complete } from '../../../src/llm/complete.js';
+
 import type { Model, Context, BaseAssistantMessage } from '@ank1015/llm-types';
 
 // Mock the core complete function

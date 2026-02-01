@@ -1,6 +1,8 @@
-import type { BaseAssistantEvent, BaseAssistantMessage } from '@ank1015/llm-types';
-import { AssistantMessageEventStream, EventStream } from '../../../src/utils/event-stream.js';
 import { describe, expect, it } from 'vitest';
+
+import { AssistantMessageEventStream, EventStream } from '../../../src/utils/event-stream.js';
+
+import type { BaseAssistantEvent, BaseAssistantMessage } from '@ank1015/llm-types';
 
 describe('EventStream', () => {
   describe('push and iteration', () => {

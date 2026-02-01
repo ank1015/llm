@@ -6,6 +6,10 @@
  */
 
 import { stream as coreStream, AssistantMessageEventStream } from '@ank1015/llm-core';
+import { ProviderError, StreamError } from '@ank1015/llm-types';
+
+import { getServerUrl } from '../config.js';
+
 import type {
   Api,
   BaseAssistantMessage,
@@ -15,8 +19,6 @@ import type {
   OptionsForApi,
   MessageRequest,
 } from '@ank1015/llm-types';
-import { ProviderError, StreamError } from '@ank1015/llm-types';
-import { getServerUrl } from '../config.js';
 
 /**
  * Parse SSE data from a text line.

@@ -1,8 +1,10 @@
-import type { Context, Model } from '@ank1015/llm-types';
 import { Type } from '@sinclair/typebox';
 import { beforeAll, describe, expect, it } from 'vitest';
+
 import { getModel } from '../../../src/models.js';
 import { completeKimi } from '../../../src/providers/kimi/complete.js';
+
+import type { Context, Model } from '@ank1015/llm-types';
 
 describe('Kimi Complete Integration', () => {
   let model: Model<'kimi'>;

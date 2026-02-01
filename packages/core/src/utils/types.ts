@@ -4,8 +4,8 @@
  * Defines the function signatures for complete and stream operations.
  */
 
-import type { Api, OptionsForApi, BaseAssistantMessage, Model, Context } from '@ank1015/llm-types';
 import type { AssistantMessageEventStream } from './event-stream.js';
+import type { Api, OptionsForApi, BaseAssistantMessage, Model, Context } from '@ank1015/llm-types';
 
 /**
  * Function signature for non-streaming completion.

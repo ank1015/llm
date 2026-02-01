@@ -1,8 +1,4 @@
-import { complete as llmComplete } from './complete.js';
-import { stream as llmStream } from './stream.js';
-import { Api, Model, Context, OptionsForApi, BaseAssistantMessage } from '@ank1015/llm-types';
 import {
-  AssistantMessageEventStream,
   generateUUID,
   getMockAnthropicMessage,
   getMockDeepSeekMessage,
@@ -11,6 +7,12 @@ import {
   getMockOpenaiMessage,
   getMockZaiMessage,
 } from '@ank1015/llm-core';
+
+import { complete as llmComplete } from './complete.js';
+import { stream as llmStream } from './stream.js';
+
+import type { AssistantMessageEventStream } from '@ank1015/llm-core';
+import type { Api, Model, Context, OptionsForApi, BaseAssistantMessage } from '@ank1015/llm-types';
 
 export interface LLMClient {
   complete<TApi extends Api>(

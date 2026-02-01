@@ -1,15 +1,7 @@
-import type {
-  BaseAssistantMessage,
-  Context,
-  Model,
-  Tool,
-  ToolResultMessage,
-  UserMessage,
-} from '@ank1015/llm-types';
-import type { Content, GenerateContentResponse } from '@google/genai';
 import { FinishReason, GoogleGenAI } from '@google/genai';
 import { Type } from '@sinclair/typebox';
 import { afterEach, describe, expect, it } from 'vitest';
+
 import {
   buildGoogleMessages,
   buildParams,
@@ -21,6 +13,16 @@ import {
   mapStopReason,
   transformSchemaForGoogle,
 } from '../../../src/providers/google/utils.js';
+
+import type {
+  BaseAssistantMessage,
+  Context,
+  Model,
+  Tool,
+  ToolResultMessage,
+  UserMessage,
+} from '@ank1015/llm-types';
+import type { Content, GenerateContentResponse } from '@google/genai';
 
 describe('Google Utils', () => {
   describe('createClient', () => {

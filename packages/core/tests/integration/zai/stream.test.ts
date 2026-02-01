@@ -1,8 +1,10 @@
-import type { BaseAssistantEvent, Context, Model } from '@ank1015/llm-types';
 import { Type } from '@sinclair/typebox';
 import { beforeAll, describe, expect, it } from 'vitest';
+
 import { getModel } from '../../../src/models.js';
 import { streamZai } from '../../../src/providers/zai/stream.js';
+
+import type { BaseAssistantEvent, Context, Model } from '@ank1015/llm-types';
 
 describe('Zai Stream Integration', () => {
   let model: Model<'zai'>;

@@ -1,3 +1,8 @@
+import OpenAI from 'openai';
+
+import { calculateCost } from '../../models.js';
+import { sanitizeSurrogates } from '../../utils/sanitize-unicode.js';
+
 import type {
   AssistantResponse,
   BaseAssistantMessage,
@@ -9,7 +14,6 @@ import type {
   Tool,
   Usage,
 } from '@ank1015/llm-types';
-import OpenAI from 'openai';
 import type {
   Tool as OpenAITool,
   Response,
@@ -21,8 +25,6 @@ import type {
   ResponseInputMessageContentList,
   ResponseOutputMessage,
 } from 'openai/resources/responses/responses.js';
-import { calculateCost } from '../../models.js';
-import { sanitizeSurrogates } from '../../utils/sanitize-unicode.js';
 
 export function createClient(model: Model<'openai'>, apiKey: string) {
   if (!apiKey) {

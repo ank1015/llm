@@ -5,8 +5,10 @@
 import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { Api, BaseAssistantMessage } from '@ank1015/llm-types';
+
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+
+import type { Api, BaseAssistantMessage } from '@ank1015/llm-types';
 
 // Mock the home directory to use a temp directory for tests
 const TEST_HOME = join(tmpdir(), `llm-test-db-${Date.now()}`);

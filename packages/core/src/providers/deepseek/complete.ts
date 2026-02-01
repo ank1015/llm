@@ -1,3 +1,12 @@
+import {
+  buildParams,
+  createClient,
+  getAssistantStopReason,
+  getResponseAssistantResponse,
+  getResponseUsage,
+} from './utils.js';
+
+import type { CompleteFunction } from '../../utils/types.js';
 import type {
   Context,
   DeepSeekProviderOptions,
@@ -6,14 +15,6 @@ import type {
   Usage,
 } from '@ank1015/llm-types';
 import type { ChatCompletion } from 'openai/resources/chat/completions.js';
-import {
-  buildParams,
-  createClient,
-  getAssistantStopReason,
-  getResponseAssistantResponse,
-  getResponseUsage,
-} from './utils.js';
-import type { CompleteFunction } from '../../utils/types.js';
 
 export const completeDeepSeek: CompleteFunction<'deepseek'> = async (
   model: Model<'deepseek'>,

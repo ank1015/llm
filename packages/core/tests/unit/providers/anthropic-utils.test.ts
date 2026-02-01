@@ -1,3 +1,16 @@
+import Anthropic from '@anthropic-ai/sdk';
+import { Type } from '@sinclair/typebox';
+import { afterEach, describe, expect, it } from 'vitest';
+
+import {
+  buildAnthropicMessages,
+  buildParams,
+  createClient,
+  getResponseAssistantResponse,
+  getResponseUsage,
+  mapStopReason,
+} from '../../../src/providers/anthropic/utils.js';
+
 import type {
   AnthropicProviderOptions,
   BaseAssistantMessage,
@@ -7,18 +20,7 @@ import type {
   ToolResultMessage,
   UserMessage,
 } from '@ank1015/llm-types';
-import Anthropic from '@anthropic-ai/sdk';
 import type { Message as AnthropicMessage } from '@anthropic-ai/sdk/resources/messages.js';
-import { Type } from '@sinclair/typebox';
-import { afterEach, describe, expect, it } from 'vitest';
-import {
-  buildAnthropicMessages,
-  buildParams,
-  createClient,
-  getResponseAssistantResponse,
-  getResponseUsage,
-  mapStopReason,
-} from '../../../src/providers/anthropic/utils.js';
 
 describe('Anthropic Utils', () => {
   describe('createClient', () => {

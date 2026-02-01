@@ -1,5 +1,3 @@
-import type { Context, Model, OpenAIProviderOptions, StopReason, Usage } from '@ank1015/llm-types';
-import type { Response } from 'openai/resources/responses/responses.js';
 import {
   buildParams,
   createClient,
@@ -7,7 +5,10 @@ import {
   getResponseUsage,
   mapStopReason,
 } from './utils.js';
+
 import type { CompleteFunction } from '../../utils/types.js';
+import type { Context, Model, OpenAIProviderOptions, StopReason, Usage } from '@ank1015/llm-types';
+import type { Response } from 'openai/resources/responses/responses.js';
 
 export const completeOpenAI: CompleteFunction<'openai'> = async (
   model: Model<'openai'>,

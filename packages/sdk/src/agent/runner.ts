@@ -1,4 +1,11 @@
-import {
+import { validateToolArguments, generateUUID } from '@ank1015/llm-core';
+
+import { getMockMessage } from '../llm/llm-client.js';
+
+import { buildToolResultMessage } from './utils.js';
+
+import type { LLMClient } from '../llm/llm-client.js';
+import type {
   Api,
   AssistantResponse,
   AssistantToolCall,
@@ -14,9 +21,6 @@ import {
   QueuedMessage,
   ToolExecutionContext,
 } from '@ank1015/llm-types';
-import { getMockMessage, LLMClient } from '../llm/llm-client.js';
-import { validateToolArguments, generateUUID } from '@ank1015/llm-core';
-import { buildToolResultMessage } from './utils.js';
 
 /**
  * AgentRunner interface - handles the execution logic of the agent loop.

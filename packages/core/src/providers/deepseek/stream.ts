@@ -1,21 +1,23 @@
-import {
-  type AssistantResponseContent,
-  type AssistantThinkingContent,
-  type AssistantToolCall,
-  type BaseAssistantEventMessage,
-  type BaseAssistantMessage,
-  type Context,
-  type DeepSeekProviderOptions,
-  type Model,
-  type TextContent,
-} from '@ank1015/llm-types';
-import type { ChatCompletion } from 'openai/resources/chat/completions.js';
 import { calculateCost } from '../../models.js';
+import { AssistantMessageEventStream } from '../../utils/event-stream.js';
 import { parseStreamingJson } from '../../utils/json-parse.js';
 import { validateToolArguments } from '../../utils/validation.js';
+
 import { buildParams, createClient, getMockDeepSeekMessage, mapStopReason } from './utils.js';
+
 import type { StreamFunction } from '../../utils/types.js';
-import { AssistantMessageEventStream } from '../../utils/event-stream.js';
+import type {
+  AssistantResponseContent,
+  AssistantThinkingContent,
+  AssistantToolCall,
+  BaseAssistantEventMessage,
+  BaseAssistantMessage,
+  Context,
+  DeepSeekProviderOptions,
+  Model,
+  TextContent,
+} from '@ank1015/llm-types';
+import type { ChatCompletion } from 'openai/resources/chat/completions.js';
 
 // Extended types for DeepSeek-specific streaming fields
 interface DeepSeekChunkDelta {

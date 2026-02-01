@@ -1,8 +1,11 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { DefaultAgentRunner, AgentRunnerCallbacks } from '../../../src/agent/runner.js';
-import { LLMClient } from '../../../src/llm/llm-client.js';
-import { AgentLoopConfig } from '@ank1015/llm-types';
 import { generateUUID } from '@ank1015/llm-core';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+import { DefaultAgentRunner } from '../../../src/agent/runner.js';
+
+import type { AgentRunnerCallbacks } from '../../../src/agent/runner.js';
+import type { LLMClient } from '../../../src/llm/llm-client.js';
+import type { AgentLoopConfig } from '@ank1015/llm-types';
 
 // Mock LLM Client
 class MockLLMClient implements LLMClient {

@@ -1,5 +1,3 @@
-import type { Model, StopReason, Usage, ZaiProviderOptions } from '@ank1015/llm-types';
-import type { ChatCompletion } from 'openai/resources/chat/completions.js';
 import {
   buildParams,
   createClient,
@@ -7,7 +5,10 @@ import {
   getResponseAssistantResponse,
   getResponseUsage,
 } from './utils.js';
+
 import type { CompleteFunction } from '../../utils/types.js';
+import type { Model, StopReason, Usage, ZaiProviderOptions } from '@ank1015/llm-types';
+import type { ChatCompletion } from 'openai/resources/chat/completions.js';
 
 export const completeZai: CompleteFunction<'zai'> = async (
   model: Model<'zai'>,

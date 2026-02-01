@@ -1,4 +1,4 @@
-import { BaseAssistantMessage, BaseAssistantEvent, Api } from '@ank1015/llm-types';
+import type { BaseAssistantMessage, BaseAssistantEvent, Api } from '@ank1015/llm-types';
 
 // Generic event stream class for async iteration
 export class EventStream<T, R = T> implements AsyncIterable<T> {

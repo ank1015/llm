@@ -3,9 +3,9 @@
  */
 
 import type { Api } from './api.js';
-import type { OptionsForApi } from './providers/index.js';
 import type { Content } from './content.js';
 import type { Message } from './message.js';
+import type { OptionsForApi } from './providers/index.js';
 import type { Tool } from './tool.js';
 
 /**

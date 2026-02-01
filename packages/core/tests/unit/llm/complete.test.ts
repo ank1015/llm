@@ -1,5 +1,14 @@
-import type { BaseAssistantMessage, Context, Model } from '@ank1015/llm-types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { complete } from '../../../src/llm/complete.js';
+import { completeAnthropic } from '../../../src/providers/anthropic/complete.js';
+import { completeDeepSeek } from '../../../src/providers/deepseek/complete.js';
+import { completeGoogle } from '../../../src/providers/google/complete.js';
+import { completeKimi } from '../../../src/providers/kimi/complete.js';
+import { completeOpenAI } from '../../../src/providers/openai/complete.js';
+import { completeZai } from '../../../src/providers/zai/complete.js';
+
+import type { BaseAssistantMessage, Context, Model } from '@ank1015/llm-types';
 
 // Mock all provider complete functions
 vi.mock('../../../src/providers/anthropic/complete.js', () => ({
@@ -20,14 +29,6 @@ vi.mock('../../../src/providers/zai/complete.js', () => ({
 vi.mock('../../../src/providers/kimi/complete.js', () => ({
   completeKimi: vi.fn(),
 }));
-
-import { complete } from '../../../src/llm/complete.js';
-import { completeAnthropic } from '../../../src/providers/anthropic/complete.js';
-import { completeDeepSeek } from '../../../src/providers/deepseek/complete.js';
-import { completeGoogle } from '../../../src/providers/google/complete.js';
-import { completeKimi } from '../../../src/providers/kimi/complete.js';
-import { completeOpenAI } from '../../../src/providers/openai/complete.js';
-import { completeZai } from '../../../src/providers/zai/complete.js';
 
 // Helper to create mock model
 function createMockModel<T extends string>(api: T): Model<any> {

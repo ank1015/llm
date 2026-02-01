@@ -1,6 +1,8 @@
-import { describe, it, expect } from 'vitest';
-import { Conversation } from '../../../src/agent/conversation.js';
 import { MODELS } from '@ank1015/llm-core';
+import { describe, it, expect } from 'vitest';
+
+import { Conversation } from '../../../src/agent/conversation.js';
+
 import { calculateTool } from './tools/index.js';
 
 describe('Budget Integration', () => {

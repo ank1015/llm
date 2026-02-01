@@ -4,13 +4,14 @@
  * Dispatches to the appropriate provider based on the API type.
  */
 
-import type { Api, BaseAssistantMessage, Context, Model, OptionsForApi } from '@ank1015/llm-types';
 import { completeAnthropic } from '../providers/anthropic/complete.js';
 import { completeDeepSeek } from '../providers/deepseek/complete.js';
 import { completeGoogle } from '../providers/google/complete.js';
 import { completeKimi } from '../providers/kimi/complete.js';
 import { completeOpenAI } from '../providers/openai/complete.js';
 import { completeZai } from '../providers/zai/complete.js';
+
+import type { Api, BaseAssistantMessage, Context, Model, OptionsForApi } from '@ank1015/llm-types';
 
 /**
  * Complete a chat request using the specified provider.

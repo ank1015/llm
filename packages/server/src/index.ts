@@ -7,11 +7,11 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 
-// Services
-export { KeyService, DbService } from './services/index.js';
-
 // Routes
 import { messagesRoutes, keysRoutes } from './routes/index.js';
+
+// Services
+export { KeyService, DbService } from './services/index.js';
 
 export const app = new Hono();
 

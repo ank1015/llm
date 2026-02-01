@@ -14,6 +14,8 @@ pnpm test:integration # Run integration tests only
 pnpm typecheck        # Type-check all packages
 pnpm format           # Format all files with Prettier
 pnpm format:check     # Check formatting (CI)
+pnpm lint             # Run ESLint on all packages
+pnpm lint:fix         # Auto-fix ESLint issues
 pnpm clean            # Remove all build artifacts
 
 # Development
@@ -43,13 +45,14 @@ packages/
 - Use Zod for runtime validation
 - Tests colocated as `*.test.ts`
 - Conventional commits: `feat(core): add feature`
-- Pre-commit hooks auto-format and typecheck staged files
+- Pre-commit hooks auto-format, lint, and typecheck staged files
 
 ## Key Files
 
 - `tsconfig.base.json` — Shared TypeScript configuration
 - `turbo.json` — Task orchestration
 - `.prettierrc` — Code formatting (applies to all packages)
+- `eslint.config.js` — Linting rules (applies to all packages)
 - `packages/core/src/index.ts` — Core package entry
 
 ## Package Guide

@@ -7,7 +7,9 @@
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
+
 import { complete, getModel, setServerUrl } from '../../src/index.js';
+
 import type { AnthropicProviderOptions, Context } from '@ank1015/llm-types';
 
 describe('complete integration', () => {

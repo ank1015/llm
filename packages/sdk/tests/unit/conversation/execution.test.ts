@@ -1,7 +1,11 @@
+import { AgentLoopConfig, UserMessage } from '@ank1015/llm-types';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+
 import { Conversation } from '../../../src/agent/conversation.js';
-import { AgentRunner, AgentRunnerCallbacks } from '../../../src/agent/runner.js';
-import { AgentLoopConfig, AgentEvent, Message, UserMessage } from '@ank1015/llm-types';
+import { AgentRunnerCallbacks } from '../../../src/agent/runner.js';
+
+import type { AgentRunner } from '../../../src/agent/runner.js';
+import type { AgentEvent, Message } from '@ank1015/llm-types';
 
 // Mock Runner
 class MockAgentRunner implements AgentRunner {
