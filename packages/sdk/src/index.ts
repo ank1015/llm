@@ -3,14 +3,108 @@
  *
  * Unified SDK for LLM interactions with multiple providers.
  *
- * This package re-exports everything from @ank1015/llm-types and @ank1015/llm-core,
- * providing a single entry point for consuming the LLM SDK.
+ * This package provides a unified entry point that:
+ * - Uses direct provider calls when apiKey is provided
+ * - Routes through the server (for usage tracking) when no apiKey is provided
  */
 
-// Re-export everything from core (which also re-exports types)
-export * from "@ank1015/llm-core";
+// Configuration
+export { setServerUrl, getServerUrl } from "./config.js";
 
-// Explicitly re-export runtime values from types that core might not re-export
+// LLM functions (our wrapped versions)
+export { complete, stream } from "./llm/index.js";
+
+// Re-export everything else from core (except complete/stream which we override)
+export {
+	VERSION,
+	MODELS,
+	getProviders,
+	getModel,
+	getModels,
+	calculateCost,
+	EventStream,
+	AssistantMessageEventStream,
+	parseStreamingJson,
+	isContextOverflow,
+	getOverflowPatterns,
+	sanitizeSurrogates,
+	validateToolCall,
+	validateToolArguments,
+	// Provider-specific functions (for direct access if needed)
+	completeAnthropic,
+	streamAnthropic,
+	completeOpenAI,
+	streamOpenAI,
+	completeGoogle,
+	streamGoogle,
+	GoogleThinkingLevel,
+	completeDeepSeek,
+	streamDeepSeek,
+	completeZai,
+	streamZai,
+	completeKimi,
+	streamKimi,
+} from "@ank1015/llm-core";
+
+export type { CompleteFunction, StreamFunction } from "@ank1015/llm-core";
+
+// Re-export all types from types package
+export type {
+	// API
+	Api,
+	// Content
+	TextContent,
+	ImageContent,
+	FileContent,
+	Content,
+	// Provider types
+	AnthropicNativeResponse,
+	AnthropicProviderOptions,
+	DeepSeekNativeResponse,
+	DeepSeekProviderOptions,
+	GoogleNativeResponse,
+	GoogleProviderOptions,
+	KimiNativeResponse,
+	KimiProviderOptions,
+	KimiThinkingConfig,
+	OpenAINativeResponse,
+	OpenAIProviderOptions,
+	ZaiNativeResponse,
+	ZaiProviderOptions,
+	ZaiThinkingConfig,
+	ApiNativeResponseMap,
+	NativeResponseForApi,
+	ApiOptionsMap,
+	OptionsForApi,
+	// Model
+	Model,
+	Provider,
+	// Message
+	StopReason,
+	AssistantResponseContent,
+	AssistantThinkingContent,
+	AssistantToolCall,
+	AssistantResponse,
+	Usage,
+	UserMessage,
+	ToolResultMessage,
+	BaseAssistantMessage,
+	CustomMessage,
+	Message,
+	BaseAssistantEventMessage,
+	BaseAssistantEvent,
+	// Tool
+	Tool,
+	Context,
+	// Request
+	MessageRequest,
+	SimpleMessageRequest,
+	// Errors
+	LLMErrorCode,
+	LLMErrorResponse,
+} from "@ank1015/llm-types";
+
+// Re-export runtime values from types
 export { KnownApis, isValidApi } from "@ank1015/llm-types";
 export {
 	LLMError,

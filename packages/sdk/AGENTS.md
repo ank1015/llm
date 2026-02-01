@@ -12,55 +12,67 @@ Unified SDK for LLM interactions with multiple providers. This is the main entry
 
 ```
 src/
-  index.ts          — Re-exports from types and core packages
+  index.ts          — Public exports
+  config.ts         — Server URL configuration
+  llm/
+    index.ts        — LLM module exports
+    complete.ts     — Complete function (routes to core or server)
+    stream.ts       — Stream function (routes to core or server)
 ```
 
 ## Key Exports
 
-This package re-exports everything from `@ank1015/llm-types` and `@ank1015/llm-core`:
+### LLM Functions
+- `complete(model, context, options?, id?)` — Complete a chat request
+- `stream(model, context, options?, id?)` — Stream a chat request
+
+These functions automatically route:
+- **With apiKey**: Calls provider directly via core package
+- **Without apiKey**: Calls server endpoints (uses stored keys, tracks usage)
+
+### Configuration
+- `setServerUrl(url)` — Set the server URL (default: http://localhost:3001)
+- `getServerUrl()` — Get the current server URL
 
 ### From Core
-- `complete(model, context, options, id)` — Central completion dispatcher
-- `stream(model, context, options, id)` — Central streaming dispatcher
-- `MODELS` — All supported model definitions by provider
+- `MODELS` — All supported model definitions
 - `getModel(api, modelId)` — Get a specific model
 - `getModels(api)` — Get all models for a provider
 - `calculateCost(model, usage)` — Calculate cost from token usage
+- Provider-specific functions: `completeAnthropic`, `streamAnthropic`, etc.
 
 ### From Types
 - `Api` — Union of supported providers
 - `Model<TApi>` — Generic model definition
 - `BaseAssistantMessage<TApi>` — Assistant response type
-- `Context` — Conversation context with messages and tools
+- `Context` — Conversation context
 - `LLMError` — Base error class and subclasses
 
 ## Usage
 
 ```typescript
-import {
-  complete,
-  stream,
-  getModel,
-  type BaseAssistantMessage,
-} from "@ank1015/llm-sdk";
+import { complete, stream, getModel, setServerUrl } from "@ank1015/llm-sdk";
 
-// Get a model
-const model = getModel("anthropic", "claude-sonnet-4-20250514");
-
-// Complete a message
+// Option 1: Direct provider call (with apiKey)
 const response = await complete(
-  model,
-  { messages: [{ role: "user", content: "Hello!" }] },
-  { apiKey: "sk-..." },
-  "request-id"
+  getModel("anthropic", "claude-sonnet-4-20250514"),
+  { messages: [{ role: "user", content: [{ type: "text", text: "Hello!" }] }] },
+  { apiKey: "sk-..." }
+);
+
+// Option 2: Via server (no apiKey, uses stored keys)
+setServerUrl("http://localhost:3001");
+const response = await complete(
+  getModel("anthropic", "claude-sonnet-4-20250514"),
+  { messages: [{ role: "user", content: [{ type: "text", text: "Hello!" }] }] }
 );
 ```
 
 ## Conventions
 
-- This package is a facade — no business logic here
-- All functionality comes from types and core packages
 - Use this package as the primary import for consumers
+- Server URL defaults to http://localhost:3001
+- Options are optional; without apiKey, routes to server
 
 ## Dependencies
 
