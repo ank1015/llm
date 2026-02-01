@@ -43,7 +43,7 @@ packages/
 - Use Zod for runtime validation
 - Tests colocated as `*.test.ts`
 - Conventional commits: `feat(core): add feature`
-- Format with Prettier before committing
+- Pre-commit hooks auto-format and typecheck staged files
 
 ## Key Files
 
