@@ -1,4 +1,4 @@
-import type { BaseAssistantMessage, Api } from "@ank1015/llm-types";
+import type { BaseAssistantMessage, Api } from '@ank1015/llm-types';
 
 /**
  * Regex patterns to detect context overflow errors from different providers.
@@ -22,17 +22,17 @@ import type { BaseAssistantMessage, Api } from "@ank1015/llm-types";
  * - Ollama: Silently truncates input - not detectable via error message
  */
 const OVERFLOW_PATTERNS = [
-	/prompt is too long/i, // Anthropic
-	/exceeds the context window/i, // OpenAI (Completions & Responses API)
-	/input token count.*exceeds the maximum/i, // Google (Gemini)
-	/maximum prompt length is \d+/i, // xAI (Grok)
-	/reduce the length of the messages/i, // Groq
-	/maximum context length is \d+ tokens/i, // OpenRouter (all backends)
-	/exceeds the available context size/i, // llama.cpp server
-	/greater than the context length/i, // LM Studio
-	/context length exceeded/i, // Generic fallback
-	/too many tokens/i, // Generic fallback
-	/token limit exceeded/i, // Generic fallback
+  /prompt is too long/i, // Anthropic
+  /exceeds the context window/i, // OpenAI (Completions & Responses API)
+  /input token count.*exceeds the maximum/i, // Google (Gemini)
+  /maximum prompt length is \d+/i, // xAI (Grok)
+  /reduce the length of the messages/i, // Groq
+  /maximum context length is \d+ tokens/i, // OpenRouter (all backends)
+  /exceeds the available context size/i, // llama.cpp server
+  /greater than the context length/i, // LM Studio
+  /context length exceeded/i, // Generic fallback
+  /too many tokens/i, // Generic fallback
+  /token limit exceeded/i, // Generic fallback
 ];
 
 /**
@@ -79,34 +79,37 @@ const OVERFLOW_PATTERNS = [
  * @param contextWindow - Optional context window size for detecting silent overflow (z.ai)
  * @returns true if the message indicates a context overflow
  */
-export function isContextOverflow(message: BaseAssistantMessage<Api>, contextWindow?: number): boolean {
-	// Case 1: Check error message patterns
-	if (message.stopReason === "error" && message.errorMessage) {
-		// Check known patterns
-		if (OVERFLOW_PATTERNS.some((p) => p.test(message.errorMessage!))) {
-			return true;
-		}
+export function isContextOverflow(
+  message: BaseAssistantMessage<Api>,
+  contextWindow?: number
+): boolean {
+  // Case 1: Check error message patterns
+  if (message.stopReason === 'error' && message.errorMessage) {
+    // Check known patterns
+    if (OVERFLOW_PATTERNS.some((p) => p.test(message.errorMessage!))) {
+      return true;
+    }
 
-		// Cerebras and Mistral return 400/413 with no body - check for status code pattern
-		if (/^4(00|13)\s*(status code)?\s*\(no body\)/i.test(message.errorMessage)) {
-			return true;
-		}
-	}
+    // Cerebras and Mistral return 400/413 with no body - check for status code pattern
+    if (/^4(00|13)\s*(status code)?\s*\(no body\)/i.test(message.errorMessage)) {
+      return true;
+    }
+  }
 
-	// Case 2: Silent overflow (z.ai style) - successful but usage exceeds context
-	if (contextWindow && message.stopReason === "stop") {
-		const inputTokens = message.usage.input + message.usage.cacheRead;
-		if (inputTokens > contextWindow) {
-			return true;
-		}
-	}
+  // Case 2: Silent overflow (z.ai style) - successful but usage exceeds context
+  if (contextWindow && message.stopReason === 'stop') {
+    const inputTokens = message.usage.input + message.usage.cacheRead;
+    if (inputTokens > contextWindow) {
+      return true;
+    }
+  }
 
-	return false;
+  return false;
 }
 
 /**
  * Get the overflow patterns for testing purposes.
  */
 export function getOverflowPatterns(): RegExp[] {
-	return [...OVERFLOW_PATTERNS];
+  return [...OVERFLOW_PATTERNS];
 }

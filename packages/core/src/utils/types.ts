@@ -4,8 +4,8 @@
  * Defines the function signatures for complete and stream operations.
  */
 
-import type { Api, OptionsForApi, BaseAssistantMessage, Model, Context } from "@ank1015/llm-types";
-import type { AssistantMessageEventStream } from "./event-stream.js";
+import type { Api, OptionsForApi, BaseAssistantMessage, Model, Context } from '@ank1015/llm-types';
+import type { AssistantMessageEventStream } from './event-stream.js';
 
 /**
  * Function signature for non-streaming completion.
@@ -13,10 +13,10 @@ import type { AssistantMessageEventStream } from "./event-stream.js";
  * @template TApi - The API provider type
  */
 export type CompleteFunction<TApi extends Api> = (
-	model: Model<TApi>,
-	context: Context,
-	options: OptionsForApi<TApi>,
-	id: string,
+  model: Model<TApi>,
+  context: Context,
+  options: OptionsForApi<TApi>,
+  id: string
 ) => Promise<BaseAssistantMessage<TApi>>;
 
 /**
@@ -25,8 +25,8 @@ export type CompleteFunction<TApi extends Api> = (
  * @template TApi - The API provider type
  */
 export type StreamFunction<TApi extends Api> = (
-	model: Model<TApi>,
-	context: Context,
-	options: OptionsForApi<TApi>,
-	id: string,
+  model: Model<TApi>,
+  context: Context,
+  options: OptionsForApi<TApi>,
+  id: string
 ) => AssistantMessageEventStream<TApi>;

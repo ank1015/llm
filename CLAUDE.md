@@ -2,12 +2,13 @@ This file contains instructions for Claude Code on how to develop and maintain t
 This is not about the project's domain logic—it's about development practices.
 
 # Core Philosophy
+
 You are not just writing code—you are writing code that future AI agents (including yourself in new sessions) will need to understand, modify, and extend. Every file you create, every function you write, and every decision you make should optimize for:
 
-1) Discoverability — Can an agent find what it needs quickly?
-2) Understandability — Can an agent grasp context without extensive exploration?
-3) Verifiability — Can an agent confirm its changes work correctly?
-4) Safety — Are there guardrails preventing catastrophic mistakes?
+1. Discoverability — Can an agent find what it needs quickly?
+2. Understandability — Can an agent grasp context without extensive exploration?
+3. Verifiability — Can an agent confirm its changes work correctly?
+4. Safety — Are there guardrails preventing catastrophic mistakes?
 
 Remember: You have no memory between sessions. The codebase itself IS your memory. Document accordingly.
 
@@ -29,27 +30,33 @@ Structure the root AGENTS.md in this exact order (agents read top-to-bottom, mos
 One-line description of what this project does.
 
 ## Commands
+
 [Exact commands with flags — agents copy-paste these directly]
 
-## Architecture  
+## Architecture
+
 [Where things live — directory map with one-line descriptions]
 
 ## Conventions
+
 [Code style rules — specific, not vague]
 
 ## Key Files
+
 [Entry points and important files to understand first]
 
 ## Package Guide
+
 [For monorepos: links to package-specific AGENTS.md files]
 
 ## Boundaries
+
 [What agents must never do, should ask about, and can freely do]
 ```
 
 ## Package-Level AGENTS.md
 
-Create an AGENTS.md in each package directory (packages/*/AGENTS.md). These files should:
+Create an AGENTS.md in each package directory (packages/\*/AGENTS.md). These files should:
 
 - Focus ONLY on that package's concerns
 - Assume the agent has read the root AGENTS.md
@@ -64,17 +71,21 @@ Example structure for a package AGENTS.md:
 What this package does and its role in the monorepo.
 
 ## Commands
+
 - `pnpm test` — Run tests for this package
 - `pnpm build` — Build this package
 
 ## Structure
+
 - `src/index.ts` — Public exports
 - `src/internal/` — Internal modules, not exported
 
 ## Conventions
+
 [Package-specific conventions only]
 
 ## Dependencies
+
 - Depends on: `@org/shared`
 - Depended on by: `@org/web`, `@org/server`
 ```
@@ -82,12 +93,14 @@ What this package does and its role in the monorepo.
 ## Keeping AGENTS.md Current
 
 Every time you:
+
 - Add a new package → Create its AGENTS.md and link from root
 - Change a build command → Update AGENTS.md immediately
 - Add a new convention → Document it before moving on
 - Create an important file → Add it to "Key Files" if agents need to know about it
 
 Do not:
+
 - Let AGENTS.md drift from reality
 - Add task-specific instructions (those go in separate docs)
 - Duplicate content that's in README.md
@@ -96,45 +109,45 @@ Do not:
 # Code Structure Principles
 
 ## Directory Organization
+
 Use this structure for TypeScript monorepos:
 
 project-root/
-├── AGENTS.md                 # Agent instructions (cross-tool)
-├── CLAUDE.md                 # This file (Claude Code specific)
-├── README.md                 # Human-focused documentation
-├── package.json              # Root package.json
-├── pnpm-workspace.yaml       # Workspace definition
-├── turbo.json                # Task orchestration
-├── tsconfig.base.json        # Shared TypeScript config
-├── .env.example              # Environment template
+├── AGENTS.md # Agent instructions (cross-tool)
+├── CLAUDE.md # This file (Claude Code specific)
+├── README.md # Human-focused documentation
+├── package.json # Root package.json
+├── pnpm-workspace.yaml # Workspace definition
+├── turbo.json # Task orchestration
+├── tsconfig.base.json # Shared TypeScript config
+├── .env.example # Environment template
 ├── .gitignore
 ├── packages/
-│   ├── <package-name>/
-│   │   ├── AGENTS.md         # Package-specific agent instructions
-│   │   ├── package.json
-│   │   ├── tsconfig.json     # Extends base config
-│   │   └── src/
-│   │       ├── index.ts      # Public exports only
-│   │       ├── <feature>/    # Feature modules
-│   │       └── __tests__/    # Or colocate tests
+│ ├── <package-name>/
+│ │ ├── AGENTS.md # Package-specific agent instructions
+│ │ ├── package.json
+│ │ ├── tsconfig.json # Extends base config
+│ │ └── src/
+│ │ ├── index.ts # Public exports only
+│ │ ├── <feature>/ # Feature modules
+│ │ └── **tests**/ # Or colocate tests
 ├── docs/
-│   ├── ARCHITECTURE.md       # High-level architecture
-│   └── adr/                  # Architecture Decision Records
-│       └── 000-template.md
-└── scripts/                  # Build/dev scripts
-
+│ ├── ARCHITECTURE.md # High-level architecture
+│ └── adr/ # Architecture Decision Records
+│ └── 000-template.md
+└── scripts/ # Build/dev scripts
 
 ## File Naming Conventions
 
 Apply these consistently across all packages:
-Type                    Convention                  Example     
-Directories             kebab-case                  user-service/
-TypeScript files        kebab-case.ts               user-service.ts
-React components        PascalCase.tsx              UserProfile.tsx
-Test files              *.test.ts or *.spec.ts      user-service.test.ts
-Type definition files   *.types.ts                  user.types.ts
-Constants files         *.constants.ts              api.constants.ts
-Config files            *.config.ts                 database.config.ts
+Type Convention Example  
+Directories kebab-case user-service/
+TypeScript files kebab-case.ts user-service.ts
+React components PascalCase.tsx UserProfile.tsx
+Test files _.test.ts or _.spec.ts user-service.test.ts
+Type definition files _.types.ts user.types.ts
+Constants files _.constants.ts api.constants.ts
+Config files \*.config.ts database.config.ts
 
 ## Module Organization
 
@@ -195,6 +208,7 @@ function email(email: string): boolean
 # TypeScript Practices
 
 ## Strict Configuration
+
 Always use strict TypeScript. Create or maintain tsconfig.base.json:
 
 ```
@@ -299,6 +313,7 @@ function handleState<T>(state: AsyncState<T>) {
 ```
 
 Use Zod for runtime validation with inferred types:
+
 ```
 import { z } from 'zod';
 
@@ -322,6 +337,7 @@ export function parseUser(data: unknown): User {
 ```
 
 Avoid These TypeScript Anti-patterns
+
 ```
 // ❌ NEVER use `any`
 function processData(data: any) { ... }
@@ -354,6 +370,7 @@ const result = legacyApi();
 # Testing Practices
 
 ## Test Infrastructure
+
 Use Vitest for TypeScript projects. Configure in each package:
 
 ```
@@ -379,12 +396,12 @@ export default defineConfig({
 Write tests that serve as documentation:
 
 describe('UserService', () => {
-  describe('getUserById', () => {
-    it('should return user when found', async () => {
-      // Arrange
-      const userId = 'test-uuid';
-      const expectedUser = createTestUser({ id: userId });
-      mockRepository.findById.mockResolvedValue(expectedUser);
+describe('getUserById', () => {
+it('should return user when found', async () => {
+// Arrange
+const userId = 'test-uuid';
+const expectedUser = createTestUser({ id: userId });
+mockRepository.findById.mockResolvedValue(expectedUser);
 
       // Act
       const result = await userService.getUserById(userId);
@@ -406,12 +423,14 @@ describe('UserService', () => {
       await expect(userService.getUserById(''))
         .rejects.toThrow(ValidationError);
     });
-  });
+
+});
 });
 
 ## Test-Driven Development Workflow
 
 When implementing new features, follow TDD:
+
 1. Write failing test first — Define expected behavior
 2. Implement minimal code — Make the test pass
 3. Refactor — Clean up while tests protect you
@@ -425,6 +444,7 @@ This is especially effective for agents because:
 # Documentation Practices
 
 ## Code Comments
+
 Write comments that explain WHY, not WHAT:
 
 ```
@@ -444,9 +464,10 @@ const GRACE_PERIOD_DAYS = 7;
 ```
 
 ## JSDoc for Public APIs
+
 Document all exported functions, classes, and types:
 
-```
+````
 /**
  * Authenticates a user with email and password.
  *
@@ -468,9 +489,10 @@ export async function authenticateUser(
 ): Promise<AuthResult> {
   // Implementation
 }
-```
+````
 
 ## Architecture Decision Records (ADRs)
+
 When making significant architectural decisions, create an ADR:
 
 ```
@@ -507,11 +529,13 @@ Reference ADRs from AGENTS.md: "Before modifying database schema, read @docs/adr
 ## Commit Messages
 
 Use Conventional Commits format:
+
 ```
 <type>(<scope>): <description>
 ```
 
 Types:
+
 - feat: New feature
 - fix: Bug fix
 - docs: Documentation only
@@ -594,6 +618,7 @@ NODE_ENV=development
 ```
 
 ## Configuration Validation
+
 Validate environment at startup with Zod:
 
 ```
@@ -618,12 +643,13 @@ export type Env = z.infer<typeof envSchema>;
 # Dependency Management
 
 ## Adding Dependencies
+
 When adding a new dependency:
 
-1) Prefer well-maintained, typed packages
-2) Check bundle size for frontend packages (bundlephobia.com)
-3) Add to correct package — Don't install at root unless truly shared
-4) Use exact versions for reproducibility
+1. Prefer well-maintained, typed packages
+2. Check bundle size for frontend packages (bundlephobia.com)
+3. Add to correct package — Don't install at root unless truly shared
+4. Use exact versions for reproducibility
 
 ```
 # Add to specific package
@@ -637,6 +663,7 @@ pnpm add -w typescript
 ```
 
 ## Shared Dependencies
+
 Put these in root or shared package:
 
 - TypeScript
@@ -653,6 +680,7 @@ Put these in specific packages:
 # Error Handling
 
 ## Custom Error Classes
+
 Create a hierarchy of typed errors:
 
 ```
@@ -694,6 +722,7 @@ export class UnauthorizedError extends AppError {
 ```
 
 Error Handling Pattern
+
 ```
 // ✅ GOOD: Specific, typed error handling
 async function getUserById(id: string): Promise<User> {
@@ -766,7 +795,9 @@ When you notice recurring issues:
 4. Consider tooling — Can a linter catch this automatically?
 
 # Quick Reference: File Templates
+
 ## New Package Checklist
+
 When creating a new package:
 
 1. Create directory: packages/<package-name>/
@@ -779,6 +810,7 @@ When creating a new package:
 8. Run pnpm install to link workspace
 
 ## New Feature Checklist
+
 When implementing a new feature:
 
 1. Create types first (<feature>.types.ts)
@@ -789,6 +821,7 @@ When implementing a new feature:
 6. Update AGENTS.md if feature adds new conventions
 
 # Summary: The Agent-Ready Mindset
+
 Every piece of code you write should answer these questions clearly:
 
 1. What is this? → Clear naming, explicit types

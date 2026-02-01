@@ -52,14 +52,17 @@ tests/
 ## Key Exports
 
 ### LLM Functions
+
 - `complete(model, context, options?, id?)` — Complete a chat request
 - `stream(model, context, options?, id?)` — Stream a chat request
 
 These functions automatically route:
+
 - **With apiKey**: Calls provider directly via core package
 - **Without apiKey**: Calls server endpoints (uses stored keys, tracks usage)
 
 ### Agent
+
 - `Conversation` — Main agent class for managing conversations with tool execution
 - `DefaultAgentRunner` — Default implementation of the agent execution loop
 - `DefaultLLMClient` — Default LLM client implementation
@@ -67,16 +70,19 @@ These functions automatically route:
 - `buildToolResultMessage(toolCall, result, isError, errorDetails?)` — Build a tool result message
 
 ### Configuration
+
 - `setServerUrl(url)` — Set the server URL (default: http://localhost:3001)
 - `getServerUrl()` — Get the current server URL
 
 ### From Core
+
 - `MODELS` — All supported model definitions
 - `getModel(api, modelId)` — Get a specific model
 - `getModels(api)` — Get all models for a provider
 - `calculateCost(model, usage)` — Calculate cost from token usage
 
 ### Agent Types (from @ank1015/llm-types)
+
 - `AgentTool` — Tool definition with execute function
 - `AgentState` — Agent state (messages, tools, provider, usage)
 - `AgentLoopConfig` — Configuration for agent loop execution
@@ -88,34 +94,33 @@ These functions automatically route:
 ### Basic LLM Usage
 
 ```typescript
-import { complete, getModel, setServerUrl } from "@ank1015/llm-sdk";
+import { complete, getModel, setServerUrl } from '@ank1015/llm-sdk';
 
-setServerUrl("http://localhost:3001");
-const response = await complete(
-  getModel("anthropic", "claude-sonnet-4-20250514"),
-  { messages: [{ role: "user", content: [{ type: "text", text: "Hello!" }] }] }
-);
+setServerUrl('http://localhost:3001');
+const response = await complete(getModel('anthropic', 'claude-sonnet-4-20250514'), {
+  messages: [{ role: 'user', content: [{ type: 'text', text: 'Hello!' }] }],
+});
 ```
 
 ### Agent with Tools
 
 ```typescript
-import { Conversation, getModel } from "@ank1015/llm-sdk";
-import type { AgentTool } from "@ank1015/llm-sdk";
+import { Conversation, getModel } from '@ank1015/llm-sdk';
+import type { AgentTool } from '@ank1015/llm-sdk';
 
 const searchTool: AgentTool = {
-  name: "search",
-  label: "Web Search",
-  description: "Search the web",
-  parameters: { type: "object", properties: { query: { type: "string" } } },
+  name: 'search',
+  label: 'Web Search',
+  description: 'Search the web',
+  parameters: { type: 'object', properties: { query: { type: 'string' } } },
   execute: async (toolCallId, params) => ({
-    content: [{ type: "text", text: `Results for: ${params.query}` }],
-    details: {}
-  })
+    content: [{ type: 'text', text: `Results for: ${params.query}` }],
+    details: {},
+  }),
 };
 
 const conversation = new Conversation();
-conversation.setProvider({ model: getModel("anthropic", "claude-sonnet-4-20250514")! });
+conversation.setProvider({ model: getModel('anthropic', 'claude-sonnet-4-20250514')! });
 conversation.setTools([searchTool]);
 
 // Subscribe to events
@@ -124,19 +129,23 @@ conversation.subscribe((event) => {
 });
 
 // Run a prompt
-const messages = await conversation.prompt("Search for TypeScript tutorials");
+const messages = await conversation.prompt('Search for TypeScript tutorials');
 ```
 
 ## Testing
 
 ### Unit Tests
+
 Unit tests use mocks and don't require API keys or server:
+
 ```bash
 pnpm test:unit
 ```
 
 ### Integration Tests
+
 Integration tests require:
+
 1. Server running on localhost:3001 with API keys configured
 2. Or environment variables set (ANTHROPIC_API_KEY, OPENAI_API_KEY, etc.)
 

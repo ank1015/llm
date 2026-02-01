@@ -5,5 +5,5 @@
  * Provides complete() and stream() functions that dispatch to the appropriate provider.
  */
 
-export { complete } from "./complete.js";
-export { stream } from "./stream.js";
+export { complete } from './complete.js';
+export { stream } from './stream.js';

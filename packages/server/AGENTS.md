@@ -33,12 +33,15 @@ tests/
 ## Endpoints
 
 ### GET /health
+
 Health check endpoint.
 
 ### POST /messages/complete
+
 Non-streaming completion. Returns `BaseAssistantMessage`.
 
 Request body: `MessageRequest`
+
 - `api` — Provider (anthropic, openai, google, etc.)
 - `modelId` — Model identifier
 - `messages` — Conversation messages
@@ -47,9 +50,11 @@ Request body: `MessageRequest`
 - `providerOptions?` — Provider-specific options
 
 ### POST /messages/stream
+
 Streaming completion using SSE. Returns events followed by final message.
 
 Events:
+
 - `start`, `text_start`, `text_delta`, `text_end`
 - `thinking_start`, `thinking_delta`, `thinking_end`
 - `toolcall_start`, `toolcall_delta`, `toolcall_end`
@@ -57,20 +62,25 @@ Events:
 - `message` — Final BaseAssistantMessage
 
 ### GET /keys
+
 List all providers with stored API keys.
 
 ### GET /keys/:api
+
 Check if an API key exists for a provider (does not return the key).
 
 ### POST /keys/:api
+
 Add an API key for a provider.
 Request body: `{ "apiKey": "sk-..." }`
 
 ### PUT /keys/:api
+
 Update an API key for a provider (alias for POST).
 Request body: `{ "apiKey": "sk-..." }`
 
 ### DELETE /keys/:api
+
 Remove an API key for a provider.
 
 ## Key Exports
@@ -84,10 +94,12 @@ Remove an API key for a provider.
 ### KeyService
 
 Manages encrypted API keys for different LLM providers.
+
 - Storage: `~/.llm/global/keys/<provider>.key`
 - Encryption: AES-256-GCM with machine-derived key
 
 Methods:
+
 - `setKey(provider, apiKey)` — Store an API key
 - `getKey(provider)` — Retrieve an API key
 - `removeKey(provider)` — Delete an API key
@@ -97,10 +109,12 @@ Methods:
 ### DbService
 
 SQLite database for storing LLM usage data.
+
 - Storage: `~/.llm/global/usages/messages.db`
 - Stores: BaseAssistantMessage<Api> objects
 
 Methods:
+
 - `saveMessage(message)` — Save a message
 - `getMessage(id)` — Get message by ID
 - `getMessages(options)` — Query messages with filters
@@ -110,6 +124,7 @@ Methods:
 ## Error Handling
 
 All endpoints return structured errors:
+
 ```json
 {
   "error": true,
@@ -120,6 +135,7 @@ All endpoints return structured errors:
 ```
 
 Error codes:
+
 - `API_KEY_NOT_FOUND` (401) — No API key for provider
 - `MODEL_NOT_FOUND` (404) — Model not found
 - `INVALID_REQUEST` (400) — Bad request body

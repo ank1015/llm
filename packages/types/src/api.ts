@@ -8,7 +8,7 @@
  * Array of all known API provider identifiers.
  * Used to derive the Api union type and for runtime validation.
  */
-export const KnownApis = ["openai", "google", "deepseek", "anthropic", "zai", "kimi"] as const;
+export const KnownApis = ['openai', 'google', 'deepseek', 'anthropic', 'zai', 'kimi'] as const;
 
 /**
  * Union type of all supported API providers.
@@ -22,5 +22,5 @@ export type Api = (typeof KnownApis)[number];
  * Type guard to check if a string is a valid Api.
  */
 export function isValidApi(value: string): value is Api {
-	return KnownApis.includes(value as Api);
+  return KnownApis.includes(value as Api);
 }

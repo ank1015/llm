@@ -5,10 +5,17 @@
  * otherwise calls the server's /messages/complete endpoint.
  */
 
-import { complete as coreComplete } from "@ank1015/llm-core";
-import type { Api, BaseAssistantMessage, Context, Model, OptionsForApi, MessageRequest } from "@ank1015/llm-types";
-import { ProviderError } from "@ank1015/llm-types";
-import { getServerUrl } from "../config.js";
+import { complete as coreComplete } from '@ank1015/llm-core';
+import type {
+  Api,
+  BaseAssistantMessage,
+  Context,
+  Model,
+  OptionsForApi,
+  MessageRequest,
+} from '@ank1015/llm-types';
+import { ProviderError } from '@ank1015/llm-types';
+import { getServerUrl } from '../config.js';
 
 /**
  * Complete a chat request.
@@ -23,56 +30,63 @@ import { getServerUrl } from "../config.js";
  * @returns The assistant message response
  */
 export async function complete<TApi extends Api>(
-	model: Model<TApi>,
-	context: Context,
-	options: Partial<OptionsForApi<TApi>> = {},
-	id?: string,
+  model: Model<TApi>,
+  context: Context,
+  options: Partial<OptionsForApi<TApi>> = {},
+  id?: string
 ): Promise<BaseAssistantMessage<TApi>> {
-	// If apiKey is provided, use core's complete directly
-	if ("apiKey" in options && options.apiKey) {
-		const requestId = id ?? `sdk-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
-		return coreComplete(model, context, options as OptionsForApi<TApi>, requestId);
-	}
+  // If apiKey is provided, use core's complete directly
+  if ('apiKey' in options && options.apiKey) {
+    const requestId = id ?? `sdk-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+    return coreComplete(model, context, options as OptionsForApi<TApi>, requestId);
+  }
 
-	// Otherwise, call the server
-	const serverUrl = getServerUrl();
+  // Otherwise, call the server
+  const serverUrl = getServerUrl();
 
-	// Build request body
-	const request: MessageRequest<TApi> = {
-		api: model.api,
-		modelId: model.id,
-		messages: context.messages,
-	};
+  // Build request body
+  const request: MessageRequest<TApi> = {
+    api: model.api,
+    modelId: model.id,
+    messages: context.messages,
+  };
 
-	if (context.systemPrompt) {
-		request.systemPrompt = context.systemPrompt;
-	}
+  if (context.systemPrompt) {
+    request.systemPrompt = context.systemPrompt;
+  }
 
-	if (context.tools) {
-		request.tools = context.tools;
-	}
+  if (context.tools) {
+    request.tools = context.tools;
+  }
 
-	// Pass through provider options (excluding apiKey and signal)
-	const { apiKey: _, signal, ...providerOptions } = options as Record<string, unknown> & { signal?: AbortSignal };
-	if (Object.keys(providerOptions).length > 0) {
-		request.providerOptions = providerOptions as Exclude<MessageRequest<TApi>["providerOptions"], undefined>;
-	}
+  // Pass through provider options (excluding apiKey and signal)
+  const {
+    apiKey: _,
+    signal,
+    ...providerOptions
+  } = options as Record<string, unknown> & { signal?: AbortSignal };
+  if (Object.keys(providerOptions).length > 0) {
+    request.providerOptions = providerOptions as Exclude<
+      MessageRequest<TApi>['providerOptions'],
+      undefined
+    >;
+  }
 
-	const fetchOptions: RequestInit = {
-		method: "POST",
-		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify(request),
-	};
-	if (signal) {
-		fetchOptions.signal = signal;
-	}
+  const fetchOptions: RequestInit = {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  };
+  if (signal) {
+    fetchOptions.signal = signal;
+  }
 
-	const response = await fetch(`${serverUrl}/messages/complete`, fetchOptions);
+  const response = await fetch(`${serverUrl}/messages/complete`, fetchOptions);
 
-	if (!response.ok) {
-		const errorData = await response.json();
-		throw new ProviderError(model.api, errorData.message ?? "Server request failed");
-	}
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new ProviderError(model.api, errorData.message ?? 'Server request failed');
+  }
 
-	return response.json() as Promise<BaseAssistantMessage<TApi>>;
+  return response.json() as Promise<BaseAssistantMessage<TApi>>;
 }

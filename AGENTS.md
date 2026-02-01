@@ -12,6 +12,8 @@ pnpm test             # Run all tests
 pnpm test:unit        # Run unit tests only
 pnpm test:integration # Run integration tests only
 pnpm typecheck        # Type-check all packages
+pnpm format           # Format all files with Prettier
+pnpm format:check     # Check formatting (CI)
 pnpm clean            # Remove all build artifacts
 
 # Development
@@ -41,11 +43,13 @@ packages/
 - Use Zod for runtime validation
 - Tests colocated as `*.test.ts`
 - Conventional commits: `feat(core): add feature`
+- Format with Prettier before committing
 
 ## Key Files
 
 - `tsconfig.base.json` — Shared TypeScript configuration
 - `turbo.json` — Task orchestration
+- `.prettierrc` — Code formatting (applies to all packages)
 - `packages/core/src/index.ts` — Core package entry
 
 ## Package Guide
@@ -59,16 +63,19 @@ packages/
 ## Boundaries
 
 **Never:**
+
 - Commit secrets or API keys
 - Use `any` type without justification
 - Skip TypeScript strict checks
 
 **Ask first:**
+
 - Adding new dependencies
 - Creating new packages
 - Changing build configuration
 
 **Freely:**
+
 - Add tests
 - Fix type errors
 - Refactor within existing patterns

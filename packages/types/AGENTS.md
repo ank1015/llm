@@ -34,6 +34,7 @@ src/
 ## Key Types
 
 ### Core Types
+
 - `Api` — Union of supported providers: "openai" | "google" | "deepseek" | "anthropic" | "zai" | "kimi"
 - `Content` — Array of TextContent | ImageContent | FileContent
 - `Message` — Union of UserMessage | ToolResultMessage | BaseAssistantMessage | CustomMessage
@@ -44,16 +45,18 @@ src/
 - `MessageRequest` — Request body for /messages endpoints
 
 ### Agent Types
+
 - `AgentTool` — Tool definition with execute function for agent execution
 - `AgentToolResult<T>` — Tool execution result with content and details
 - `AgentState` — Agent state (messages, tools, provider, usage, limits)
 - `AgentLoopConfig` — Configuration for agent loop execution
-- `AgentEvent` — Events emitted during agent execution (turn_start, message_start, tool_execution_*, etc.)
+- `AgentEvent` — Events emitted during agent execution (turn*start, message_start, tool_execution*\*, etc.)
 - `Attachment` — File/image attachment for user messages
 - `QueuedMessage<T>` — Message queued for injection at next turn
 - `ToolExecutionContext` — Context provided to tools during execution
 
 ### Error Types
+
 - `LLMError` — Base error class with code, message, and status code
 - `LLMErrorCode` — Error codes (API_KEY_NOT_FOUND, MODEL_NOT_FOUND, etc.)
 

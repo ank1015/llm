@@ -5,10 +5,10 @@
  * user messages, assistant messages, tool results, and custom messages.
  */
 
-import type { Api } from "./api.js";
-import type { Content } from "./content.js";
-import type { Model } from "./model.js";
-import type { NativeResponseForApi } from "./providers/index.js";
+import type { Api } from './api.js';
+import type { Content } from './content.js';
+import type { Model } from './model.js';
+import type { NativeResponseForApi } from './providers/index.js';
 
 // ################################################################
 //  Stop Reason
@@ -17,7 +17,7 @@ import type { NativeResponseForApi } from "./providers/index.js";
 /**
  * Reason why the assistant stopped generating.
  */
-export type StopReason = "stop" | "length" | "toolUse" | "error" | "aborted";
+export type StopReason = 'stop' | 'length' | 'toolUse' | 'error' | 'aborted';
 
 // ################################################################
 //  Assistant Response Content Types
@@ -27,33 +27,37 @@ export type StopReason = "stop" | "length" | "toolUse" | "error" | "aborted";
  * Text/content response from the assistant.
  */
 export interface AssistantResponseContent {
-	type: "response";
-	content: Content;
+  type: 'response';
+  content: Content;
 }
 
 /**
  * Thinking/reasoning content from the assistant.
  */
 export interface AssistantThinkingContent {
-	type: "thinking";
-	thinkingText: string;
+  type: 'thinking';
+  thinkingText: string;
 }
 
 /**
  * Tool call made by the assistant.
  */
 export interface AssistantToolCall {
-	type: "toolCall";
-	name: string;
-	arguments: Record<string, unknown>;
-	toolCallId: string;
+  type: 'toolCall';
+  name: string;
+  arguments: Record<string, unknown>;
+  toolCallId: string;
 }
 
 /**
  * Array of assistant response content blocks.
  * Can include text responses, thinking, and tool calls.
  */
-export type AssistantResponse = (AssistantResponseContent | AssistantThinkingContent | AssistantToolCall)[];
+export type AssistantResponse = (
+  | AssistantResponseContent
+  | AssistantThinkingContent
+  | AssistantToolCall
+)[];
 
 // ################################################################
 //  Usage Tracking
@@ -63,24 +67,24 @@ export type AssistantResponse = (AssistantResponseContent | AssistantThinkingCon
  * Token usage and cost tracking for a response.
  */
 export interface Usage {
-	/** Non-cached input tokens */
-	input: number;
-	/** Output tokens */
-	output: number;
-	/** Tokens read from cache */
-	cacheRead: number;
-	/** Tokens written to cache */
-	cacheWrite: number;
-	/** Total tokens (input + output + cache) */
-	totalTokens: number;
-	/** Cost breakdown in USD */
-	cost: {
-		input: number;
-		output: number;
-		cacheRead: number;
-		cacheWrite: number;
-		total: number;
-	};
+  /** Non-cached input tokens */
+  input: number;
+  /** Output tokens */
+  output: number;
+  /** Tokens read from cache */
+  cacheRead: number;
+  /** Tokens written to cache */
+  cacheWrite: number;
+  /** Total tokens (input + output + cache) */
+  totalTokens: number;
+  /** Cost breakdown in USD */
+  cost: {
+    input: number;
+    output: number;
+    cacheRead: number;
+    cacheWrite: number;
+    total: number;
+  };
 }
 
 // ################################################################
@@ -91,34 +95,34 @@ export interface Usage {
  * User message containing text, images, or files.
  */
 export interface UserMessage {
-	role: "user";
-	id: string;
-	timestamp?: number;
-	/** Content supports text, images, and files */
-	content: Content;
+  role: 'user';
+  id: string;
+  timestamp?: number;
+  /** Content supports text, images, and files */
+  content: Content;
 }
 
 /**
  * Tool execution result message.
  */
 export interface ToolResultMessage<TDetails = unknown> {
-	role: "toolResult";
-	id: string;
-	toolName: string;
-	toolCallId: string;
-	/** Content supports text, images, and files */
-	content: Content;
-	/** Extra information not sent to model */
-	details?: TDetails;
-	isError: boolean;
-	/** Full error details if isError is true */
-	error?: {
-		message: string;
-		name?: string;
-		stack?: string;
-	};
-	/** Unix timestamp in milliseconds */
-	timestamp: number;
+  role: 'toolResult';
+  id: string;
+  toolName: string;
+  toolCallId: string;
+  /** Content supports text, images, and files */
+  content: Content;
+  /** Extra information not sent to model */
+  details?: TDetails;
+  isError: boolean;
+  /** Full error details if isError is true */
+  error?: {
+    message: string;
+    name?: string;
+    stack?: string;
+  };
+  /** Unix timestamp in milliseconds */
+  timestamp: number;
 }
 
 /**
@@ -127,31 +131,31 @@ export interface ToolResultMessage<TDetails = unknown> {
  * @template TApi - The API provider type
  */
 export interface BaseAssistantMessage<TApi extends Api> {
-	role: "assistant";
-	/** Native provider response (preserved for provider-specific access) */
-	message: NativeResponseForApi<TApi>;
-	api: TApi;
-	id: string;
-	model: Model<TApi>;
-	errorMessage?: string;
-	timestamp: number;
-	/** Response duration in milliseconds */
-	duration: number;
-	stopReason: StopReason;
-	/** Normalized content (unified format across providers) */
-	content: AssistantResponse;
-	usage: Usage;
+  role: 'assistant';
+  /** Native provider response (preserved for provider-specific access) */
+  message: NativeResponseForApi<TApi>;
+  api: TApi;
+  id: string;
+  model: Model<TApi>;
+  errorMessage?: string;
+  timestamp: number;
+  /** Response duration in milliseconds */
+  duration: number;
+  stopReason: StopReason;
+  /** Normalized content (unified format across providers) */
+  content: AssistantResponse;
+  usage: Usage;
 }
 
 /**
  * Custom message for application-specific metadata.
  */
 export interface CustomMessage {
-	role: "custom";
-	id: string;
-	/** Any custom data structure */
-	content: Record<string, unknown>;
-	timestamp?: number;
+  role: 'custom';
+  id: string;
+  /** Any custom data structure */
+  content: Record<string, unknown>;
+  timestamp?: number;
 }
 
 /**
@@ -166,30 +170,62 @@ export type Message = UserMessage | ToolResultMessage | BaseAssistantMessage<Api
 /**
  * Assistant message during streaming (without native message).
  */
-export type BaseAssistantEventMessage<TApi extends Api> = Omit<BaseAssistantMessage<TApi>, "message">;
+export type BaseAssistantEventMessage<TApi extends Api> = Omit<
+  BaseAssistantMessage<TApi>,
+  'message'
+>;
 
 /**
  * Streaming events emitted during assistant response generation.
  */
 export type BaseAssistantEvent<TApi extends Api> =
-	| { type: "start"; message: BaseAssistantEventMessage<TApi> }
-	| { type: "text_start"; contentIndex: number; message: BaseAssistantEventMessage<TApi> }
-	| { type: "text_delta"; contentIndex: number; delta: string; message: BaseAssistantEventMessage<TApi> }
-	| { type: "text_end"; contentIndex: number; content: Content; message: BaseAssistantEventMessage<TApi> }
-	| { type: "thinking_start"; contentIndex: number; message: BaseAssistantEventMessage<TApi> }
-	| { type: "thinking_delta"; contentIndex: number; delta: string; message: BaseAssistantEventMessage<TApi> }
-	| { type: "thinking_end"; contentIndex: number; content: string; message: BaseAssistantEventMessage<TApi> }
-	| { type: "toolcall_start"; contentIndex: number; message: BaseAssistantEventMessage<TApi> }
-	| { type: "toolcall_delta"; contentIndex: number; delta: string; message: BaseAssistantEventMessage<TApi> }
-	| {
-			type: "toolcall_end";
-			contentIndex: number;
-			toolCall: AssistantToolCall;
-			message: BaseAssistantEventMessage<TApi>;
-	  }
-	| {
-			type: "done";
-			reason: Extract<StopReason, "stop" | "length" | "toolUse">;
-			message: BaseAssistantEventMessage<TApi>;
-	  }
-	| { type: "error"; reason: Extract<StopReason, "aborted" | "error">; message: BaseAssistantEventMessage<TApi> };
+  | { type: 'start'; message: BaseAssistantEventMessage<TApi> }
+  | { type: 'text_start'; contentIndex: number; message: BaseAssistantEventMessage<TApi> }
+  | {
+      type: 'text_delta';
+      contentIndex: number;
+      delta: string;
+      message: BaseAssistantEventMessage<TApi>;
+    }
+  | {
+      type: 'text_end';
+      contentIndex: number;
+      content: Content;
+      message: BaseAssistantEventMessage<TApi>;
+    }
+  | { type: 'thinking_start'; contentIndex: number; message: BaseAssistantEventMessage<TApi> }
+  | {
+      type: 'thinking_delta';
+      contentIndex: number;
+      delta: string;
+      message: BaseAssistantEventMessage<TApi>;
+    }
+  | {
+      type: 'thinking_end';
+      contentIndex: number;
+      content: string;
+      message: BaseAssistantEventMessage<TApi>;
+    }
+  | { type: 'toolcall_start'; contentIndex: number; message: BaseAssistantEventMessage<TApi> }
+  | {
+      type: 'toolcall_delta';
+      contentIndex: number;
+      delta: string;
+      message: BaseAssistantEventMessage<TApi>;
+    }
+  | {
+      type: 'toolcall_end';
+      contentIndex: number;
+      toolCall: AssistantToolCall;
+      message: BaseAssistantEventMessage<TApi>;
+    }
+  | {
+      type: 'done';
+      reason: Extract<StopReason, 'stop' | 'length' | 'toolUse'>;
+      message: BaseAssistantEventMessage<TApi>;
+    }
+  | {
+      type: 'error';
+      reason: Extract<StopReason, 'aborted' | 'error'>;
+      message: BaseAssistantEventMessage<TApi>;
+    };
