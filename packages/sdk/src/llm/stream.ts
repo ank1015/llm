@@ -24,6 +24,32 @@ function parseSSELine(line: string): { event?: string; data?: string } | null {
 }
 
 /**
+ * Create an error response to end the stream.
+ */
+function createErrorResponse<TApi extends Api>(model: Model<TApi>, errorMessage: string): BaseAssistantMessage<TApi> {
+	return {
+		role: "assistant" as const,
+		message: {} as BaseAssistantMessage<TApi>["message"],
+		api: model.api,
+		id: "",
+		model: model,
+		errorMessage,
+		timestamp: Date.now(),
+		duration: 0,
+		stopReason: "error" as const,
+		content: [],
+		usage: {
+			input: 0,
+			output: 0,
+			cacheRead: 0,
+			cacheWrite: 0,
+			totalTokens: 0,
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+		},
+	} as BaseAssistantMessage<TApi>;
+}
+
+/**
  * Stream a chat request.
  *
  * If options.apiKey is provided, calls the provider directly via core.
@@ -51,8 +77,10 @@ export function stream<TApi extends Api>(
 	const eventStream = new AssistantMessageEventStream<TApi>();
 
 	// Start the fetch in the background
-	streamFromServer(model, context, options, eventStream).catch(() => {
-		// Error already handled in streamFromServer
+	streamFromServer(model, context, options, eventStream).catch((error) => {
+		// End the stream with an error response if streamFromServer throws
+		const errorMessage = error instanceof Error ? error.message : String(error);
+		eventStream.end(createErrorResponse(model, errorMessage));
 	});
 
 	return eventStream;
@@ -99,13 +127,7 @@ async function streamFromServer<TApi extends Api>(
 		fetchOptions.signal = signal;
 	}
 
-	let response: Response;
-	try {
-		response = await fetch(`${serverUrl}/messages/stream`, fetchOptions);
-	} catch (error) {
-		const message = error instanceof Error ? error.message : String(error);
-		throw new ProviderError(model.api, message);
-	}
+	const response = await fetch(`${serverUrl}/messages/stream`, fetchOptions);
 
 	if (!response.ok) {
 		const errorData = (await response.json()) as { message?: string };
@@ -122,81 +144,49 @@ async function streamFromServer<TApi extends Api>(
 	let currentEvent = "";
 	let finalMessage: BaseAssistantMessage<TApi> | null = null;
 
-	try {
-		while (true) {
-			const { done, value } = await reader.read();
+	while (true) {
+		const { done, value } = await reader.read();
 
-			if (done) break;
+		if (done) break;
 
-			buffer += decoder.decode(value, { stream: true });
+		buffer += decoder.decode(value, { stream: true });
 
-			// Process complete lines
-			const lines = buffer.split("\n");
-			buffer = lines.pop() ?? "";
+		// Process complete lines
+		const lines = buffer.split("\n");
+		buffer = lines.pop() ?? "";
 
-			for (const line of lines) {
-				const trimmed = line.trim();
-				if (!trimmed) continue;
+		for (const line of lines) {
+			const trimmed = line.trim();
+			if (!trimmed) continue;
 
-				const parsed = parseSSELine(trimmed);
-				if (!parsed) continue;
+			const parsed = parseSSELine(trimmed);
+			if (!parsed) continue;
 
-				if (parsed.event) {
-					currentEvent = parsed.event;
-				} else if (parsed.data && currentEvent) {
-					try {
-						const data: unknown = JSON.parse(parsed.data);
+			if (parsed.event) {
+				currentEvent = parsed.event;
+			} else if (parsed.data && currentEvent) {
+				const data: unknown = JSON.parse(parsed.data);
 
-						if (currentEvent === "message") {
-							// Final message
-							finalMessage = data as BaseAssistantMessage<TApi>;
-						} else if (currentEvent === "error") {
-							// Error event
-							const errorData = data as { message?: string };
-							const errorMessage = errorData.message ?? "Stream error";
-							throw new ProviderError(model.api, errorMessage);
-						} else {
-							// Regular event
-							eventStream.push(data as BaseAssistantEvent<TApi>);
-						}
-					} catch (parseError) {
-						if (parseError instanceof ProviderError) throw parseError;
-						// Ignore JSON parse errors for malformed data
-					}
-					currentEvent = "";
+				if (currentEvent === "message") {
+					// Final message
+					finalMessage = data as BaseAssistantMessage<TApi>;
+				} else if (currentEvent === "error") {
+					// Error event from server
+					const errorData = data as { message?: string };
+					throw new ProviderError(model.api, errorData.message ?? "Stream error");
+				} else {
+					// Regular event
+					eventStream.push(data as BaseAssistantEvent<TApi>);
 				}
+				currentEvent = "";
 			}
 		}
+	}
 
-		// End the stream with the final message
-		if (finalMessage) {
-			eventStream.end(finalMessage);
-		} else {
-			throw new StreamError("No final message received");
-		}
-	} catch (error) {
-		// Create an error message to end the stream
-		const errorMessage = error instanceof Error ? error.message : String(error);
-		const errorResponse = {
-			role: "assistant" as const,
-			message: {} as BaseAssistantMessage<TApi>["message"],
-			api: model.api,
-			id: "",
-			model: model,
-			errorMessage,
-			timestamp: Date.now(),
-			duration: 0,
-			stopReason: "error" as const,
-			content: [],
-			usage: {
-				input: 0,
-				output: 0,
-				cacheRead: 0,
-				cacheWrite: 0,
-				totalTokens: 0,
-				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-			},
-		} as BaseAssistantMessage<TApi>;
-		eventStream.end(errorResponse);
+	// End the stream with the final message
+	if (finalMessage) {
+		eventStream.end(finalMessage);
+	} else {
+		throw new StreamError("No final message received");
 	}
 }

@@ -17,6 +17,10 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
     "typecheck": "tsc --noEmit",
     "lint": "echo 'No linter configured yet'",
     "clean": "rm -rf dist *.tsbuildinfo"
@@ -34,5 +38,8 @@
   "dependencies": {
     "@ank1015/llm-types": "workspace:^",
     "@ank1015/llm-core": "workspace:^"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.0"
   }
 }
