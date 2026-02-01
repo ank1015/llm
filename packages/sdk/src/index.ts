@@ -14,6 +14,24 @@ export { setServerUrl, getServerUrl } from "./config.js";
 // LLM functions (our wrapped versions)
 export { complete, stream } from "./llm/index.js";
 
+// LLM Client (for dependency injection)
+export { DefaultLLMClient, getMockMessage } from "./llm/llm-client.js";
+export type { LLMClient } from "./llm/llm-client.js";
+
+// Agent
+export {
+	Conversation,
+	DefaultAgentRunner,
+	buildUserMessage,
+	buildToolResultMessage,
+} from "./agent/index.js";
+export type {
+	AgentOptions,
+	AgentRunner,
+	AgentRunnerCallbacks,
+	AgentRunnerOptions,
+} from "./agent/index.js";
+
 // Re-export everything else from core (except complete/stream which we override)
 export {
 	VERSION,
@@ -30,6 +48,7 @@ export {
 	sanitizeSurrogates,
 	validateToolCall,
 	validateToolArguments,
+	generateUUID,
 	// Provider-specific functions (for direct access if needed)
 	completeAnthropic,
 	streamAnthropic,
@@ -102,6 +121,16 @@ export type {
 	// Errors
 	LLMErrorCode,
 	LLMErrorResponse,
+	// Agent types
+	ToolExecutionContext,
+	AgentToolResult,
+	Attachment,
+	AgentToolUpdateCallback,
+	AgentTool,
+	QueuedMessage,
+	AgentState,
+	AgentLoopConfig,
+	AgentEvent,
 } from "@ank1015/llm-types";
 
 // Re-export runtime values from types

@@ -70,3 +70,15 @@ export {
 	ContextOverflowError,
 	StreamError,
 } from "./errors.js";
+
+export type {
+	ToolExecutionContext,
+	AgentToolResult,
+	Attachment,
+	AgentToolUpdateCallback,
+	AgentTool,
+	QueuedMessage,
+	AgentState,
+	AgentLoopConfig,
+	AgentEvent
+} from './agent-types.js'

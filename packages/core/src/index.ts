@@ -20,16 +20,17 @@ export {
 	sanitizeSurrogates,
 	validateToolCall,
 	validateToolArguments,
+	generateUUID
 } from "./utils/index.js";
 export type { CompleteFunction, StreamFunction } from "./utils/index.js";
 
 // Providers
-export { completeAnthropic, streamAnthropic } from "./providers/anthropic/index.js";
-export { completeOpenAI, streamOpenAI } from "./providers/openai/index.js";
-export { completeGoogle, streamGoogle, GoogleThinkingLevel } from "./providers/google/index.js";
-export { completeDeepSeek, streamDeepSeek } from "./providers/deepseek/index.js";
-export { completeZai, streamZai } from "./providers/zai/index.js";
-export { completeKimi, streamKimi } from "./providers/kimi/index.js";
+export * from "./providers/anthropic/index.js";
+export * from "./providers/openai/index.js";
+export * from "./providers/google/index.js";
+export * from "./providers/deepseek/index.js";
+export * from "./providers/zai/index.js";
+export * from "./providers/kimi/index.js";
 
 // LLM - Central entry point (dispatches to providers)
 export { complete, stream } from "./llm/index.js";
