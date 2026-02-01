@@ -58,6 +58,9 @@ importers:
         specifier: workspace:^
         version: link:../types
     devDependencies:
+      '@sinclair/typebox':
+        specifier: ^0.34.48
+        version: 0.34.48
       vitest:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@25.1.0)(lightningcss@1.30.2)

@@ -8,7 +8,7 @@ Unified SDK for LLM interactions with multiple providers. This is the main entry
 - `pnpm dev` — Watch mode compilation
 - `pnpm test` — Run all tests
 - `pnpm test:unit` — Run unit tests
-- `pnpm test:integration` — Run integration tests
+- `pnpm test:integration` — Run integration tests (requires API keys and server)
 - `pnpm typecheck` — Type-check without emitting
 
 ## Structure
@@ -28,8 +28,25 @@ src/
     runner.ts       — AgentRunner interface and DefaultAgentRunner (execution logic)
     utils.ts        — Utility functions (buildUserMessage, buildToolResultMessage)
 tests/
-  unit/             — Unit tests
-  integration/      — Integration tests
+  unit/
+    llm/            — LLM function unit tests
+      complete.test.ts
+      stream.test.ts
+    conversation/   — Conversation unit tests
+      state.test.ts      — State management tests
+      runner.test.ts     — AgentRunner tests
+      execution.test.ts  — Tool execution tests
+  integration/
+    complete.test.ts     — LLM complete integration tests
+    stream.test.ts       — LLM stream integration tests
+    conversation/        — Conversation integration tests (per provider)
+      anthropic.test.ts
+      openai.test.ts
+      google.test.ts
+      deepseek.test.ts
+      kimi.test.ts
+      zai.test.ts
+      budget.test.ts     — Cost/context limit tests
 ```
 
 ## Key Exports
@@ -98,7 +115,7 @@ const searchTool: AgentTool = {
 };
 
 const conversation = new Conversation();
-conversation.setProvider({ model: getModel("anthropic", "claude-sonnet-4-20250514") });
+conversation.setProvider({ model: getModel("anthropic", "claude-sonnet-4-20250514")! });
 conversation.setTools([searchTool]);
 
 // Subscribe to events
@@ -110,12 +127,34 @@ conversation.subscribe((event) => {
 const messages = await conversation.prompt("Search for TypeScript tutorials");
 ```
 
+## Testing
+
+### Unit Tests
+Unit tests use mocks and don't require API keys or server:
+```bash
+pnpm test:unit
+```
+
+### Integration Tests
+Integration tests require:
+1. Server running on localhost:3001 with API keys configured
+2. Or environment variables set (ANTHROPIC_API_KEY, OPENAI_API_KEY, etc.)
+
+```bash
+# Start server first
+pnpm dev:server
+
+# Run integration tests
+pnpm test:integration
+```
+
 ## Conventions
 
 - Use this package as the primary import for consumers
 - Server URL defaults to http://localhost:3001
 - Options are optional; without apiKey, routes to server
 - Agent events are for UI updates; messages array is the source of truth
+- Use `exactOptionalPropertyTypes` — conditionally set optional properties, don't assign undefined
 
 ## Dependencies
 
