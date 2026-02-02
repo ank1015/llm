@@ -19,11 +19,26 @@ src/
     page.tsx
     globals.css
     api/
-      ... route.ts files for chat/provider/key/session/usage APIs
+      keys/
+        route.ts              — GET: list providers with key status
+        [provider]/route.ts   — PUT: set key, DELETE: delete key
   lib/
     api/
-      placeholder.ts
+      keys.ts                 — Keys adapter factory and helpers
+      response.ts             — API response utilities
 ```
+
+## API Endpoints
+
+### Keys API
+
+- `GET /api/keys` — List all providers and whether they have a key stored
+- `PUT /api/keys/[provider]` — Set API key (body: `{ "key": "..." }`)
+- `DELETE /api/keys/[provider]` — Delete API key
+
+## Dependencies
+
+- Depends on: @ank1015/llm-sdk (for adapters)
 
 ## Conventions
 
