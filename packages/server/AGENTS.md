@@ -21,6 +21,7 @@ src/
     index.ts            — Service exports
     keys.ts             — API key management (encrypted storage)
     db.ts               — SQLite database for usage tracking
+    sessions.ts         — Session management (JSONL-based tree storage)
   routes/
     index.ts            — Route exports
     messages.ts         — /messages/complete and /messages/stream endpoints
@@ -126,6 +127,7 @@ Returns:
 - `app` — Hono application instance
 - `KeyService` — API key management service
 - `DbService` — SQLite database service for messages
+- `SessionService` — Session management service (JSONL tree storage)
 
 ## Services
 
@@ -158,6 +160,31 @@ Methods:
 - `getMessages(options)` — Query messages with filters
 - `deleteMessage(id)` — Delete a message
 - `getUsageStats(options)` — Get usage statistics
+
+### SessionService
+
+Manages session files stored as JSONL with tree structure for branching conversations.
+
+- Storage: `~/.llm/sessions/<projectName>/<path>/<sessionId>.jsonl`
+- Format: Append-only JSONL (header can be updated for name changes)
+- Node types: SessionHeader, MessageNode, CustomNode
+
+Methods:
+
+- `createSession(projectName, path?, sessionName?)` — Create a new session
+- `getSession(projectName, path, sessionId)` — Get full session with all nodes
+- `deleteSession(projectName, path, sessionId)` — Delete a session file
+- `updateSessionName(projectName, path, sessionId, name)` — Update session name
+- `appendMessage(projectName, path, sessionId?, parentId, branch, message, api, modelId, options?)` — Add message node
+- `appendCustom(projectName, path, sessionId, parentId, branch, payload)` — Add custom node
+- `listSessions(projectName, path?)` — List sessions in a project/path
+- `listProjects()` — List all projects
+- `getBranches(projectName, path, sessionId)` — Get branch info for a session
+- `getBranchHistory(projectName, path, sessionId, branch)` — Get linear history of a branch
+- `getLatestNode(projectName, path, sessionId, branch?)` — Get latest node
+- `getNode(projectName, path, sessionId, nodeId)` — Get specific node by ID
+- `getMessages(projectName, path, sessionId, branch?)` — Get message nodes only
+- `searchSessions(projectName, path, query)` — Search sessions by name
 
 ## Error Handling
 

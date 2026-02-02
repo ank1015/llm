@@ -11,7 +11,7 @@ import { cors } from 'hono/cors';
 import { messagesRoutes, keysRoutes, usagesRoutes } from './routes/index.js';
 
 // Services
-export { KeyService, DbService } from './services/index.js';
+export { KeyService, DbService, SessionService } from './services/index.js';
 
 export const app = new Hono();
 
