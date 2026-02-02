@@ -7,7 +7,6 @@
 import { InvalidRequestError, isValidApi, LLMError } from '@ank1015/llm-types';
 import { Hono } from 'hono';
 
-
 import { SessionService } from '../services/index.js';
 
 import type { Api, Message } from '@ank1015/llm-types';
@@ -130,6 +129,7 @@ app.post('/:projectName', async (c) => {
  * Query params:
  * - path: Path within project (optional)
  */
+// eslint-disable-next-line sonarjs/no-duplicate-string
 app.get('/:projectName/:sessionId', (c) => {
   const projectName = c.req.param('projectName');
   const sessionId = c.req.param('sessionId');
@@ -208,6 +208,7 @@ app.patch('/:projectName/:sessionId', async (c) => {
     const body = await c.req.json();
 
     if (!body || typeof body !== 'object') {
+      // eslint-disable-next-line sonarjs/no-duplicate-string
       throw new InvalidRequestError('Request body is required');
     }
 

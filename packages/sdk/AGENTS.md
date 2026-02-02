@@ -27,6 +27,9 @@ src/
     conversation.ts — Conversation class (state management, event emitting)
     runner.ts       — AgentRunner interface and DefaultAgentRunner (execution logic)
     utils.ts        — Utility functions (buildUserMessage, buildToolResultMessage)
+  session/
+    index.ts        — Session module exports
+    session-client.ts — SessionClient interface and DefaultSessionClient
 tests/
   unit/
     llm/            — LLM function unit tests
@@ -73,6 +76,14 @@ These functions automatically route:
 
 - `setServerUrl(url)` — Set the server URL (default: http://localhost:3001)
 - `getServerUrl()` — Get the current server URL
+
+### Session Client
+
+- `sessionClient` — Default session client instance
+- `DefaultSessionClient` — Default implementation of SessionClient
+- `SessionClient` (interface) — Interface for dependency injection/testing
+
+Methods: `listProjects()`, `listSessions()`, `searchSessions()`, `createSession()`, `getSession()`, `deleteSession()`, `updateSessionName()`, `appendMessage()`, `appendCustom()`, `getBranches()`, `getBranchHistory()`, `getNode()`, `getLatestNode()`, `getMessages()`
 
 ### From Core
 
@@ -130,6 +141,34 @@ conversation.subscribe((event) => {
 
 // Run a prompt
 const messages = await conversation.prompt('Search for TypeScript tutorials');
+```
+
+### Session Management
+
+```typescript
+import { sessionClient, setServerUrl } from '@ank1015/llm-sdk';
+
+setServerUrl('http://localhost:3001');
+
+// Create a session
+const { sessionId, header } = await sessionClient.createSession('my-project', '', 'My Chat');
+
+// Append a message
+await sessionClient.appendMessage(
+  'my-project',
+  sessionId,
+  header.id, // parentId
+  'main', // branch
+  { role: 'user', id: 'msg-1', content: [{ type: 'text', text: 'Hello!' }] },
+  'anthropic',
+  'claude-sonnet-4-20250514'
+);
+
+// Get the session
+const session = await sessionClient.getSession('my-project', sessionId);
+
+// List all sessions
+const { sessions } = await sessionClient.listSessions('my-project');
 ```
 
 ## Testing

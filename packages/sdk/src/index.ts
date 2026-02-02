@@ -32,6 +32,24 @@ export type {
   AgentRunnerOptions,
 } from './agent/index.js';
 
+// Session Client
+export { sessionClient, DefaultSessionClient } from './session/index.js';
+export type {
+  SessionClient,
+  ListProjectsResponse,
+  ListSessionsResponse,
+  SearchSessionsResponse,
+  CreateSessionResponse,
+  DeleteSessionResponse,
+  UpdateSessionNameResponse,
+  AppendMessageResponse,
+  AppendCustomResponse,
+  GetBranchesResponse,
+  GetBranchHistoryResponse,
+  GetLatestNodeResponse,
+  GetMessagesResponse,
+} from './session/index.js';
+
 // Re-export everything else from core (except complete/stream which we override)
 export {
   VERSION,
@@ -131,6 +149,21 @@ export type {
   AgentState,
   AgentLoopConfig,
   AgentEvent,
+  // Session types
+  BaseNode,
+  SessionHeader,
+  MessageNode,
+  CustomNode,
+  SessionNode,
+  AppendableNode,
+  SessionLocation,
+  SessionSummary,
+  Session,
+  BranchInfo,
+  CreateSessionInput,
+  AppendMessageInput,
+  AppendCustomInput,
+  UpdateSessionNameInput,
 } from '@ank1015/llm-types';
 
 // Re-export runtime values from types
