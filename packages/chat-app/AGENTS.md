@@ -18,6 +18,11 @@ src/
     layout.tsx
     page.tsx
     globals.css
+    api/
+      ... route.ts files for chat/provider/key/session/usage APIs
+  lib/
+    api/
+      placeholder.ts
 ```
 
 ## Conventions
@@ -25,3 +30,4 @@ src/
 - Use App Router (Next.js 14+)
 - Use strict TypeScript
 - Server Components by default
+- Scaffold new API routes first, then fill business logic incrementally
