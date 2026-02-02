@@ -2,27 +2,12 @@
 
 import { create } from 'zustand';
 
-import type { AgentEvent, Api, Attachment, MessageNode } from '@ank1015/llm-sdk';
+import type { ConversationTurnRequest, SessionRef } from '@/lib/contracts';
+import type { AgentEvent, MessageNode } from '@ank1015/llm-sdk';
 
-type SessionScope = {
-  projectName?: string;
-  path?: string;
-};
+import { getSessionMessages, promptConversation, streamConversation } from '@/lib/client-api';
 
-type SessionRef = SessionScope & {
-  sessionId: string;
-};
-
-type ChatPromptInput = SessionRef & {
-  prompt: string;
-  api: Api;
-  modelId: string;
-  branch?: string;
-  parentId?: string;
-  providerOptions?: Record<string, unknown>;
-  systemPrompt?: string;
-  attachments?: Attachment[];
-};
+type ChatPromptInput = ConversationTurnRequest;
 
 type PendingPrompt = {
   id: string;
@@ -51,22 +36,6 @@ type ChatStoreState = {
   sendMessage: (input: ChatPromptInput) => Promise<void>;
   startStream: (input: ChatPromptInput) => Promise<void>;
   abortStream: (session: SessionRef) => void;
-};
-
-type MessagesApiResponse = {
-  ok: boolean;
-  messages: MessageNode[];
-};
-
-type PromptApiResponse = {
-  ok: boolean;
-  nodes: MessageNode[];
-};
-
-type ApiErrorResponse = {
-  error?: {
-    message?: string;
-  };
 };
 
 const MAX_AGENT_EVENTS = 200;
@@ -140,177 +109,6 @@ function mergeMessageNodes(existing: MessageNode[], incoming: MessageNode[]): Me
   return merged;
 }
 
-function buildMessagesUrl(params: SessionRef & { branch?: string }): string {
-  const search = new URLSearchParams();
-
-  if (params.projectName) {
-    search.set('projectName', params.projectName);
-  }
-
-  if (params.path) {
-    search.set('path', params.path);
-  }
-
-  const branch = normalizeText(params.branch);
-  if (branch) {
-    search.set('branch', branch);
-  }
-
-  const queryString = search.toString();
-  const base = `/api/sessions/${encodeURIComponent(params.sessionId)}/messages`;
-  return queryString.length > 0 ? `${base}?${queryString}` : base;
-}
-
-function buildStreamUrl(params: SessionRef): string {
-  return `/api/sessions/${encodeURIComponent(params.sessionId)}/stream`;
-}
-
-async function parseJsonResponse<T>(response: Response): Promise<T> {
-  const data = (await response.json().catch(() => ({}))) as T & ApiErrorResponse & { ok?: boolean };
-
-  if (!response.ok || data.ok === false) {
-    throw new Error(data.error?.message ?? 'API request failed.');
-  }
-
-  return data;
-}
-
-function buildPromptBody(input: ChatPromptInput): Record<string, unknown> {
-  const body: Record<string, unknown> = {
-    prompt: input.prompt,
-    api: input.api,
-    modelId: input.modelId,
-  };
-
-  const projectName = normalizeText(input.projectName);
-  const path = normalizeText(input.path);
-  const branch = normalizeText(input.branch);
-  const parentId = normalizeText(input.parentId);
-  const systemPrompt = normalizeText(input.systemPrompt);
-
-  if (projectName) {
-    body.projectName = projectName;
-  }
-
-  if (path) {
-    body.path = path;
-  }
-
-  if (branch) {
-    body.branch = branch;
-  }
-
-  if (parentId) {
-    body.parentId = parentId;
-  }
-
-  if (systemPrompt) {
-    body.systemPrompt = systemPrompt;
-  }
-
-  if (input.providerOptions && Object.keys(input.providerOptions).length > 0) {
-    body.providerOptions = input.providerOptions;
-  }
-
-  if (input.attachments && input.attachments.length > 0) {
-    body.attachments = input.attachments;
-  }
-
-  return body;
-}
-
-function parseSseBlock(block: string): { event: string; data: unknown } | null {
-  if (block.trim().length === 0) {
-    return null;
-  }
-
-  let event = 'message';
-  const dataLines: string[] = [];
-
-  for (const line of block.split('\n')) {
-    if (line.startsWith('event:')) {
-      event = line.slice('event:'.length).trim();
-      continue;
-    }
-
-    if (line.startsWith('data:')) {
-      dataLines.push(line.slice('data:'.length).trim());
-    }
-  }
-
-  if (dataLines.length === 0) {
-    return { event, data: null };
-  }
-
-  const rawData = dataLines.join('\n');
-
-  try {
-    return { event, data: JSON.parse(rawData) };
-  } catch {
-    return { event, data: rawData };
-  }
-}
-
-// eslint-disable-next-line sonarjs/cognitive-complexity
-async function consumeEventStream(
-  response: Response,
-  handlers: {
-    onAgentEvent: (event: AgentEvent) => void;
-    onError: (message: string) => void;
-  }
-): Promise<void> {
-  const body = response.body;
-  if (!body) {
-    throw new Error('Missing stream body from server.');
-  }
-
-  const reader = body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) {
-        break;
-      }
-
-      buffer += decoder.decode(value, { stream: true });
-
-      while (true) {
-        const boundaryIndex = buffer.indexOf('\n\n');
-        if (boundaryIndex === -1) {
-          break;
-        }
-
-        const chunk = buffer.slice(0, boundaryIndex);
-        buffer = buffer.slice(boundaryIndex + 2);
-
-        const parsed = parseSseBlock(chunk);
-        if (!parsed) {
-          continue;
-        }
-
-        if (parsed.event === 'agent_event' && parsed.data && typeof parsed.data === 'object') {
-          handlers.onAgentEvent(parsed.data as AgentEvent);
-          continue;
-        }
-
-        if (parsed.event === 'error') {
-          const message =
-            parsed.data && typeof parsed.data === 'object' && 'message' in parsed.data
-              ? String((parsed.data as { message?: unknown }).message ?? 'Stream failed.')
-              : 'Stream failed.';
-          handlers.onError(message);
-          throw new Error(message);
-        }
-      }
-    }
-  } finally {
-    reader.releaseLock();
-  }
-}
-
 function resolveSession(options: {
   activeSession: SessionRef | null;
   session?: SessionRef;
@@ -368,6 +166,19 @@ function markPendingFailed(
           }
         : item
     ),
+  };
+}
+
+function normalizePromptInput(input: ChatPromptInput): ChatPromptInput {
+  return {
+    ...input,
+    projectName: normalizeText(input.projectName),
+    path: normalizeText(input.path),
+    prompt: input.prompt,
+    branch: normalizeText(input.branch),
+    parentId: normalizeText(input.parentId),
+    systemPrompt: normalizeText(input.systemPrompt),
+    attachments: input.attachments,
   };
 }
 
@@ -483,20 +294,10 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     }));
 
     try {
-      const response = await fetch(
-        buildMessagesUrl({
-          ...session,
-          branch: options?.branch,
-        }),
-        {
-          method: 'GET',
-          headers: {
-            Accept: 'application/json',
-          },
-        }
-      );
-
-      const payload = await parseJsonResponse<MessagesApiResponse>(response);
+      const payload = await getSessionMessages({
+        ...session,
+        branch: options?.branch,
+      });
 
       if ((messageLoadRequestIds.get(key) ?? 0) !== nextRequestId) {
         return;
@@ -531,9 +332,10 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
   },
 
   sendMessage: async (input) => {
-    const session = normalizeSessionRef(input);
+    const normalizedInput = normalizePromptInput(input);
+    const session = normalizeSessionRef(normalizedInput);
     const key = getSessionKey(session);
-    const prompt = input.prompt.trim();
+    const prompt = normalizedInput.prompt.trim();
 
     if (prompt.length === 0) {
       throw new Error('Prompt cannot be empty.');
@@ -550,16 +352,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     }));
 
     try {
-      const response = await fetch(buildMessagesUrl(session), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        body: JSON.stringify(buildPromptBody(input)),
-      });
-
-      const payload = await parseJsonResponse<PromptApiResponse>(response);
+      const payload = await promptConversation(normalizedInput);
 
       set((state) => ({
         messagesBySession: {
@@ -593,9 +386,10 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
   },
 
   startStream: async (input) => {
-    const session = normalizeSessionRef(input);
+    const normalizedInput = normalizePromptInput(input);
+    const session = normalizeSessionRef(normalizedInput);
     const key = getSessionKey(session);
-    const prompt = input.prompt.trim();
+    const prompt = normalizedInput.prompt.trim();
 
     if (prompt.length === 0) {
       throw new Error('Prompt cannot be empty.');
@@ -628,49 +422,43 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     }));
 
     try {
-      const response = await fetch(buildStreamUrl(session), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'text/event-stream',
-        },
-        body: JSON.stringify(buildPromptBody(input)),
-        signal: controller.signal,
-      });
+      await streamConversation(
+        normalizedInput,
+        {
+          onEvent: (eventName, data) => {
+            if (eventName === 'agent_event') {
+              set((state) => {
+                const existingEvents = state.agentEventsBySession[key] ?? [];
+                const nextEvents = [...existingEvents, data as AgentEvent];
 
-      if (!response.ok) {
-        await parseJsonResponse<Record<string, never>>(response);
-      }
+                if (nextEvents.length > MAX_AGENT_EVENTS) {
+                  nextEvents.splice(0, nextEvents.length - MAX_AGENT_EVENTS);
+                }
 
-      await consumeEventStream(response, {
-        onAgentEvent: (event) => {
-          set((state) => {
-            const existingEvents = state.agentEventsBySession[key] ?? [];
-            const nextEvents = [...existingEvents, event];
-
-            if (nextEvents.length > MAX_AGENT_EVENTS) {
-              nextEvents.splice(0, nextEvents.length - MAX_AGENT_EVENTS);
+                return {
+                  agentEventsBySession: {
+                    ...state.agentEventsBySession,
+                    [key]: nextEvents,
+                  },
+                };
+              });
             }
 
-            return {
-              agentEventsBySession: {
-                ...state.agentEventsBySession,
-                [key]: nextEvents,
-              },
-            };
-          });
+            if (eventName === 'error') {
+              const message = (data as { message: string }).message;
+              set((state) => ({
+                errorsBySession: {
+                  ...state.errorsBySession,
+                  [key]: message,
+                },
+              }));
+            }
+          },
         },
-        onError: (message) => {
-          set((state) => ({
-            errorsBySession: {
-              ...state.errorsBySession,
-              [key]: message,
-            },
-          }));
-        },
-      });
+        controller.signal
+      );
 
-      await get().loadMessages({ session, branch: input.branch, force: true });
+      await get().loadMessages({ session, branch: normalizedInput.branch, force: true });
 
       set((state) => ({
         pendingPromptsBySession: removePendingPrompt(

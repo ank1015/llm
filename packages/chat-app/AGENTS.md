@@ -36,6 +36,15 @@ src/
       sessions.ts             — Sessions adapter factory and helpers
       conversation.ts         — Conversation turn logic (shared by messages/stream)
       response.ts             — API response utilities
+    client-api/
+      index.ts                — Client API exports
+      http.ts                 — HTTP utilities (apiRequestJson, buildQueryString)
+      catalog.ts              — getProvidersCatalog, getModelsCatalog
+      sessions.ts             — listSessions
+      conversation.ts         — getSessionMessages, promptConversation, streamConversation
+    contracts/
+      index.ts                — Contract exports
+      api.ts                  — Shared API types (SessionRef, request/response types)
   stores/
     index.ts                  — Store exports
     chat-store.ts             — Chat state per session (messages, streaming, pending prompts)

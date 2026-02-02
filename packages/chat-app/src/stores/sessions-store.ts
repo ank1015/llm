@@ -2,19 +2,10 @@
 
 import { create } from 'zustand';
 
+import type { SessionScope } from '@/lib/contracts';
 import type { SessionSummary } from '@ank1015/llm-sdk';
 
-type SessionScope = {
-  projectName?: string;
-  path?: string;
-};
-
-type SessionsApiResponse = {
-  ok: boolean;
-  total: number;
-  count: number;
-  sessions: SessionSummary[];
-};
+import { listSessions } from '@/lib/client-api';
 
 type SessionsStoreState = {
   sessions: SessionSummary[];
@@ -77,67 +68,6 @@ function mergeSessions(existing: SessionSummary[], incoming: SessionSummary[]): 
   return merged;
 }
 
-function buildSessionsUrl(params: {
-  scope: SessionScope;
-  query: string;
-  limit: number;
-  offset: number;
-}): string {
-  const search = new URLSearchParams();
-
-  if (params.scope.projectName) {
-    search.set('projectName', params.scope.projectName);
-  }
-
-  if (params.scope.path) {
-    search.set('path', params.scope.path);
-  }
-
-  const trimmedQuery = params.query.trim();
-  if (trimmedQuery.length > 0) {
-    search.set('query', trimmedQuery);
-  }
-
-  search.set('limit', String(params.limit));
-  search.set('offset', String(params.offset));
-
-  const queryString = search.toString();
-  return queryString.length > 0 ? `/api/sessions?${queryString}` : '/api/sessions';
-}
-
-async function fetchSessions(params: {
-  scope: SessionScope;
-  query: string;
-  limit: number;
-  offset: number;
-}): Promise<SessionsApiResponse> {
-  const response = await fetch(buildSessionsUrl(params), {
-    method: 'GET',
-    headers: {
-      Accept: 'application/json',
-    },
-  });
-
-  const body = (await response.json().catch(() => ({}))) as Partial<SessionsApiResponse> & {
-    error?: { message?: string };
-  };
-
-  if (!response.ok || !body.ok) {
-    throw new Error(body.error?.message ?? 'Failed to load sessions.');
-  }
-
-  if (!Array.isArray(body.sessions)) {
-    throw new Error('Malformed sessions response.');
-  }
-
-  return {
-    ok: true,
-    total: typeof body.total === 'number' ? body.total : body.sessions.length,
-    count: typeof body.count === 'number' ? body.count : body.sessions.length,
-    sessions: body.sessions,
-  };
-}
-
 const initialState = {
   sessions: [] as SessionSummary[],
   query: '',
@@ -189,8 +119,8 @@ export const useSessionsStore = create<SessionsStoreState>((set, get) => ({
     });
 
     try {
-      const result = await fetchSessions({
-        scope,
+      const result = await listSessions({
+        ...scope,
         query,
         limit: pageSize,
         offset: 0,
@@ -232,8 +162,8 @@ export const useSessionsStore = create<SessionsStoreState>((set, get) => ({
     set({ isLoadingMore: true, error: null });
 
     try {
-      const result = await fetchSessions({
-        scope,
+      const result = await listSessions({
+        ...scope,
         query,
         limit: pageSize,
         offset,
@@ -276,8 +206,8 @@ export const useSessionsStore = create<SessionsStoreState>((set, get) => ({
     });
 
     try {
-      const result = await fetchSessions({
-        scope,
+      const result = await listSessions({
+        ...scope,
         query,
         limit: pageSize,
         offset: 0,

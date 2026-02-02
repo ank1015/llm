@@ -2,16 +2,8 @@
 
 import { create } from 'zustand';
 
+import type { SessionRef } from '@/lib/contracts';
 import type { Attachment } from '@ank1015/llm-sdk';
-
-type SessionScope = {
-  projectName?: string;
-  path?: string;
-};
-
-type SessionRef = SessionScope & {
-  sessionId: string;
-};
 
 type ComposerSnapshot = {
   draft: string;

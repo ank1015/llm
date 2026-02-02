@@ -2,35 +2,10 @@
 
 import { create } from 'zustand';
 
+import type { ProviderInfo } from '@/lib/contracts';
 import type { Api, Model } from '@ank1015/llm-sdk';
 
-type ModelInput = 'text' | 'image' | 'file';
-
-type ProviderInfo = {
-  api: Api;
-  hasKey: boolean;
-  modelCount: number;
-  available: boolean;
-  supportsReasoning: boolean;
-  supportsTools: boolean;
-  supportedInputs: ModelInput[];
-};
-
-type ProvidersApiResponse = {
-  ok: boolean;
-  providers: ProviderInfo[];
-};
-
-type ModelsApiResponse = {
-  ok: boolean;
-  models: Model<Api>[];
-};
-
-type ApiErrorResponse = {
-  error?: {
-    message?: string;
-  };
-};
+import { getModelsCatalog, getProvidersCatalog } from '@/lib/client-api';
 
 type ProvidersStoreState = {
   providers: ProviderInfo[];
@@ -133,25 +108,8 @@ function resolveSelection(params: {
   };
 }
 
-async function parseJsonResponse<T>(response: Response): Promise<T> {
-  const data = (await response.json().catch(() => ({}))) as T & ApiErrorResponse & { ok?: boolean };
-
-  if (!response.ok || data.ok === false) {
-    throw new Error(data.error?.message ?? 'API request failed.');
-  }
-
-  return data;
-}
-
 async function fetchProvidersApi(): Promise<ProviderInfo[]> {
-  const response = await fetch('/api/providers', {
-    method: 'GET',
-    headers: {
-      Accept: 'application/json',
-    },
-  });
-
-  const payload = await parseJsonResponse<ProvidersApiResponse>(response);
+  const payload = await getProvidersCatalog();
   if (!Array.isArray(payload.providers)) {
     throw new Error('Malformed providers response.');
   }
@@ -160,14 +118,7 @@ async function fetchProvidersApi(): Promise<ProviderInfo[]> {
 }
 
 async function fetchModelsApi(): Promise<Model<Api>[]> {
-  const response = await fetch('/api/models', {
-    method: 'GET',
-    headers: {
-      Accept: 'application/json',
-    },
-  });
-
-  const payload = await parseJsonResponse<ModelsApiResponse>(response);
+  const payload = await getModelsCatalog();
   if (!Array.isArray(payload.models)) {
     throw new Error('Malformed models response.');
   }
@@ -369,4 +320,4 @@ export const useProvidersStore = create<ProvidersStoreState>((set) => ({
   },
 }));
 
-export type { ModelInput, ProviderInfo };
+export type { ProviderInfo };
