@@ -34,6 +34,7 @@ src/
     json-parse.ts       — Streaming JSON parser
     overflow.ts         — Context overflow detection
     sanitize-unicode.ts — Unicode surrogate sanitization
+    uuid.ts             — UUID generation
     validation.ts       — Tool argument validation (AJV)
     types.ts            — CompleteFunction and StreamFunction type definitions
   providers/
@@ -69,10 +70,13 @@ src/
       utils.ts          — Provider-specific utilities
 tests/
   unit/                 — Unit tests (no API calls)
+    agent/              — Agent runner, utils, mock tests
     llm/                — Central dispatcher tests
     providers/          — Provider utility tests
     utils/              — Utility function tests
+    models.test.ts      — Model utilities tests
   integration/          — Integration tests (require API keys)
+    agent/              — Agent runner integration tests
     anthropic/          — Anthropic API tests
     openai/             — OpenAI API tests
     google/             — Google/Gemini API tests
@@ -100,6 +104,8 @@ tests/
 - `completeKimi` / `streamKimi` — Kimi/Moonshot provider functions
 - `completeZai` / `streamZai` — Z.AI provider functions
 - `EventStream` / `AssistantMessageEventStream` — Streaming utilities
+- `generateUUID()` — Generate unique identifiers
+- `validateToolArguments(tool, toolCall)` — Validate tool call arguments
 
 ## Conventions
 
@@ -121,4 +127,4 @@ tests/
 ## Dependencies
 
 - Depends on: @ank1015/llm-types
-- Depended on by: @ank1015/llm-sdk, @ank1015/llm-server
+- Depended on by: @ank1015/llm-sdk
