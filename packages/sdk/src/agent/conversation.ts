@@ -475,6 +475,11 @@ export class Conversation {
         callbacks
       );
 
+      // Check for errors returned by the runner (e.g., budget limits)
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
       return result.messages;
     } catch (e) {
       this._state.error = e instanceof Error ? e.message : String(e);
@@ -509,6 +514,11 @@ export class Conversation {
         signal,
         callbacks
       );
+
+      // Check for errors returned by the runner (e.g., budget limits)
+      if (result.error) {
+        throw new Error(result.error);
+      }
 
       return result.messages;
     } catch (e) {

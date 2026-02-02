@@ -182,9 +182,23 @@ tests/
     session/
       session-manager.test.ts — SessionManager delegation tests
   integration/
-    complete.test.ts          — End-to-end complete tests
-    stream.test.ts            — End-to-end stream tests
-    conversation/             — Provider-specific conversation tests
+    complete.test.ts          — End-to-end complete tests (requires API keys)
+    stream.test.ts            — End-to-end stream tests (requires API keys)
+    adapters/
+      file-keys.test.ts       — FileKeysAdapter file system tests
+      sqlite-usage.test.ts    — SqliteUsageAdapter database tests
+      file-sessions.test.ts   — FileSessionsAdapter file system tests
+      usage-tracking.test.ts  — End-to-end usage tracking with complete/stream
+    session/
+      session-manager.test.ts — SessionManager with real adapter
+    conversation/
+      anthropic.test.ts       — Anthropic provider tests (tools, events)
+      openai.test.ts          — OpenAI provider tests
+      google.test.ts          — Google provider tests
+      deepseek.test.ts        — DeepSeek provider tests
+      kimi.test.ts            — Kimi provider tests
+      zai.test.ts             — Z.AI provider tests
+      budget.test.ts          — Cost/context limit tests
 ```
 
 Run tests:
@@ -192,6 +206,15 @@ Run tests:
 - `pnpm test` — All tests
 - `pnpm test tests/unit` — Unit tests only
 - `pnpm test tests/integration` — Integration tests (requires API keys)
+
+Environment variables for integration tests:
+
+- `ANTHROPIC_API_KEY` — Anthropic API key
+- `OPENAI_API_KEY` — OpenAI API key
+- `GEMINI_API_KEY` — Google Gemini API key
+- `DEEPSEEK_API_KEY` — DeepSeek API key
+- `KIMI_API_KEY` — Kimi API key
+- `ZAI_API_KEY` — Z.AI API key
 
 ## Conventions
 

@@ -1,78 +1,127 @@
 /**
  * Integration tests for SDK complete function
  *
- * These tests make real API calls. Run with:
- * - ANTHROPIC_API_KEY set for direct API tests
- * - Server running on localhost:3001 with API keys configured for server tests
+ * These tests make real API calls. Run with API keys set in environment:
+ * - ANTHROPIC_API_KEY
+ * - OPENAI_API_KEY
  */
 
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect } from 'vitest';
 
-import { complete, getModel, setServerUrl } from '../../src/index.js';
+import { complete, getModel } from '../../src/index.js';
 
-import type { AnthropicProviderOptions, Context } from '@ank1015/llm-types';
+import type { Context } from '@ank1015/llm-types';
 
 describe('complete integration', () => {
   const anthropicApiKey = process.env['ANTHROPIC_API_KEY'];
   const openaiApiKey = process.env['OPENAI_API_KEY'];
 
-  beforeAll(() => {
-    setServerUrl('http://localhost:3001');
+  describe('with apiKey in providerOptions', () => {
+    it.skipIf(!anthropicApiKey)(
+      'should complete with Anthropic',
+      async () => {
+        const model = getModel('anthropic', 'claude-haiku-4-5');
+        expect(model).toBeDefined();
+
+        const context: Context = {
+          messages: [
+            {
+              role: 'user',
+              id: 'test-msg-1',
+              content: [{ type: 'text', content: "Say 'hello' and nothing else." }],
+            },
+          ],
+        };
+
+        const response = await complete(model!, context, {
+          providerOptions: {
+            apiKey: anthropicApiKey,
+            max_tokens: 100,
+          },
+        });
+
+        expect(response.api).toBe('anthropic');
+        expect(response.stopReason).toBe('stop');
+        expect(response.content.length).toBeGreaterThan(0);
+        expect(response.usage.input).toBeGreaterThan(0);
+        expect(response.usage.output).toBeGreaterThan(0);
+      },
+      30000
+    );
+
+    it.skipIf(!openaiApiKey)(
+      'should complete with OpenAI',
+      async () => {
+        const model = getModel('openai', 'gpt-5.2');
+        expect(model).toBeDefined();
+
+        const context: Context = {
+          messages: [
+            {
+              role: 'user',
+              id: 'test-msg-1',
+              content: [{ type: 'text', content: "Say 'hello' and nothing else." }],
+            },
+          ],
+        };
+
+        const response = await complete(model!, context, {
+          providerOptions: { apiKey: openaiApiKey },
+        });
+
+        expect(response.api).toBe('openai');
+        expect(response.stopReason).toBe('stop');
+        expect(response.content.length).toBeGreaterThan(0);
+        expect(response.usage.input).toBeGreaterThan(0);
+        expect(response.usage.output).toBeGreaterThan(0);
+      },
+      30000
+    );
   });
 
-  describe('direct API calls (with apiKey)', () => {
-    it.skipIf(!anthropicApiKey)('should complete with Anthropic directly', async () => {
-      const model = getModel('anthropic', 'claude-haiku-4-5');
-      expect(model).toBeDefined();
+  describe('with system prompt', () => {
+    it.skipIf(!anthropicApiKey)(
+      'should include system prompt',
+      async () => {
+        const model = getModel('anthropic', 'claude-haiku-4-5');
+        expect(model).toBeDefined();
 
-      const context: Context = {
-        messages: [
-          {
-            role: 'user',
-            id: 'test-msg-1',
-            content: [{ type: 'text', content: "Say 'hello' and nothing else." }],
+        const context: Context = {
+          messages: [
+            {
+              role: 'user',
+              id: 'test-msg-1',
+              content: [{ type: 'text', content: 'What is your name?' }],
+            },
+          ],
+          systemPrompt: 'Your name is TestBot. Always introduce yourself by name.',
+        };
+
+        const response = await complete(model!, context, {
+          providerOptions: {
+            apiKey: anthropicApiKey,
+            max_tokens: 200,
           },
-        ],
-      };
+        });
 
-      const response = await complete(model!, context, {
-        apiKey: anthropicApiKey,
-        max_tokens: 1000,
-      });
+        expect(response.stopReason).toBe('stop');
 
-      expect(response.api).toBe('anthropic');
-      expect(response.stopReason).toBe('stop');
-      expect(response.content.length).toBeGreaterThan(0);
-      expect(response.usage.input).toBeGreaterThan(0);
-      expect(response.usage.output).toBeGreaterThan(0);
-    });
+        // The response should mention TestBot
+        const responseText = response.content
+          .filter((c) => c.type === 'response')
+          .flatMap((c) => (c.type === 'response' ? c.content : []))
+          .filter((t) => t.type === 'text')
+          .map((t) => (t as { type: 'text'; content: string }).content)
+          .join('');
 
-    it.skipIf(!openaiApiKey)('should complete with OpenAI directly', async () => {
-      const model = getModel('openai', 'gpt-5-nano');
-      expect(model).toBeDefined();
-
-      const context: Context = {
-        messages: [
-          {
-            role: 'user',
-            id: 'test-msg-1',
-            content: [{ type: 'text', content: "Say 'hello' and nothing else." }],
-          },
-        ],
-      };
-
-      const response = await complete(model!, context, { apiKey: openaiApiKey });
-
-      expect(response.api).toBe('openai');
-      expect(response.stopReason).toBe('stop');
-      expect(response.content.length).toBeGreaterThan(0);
-      expect(response.usage.input).toBeGreaterThan(0);
-      expect(response.usage.output).toBeGreaterThan(0);
-    });
+        expect(responseText.toLowerCase()).toContain('testbot');
+      },
+      30000
+    );
   });
 
-  describe('server routing (without apiKey)', () => {
-    it('should complete via server with Anthropic', async () => {
+  describe('error handling', () => {
+    it('should throw ApiKeyNotFoundError when no key provided', async () => {
       const model = getModel('anthropic', 'claude-haiku-4-5');
       expect(model).toBeDefined();
 
@@ -81,82 +130,12 @@ describe('complete integration', () => {
           {
             role: 'user',
             id: 'test-msg-1',
-            content: [{ type: 'text', content: "Say 'hello' and nothing else." }],
+            content: [{ type: 'text', content: 'Hello' }],
           },
         ],
       };
 
-      // No apiKey - should route through server
-      const response = await complete(model!, context, {
-        max_tokens: 1000,
-      } as AnthropicProviderOptions);
-
-      expect(response.api).toBe('anthropic');
-      expect(response.stopReason).toBe('stop');
-      expect(response.content.length).toBeGreaterThan(0);
-      expect(response.usage.input).toBeGreaterThan(0);
-      expect(response.usage.output).toBeGreaterThan(0);
-    });
-
-    it('should complete via server with OpenAI', async () => {
-      const model = getModel('openai', 'gpt-5-nano');
-      expect(model).toBeDefined();
-
-      const context: Context = {
-        messages: [
-          {
-            role: 'user',
-            id: 'test-msg-1',
-            content: [{ type: 'text', content: "Say 'hello' and nothing else." }],
-          },
-        ],
-      };
-
-      // No apiKey - should route through server
-      const response = await complete(model!, context);
-      console.log(response);
-
-      expect(response.api).toBe('openai');
-      expect(response.stopReason).toBe('stop');
-      expect(response.content.length).toBeGreaterThan(0);
-      expect(response.usage.input).toBeGreaterThan(0);
-      expect(response.usage.output).toBeGreaterThan(0);
-    });
-
-    it('should include system prompt', async () => {
-      const model = getModel('anthropic', 'claude-haiku-4-5');
-      expect(model).toBeDefined();
-
-      const context: Context = {
-        messages: [
-          {
-            role: 'user',
-            id: 'test-msg-1',
-            content: [{ type: 'text', content: 'What is your name?' }],
-          },
-        ],
-        systemPrompt: 'Your name is TestBot. Always introduce yourself by name.',
-      };
-
-      const response = await complete(model!, context, {
-        max_tokens: 1000,
-      } as AnthropicProviderOptions);
-
-      expect(response.stopReason).toBe('stop');
-      // The response should mention TestBot
-      const responseText = response.content
-        .filter((c) => c.type === 'response')
-        .map((c) => {
-          if (c.type === 'response') {
-            return c.content
-              .filter((t) => t.type === 'text')
-              .map((t) => (t as { type: 'text'; content: string }).content)
-              .join('');
-          }
-          return '';
-        })
-        .join('');
-      expect(responseText.toLowerCase()).toContain('testbot');
+      await expect(complete(model!, context)).rejects.toThrow(/API key not found/);
     });
   });
 });
