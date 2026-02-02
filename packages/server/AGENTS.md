@@ -27,6 +27,7 @@ src/
     messages.ts         — /messages/complete and /messages/stream endpoints
     keys.ts             — /keys API key management endpoints
     usages.ts           — /usages/stats and /usages/messages endpoints
+    sessions.ts         — /sessions session management endpoints
 tests/
   unit/
     services/           — Service unit tests
@@ -121,6 +122,66 @@ Returns:
 
 - `messages` — Array of message summaries
 - `pagination` — Pagination info (total, limit, offset, hasMore)
+
+### Sessions Endpoints
+
+All session endpoints use query param `path` for nested paths within a project.
+
+#### GET /sessions/projects
+
+List all projects.
+
+#### GET /sessions/:projectName
+
+List sessions in a project. Query: `path`
+
+#### GET /sessions/:projectName/search
+
+Search sessions by name. Query: `path`, `q` (required)
+
+#### POST /sessions/:projectName
+
+Create a new session. Query: `path`. Body: `{ sessionName? }`
+
+#### GET /sessions/:projectName/:sessionId
+
+Get a session with all nodes. Query: `path`
+
+#### DELETE /sessions/:projectName/:sessionId
+
+Delete a session. Query: `path`
+
+#### PATCH /sessions/:projectName/:sessionId
+
+Update session name. Query: `path`. Body: `{ sessionName }`
+
+#### POST /sessions/:projectName/:sessionId/messages
+
+Append a message node. Query: `path`. Body: `{ parentId, branch, message, api, modelId, providerOptions? }`
+
+#### POST /sessions/:projectName/:sessionId/custom
+
+Append a custom node. Query: `path`. Body: `{ parentId, branch, payload }`
+
+#### GET /sessions/:projectName/:sessionId/branches
+
+Get branch information. Query: `path`
+
+#### GET /sessions/:projectName/:sessionId/history/:branch
+
+Get linear history of a branch. Query: `path`
+
+#### GET /sessions/:projectName/:sessionId/nodes/:nodeId
+
+Get a specific node. Query: `path`
+
+#### GET /sessions/:projectName/:sessionId/latest
+
+Get latest node. Query: `path`, `branch?`
+
+#### GET /sessions/:projectName/:sessionId/messages
+
+Get all message nodes. Query: `path`, `branch?`
 
 ## Key Exports
 
