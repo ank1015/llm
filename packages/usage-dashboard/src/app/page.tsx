@@ -2,41 +2,35 @@
 
 import type React from 'react';
 
-import { StatCard, ProviderStatsCard, UsageChartCard } from '@/components';
+import {
+  StatCard,
+  ProviderStatsCard,
+  UsageChartCard,
+  TokenBreakdownCard,
+  MiniStatCard,
+  TopModelsCard,
+} from '@/components';
+import { useUsageStatsQuery, useUsageMessagesQuery } from '@/lib/queries';
 
-// Mock data for charts
-const MONTHLY_COST_DATA = [
-  { month: 'Jan', value: 8400 },
-  { month: 'Feb', value: 1800 },
-  { month: 'Mar', value: 3200 },
-  { month: 'Apr', value: 2800 },
-  { month: 'May', value: 4100 },
-  { month: 'Jun', value: 3600 },
-  { month: 'Jul', value: 3100 },
-];
+// Provider colors mapping
+const PROVIDER_COLORS: Record<string, string> = {
+  openai: '#3b82f6',
+  anthropic: '#f97316',
+  google: '#22c55e',
+  deepseek: '#a855f7',
+  kimi: '#ec4899',
+  zai: '#06b6d4',
+};
 
-const DAILY_USAGE_DATA = [
-  { date: '1', tokens: 4000, cost: 2400 },
-  { date: '2', tokens: 3000, cost: 1398 },
-  { date: '3', tokens: 2000, cost: 4800 },
-  { date: '4', tokens: 2780, cost: 3908 },
-  { date: '5', tokens: 1890, cost: 4800 },
-  { date: '6', tokens: 2390, cost: 3800 },
-  { date: '7', tokens: 3490, cost: 4300 },
-  { date: '8', tokens: 4000, cost: 2400 },
-  { date: '9', tokens: 3000, cost: 1398 },
-  { date: '10', tokens: 2000, cost: 3800 },
-  { date: '11', tokens: 2780, cost: 3908 },
-  { date: '12', tokens: 1890, cost: 4800 },
-  { date: '13', tokens: 2390, cost: 3800 },
-  { date: '14', tokens: 3490, cost: 4300 },
-];
-
-const PROVIDER_STATS = [
-  { rank: 1, name: 'OpenAI', value: '33.5k', percentage: 100, color: '#3b82f6' },
-  { rank: 2, name: 'Anthropic', value: '13.5k', percentage: 40, color: '#f97316' },
-  { rank: 3, name: 'Google', value: '4.5k', percentage: 13, color: '#22c55e' },
-];
+// Provider display names
+const PROVIDER_NAMES: Record<string, string> = {
+  openai: 'OpenAI',
+  anthropic: 'Anthropic',
+  google: 'Google',
+  deepseek: 'DeepSeek',
+  kimi: 'Kimi',
+  zai: 'Z.AI',
+};
 
 function CalendarIcon(): React.ReactElement {
   return (
@@ -59,14 +53,147 @@ function CalendarIcon(): React.ReactElement {
   );
 }
 
+function MessageIcon(): React.ReactElement {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}
+
+function CacheIcon(): React.ReactElement {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 2v4" />
+      <path d="m16.2 7.8 2.9-2.9" />
+      <path d="M18 12h4" />
+      <path d="m16.2 16.2 2.9 2.9" />
+      <path d="M12 18v4" />
+      <path d="m4.9 19.1 2.9-2.9" />
+      <path d="M2 12h4" />
+      <path d="m4.9 4.9 2.9 2.9" />
+    </svg>
+  );
+}
+
+function formatNumber(value: number): string {
+  if (value >= 1_000_000_000) {
+    return `${(value / 1_000_000_000).toFixed(2)}B`;
+  }
+  if (value >= 1_000_000) {
+    return `${(value / 1_000_000).toFixed(2)}M`;
+  }
+  if (value >= 1_000) {
+    return `${(value / 1_000).toFixed(1)}K`;
+  }
+  return value.toString();
+}
+
+function formatCost(value: number): string {
+  if (value >= 1000) {
+    return `$${(value / 1000).toFixed(1)}K`;
+  }
+  if (value >= 1) {
+    return `$${value.toFixed(2)}`;
+  }
+  return `$${value.toFixed(4)}`;
+}
+
 export default function OverviewPage(): React.ReactElement {
+  const { data: stats, isLoading, refetch } = useUsageStatsQuery();
+  const { data: messagesData } = useUsageMessagesQuery(undefined, { limit: 50 });
+
+  // Transform provider stats for the card
+  const providerStats = stats
+    ? Object.entries(stats.byApi)
+        .map(([api, data], index) => ({
+          rank: index + 1,
+          name: PROVIDER_NAMES[api] || api,
+          value: formatCost(data.cost.total),
+          percentage:
+            stats.cost.total > 0 ? Math.round((data.cost.total / stats.cost.total) * 100) : 0,
+          color: PROVIDER_COLORS[api] || '#71717a',
+        }))
+        .sort((a, b) => b.percentage - a.percentage)
+        .map((item, index) => ({ ...item, rank: index + 1 }))
+    : [];
+
+  // Transform model stats for the card
+  const topModels = stats
+    ? Object.entries(stats.byModel)
+        .map(([id, data]) => ({
+          id,
+          name: data.modelName,
+          count: data.messages,
+          percentage:
+            stats.totalMessages > 0 ? Math.round((data.messages / stats.totalMessages) * 100) : 0,
+        }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5)
+    : [];
+
+  // Generate chart data from messages (group by date)
+  const chartData = messagesData
+    ? (() => {
+        const grouped: Record<string, { tokens: number; cost: number }> = {};
+        messagesData.messages.forEach((msg) => {
+          const date = new Date(msg.timestamp).toLocaleDateString('en-US', { day: 'numeric' });
+          if (!grouped[date]) {
+            grouped[date] = { tokens: 0, cost: 0 };
+          }
+          grouped[date].tokens += msg.tokens.total;
+          grouped[date].cost += msg.cost.total;
+        });
+        return Object.entries(grouped)
+          .map(([date, data]) => ({
+            date,
+            tokens: data.tokens,
+            cost: Math.round(data.cost * 10000), // Scale for visibility
+          }))
+          .slice(-14); // Last 14 days
+      })()
+    : [];
+
+  if (isLoading) {
+    return (
+      <div className="p-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-zinc-400">Loading...</div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6">
       {/* Page Header */}
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-3xl font-bold text-white">Token Usage & Costs</h1>
         <div className="flex items-center gap-3">
-          <button className="px-4 py-2 text-sm font-medium text-zinc-300 bg-zinc-800 border border-zinc-700 rounded-lg hover:bg-zinc-700 transition-colors">
+          <button
+            onClick={() => refetch()}
+            className="px-4 py-2 text-sm font-medium text-zinc-300 bg-zinc-800 border border-zinc-700 rounded-lg hover:bg-zinc-700 transition-colors"
+          >
             Refresh
           </button>
         </div>
@@ -77,34 +204,67 @@ export default function OverviewPage(): React.ReactElement {
         {/* Total Token Cost */}
         <div className="col-span-12 md:col-span-3">
           <StatCard
-            title="Total Token Cost (YTD)"
-            value="$12,450"
-            chart={MONTHLY_COST_DATA}
+            title="Total Token Cost"
+            value={stats ? formatCost(stats.cost.total) : '--'}
             chartColor="#C2D2E7"
             icon={<CalendarIcon />}
           />
         </div>
 
-        {/* Total Token Usage */}
+        {/* Provider Cost Stats */}
         <div className="col-span-12 md:col-span-3">
-          <StatCard title="Total Token Usage (M)" value="4.5B" />
+          <ProviderStatsCard title="Provider Cost Stats" stats={providerStats} />
         </div>
 
         {/* Daily Usage Chart */}
         <div className="col-span-12 md:col-span-6">
-          <UsageChartCard data={DAILY_USAGE_DATA} />
+          <UsageChartCard data={chartData} />
         </div>
       </div>
 
-      {/* Row 3: Provider stats and info cards */}
+      {/* Row 2: Token stats and small stats */}
       <div className="grid grid-cols-12 gap-4">
-        {/* Provider Cost Stats */}
+        {/* Total Token Usage */}
         <div className="col-span-12 md:col-span-3">
-          <ProviderStatsCard title="Provider Cost Stats" stats={PROVIDER_STATS} />
+          <StatCard
+            title="Total Token Usage"
+            value={stats ? formatNumber(stats.tokens.total) : '--'}
+          />
         </div>
 
-        {/* Empty space for cost trend extension */}
-        <div className="col-span-12 md:col-span-3">{/* Intentionally empty */}</div>
+        {/* Token Breakdown */}
+        <div className="col-span-12 md:col-span-3">
+          <TokenBreakdownCard
+            input={stats?.tokens.input ?? 0}
+            output={stats?.tokens.output ?? 0}
+            total={stats?.tokens.total ?? 0}
+          />
+        </div>
+
+        {/* Total Messages */}
+        <div className="col-span-6 md:col-span-2">
+          <MiniStatCard
+            title="Total Messages"
+            value={stats ? stats.totalMessages.toLocaleString() : '--'}
+            subtitle="API calls"
+            icon={<MessageIcon />}
+          />
+        </div>
+
+        {/* Cache Stats */}
+        <div className="col-span-6 md:col-span-2">
+          <MiniStatCard
+            title="Cache Hits"
+            value={stats ? formatNumber(stats.tokens.cacheRead) : '--'}
+            subtitle={stats ? `${formatNumber(stats.tokens.cacheWrite)} written` : ''}
+            icon={<CacheIcon />}
+          />
+        </div>
+
+        {/* Top Models */}
+        <div className="col-span-12 md:col-span-2">
+          <TopModelsCard models={topModels} />
+        </div>
       </div>
     </div>
   );
