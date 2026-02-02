@@ -36,6 +36,10 @@ src/
       sessions.ts             — Sessions adapter factory and helpers
       conversation.ts         — Conversation turn logic (shared by messages/stream)
       response.ts             — API response utilities
+  stores/
+    index.ts                  — Store exports
+    sessions-store.ts         — Sessions list state (pagination, search, optimistic updates)
+    ui-store.ts               — UI state (sidebar, settings, dialogs)
 ```
 
 ## API Endpoints
@@ -90,7 +94,7 @@ src/
 
 ## Dependencies
 
-- Depends on: @ank1015/llm-sdk (for adapters)
+- Depends on: @ank1015/llm-sdk (for adapters), zustand (state management)
 
 ## Conventions
 
