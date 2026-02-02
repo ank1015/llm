@@ -22,6 +22,8 @@ src/
       keys/
         route.ts              — GET: list providers with key status
         [provider]/route.ts   — PUT: set key, DELETE: delete key
+      models/route.ts         — GET: list models with filters
+      providers/route.ts      — GET: list providers with capabilities
   lib/
     api/
       keys.ts                 — Keys adapter factory and helpers
@@ -35,6 +37,18 @@ src/
 - `GET /api/keys` — List all providers and whether they have a key stored
 - `PUT /api/keys/[provider]` — Set API key (body: `{ "key": "..." }`)
 - `DELETE /api/keys/[provider]` — Delete API key
+
+### Models API
+
+- `GET /api/models` — List all models with optional filters
+  - `?api=<provider>` — Filter by provider
+  - `?reasoning=true|false` — Filter by reasoning capability
+  - `?input=text|image|file` — Filter by input type
+  - `?tool=<tool>` — Filter by tool support
+
+### Providers API
+
+- `GET /api/providers` — List all providers with capabilities (hasKey, modelCount, supportsReasoning, supportsTools, supportedInputs)
 
 ## Dependencies
 
