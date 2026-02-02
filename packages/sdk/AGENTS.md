@@ -164,6 +164,35 @@ await sessionManager.appendMessage({
 const session = await sessionManager.getSession('my-project', sessionId);
 ```
 
+## Testing
+
+```
+tests/
+  unit/
+    adapters/
+      file-keys.test.ts       — FileKeysAdapter tests (encryption, CRUD)
+      sqlite-usage.test.ts    — SqliteUsageAdapter tests (tracking, stats, filters)
+      file-sessions.test.ts   — FileSessionsAdapter tests (JSONL, branches)
+    llm/
+      complete.test.ts        — Complete function (key resolution, usage tracking)
+      stream.test.ts          — Stream function (key resolution, usage tracking)
+    conversation/
+      state.test.ts           — Conversation state management
+      execution.test.ts       — Conversation execution with adapters
+    session/
+      session-manager.test.ts — SessionManager delegation tests
+  integration/
+    complete.test.ts          — End-to-end complete tests
+    stream.test.ts            — End-to-end stream tests
+    conversation/             — Provider-specific conversation tests
+```
+
+Run tests:
+
+- `pnpm test` — All tests
+- `pnpm test tests/unit` — Unit tests only
+- `pnpm test tests/integration` — Integration tests (requires API keys)
+
 ## Conventions
 
 - Use adapters for storage operations (keys, usage, sessions)
@@ -171,6 +200,7 @@ const session = await sessionManager.getSession('my-project', sessionId);
 - API key resolution: explicit apiKey → adapter → error
 - Agent events are for UI updates; messages array is the source of truth
 - Use `exactOptionalPropertyTypes` — conditionally set optional properties
+- Mock `runAgentLoop` from core in unit tests; use `vi.resetAllMocks()` in beforeEach
 
 ## Dependencies
 

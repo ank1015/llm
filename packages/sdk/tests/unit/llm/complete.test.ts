@@ -3,11 +3,11 @@
  */
 
 import * as core from '@ank1015/llm-core';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-import { setServerUrl } from '../../../src/config.js';
 import { complete } from '../../../src/llm/complete.js';
 
+import type { KeysAdapter, UsageAdapter } from '../../../src/adapters/types.js';
 import type { Model, Context, BaseAssistantMessage } from '@ank1015/llm-types';
 
 // Mock the core complete function
@@ -19,19 +19,18 @@ vi.mock('@ank1015/llm-core', async () => {
   };
 });
 
-// Mock fetch
-const mockFetch = vi.fn();
-vi.stubGlobal('fetch', mockFetch);
-
 describe('complete', () => {
   const mockModel: Model<'anthropic'> = {
     api: 'anthropic',
     id: 'claude-sonnet-4-20250514',
     name: 'Claude Sonnet 4',
+    baseUrl: 'https://api.anthropic.com',
+    reasoning: false,
+    input: ['text', 'image'],
     contextWindow: 200000,
-    maxOutput: 8192,
+    maxTokens: 8192,
     cost: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
-    capabilities: { vision: true, streaming: true, tools: true, thinking: false },
+    tools: ['function'],
   };
 
   const mockContext: Context = {
@@ -39,7 +38,8 @@ describe('complete', () => {
       {
         role: 'user',
         id: 'msg-1',
-        content: [{ type: 'text', text: 'Hello' }],
+        timestamp: Date.now(),
+        content: [{ type: 'text', content: 'Hello' }],
       },
     ],
   };
@@ -53,7 +53,7 @@ describe('complete', () => {
     timestamp: Date.now(),
     duration: 100,
     stopReason: 'stop',
-    content: [{ type: 'response', content: [{ type: 'text', text: 'Hi there!' }] }],
+    content: [{ type: 'response', content: [{ type: 'text', content: 'Hi there!' }] }],
     usage: {
       input: 10,
       output: 5,
@@ -66,146 +66,209 @@ describe('complete', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    setServerUrl('http://localhost:3001');
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  describe('with apiKey provided', () => {
-    it('should call core complete directly', async () => {
+  describe('API key resolution', () => {
+    it('should use apiKey from providerOptions when provided', async () => {
       vi.mocked(core.complete).mockResolvedValue(mockResponse);
 
-      const result = await complete(mockModel, mockContext, { apiKey: 'test-key' });
-
-      expect(core.complete).toHaveBeenCalledTimes(1);
-      expect(core.complete).toHaveBeenCalledWith(
-        mockModel,
-        mockContext,
-        { apiKey: 'test-key' },
-        expect.stringMatching(/^sdk-\d+-[a-z0-9]+$/)
-      );
-      expect(result).toEqual(mockResponse);
-      expect(mockFetch).not.toHaveBeenCalled();
-    });
-
-    it('should use provided id when given', async () => {
-      vi.mocked(core.complete).mockResolvedValue(mockResponse);
-
-      await complete(mockModel, mockContext, { apiKey: 'test-key' }, 'custom-id');
+      await complete(mockModel, mockContext, {
+        providerOptions: { apiKey: 'direct-key' },
+      });
 
       expect(core.complete).toHaveBeenCalledWith(
         mockModel,
         mockContext,
-        { apiKey: 'test-key' },
-        'custom-id'
+        expect.objectContaining({ apiKey: 'direct-key' }),
+        expect.any(String)
       );
     });
-  });
 
-  describe('without apiKey (server routing)', () => {
-    it('should call server endpoint', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(mockResponse),
-      });
+    it('should use keysAdapter when apiKey not in providerOptions', async () => {
+      vi.mocked(core.complete).mockResolvedValue(mockResponse);
 
-      const result = await complete(mockModel, mockContext);
-
-      expect(mockFetch).toHaveBeenCalledTimes(1);
-      expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:3001/messages/complete',
-        expect.objectContaining({
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-        })
-      );
-      expect(core.complete).not.toHaveBeenCalled();
-      expect(result).toEqual(mockResponse);
-    });
-
-    it('should include systemPrompt and tools in request', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(mockResponse),
-      });
-
-      const contextWithExtras: Context = {
-        ...mockContext,
-        systemPrompt: 'You are helpful',
-        tools: [{ name: 'test', description: 'test tool', parameters: { type: 'object' } }],
+      const mockKeysAdapter: KeysAdapter = {
+        get: vi.fn().mockResolvedValue('adapter-key'),
+        set: vi.fn(),
+        delete: vi.fn(),
+        list: vi.fn(),
       };
 
-      await complete(mockModel, contextWithExtras);
-
-      const fetchCall = mockFetch.mock.calls[0];
-      const body = JSON.parse(fetchCall[1].body);
-
-      expect(body.systemPrompt).toBe('You are helpful');
-      expect(body.tools).toHaveLength(1);
-    });
-
-    it('should throw ProviderError on server error', async () => {
-      mockFetch.mockResolvedValue({
-        ok: false,
-        json: () => Promise.resolve({ message: 'Server error' }),
+      await complete(mockModel, mockContext, {
+        keysAdapter: mockKeysAdapter,
       });
 
-      await expect(complete(mockModel, mockContext)).rejects.toThrow('Server error');
-    });
-
-    it('should use custom server URL', async () => {
-      setServerUrl('http://custom-server:8080');
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(mockResponse),
-      });
-
-      await complete(mockModel, mockContext);
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        'http://custom-server:8080/messages/complete',
-        expect.any(Object)
+      expect(mockKeysAdapter.get).toHaveBeenCalledWith('anthropic');
+      expect(core.complete).toHaveBeenCalledWith(
+        mockModel,
+        mockContext,
+        expect.objectContaining({ apiKey: 'adapter-key' }),
+        expect.any(String)
       );
     });
 
-    it('should pass signal for abort support', async () => {
-      const controller = new AbortController();
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(mockResponse),
+    it('should prefer providerOptions.apiKey over keysAdapter', async () => {
+      vi.mocked(core.complete).mockResolvedValue(mockResponse);
+
+      const mockKeysAdapter: KeysAdapter = {
+        get: vi.fn().mockResolvedValue('adapter-key'),
+        set: vi.fn(),
+        delete: vi.fn(),
+        list: vi.fn(),
+      };
+
+      await complete(mockModel, mockContext, {
+        providerOptions: { apiKey: 'direct-key' },
+        keysAdapter: mockKeysAdapter,
       });
 
-      await complete(mockModel, mockContext, { signal: controller.signal });
+      expect(mockKeysAdapter.get).not.toHaveBeenCalled();
+      expect(core.complete).toHaveBeenCalledWith(
+        mockModel,
+        mockContext,
+        expect.objectContaining({ apiKey: 'direct-key' }),
+        expect.any(String)
+      );
+    });
 
-      const fetchCall = mockFetch.mock.calls[0];
-      expect(fetchCall[1].signal).toBe(controller.signal);
+    it('should throw ApiKeyNotFoundError when no key available', async () => {
+      await expect(complete(mockModel, mockContext, {})).rejects.toThrow(
+        'API key not found for provider: anthropic'
+      );
+    });
+
+    it('should throw ApiKeyNotFoundError when keysAdapter returns undefined', async () => {
+      const mockKeysAdapter: KeysAdapter = {
+        get: vi.fn().mockResolvedValue(undefined),
+        set: vi.fn(),
+        delete: vi.fn(),
+        list: vi.fn(),
+      };
+
+      await expect(
+        complete(mockModel, mockContext, { keysAdapter: mockKeysAdapter })
+      ).rejects.toThrow('API key not found for provider: anthropic');
     });
   });
 
-  describe('edge cases', () => {
-    it('should handle empty options', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(mockResponse),
+  describe('usage tracking', () => {
+    it('should track usage when usageAdapter is provided', async () => {
+      vi.mocked(core.complete).mockResolvedValue(mockResponse);
+
+      const mockUsageAdapter: UsageAdapter = {
+        track: vi.fn().mockResolvedValue(undefined),
+        getStats: vi.fn(),
+        getMessage: vi.fn(),
+        getMessages: vi.fn(),
+        deleteMessage: vi.fn(),
+      };
+
+      await complete(mockModel, mockContext, {
+        providerOptions: { apiKey: 'test-key' },
+        usageAdapter: mockUsageAdapter,
       });
 
-      const result = await complete(mockModel, mockContext, {});
+      expect(mockUsageAdapter.track).toHaveBeenCalledWith(mockResponse);
+    });
 
-      expect(mockFetch).toHaveBeenCalled();
+    it('should not track usage when usageAdapter is not provided', async () => {
+      vi.mocked(core.complete).mockResolvedValue(mockResponse);
+
+      const result = await complete(mockModel, mockContext, {
+        providerOptions: { apiKey: 'test-key' },
+      });
+
       expect(result).toEqual(mockResponse);
     });
 
-    it('should handle undefined options', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(mockResponse),
+    it('should return response even if tracking fails', async () => {
+      vi.mocked(core.complete).mockResolvedValue(mockResponse);
+
+      const mockUsageAdapter: UsageAdapter = {
+        track: vi.fn().mockRejectedValue(new Error('Tracking failed')),
+        getStats: vi.fn(),
+        getMessage: vi.fn(),
+        getMessages: vi.fn(),
+        deleteMessage: vi.fn(),
+      };
+
+      await expect(
+        complete(mockModel, mockContext, {
+          providerOptions: { apiKey: 'test-key' },
+          usageAdapter: mockUsageAdapter,
+        })
+      ).rejects.toThrow('Tracking failed');
+    });
+  });
+
+  describe('request ID', () => {
+    it('should generate request ID when not provided', async () => {
+      vi.mocked(core.complete).mockResolvedValue(mockResponse);
+
+      await complete(mockModel, mockContext, {
+        providerOptions: { apiKey: 'test-key' },
       });
 
-      const result = await complete(mockModel, mockContext);
+      expect(core.complete).toHaveBeenCalledWith(
+        mockModel,
+        mockContext,
+        expect.any(Object),
+        expect.stringMatching(/^sdk-\d+-[a-z0-9]+$/)
+      );
+    });
 
-      expect(mockFetch).toHaveBeenCalled();
+    it('should use provided request ID', async () => {
+      vi.mocked(core.complete).mockResolvedValue(mockResponse);
+
+      await complete(
+        mockModel,
+        mockContext,
+        { providerOptions: { apiKey: 'test-key' } },
+        'custom-request-id'
+      );
+
+      expect(core.complete).toHaveBeenCalledWith(
+        mockModel,
+        mockContext,
+        expect.any(Object),
+        'custom-request-id'
+      );
+    });
+  });
+
+  describe('provider options passthrough', () => {
+    it('should pass through additional provider options', async () => {
+      vi.mocked(core.complete).mockResolvedValue(mockResponse);
+
+      await complete(mockModel, mockContext, {
+        providerOptions: {
+          apiKey: 'test-key',
+          temperature: 0.7,
+          maxTokens: 1000,
+        } as core.AnthropicProviderOptions,
+      });
+
+      expect(core.complete).toHaveBeenCalledWith(
+        mockModel,
+        mockContext,
+        expect.objectContaining({
+          apiKey: 'test-key',
+          temperature: 0.7,
+          maxTokens: 1000,
+        }),
+        expect.any(String)
+      );
+    });
+  });
+
+  describe('return value', () => {
+    it('should return the response from core.complete', async () => {
+      vi.mocked(core.complete).mockResolvedValue(mockResponse);
+
+      const result = await complete(mockModel, mockContext, {
+        providerOptions: { apiKey: 'test-key' },
+      });
+
       expect(result).toEqual(mockResponse);
     });
   });

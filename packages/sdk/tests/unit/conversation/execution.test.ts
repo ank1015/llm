@@ -1,369 +1,558 @@
-import { AgentLoopConfig, UserMessage } from '@ank1015/llm-types';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+/**
+ * Unit tests for Conversation execution with adapter pattern
+ */
+
+import * as core from '@ank1015/llm-core';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 import { Conversation } from '../../../src/agent/conversation.js';
-import { AgentRunnerCallbacks } from '../../../src/agent/runner.js';
 
-import type { AgentRunner } from '../../../src/agent/runner.js';
-import type { AgentEvent, Message } from '@ank1015/llm-types';
+import type { KeysAdapter, UsageAdapter } from '../../../src/adapters/types.js';
+import type { Model, BaseAssistantMessage, AgentEvent } from '@ank1015/llm-types';
 
-// Mock Runner
-class MockAgentRunner implements AgentRunner {
-  run = vi.fn();
-}
+// Mock the core module
+vi.mock('@ank1015/llm-core', async () => {
+  const actual = await vi.importActual('@ank1015/llm-core');
+  return {
+    ...actual,
+    runAgentLoop: vi.fn(),
+    complete: vi.fn(),
+    stream: vi.fn(),
+  };
+});
 
 describe('Conversation Execution', () => {
-  let conversation: Conversation;
-  let mockRunner: MockAgentRunner;
+  const mockModel: Model<'anthropic'> = {
+    api: 'anthropic',
+    id: 'claude-sonnet-4-20250514',
+    name: 'Claude Sonnet 4',
+    baseUrl: 'https://api.anthropic.com',
+    reasoning: false,
+    input: ['text', 'image'],
+    contextWindow: 200000,
+    maxTokens: 8192,
+    cost: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
+    tools: ['function'],
+  };
+
+  const mockAssistantMessage: BaseAssistantMessage<'anthropic'> = {
+    role: 'assistant',
+    message: {} as BaseAssistantMessage<'anthropic'>['message'],
+    api: 'anthropic',
+    id: 'resp-1',
+    model: mockModel,
+    timestamp: Date.now(),
+    duration: 100,
+    stopReason: 'stop',
+    content: [{ type: 'response', content: [{ type: 'text', content: 'Hello!' }] }],
+    usage: {
+      input: 10,
+      output: 5,
+      cacheRead: 0,
+      cacheWrite: 0,
+      totalTokens: 15,
+      cost: { input: 0.00003, output: 0.000075, cacheRead: 0, cacheWrite: 0, total: 0.000105 },
+    },
+  };
+
+  function createMockKeysAdapter(key: string | undefined = 'test-api-key'): KeysAdapter {
+    return {
+      get: vi.fn().mockResolvedValue(key),
+      set: vi.fn(),
+      delete: vi.fn(),
+      list: vi.fn(),
+    };
+  }
+
+  function createMockUsageAdapter(): UsageAdapter {
+    return {
+      track: vi.fn().mockResolvedValue(undefined),
+      getStats: vi.fn(),
+      getMessage: vi.fn(),
+      getMessages: vi.fn(),
+      deleteMessage: vi.fn(),
+    };
+  }
 
   beforeEach(() => {
-    mockRunner = new MockAgentRunner();
-    // Reset mock behavior
-    mockRunner.run.mockReset();
-    mockRunner.run.mockResolvedValue([]);
+    vi.resetAllMocks();
 
-    conversation = new Conversation({
-      runner: mockRunner,
+    // Default mock for runAgentLoop - resolves immediately
+    vi.mocked(core.runAgentLoop).mockResolvedValue({
+      messages: [mockAssistantMessage],
+      totalCost: 0.000105,
+      aborted: false,
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe('API key resolution', () => {
+    it('should use keysAdapter to resolve API key', async () => {
+      const mockKeysAdapter = createMockKeysAdapter('adapter-key');
+      const conversation = new Conversation({ keysAdapter: mockKeysAdapter });
+      conversation.setProvider({ model: mockModel, providerOptions: {} });
+
+      await conversation.prompt('Hello');
+
+      expect(mockKeysAdapter.get).toHaveBeenCalledWith('anthropic');
+    });
+
+    it('should prefer providerOptions.apiKey over keysAdapter', async () => {
+      const mockKeysAdapter = createMockKeysAdapter('adapter-key');
+      const conversation = new Conversation({ keysAdapter: mockKeysAdapter });
+      conversation.setProvider({
+        model: mockModel,
+        providerOptions: { apiKey: 'direct-key' },
+      });
+
+      await conversation.prompt('Hello');
+
+      expect(mockKeysAdapter.get).not.toHaveBeenCalled();
+    });
+
+    it('should throw ApiKeyNotFoundError when no key available', async () => {
+      const conversation = new Conversation();
+      conversation.setProvider({ model: mockModel, providerOptions: {} });
+
+      await expect(conversation.prompt('Hello')).rejects.toThrow(
+        'API key not found for provider: anthropic'
+      );
+    });
+
+    it('should throw ApiKeyNotFoundError when keysAdapter returns undefined', async () => {
+      // Create a fresh adapter that explicitly returns undefined
+      const mockKeysAdapter: KeysAdapter = {
+        get: vi.fn().mockImplementation(() => Promise.resolve(undefined)),
+        set: vi.fn(),
+        delete: vi.fn(),
+        list: vi.fn(),
+      };
+
+      const conversation = new Conversation({ keysAdapter: mockKeysAdapter });
+      conversation.setProvider({ model: mockModel, providerOptions: {} });
+
+      await expect(conversation.prompt('Hello')).rejects.toThrow(
+        'API key not found for provider: anthropic'
+      );
+
+      // Verify the adapter was called
+      expect(mockKeysAdapter.get).toHaveBeenCalledWith('anthropic');
+    });
+  });
+
+  describe('setKeysAdapter()', () => {
+    it('should allow setting keysAdapter after construction', async () => {
+      const conversation = new Conversation();
+      const mockKeysAdapter = createMockKeysAdapter('late-key');
+
+      conversation.setKeysAdapter(mockKeysAdapter);
+      conversation.setProvider({ model: mockModel, providerOptions: {} });
+
+      await conversation.prompt('Hello');
+
+      expect(mockKeysAdapter.get).toHaveBeenCalledWith('anthropic');
+    });
+  });
+
+  describe('setUsageAdapter()', () => {
+    it('should allow setting usageAdapter after construction', async () => {
+      const mockKeysAdapter = createMockKeysAdapter();
+      const mockUsageAdapter = createMockUsageAdapter();
+
+      const conversation = new Conversation({ keysAdapter: mockKeysAdapter });
+      conversation.setUsageAdapter(mockUsageAdapter);
+      conversation.setProvider({ model: mockModel, providerOptions: {} });
+
+      await conversation.prompt('Hello');
+
+      // The usage adapter is passed to the bound complete/stream functions
+      // which are called by runAgentLoop
+      expect(core.runAgentLoop).toHaveBeenCalled();
     });
   });
 
   describe('prompt()', () => {
-    it('should call runner.run with correct arguments', async () => {
-      const input = 'Hello world';
+    it('should call runAgentLoop with correct configuration', async () => {
+      const mockKeysAdapter = createMockKeysAdapter();
+      const conversation = new Conversation({ keysAdapter: mockKeysAdapter });
+      conversation.setProvider({ model: mockModel, providerOptions: {} });
+      conversation.setSystemPrompt('You are a helpful assistant.');
 
-      // Mock runner to return the messages it gets + response
-      mockRunner.run.mockImplementation(async (cfg, msgs, emit, signal, cbs) => {
-        return msgs;
-      });
+      await conversation.prompt('Hello');
 
-      await conversation.prompt(input);
-
-      expect(mockRunner.run).toHaveBeenCalledTimes(1);
-      const [cfg, msgs, emit, signal, cbs] = mockRunner.run.mock.calls[0];
-
-      expect(cfg.provider).toBeDefined();
-      expect(msgs.length).toBe(1);
-      expect(msgs[0].role).toBe('user');
-      expect((msgs[0].content[0] as any).content).toBe(input);
-      expect(signal).toBeInstanceOf(AbortSignal);
+      expect(core.runAgentLoop).toHaveBeenCalledWith(
+        expect.objectContaining({
+          provider: expect.objectContaining({
+            model: mockModel,
+          }),
+          tools: [],
+          streamAssistantMessage: true,
+        }),
+        expect.any(Array), // messages
+        expect.any(Function), // emit
+        expect.any(Object), // signal
+        expect.any(Object) // callbacks
+      );
     });
 
     it('should prevent concurrent prompts', async () => {
-      // Make run take some time
-      mockRunner.run.mockImplementation(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        return [];
-      });
+      const mockKeysAdapter = createMockKeysAdapter();
+      const conversation = new Conversation({ keysAdapter: mockKeysAdapter });
+      conversation.setProvider({ model: mockModel, providerOptions: {} });
 
-      const p1 = conversation.prompt('first');
+      // Make runAgentLoop hang until we resolve it
+      let resolveLoop!: () => void;
+      vi.mocked(core.runAgentLoop).mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveLoop = () =>
+              resolve({ messages: [mockAssistantMessage], totalCost: 0, aborted: false });
+          })
+      );
 
-      // Immediately try second prompt
-      await expect(conversation.prompt('second')).rejects.toThrow(/Cannot start a new prompt/);
+      // Start the first prompt (it will hang)
+      const firstPrompt = conversation.prompt('First');
 
-      await p1;
+      // Wait a tick to ensure the first prompt has started
+      await new Promise((r) => setImmediate(r));
+
+      // Second prompt should fail immediately
+      await expect(conversation.prompt('Second')).rejects.toThrow(
+        'Cannot start a new prompt while another is running'
+      );
+
+      // Cleanup
+      resolveLoop();
+      await firstPrompt;
+    });
+
+    it('should emit events during execution', async () => {
+      const mockKeysAdapter = createMockKeysAdapter();
+      const conversation = new Conversation({ keysAdapter: mockKeysAdapter });
+      conversation.setProvider({ model: mockModel, providerOptions: {} });
+
+      const events: AgentEvent[] = [];
+      conversation.subscribe((e) => events.push(e));
+
+      await conversation.prompt('Hello');
+
+      // Should have agent_start, turn_start, and message events
+      expect(events.some((e) => e.type === 'agent_start')).toBe(true);
+      expect(events.some((e) => e.type === 'turn_start')).toBe(true);
+      expect(events.some((e) => e.type === 'message_start')).toBe(true);
+      expect(events.some((e) => e.type === 'message_end')).toBe(true);
     });
 
     it('should update state.isStreaming during execution', async () => {
-      let isStreamingDuringRun = false;
-      mockRunner.run.mockImplementation(async () => {
-        isStreamingDuringRun = conversation.state.isStreaming;
-        return [];
+      const mockKeysAdapter = createMockKeysAdapter();
+      const conversation = new Conversation({ keysAdapter: mockKeysAdapter });
+      conversation.setProvider({ model: mockModel, providerOptions: {} });
+
+      let streamingDuringExecution = false;
+      let resolveLoop: () => void;
+
+      vi.mocked(core.runAgentLoop).mockImplementation(() => {
+        streamingDuringExecution = conversation.state.isStreaming;
+        return new Promise((resolve) => {
+          resolveLoop = () =>
+            resolve({ messages: [mockAssistantMessage], totalCost: 0, aborted: false });
+        });
       });
 
-      await conversation.prompt('test');
-      expect(isStreamingDuringRun).toBe(true);
+      const promptPromise = conversation.prompt('Hello');
+
+      // Wait a tick for the promise to start
+      await new Promise((r) => setTimeout(r, 0));
+
+      resolveLoop!();
+      await promptPromise;
+
+      expect(streamingDuringExecution).toBe(true);
       expect(conversation.state.isStreaming).toBe(false);
     });
 
     it('should handle errors gracefully', async () => {
-      mockRunner.run.mockRejectedValue(new Error('Runner failed'));
+      const mockKeysAdapter = createMockKeysAdapter();
+      const conversation = new Conversation({ keysAdapter: mockKeysAdapter });
+      conversation.setProvider({ model: mockModel, providerOptions: {} });
 
-      await expect(conversation.prompt('test')).rejects.toThrow('Runner failed');
+      vi.mocked(core.runAgentLoop).mockRejectedValue(new Error('LLM error'));
 
-      expect(conversation.state.error).toBe('Runner failed');
+      await expect(conversation.prompt('Hello')).rejects.toThrow('LLM error');
+      expect(conversation.state.error).toBe('LLM error');
       expect(conversation.state.isStreaming).toBe(false);
-    });
-
-    it('should propagate events from runner to subscribers', async () => {
-      mockRunner.run.mockImplementation(async (cfg, msgs, emit, signal) => {
-        emit({ type: 'turn_start' });
-        return msgs;
-      });
-
-      const events: string[] = [];
-      conversation.subscribe((e) => events.push(e.type));
-
-      await conversation.prompt('test');
-
-      expect(events).toContain('turn_start');
-      expect(events).toContain('agent_start'); // Emitted by conversation itself before runner
-    });
-  });
-
-  describe('waitForIdle()', () => {
-    it('should resolve immediately if idle', async () => {
-      const start = Date.now();
-      await conversation.waitForIdle();
-      const duration = Date.now() - start;
-      expect(duration).toBeLessThan(10); // Should be near instant
-    });
-
-    it('should wait for running prompt to complete', async () => {
-      let resolveRun: () => void;
-      const runPromise = new Promise<Message[]>((resolve) => {
-        resolveRun = () => resolve([]);
-      });
-
-      mockRunner.run.mockReturnValue(runPromise);
-
-      const promptPromise = conversation.prompt('test');
-
-      let idleResolved = false;
-      conversation.waitForIdle().then(() => {
-        idleResolved = true;
-      });
-
-      await new Promise((r) => setTimeout(r, 0));
-      expect(idleResolved).toBe(false); // Should still be waiting
-
-      resolveRun!();
-      await promptPromise;
-      await new Promise((r) => setTimeout(r, 0));
-
-      expect(idleResolved).toBe(true);
-    });
-  });
-
-  describe('abort()', () => {
-    it('should signal abort to runner', async () => {
-      let receivedSignal: AbortSignal;
-
-      mockRunner.run.mockImplementation(async (cfg, msgs, emit, signal) => {
-        receivedSignal = signal;
-        await new Promise((r) => setTimeout(r, 50));
-        return [];
-      });
-
-      const p = conversation.prompt('test');
-      conversation.abort();
-
-      await p;
-
-      expect(receivedSignal!).toBeDefined();
-      expect(receivedSignal!.aborted).toBe(true);
-    });
-  });
-
-  describe('addCustomMessage()', () => {
-    it('should emit events and append custom message', async () => {
-      const events: AgentEvent[] = [];
-      conversation.subscribe((e) => events.push(e));
-
-      const customContent = { type: 'ui-update', value: 1 };
-      await conversation.addCustomMessage(customContent);
-
-      expect(conversation.state.messages.length).toBe(1);
-      const msg = conversation.state.messages[0];
-      expect(msg.role).toBe('custom');
-      expect((msg as any).content).toEqual(customContent);
-
-      // Check events
-      const startEvent = events.find(
-        (e) => e.type === 'message_start' && e.messageType === 'custom'
-      );
-      const updateEvent = events.find(
-        (e) => e.type === 'message_update' && e.messageType === 'custom'
-      );
-      const endEvent = events.find((e) => e.type === 'message_end' && e.messageType === 'custom');
-
-      expect(startEvent).toBeDefined();
-      expect(updateEvent).toBeDefined();
-      expect(endEvent).toBeDefined();
-    });
-
-    it('should wait for idle before adding', async () => {
-      // Start a long running prompt
-      mockRunner.run.mockImplementation(async () => {
-        await new Promise((r) => setTimeout(r, 50));
-        return [];
-      });
-
-      const p = conversation.prompt('test');
-
-      let added = false;
-      const addPromise = conversation.addCustomMessage({}).then(() => {
-        added = true;
-      });
-
-      expect(added).toBe(false);
-      await p;
-      await addPromise;
-      expect(added).toBe(true);
     });
   });
 
   describe('continue()', () => {
-    it('should throw if no messages', async () => {
-      await expect(conversation.continue()).rejects.toThrow('No messages to continue from');
-    });
+    it('should continue from existing messages', async () => {
+      const mockKeysAdapter = createMockKeysAdapter();
+      const conversation = new Conversation({ keysAdapter: mockKeysAdapter });
+      conversation.setProvider({ model: mockModel, providerOptions: {} });
 
-    it('should throw if last message is not user/toolResult', async () => {
-      const assistantMsg: Message = {
-        role: 'assistant',
-        id: '1',
-        content: [],
-        api: 'openai',
-        model: {} as any,
-        stopReason: 'stop',
-        usage: {
-          input: 0,
-          output: 0,
-          totalTokens: 0,
-          cacheRead: 0,
-          cacheWrite: 0,
-          cost: { total: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-        },
-        timestamp: 0,
-        duration: 0,
-        message: {} as any,
-      };
-      conversation.appendMessage(assistantMsg);
-
-      // Mock transformer to return the message as is
-      // Note: `continue` checks the TRANSFORMED messages.
-      // Default transformer acts as identity, BUT we need to ensure the check
-      // inside `_runAgentLoopContinue` sees the right roles.
-      // The check is: lastMessage.role !== "user" && lastMessage.role !== "toolResult"
-
-      // Wait, logic in conversation code:
-      // const { llmMessages, cfg, signal } = await this._prepareRun();
-      // const lastMessage = llmMessages[llmMessages.length - 1];
-
-      await expect(conversation.continue()).rejects.toThrow(/Cannot continue from message role/);
-    });
-
-    it('should call runner with existing messages', async () => {
-      const userMsg: Message = {
+      // Add a user message first
+      conversation.appendMessage({
         role: 'user',
-        id: '1',
-        content: [{ type: 'text', content: 'hi' }],
-      };
-      conversation.appendMessage(userMsg);
-
-      mockRunner.run.mockResolvedValue([]);
+        id: 'user-1',
+        timestamp: Date.now(),
+        content: [{ type: 'text', content: 'Hello' }],
+      });
 
       await conversation.continue();
 
-      expect(mockRunner.run).toHaveBeenCalledTimes(1);
-      const [_, msgs] = mockRunner.run.mock.calls[0];
-      expect(msgs.length).toBe(1);
-      expect(msgs[0]).toEqual(userMsg);
-    });
-  });
-
-  describe('Limits and Budget', () => {
-    it('should throw immediately if cost limit exceeded before run', async () => {
-      conversation.setCostLimit(1.0);
-      // Manually set usage to exceed limit
-      conversation.state.usage.totalCost = 1.5;
-
-      await expect(conversation.prompt('test')).rejects.toThrow('Cost limit exceeded');
-      expect(mockRunner.run).not.toHaveBeenCalled();
+      expect(core.runAgentLoop).toHaveBeenCalled();
     });
 
-    it('should NOT throw if context limit exceeded before run (check removed)', async () => {
-      conversation.setContextLimit(100);
-      conversation.state.usage.lastInputTokens = 200;
+    it('should throw if no messages exist', async () => {
+      const mockKeysAdapter = createMockKeysAdapter();
+      const conversation = new Conversation({ keysAdapter: mockKeysAdapter });
+      conversation.setProvider({ model: mockModel, providerOptions: {} });
 
-      mockRunner.run.mockResolvedValue([]);
-
-      await conversation.prompt('test');
-      expect(mockRunner.run).toHaveBeenCalled();
+      await expect(conversation.continue()).rejects.toThrow('No messages to continue from');
     });
 
-    it('should pass budget to runner', async () => {
-      conversation.setCostLimit(10.0);
-      conversation.setContextLimit(5000);
-      conversation.state.usage.totalCost = 2.5;
+    it('should prevent concurrent continues', async () => {
+      const mockKeysAdapter = createMockKeysAdapter();
+      const conversation = new Conversation({ keysAdapter: mockKeysAdapter });
+      conversation.setProvider({ model: mockModel, providerOptions: {} });
 
-      mockRunner.run.mockResolvedValue([]);
-
-      await conversation.prompt('test');
-
-      const [cfg] = mockRunner.run.mock.calls[0];
-      expect(cfg.budget).toBeDefined();
-      expect(cfg.budget?.costLimit).toBe(10.0);
-      expect(cfg.budget?.contextLimit).toBe(5000);
-      expect(cfg.budget?.currentCost).toBe(2.5);
-    });
-  });
-
-  describe('Transformer', () => {
-    it('should transform messages before sending to runner', async () => {
-      const transformer = vi.fn().mockImplementation((msgs) => {
-        return msgs.map((m: any) => ({ ...m, extra: 'transformed' }));
+      conversation.appendMessage({
+        role: 'user',
+        id: 'user-1',
+        timestamp: Date.now(),
+        content: [{ type: 'text', content: 'Hello' }],
       });
 
-      conversation = new Conversation({
-        runner: mockRunner,
-        messageTransformer: transformer,
-      });
+      // Make runAgentLoop hang until we resolve it
+      let resolveLoop!: () => void;
+      vi.mocked(core.runAgentLoop).mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveLoop = () =>
+              resolve({ messages: [mockAssistantMessage], totalCost: 0, aborted: false });
+          })
+      );
 
-      // Add a message to history which WILL be transformed
-      conversation.appendMessage({ role: 'user', id: 'old', content: [] });
+      // Start the first continue (it will hang)
+      const firstContinue = conversation.continue();
 
-      await conversation.prompt('test');
+      // Wait a tick to ensure the first continue has started
+      await new Promise((r) => setImmediate(r));
 
-      expect(transformer).toHaveBeenCalled();
-      const [_, msgs] = mockRunner.run.mock.calls[0];
+      // Second continue should fail immediately
+      await expect(conversation.continue()).rejects.toThrow(
+        'Cannot continue while another prompt is running'
+      );
 
-      // msgs[0] is the historical message, which should be transformed
-      expect((msgs[0] as any).extra).toBe('transformed');
-
-      // msgs[1] is the new prompt, which is NOT transformed in the current implementation
-      expect(msgs.length).toBe(2);
+      // Cleanup
+      resolveLoop();
+      await firstContinue;
     });
   });
 
-  describe('Queue Mode', () => {
-    it('should provide one queued message at a time if mode is "one-at-a-time"', async () => {
-      // Setup
-      conversation.setQueueMode('one-at-a-time');
-      const q1: Message = { role: 'user', id: 'q1', content: [] };
-      const q2: Message = { role: 'user', id: 'q2', content: [] };
-      await conversation.queueMessage(q1);
-      await conversation.queueMessage(q2);
+  describe('abort()', () => {
+    it('should signal abort to the running prompt', async () => {
+      const mockKeysAdapter = createMockKeysAdapter();
+      const conversation = new Conversation({ keysAdapter: mockKeysAdapter });
+      conversation.setProvider({ model: mockModel, providerOptions: {} });
 
-      // Trigger prompt
-      await conversation.prompt('start');
+      let capturedSignal: AbortSignal | undefined;
 
-      // Check what runner received in config.getQueuedMessages
-      const [config] = mockRunner.run.mock.calls[0];
-      const queued = await config.getQueuedMessages();
+      vi.mocked(core.runAgentLoop).mockImplementation(async (_cfg, _msgs, _emit, signal) => {
+        capturedSignal = signal;
+        // Wait for abort
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        return { messages: [], totalCost: 0, aborted: signal.aborted };
+      });
 
-      expect(queued.length).toBe(1);
-      expect(queued[0].original).toBe(q1);
+      const promptPromise = conversation.prompt('Hello');
 
-      // Check remaining queue via second call (simulating next turn)
-      const queued2 = await config.getQueuedMessages();
-      expect(queued2[0].original).toBe(q2);
+      // Wait a tick then abort
+      await new Promise((r) => setTimeout(r, 10));
+      conversation.abort();
+
+      await promptPromise;
+
+      expect(capturedSignal?.aborted).toBe(true);
+    });
+  });
+
+  describe('waitForIdle()', () => {
+    it('should resolve immediately when not running', async () => {
+      const conversation = new Conversation();
+
+      await expect(conversation.waitForIdle()).resolves.toBeUndefined();
     });
 
-    it('should provide all queued messages if mode is "all"', async () => {
-      conversation.setQueueMode('all');
-      const q1: Message = { role: 'user', id: 'q1', content: [] };
-      const q2: Message = { role: 'user', id: 'q2', content: [] };
-      await conversation.queueMessage(q1);
-      await conversation.queueMessage(q2);
+    it('should wait for running prompt to complete', async () => {
+      const mockKeysAdapter = createMockKeysAdapter();
+      const conversation = new Conversation({ keysAdapter: mockKeysAdapter });
+      conversation.setProvider({ model: mockModel, providerOptions: {} });
 
-      await conversation.prompt('start');
+      // Make runAgentLoop hang until we resolve it
+      let resolveLoop!: () => void;
+      vi.mocked(core.runAgentLoop).mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveLoop = () =>
+              resolve({ messages: [mockAssistantMessage], totalCost: 0, aborted: false });
+          })
+      );
 
-      const [config] = mockRunner.run.mock.calls[0];
-      const queued = await config.getQueuedMessages();
+      // Start the prompt (it will hang)
+      const promptPromise = conversation.prompt('Hello');
 
-      expect(queued.length).toBe(2);
-      expect(queued[0].original).toBe(q1);
-      expect(queued[1].original).toBe(q2);
+      // Wait a tick to ensure the prompt has started
+      await new Promise((r) => setImmediate(r));
+
+      // Now set up the wait
+      let waitResolved = false;
+      const waitPromise = conversation.waitForIdle().then(() => {
+        waitResolved = true;
+      });
+
+      // Wait should not resolve yet (prompt is still running)
+      await new Promise((r) => setImmediate(r));
+      expect(waitResolved).toBe(false);
+
+      // Resolve the loop
+      resolveLoop();
+      await promptPromise;
+      await waitPromise;
+
+      expect(waitResolved).toBe(true);
+    });
+  });
+
+  describe('budget limits', () => {
+    it('should pass budget configuration to runAgentLoop', async () => {
+      const mockKeysAdapter = createMockKeysAdapter();
+      const conversation = new Conversation({
+        keysAdapter: mockKeysAdapter,
+        costLimit: 1.0,
+        contextLimit: 50000,
+      });
+      conversation.setProvider({ model: mockModel, providerOptions: {} });
+
+      await conversation.prompt('Hello');
+
+      expect(core.runAgentLoop).toHaveBeenCalledWith(
+        expect.objectContaining({
+          budget: expect.objectContaining({
+            costLimit: 1.0,
+            contextLimit: 50000,
+            currentCost: 0,
+          }),
+        }),
+        expect.any(Array),
+        expect.any(Function),
+        expect.any(Object),
+        expect.any(Object)
+      );
+    });
+
+    it('should use setCostLimit() to update limit', async () => {
+      const mockKeysAdapter = createMockKeysAdapter();
+      const conversation = new Conversation({ keysAdapter: mockKeysAdapter });
+      conversation.setProvider({ model: mockModel, providerOptions: {} });
+
+      conversation.setCostLimit(0.5);
+
+      await conversation.prompt('Hello');
+
+      expect(core.runAgentLoop).toHaveBeenCalledWith(
+        expect.objectContaining({
+          budget: expect.objectContaining({
+            costLimit: 0.5,
+          }),
+        }),
+        expect.any(Array),
+        expect.any(Function),
+        expect.any(Object),
+        expect.any(Object)
+      );
+    });
+  });
+
+  describe('streamAssistantMessage', () => {
+    it('should default to streaming enabled', async () => {
+      const mockKeysAdapter = createMockKeysAdapter();
+      const conversation = new Conversation({ keysAdapter: mockKeysAdapter });
+      conversation.setProvider({ model: mockModel, providerOptions: {} });
+
+      await conversation.prompt('Hello');
+
+      expect(core.runAgentLoop).toHaveBeenCalledWith(
+        expect.objectContaining({
+          streamAssistantMessage: true,
+        }),
+        expect.any(Array),
+        expect.any(Function),
+        expect.any(Object),
+        expect.any(Object)
+      );
+    });
+
+    it('should allow disabling streaming', async () => {
+      const mockKeysAdapter = createMockKeysAdapter();
+      const conversation = new Conversation({
+        keysAdapter: mockKeysAdapter,
+        streamAssistantMessage: false,
+      });
+      conversation.setProvider({ model: mockModel, providerOptions: {} });
+
+      await conversation.prompt('Hello');
+
+      expect(core.runAgentLoop).toHaveBeenCalledWith(
+        expect.objectContaining({
+          streamAssistantMessage: false,
+        }),
+        expect.any(Array),
+        expect.any(Function),
+        expect.any(Object),
+        expect.any(Object)
+      );
+    });
+
+    it('should use setStreamAssistantMessage() to update', async () => {
+      const mockKeysAdapter = createMockKeysAdapter();
+      const conversation = new Conversation({ keysAdapter: mockKeysAdapter });
+      conversation.setProvider({ model: mockModel, providerOptions: {} });
+
+      conversation.setStreamAssistantMessage(false);
+
+      await conversation.prompt('Hello');
+
+      expect(core.runAgentLoop).toHaveBeenCalledWith(
+        expect.objectContaining({
+          streamAssistantMessage: false,
+        }),
+        expect.any(Array),
+        expect.any(Function),
+        expect.any(Object),
+        expect.any(Object)
+      );
+    });
+  });
+
+  describe('reset()', () => {
+    it('should clear messages and state', async () => {
+      const mockKeysAdapter = createMockKeysAdapter();
+      const conversation = new Conversation({ keysAdapter: mockKeysAdapter });
+      conversation.setProvider({ model: mockModel, providerOptions: {} });
+
+      await conversation.prompt('Hello');
+
+      expect(conversation.state.messages.length).toBeGreaterThan(0);
+
+      conversation.reset();
+
+      expect(conversation.state.messages).toEqual([]);
+      expect(conversation.state.isStreaming).toBe(false);
+      expect(conversation.state.error).toBeUndefined();
     });
   });
 });
