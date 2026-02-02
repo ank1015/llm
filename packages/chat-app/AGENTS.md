@@ -38,6 +38,8 @@ src/
       response.ts             — API response utilities
   stores/
     index.ts                  — Store exports
+    chat-store.ts             — Chat state per session (messages, streaming, pending prompts)
+    providers-store.ts        — Providers/models catalog and selection
     sessions-store.ts         — Sessions list state (pagination, search, optimistic updates)
     ui-store.ts               — UI state (sidebar, settings, dialogs)
 ```
