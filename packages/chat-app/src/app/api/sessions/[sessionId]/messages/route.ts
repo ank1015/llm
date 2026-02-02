@@ -1,6 +1,9 @@
-import type { Api, Message } from '@ank1015/llm-sdk';
-
-import { parseApi } from '@/lib/api/keys';
+import {
+  parseConversationTurnBody,
+  prepareConversationTurn,
+  runConversationTurn,
+  toConversationFailure,
+} from '@/lib/api/conversation';
 import { apiError } from '@/lib/api/response';
 import { createSessionsAdapter, parseSessionScope, toSessionLocation } from '@/lib/api/sessions';
 
@@ -8,17 +11,6 @@ type MessagesRouteContext = {
   params: Promise<{
     sessionId: string;
   }>;
-};
-
-type AppendMessageBody = {
-  projectName?: string;
-  path?: string;
-  parentId?: string;
-  branch?: string;
-  message?: Message;
-  api?: Api;
-  modelId?: string;
-  providerOptions?: Record<string, unknown>;
 };
 
 export const runtime = 'nodejs';
@@ -43,94 +35,6 @@ function parseBranch(value: string | null | undefined): string | undefined {
 
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
-}
-
-function isObjectRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isMessage(value: unknown): value is Message {
-  if (!isObjectRecord(value)) {
-    return false;
-  }
-
-  const role = value.role;
-  if (role !== 'user' && role !== 'assistant' && role !== 'toolResult' && role !== 'custom') {
-    return false;
-  }
-
-  return typeof value.id === 'string' && value.id.trim().length > 0;
-}
-
-// eslint-disable-next-line sonarjs/cognitive-complexity
-function parseAppendMessageBody(value: unknown): AppendMessageBody | undefined {
-  if (!isObjectRecord(value)) {
-    return undefined;
-  }
-
-  const body: AppendMessageBody = {};
-
-  if (value.projectName !== undefined) {
-    if (typeof value.projectName !== 'string') {
-      return undefined;
-    }
-    body.projectName = value.projectName;
-  }
-
-  if (value.path !== undefined) {
-    if (typeof value.path !== 'string') {
-      return undefined;
-    }
-    body.path = value.path;
-  }
-
-  if (value.parentId !== undefined) {
-    if (typeof value.parentId !== 'string') {
-      return undefined;
-    }
-    body.parentId = value.parentId;
-  }
-
-  if (value.branch !== undefined) {
-    if (typeof value.branch !== 'string') {
-      return undefined;
-    }
-    body.branch = value.branch;
-  }
-
-  if (value.message !== undefined) {
-    if (!isMessage(value.message)) {
-      return undefined;
-    }
-    body.message = value.message;
-  }
-
-  if (value.api !== undefined) {
-    if (typeof value.api !== 'string') {
-      return undefined;
-    }
-    const api = parseApi(value.api);
-    if (!api) {
-      return undefined;
-    }
-    body.api = api;
-  }
-
-  if (value.modelId !== undefined) {
-    if (typeof value.modelId !== 'string') {
-      return undefined;
-    }
-    body.modelId = value.modelId;
-  }
-
-  if (value.providerOptions !== undefined) {
-    if (!isObjectRecord(value.providerOptions)) {
-      return undefined;
-    }
-    body.providerOptions = value.providerOptions;
-  }
-
-  return body;
 }
 
 export async function GET(request: Request, context: MessagesRouteContext): Promise<Response> {
@@ -203,98 +107,40 @@ export async function GET(request: Request, context: MessagesRouteContext): Prom
 
 export async function POST(request: Request, context: MessagesRouteContext): Promise<Response> {
   const { sessionId } = await context.params;
-  if (!sessionId) {
-    return apiError(400, {
-      code: 'INVALID_SESSION_ID',
-      message: 'Session ID is required.',
-    });
-  }
 
   const requestBody = await request.json().catch(() => undefined);
-  const body = parseAppendMessageBody(requestBody);
+  const body = parseConversationTurnBody(requestBody);
+
   if (!body) {
     return apiError(400, {
       code: 'INVALID_BODY',
-      message: 'Request body is invalid for message append.',
+      message: 'Request body is invalid for conversation prompt.',
     });
   }
-
-  const scope = parseSessionScope({
-    projectName: body.projectName,
-    path: body.path,
-  });
-  if (!scope) {
-    return apiError(400, {
-      code: 'INVALID_SESSION_SCOPE',
-      message: 'Invalid projectName/path. projectName cannot include path separators.',
-    });
-  }
-
-  if (!body.message || !body.api || !body.modelId) {
-    return apiError(400, {
-      code: 'MISSING_FIELDS',
-      message: '"message", "api", and "modelId" are required.',
-    });
-  }
-
-  const branch = parseBranch(body.branch) ?? 'main';
 
   try {
-    const sessionsAdapter = createSessionsAdapter();
-    const location = toSessionLocation(scope, sessionId);
-    const session = await sessionsAdapter.getSession(location);
-
-    if (!session) {
-      return apiError(404, {
-        code: 'SESSION_NOT_FOUND',
-        message: `Session not found: ${sessionId}`,
-      });
-    }
-
-    let parentId = body.parentId?.trim();
-    if (!parentId) {
-      const latestNode = await sessionsAdapter.getLatestNode(location, branch);
-      if (!latestNode) {
-        return apiError(404, {
-          code: 'PARENT_NOT_FOUND',
-          message: `No parent node found for branch: ${branch}`,
-        });
-      }
-      parentId = latestNode.id;
-    }
-
-    const parentNode = await sessionsAdapter.getNode(location, parentId);
-    if (!parentNode) {
-      return apiError(404, {
-        code: 'PARENT_NOT_FOUND',
-        message: `Parent node not found: ${parentId}`,
-      });
-    }
-
-    const result = await sessionsAdapter.appendMessage({
-      projectName: scope.projectName,
-      path: scope.path,
-      sessionId,
-      parentId,
-      branch,
-      message: body.message,
-      api: body.api,
-      modelId: body.modelId,
-      providerOptions: body.providerOptions ?? {},
+    const prepared = await prepareConversationTurn(sessionId, body);
+    const result = await runConversationTurn(prepared, {
+      streamAssistantMessage: false,
+      requestSignal: request.signal,
     });
 
     return Response.json(
       {
         ok: true,
-        sessionId: result.sessionId,
-        node: result.node,
+        sessionId,
+        branch: result.branch,
+        messageCount: result.newMessages.length,
+        messages: result.newMessages,
+        nodes: result.nodes,
       },
       { status: 201 }
     );
-  } catch {
-    return apiError(500, {
-      code: 'MESSAGE_APPEND_FAILED',
-      message: 'Failed to append message node.',
+  } catch (error) {
+    const failure = toConversationFailure(error);
+    return apiError(failure.status, {
+      code: failure.code,
+      message: failure.message,
     });
   }
 }

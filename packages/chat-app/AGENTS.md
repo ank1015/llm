@@ -26,11 +26,15 @@ src/
       providers/route.ts      — GET: list providers with capabilities
       sessions/
         route.ts              — GET: list sessions, POST: create session
-        [sessionId]/route.ts  — GET: get session, PATCH: rename, DELETE: delete
+        [sessionId]/
+          route.ts            — GET: get session, PATCH: rename, DELETE: delete
+          messages/route.ts   — GET: get messages, POST: run conversation turn
+          stream/route.ts     — POST: stream conversation turn (SSE)
   lib/
     api/
       keys.ts                 — Keys adapter factory and helpers
       sessions.ts             — Sessions adapter factory and helpers
+      conversation.ts         — Conversation turn logic (shared by messages/stream)
       response.ts             — API response utilities
 ```
 
@@ -67,6 +71,22 @@ src/
   - `?branch=<name>` — Filter latest node by branch
 - `PATCH /api/sessions/[sessionId]` — Rename session (body: `{ projectName?, path?, sessionName }`)
 - `DELETE /api/sessions/[sessionId]` — Delete session
+
+### Messages API
+
+- `GET /api/sessions/[sessionId]/messages` — Get messages from session
+  - `?projectName=<name>&path=<path>` — Session scope
+  - `?branch=<name>` — Filter by branch
+  - `?limit=<n>&offset=<n>` — Pagination
+- `POST /api/sessions/[sessionId]/messages` — Run conversation turn (non-streaming)
+  - Body: `{ projectName?, path?, branch?, parentId?, prompt, api, modelId, providerOptions?, systemPrompt?, attachments? }`
+  - Returns: `{ messages, nodes, branch }`
+
+### Stream API
+
+- `POST /api/sessions/[sessionId]/stream` — Run conversation turn (SSE streaming)
+  - Body: Same as POST messages
+  - Events: `ready`, `agent_event`, `done`, `error`
 
 ## Dependencies
 
