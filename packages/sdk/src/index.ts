@@ -148,12 +148,8 @@ export type {
   // Tool
   Tool,
   Context,
-  // Request
-  MessageRequest,
-  SimpleMessageRequest,
   // Errors
   LLMErrorCode,
-  LLMErrorResponse,
   // Agent types
   ToolExecutionContext,
   AgentToolResult,
@@ -179,13 +175,4 @@ export type {
 
 // Re-export runtime values from types
 export { KnownApis, isValidApi } from '@ank1015/llm-types';
-export {
-  LLMError,
-  ApiKeyNotFoundError,
-  ModelNotFoundError,
-  InvalidRequestError,
-  ProviderError,
-  RateLimitError,
-  ContextOverflowError,
-  StreamError,
-} from '@ank1015/llm-types';
+export { LLMError, ApiKeyNotFoundError } from '@ank1015/llm-types';

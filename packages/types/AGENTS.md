@@ -18,8 +18,7 @@ src/
   message.ts        — Message types (UserMessage, BaseAssistantMessage, etc.)
   model.ts          — Model and Provider types
   tool.ts           — Tool definition and Context types
-  request.ts        — API request types (MessageRequest)
-  errors.ts         — Error types and classes (LLMError, etc.)
+  errors.ts         — Error types and classes (LLMError, ApiKeyNotFoundError)
   agent-types.ts    — Agent types (AgentTool, AgentState, AgentEvent, etc.)
   session.ts        — Session types (SessionHeader, MessageNode, CustomNode, etc.)
   providers/        — Provider-specific types
@@ -43,7 +42,6 @@ src/
 - `Provider<TApi>` — Provider configuration (model + options)
 - `Tool` — Tool definition with TypeBox schema parameters
 - `Context` — Conversation context (messages, systemPrompt, tools)
-- `MessageRequest` — Request body for /messages endpoints
 
 ### Agent Types
 
@@ -70,8 +68,9 @@ src/
 
 ### Error Types
 
-- `LLMError` — Base error class with code, message, and status code
-- `LLMErrorCode` — Error codes (API_KEY_NOT_FOUND, MODEL_NOT_FOUND, etc.)
+- `LLMError` — Base error class with code and message
+- `LLMErrorCode` — Error code type ('API_KEY_NOT_FOUND')
+- `ApiKeyNotFoundError` — Thrown when API key is not found for a provider
 
 ## Conventions
 
@@ -80,10 +79,9 @@ src/
 - Use discriminated unions for variant types
 - Use JSDoc comments on all exports
 - Provider types extend/omit from official SDK types
-- Error classes extend `LLMError` base class
 - Agent types use `exactOptionalPropertyTypes` — don't assign undefined to optional properties
 
 ## Dependencies
 
 - Depends on: (none — uses SDK types as devDependencies)
-- Depended on by: @ank1015/llm-core, @ank1015/llm-sdk, @ank1015/llm-server
+- Depended on by: @ank1015/llm-core, @ank1015/llm-sdk
