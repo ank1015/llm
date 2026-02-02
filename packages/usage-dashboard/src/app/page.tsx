@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
-const API_BASE = 'http://localhost:3001';
+import type { Api } from '@ank1015/llm-types';
+
+import { useKeyStatusQuery, useSaveKeyMutation, useDeleteKeyMutation } from '@/lib/queries';
 
 const PROVIDERS = [
   { id: 'anthropic', name: 'Anthropic', placeholder: 'sk-ant-...' },
@@ -13,118 +15,86 @@ const PROVIDERS = [
   { id: 'zai', name: 'Z.AI', placeholder: 'sk-...' },
 ] as const;
 
-type ProviderId = (typeof PROVIDERS)[number]['id'];
+interface ProviderCardProps {
+  provider: (typeof PROVIDERS)[number];
+}
 
-interface KeyStatus {
-  exists: boolean;
-  loading: boolean;
-  saving: boolean;
-  error: string | null;
+function ProviderCard({ provider }: ProviderCardProps) {
+  const [keyInput, setKeyInput] = useState('');
+
+  const { data, isLoading, error } = useKeyStatusQuery(provider.id as Api);
+  const saveMutation = useSaveKeyMutation();
+  const deleteMutation = useDeleteKeyMutation();
+
+  const isSaving = saveMutation.isPending || deleteMutation.isPending;
+  const mutationError = saveMutation.error || deleteMutation.error;
+
+  async function handleSave() {
+    if (!keyInput.trim()) return;
+    await saveMutation.mutateAsync({ api: provider.id as Api, apiKey: keyInput });
+    setKeyInput('');
+  }
+
+  async function handleDelete() {
+    await deleteMutation.mutateAsync(provider.id as Api);
+  }
+
+  return (
+    <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-3">
+          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">{provider.name}</h2>
+          {isLoading ? (
+            <span className="text-xs text-zinc-400">Loading...</span>
+          ) : data?.exists ? (
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+              Key Set
+            </span>
+          ) : (
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+              Not Set
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="flex gap-2">
+        <input
+          type="password"
+          placeholder={data?.exists ? 'Enter new key to update...' : provider.placeholder}
+          value={keyInput}
+          onChange={(e) => setKeyInput(e.target.value)}
+          className="flex-1 px-3 py-2 text-sm rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          disabled={isSaving}
+        />
+        <button
+          onClick={handleSave}
+          disabled={!keyInput.trim() || isSaving}
+          className="px-4 py-2 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {saveMutation.isPending ? '...' : 'Save'}
+        </button>
+        {data?.exists && (
+          <button
+            onClick={handleDelete}
+            disabled={isSaving}
+            className="px-4 py-2 text-sm font-medium rounded-md bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {deleteMutation.isPending ? '...' : 'Delete'}
+          </button>
+        )}
+      </div>
+
+      {(error || mutationError) && (
+        <p className="mt-2 text-sm text-red-600 dark:text-red-400">
+          {error?.message || mutationError?.message}
+        </p>
+      )}
+    </div>
+  );
 }
 
 export default function Home() {
-  const [keyStatuses, setKeyStatuses] = useState<Record<ProviderId, KeyStatus>>(
-    () =>
-      Object.fromEntries(
-        PROVIDERS.map((p) => [p.id, { exists: false, loading: true, saving: false, error: null }])
-      ) as Record<ProviderId, KeyStatus>
-  );
-  const [keyInputs, setKeyInputs] = useState<Record<ProviderId, string>>(
-    () => Object.fromEntries(PROVIDERS.map((p) => [p.id, ''])) as Record<ProviderId, string>
-  );
-
-  useEffect(() => {
-    PROVIDERS.forEach((provider) => {
-      checkKeyStatus(provider.id);
-    });
-  }, []);
-
-  async function checkKeyStatus(providerId: ProviderId) {
-    try {
-      const response = await fetch(`${API_BASE}/keys/${providerId}`);
-      const data = await response.json();
-      setKeyStatuses((prev) => ({
-        ...prev,
-        [providerId]: { ...prev[providerId], exists: data.exists, loading: false, error: null },
-      }));
-    } catch {
-      setKeyStatuses((prev) => ({
-        ...prev,
-        [providerId]: { ...prev[providerId], loading: false, error: 'Failed to check status' },
-      }));
-    }
-  }
-
-  async function saveKey(providerId: ProviderId) {
-    const apiKey = keyInputs[providerId];
-    if (!apiKey.trim()) return;
-
-    setKeyStatuses((prev) => ({
-      ...prev,
-      [providerId]: { ...prev[providerId], saving: true, error: null },
-    }));
-
-    try {
-      const response = await fetch(`${API_BASE}/keys/${providerId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || 'Failed to save');
-      }
-
-      setKeyStatuses((prev) => ({
-        ...prev,
-        [providerId]: { ...prev[providerId], exists: true, saving: false },
-      }));
-      setKeyInputs((prev) => ({ ...prev, [providerId]: '' }));
-    } catch (err) {
-      setKeyStatuses((prev) => ({
-        ...prev,
-        [providerId]: {
-          ...prev[providerId],
-          saving: false,
-          error: err instanceof Error ? err.message : 'Failed to save',
-        },
-      }));
-    }
-  }
-
-  async function deleteKey(providerId: ProviderId) {
-    setKeyStatuses((prev) => ({
-      ...prev,
-      [providerId]: { ...prev[providerId], saving: true, error: null },
-    }));
-
-    try {
-      const response = await fetch(`${API_BASE}/keys/${providerId}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok && response.status !== 404) {
-        const data = await response.json();
-        throw new Error(data.message || 'Failed to delete');
-      }
-
-      setKeyStatuses((prev) => ({
-        ...prev,
-        [providerId]: { ...prev[providerId], exists: false, saving: false },
-      }));
-    } catch (err) {
-      setKeyStatuses((prev) => ({
-        ...prev,
-        [providerId]: {
-          ...prev[providerId],
-          saving: false,
-          error: err instanceof Error ? err.message : 'Failed to delete',
-        },
-      }));
-    }
-  }
-
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 py-12 px-4">
       <main className="max-w-2xl mx-auto">
@@ -136,71 +106,9 @@ export default function Home() {
         </p>
 
         <div className="space-y-4">
-          {PROVIDERS.map((provider) => {
-            const status = keyStatuses[provider.id];
-            const input = keyInputs[provider.id];
-
-            return (
-              <div
-                key={provider.id}
-                className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 p-4"
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-                      {provider.name}
-                    </h2>
-                    {status.loading ? (
-                      <span className="text-xs text-zinc-400">Loading...</span>
-                    ) : status.exists ? (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                        Key Set
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
-                        Not Set
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <input
-                    type="password"
-                    placeholder={
-                      status.exists ? 'Enter new key to update...' : provider.placeholder
-                    }
-                    value={input}
-                    onChange={(e) =>
-                      setKeyInputs((prev) => ({ ...prev, [provider.id]: e.target.value }))
-                    }
-                    className="flex-1 px-3 py-2 text-sm rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    disabled={status.saving}
-                  />
-                  <button
-                    onClick={() => saveKey(provider.id)}
-                    disabled={!input.trim() || status.saving}
-                    className="px-4 py-2 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {status.saving ? '...' : 'Save'}
-                  </button>
-                  {status.exists && (
-                    <button
-                      onClick={() => deleteKey(provider.id)}
-                      disabled={status.saving}
-                      className="px-4 py-2 text-sm font-medium rounded-md bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      Delete
-                    </button>
-                  )}
-                </div>
-
-                {status.error && (
-                  <p className="mt-2 text-sm text-red-600 dark:text-red-400">{status.error}</p>
-                )}
-              </div>
-            );
-          })}
+          {PROVIDERS.map((provider) => (
+            <ProviderCard key={provider.id} provider={provider} />
+          ))}
         </div>
       </main>
     </div>
