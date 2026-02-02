@@ -25,6 +25,7 @@ src/
     index.ts            — Route exports
     messages.ts         — /messages/complete and /messages/stream endpoints
     keys.ts             — /keys API key management endpoints
+    usages.ts           — /usages/stats and /usages/messages endpoints
 tests/
   unit/
     services/           — Service unit tests
@@ -82,6 +83,43 @@ Request body: `{ "apiKey": "sk-..." }`
 ### DELETE /keys/:api
 
 Remove an API key for a provider.
+
+### GET /usages/stats
+
+Get aggregated usage statistics.
+
+Query params:
+
+- `api` — Filter by provider (optional)
+- `modelId` — Filter by model (optional)
+- `startTime` — Filter by start timestamp in ms (optional)
+- `endTime` — Filter by end timestamp in ms (optional)
+
+Returns:
+
+- `totalMessages` — Total number of messages
+- `tokens` — Token breakdown (input, output, cacheRead, cacheWrite, total)
+- `cost` — Cost breakdown (input, output, cacheRead, cacheWrite, total)
+- `byApi` — Breakdown by provider
+- `byModel` — Breakdown by model
+
+### GET /usages/messages
+
+Get paginated message summaries (metadata only, no content).
+
+Query params:
+
+- `api` — Filter by provider (optional)
+- `modelId` — Filter by model (optional)
+- `startTime` — Filter by start timestamp in ms (optional)
+- `endTime` — Filter by end timestamp in ms (optional)
+- `limit` — Number of messages (default: 50, max: 100)
+- `offset` — Pagination offset (default: 0)
+
+Returns:
+
+- `messages` — Array of message summaries
+- `pagination` — Pagination info (total, limit, offset, hasMore)
 
 ## Key Exports
 

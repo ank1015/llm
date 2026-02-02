@@ -250,21 +250,25 @@ export const DbService = {
     const params: (string | number)[] = [];
 
     if (options?.api) {
+      // eslint-disable-next-line sonarjs/no-duplicate-string
       query += ' AND api = ?';
       params.push(options.api);
     }
 
     if (options?.modelId) {
+      // eslint-disable-next-line sonarjs/no-duplicate-string
       query += ' AND model_id = ?';
       params.push(options.modelId);
     }
 
     if (options?.startTime) {
+      // eslint-disable-next-line sonarjs/no-duplicate-string
       query += ' AND timestamp >= ?';
       params.push(options.startTime);
     }
 
     if (options?.endTime) {
+      // eslint-disable-next-line sonarjs/no-duplicate-string
       query += ' AND timestamp <= ?';
       params.push(options.endTime);
     }
@@ -306,12 +310,64 @@ export const DbService = {
    * @param options - Filter options
    * @returns Usage statistics
    */
-  getUsageStats(options?: { api?: Api; startTime?: number; endTime?: number }): {
+  getUsageStats(options?: { api?: Api; modelId?: string; startTime?: number; endTime?: number }): {
     totalMessages: number;
-    totalInputTokens: number;
-    totalOutputTokens: number;
-    totalCost: number;
-    byApi: Record<string, { messages: number; tokens: number; cost: number }>;
+    tokens: {
+      input: number;
+      output: number;
+      cacheRead: number;
+      cacheWrite: number;
+      total: number;
+    };
+    cost: {
+      input: number;
+      output: number;
+      cacheRead: number;
+      cacheWrite: number;
+      total: number;
+    };
+    byApi: Record<
+      string,
+      {
+        messages: number;
+        tokens: {
+          input: number;
+          output: number;
+          cacheRead: number;
+          cacheWrite: number;
+          total: number;
+        };
+        cost: {
+          input: number;
+          output: number;
+          cacheRead: number;
+          cacheWrite: number;
+          total: number;
+        };
+      }
+    >;
+    byModel: Record<
+      string,
+      {
+        api: string;
+        modelName: string;
+        messages: number;
+        tokens: {
+          input: number;
+          output: number;
+          cacheRead: number;
+          cacheWrite: number;
+          total: number;
+        };
+        cost: {
+          input: number;
+          output: number;
+          cacheRead: number;
+          cacheWrite: number;
+          total: number;
+        };
+      }
+    >;
   } {
     const db = initDatabase();
 
@@ -321,6 +377,11 @@ export const DbService = {
     if (options?.api) {
       whereClause += ' AND api = ?';
       params.push(options.api);
+    }
+
+    if (options?.modelId) {
+      whereClause += ' AND model_id = ?';
+      params.push(options.modelId);
     }
 
     if (options?.startTime) {
@@ -333,54 +394,343 @@ export const DbService = {
       params.push(options.endTime);
     }
 
-    // Get totals
+    // Get totals with full breakdown
     const totalsStmt = db.prepare(`
 			SELECT
 				COUNT(*) as total_messages,
-				COALESCE(SUM(input_tokens), 0) as total_input_tokens,
-				COALESCE(SUM(output_tokens), 0) as total_output_tokens,
-				COALESCE(SUM(cost_total), 0) as total_cost
+				COALESCE(SUM(input_tokens), 0) as input_tokens,
+				COALESCE(SUM(output_tokens), 0) as output_tokens,
+				COALESCE(SUM(cache_read_tokens), 0) as cache_read_tokens,
+				COALESCE(SUM(cache_write_tokens), 0) as cache_write_tokens,
+				COALESCE(SUM(total_tokens), 0) as total_tokens,
+				COALESCE(SUM(cost_input), 0) as cost_input,
+				COALESCE(SUM(cost_output), 0) as cost_output,
+				COALESCE(SUM(cost_cache_read), 0) as cost_cache_read,
+				COALESCE(SUM(cost_cache_write), 0) as cost_cache_write,
+				COALESCE(SUM(cost_total), 0) as cost_total
 			FROM messages ${whereClause}
 		`);
     const totals = totalsStmt.get(...params) as {
       total_messages: number;
-      total_input_tokens: number;
-      total_output_tokens: number;
-      total_cost: number;
+      input_tokens: number;
+      output_tokens: number;
+      cache_read_tokens: number;
+      cache_write_tokens: number;
+      total_tokens: number;
+      cost_input: number;
+      cost_output: number;
+      cost_cache_read: number;
+      cost_cache_write: number;
+      cost_total: number;
     };
 
-    // Get by API
+    // Get by API with full breakdown
     const byApiStmt = db.prepare(`
 			SELECT
 				api,
 				COUNT(*) as messages,
-				COALESCE(SUM(total_tokens), 0) as tokens,
-				COALESCE(SUM(cost_total), 0) as cost
+				COALESCE(SUM(input_tokens), 0) as input_tokens,
+				COALESCE(SUM(output_tokens), 0) as output_tokens,
+				COALESCE(SUM(cache_read_tokens), 0) as cache_read_tokens,
+				COALESCE(SUM(cache_write_tokens), 0) as cache_write_tokens,
+				COALESCE(SUM(total_tokens), 0) as total_tokens,
+				COALESCE(SUM(cost_input), 0) as cost_input,
+				COALESCE(SUM(cost_output), 0) as cost_output,
+				COALESCE(SUM(cost_cache_read), 0) as cost_cache_read,
+				COALESCE(SUM(cost_cache_write), 0) as cost_cache_write,
+				COALESCE(SUM(cost_total), 0) as cost_total
 			FROM messages ${whereClause}
 			GROUP BY api
 		`);
     const byApiRows = byApiStmt.all(...params) as {
       api: string;
       messages: number;
-      tokens: number;
-      cost: number;
+      input_tokens: number;
+      output_tokens: number;
+      cache_read_tokens: number;
+      cache_write_tokens: number;
+      total_tokens: number;
+      cost_input: number;
+      cost_output: number;
+      cost_cache_read: number;
+      cost_cache_write: number;
+      cost_total: number;
     }[];
 
-    const byApi: Record<string, { messages: number; tokens: number; cost: number }> = {};
+    const byApi: Record<
+      string,
+      {
+        messages: number;
+        tokens: {
+          input: number;
+          output: number;
+          cacheRead: number;
+          cacheWrite: number;
+          total: number;
+        };
+        cost: {
+          input: number;
+          output: number;
+          cacheRead: number;
+          cacheWrite: number;
+          total: number;
+        };
+      }
+    > = {};
     for (const row of byApiRows) {
       byApi[row.api] = {
         messages: row.messages,
-        tokens: row.tokens,
-        cost: row.cost,
+        tokens: {
+          input: row.input_tokens,
+          output: row.output_tokens,
+          cacheRead: row.cache_read_tokens,
+          cacheWrite: row.cache_write_tokens,
+          total: row.total_tokens,
+        },
+        cost: {
+          input: row.cost_input,
+          output: row.cost_output,
+          cacheRead: row.cost_cache_read,
+          cacheWrite: row.cost_cache_write,
+          total: row.cost_total,
+        },
+      };
+    }
+
+    // Get by Model with full breakdown
+    const byModelStmt = db.prepare(`
+			SELECT
+				model_id,
+				api,
+				model_name,
+				COUNT(*) as messages,
+				COALESCE(SUM(input_tokens), 0) as input_tokens,
+				COALESCE(SUM(output_tokens), 0) as output_tokens,
+				COALESCE(SUM(cache_read_tokens), 0) as cache_read_tokens,
+				COALESCE(SUM(cache_write_tokens), 0) as cache_write_tokens,
+				COALESCE(SUM(total_tokens), 0) as total_tokens,
+				COALESCE(SUM(cost_input), 0) as cost_input,
+				COALESCE(SUM(cost_output), 0) as cost_output,
+				COALESCE(SUM(cost_cache_read), 0) as cost_cache_read,
+				COALESCE(SUM(cost_cache_write), 0) as cost_cache_write,
+				COALESCE(SUM(cost_total), 0) as cost_total
+			FROM messages ${whereClause}
+			GROUP BY model_id
+		`);
+    const byModelRows = byModelStmt.all(...params) as {
+      model_id: string;
+      api: string;
+      model_name: string;
+      messages: number;
+      input_tokens: number;
+      output_tokens: number;
+      cache_read_tokens: number;
+      cache_write_tokens: number;
+      total_tokens: number;
+      cost_input: number;
+      cost_output: number;
+      cost_cache_read: number;
+      cost_cache_write: number;
+      cost_total: number;
+    }[];
+
+    const byModel: Record<
+      string,
+      {
+        api: string;
+        modelName: string;
+        messages: number;
+        tokens: {
+          input: number;
+          output: number;
+          cacheRead: number;
+          cacheWrite: number;
+          total: number;
+        };
+        cost: {
+          input: number;
+          output: number;
+          cacheRead: number;
+          cacheWrite: number;
+          total: number;
+        };
+      }
+    > = {};
+    for (const row of byModelRows) {
+      byModel[row.model_id] = {
+        api: row.api,
+        modelName: row.model_name,
+        messages: row.messages,
+        tokens: {
+          input: row.input_tokens,
+          output: row.output_tokens,
+          cacheRead: row.cache_read_tokens,
+          cacheWrite: row.cache_write_tokens,
+          total: row.total_tokens,
+        },
+        cost: {
+          input: row.cost_input,
+          output: row.cost_output,
+          cacheRead: row.cost_cache_read,
+          cacheWrite: row.cost_cache_write,
+          total: row.cost_total,
+        },
       };
     }
 
     return {
       totalMessages: totals.total_messages,
-      totalInputTokens: totals.total_input_tokens,
-      totalOutputTokens: totals.total_output_tokens,
-      totalCost: totals.total_cost,
+      tokens: {
+        input: totals.input_tokens,
+        output: totals.output_tokens,
+        cacheRead: totals.cache_read_tokens,
+        cacheWrite: totals.cache_write_tokens,
+        total: totals.total_tokens,
+      },
+      cost: {
+        input: totals.cost_input,
+        output: totals.cost_output,
+        cacheRead: totals.cost_cache_read,
+        cacheWrite: totals.cost_cache_write,
+        total: totals.cost_total,
+      },
       byApi,
+      byModel,
+    };
+  },
+
+  /**
+   * Get message summaries (metadata only, no content).
+   *
+   * @param options - Filter and pagination options
+   * @returns Paginated message summaries
+   */
+  getMessagesSummary(options?: {
+    api?: Api;
+    modelId?: string;
+    limit?: number;
+    offset?: number;
+    startTime?: number;
+    endTime?: number;
+  }): {
+    messages: {
+      id: string;
+      api: string;
+      modelId: string;
+      modelName: string;
+      timestamp: number;
+      duration: number;
+      stopReason: string;
+      tokens: {
+        input: number;
+        output: number;
+        cacheRead: number;
+        cacheWrite: number;
+        total: number;
+      };
+      cost: { input: number; output: number; cacheRead: number; cacheWrite: number; total: number };
+    }[];
+    pagination: {
+      total: number;
+      limit: number;
+      offset: number;
+      hasMore: boolean;
+    };
+  } {
+    const db = initDatabase();
+    const limit = options?.limit ?? 50;
+    const offset = options?.offset ?? 0;
+
+    let whereClause = 'WHERE 1=1';
+    const params: (string | number)[] = [];
+
+    if (options?.api) {
+      whereClause += ' AND api = ?';
+      params.push(options.api);
+    }
+
+    if (options?.modelId) {
+      whereClause += ' AND model_id = ?';
+      params.push(options.modelId);
+    }
+
+    if (options?.startTime) {
+      whereClause += ' AND timestamp >= ?';
+      params.push(options.startTime);
+    }
+
+    if (options?.endTime) {
+      whereClause += ' AND timestamp <= ?';
+      params.push(options.endTime);
+    }
+
+    // Get total count
+    const countStmt = db.prepare(`SELECT COUNT(*) as total FROM messages ${whereClause}`);
+    const countResult = countStmt.get(...params) as { total: number };
+    const total = countResult.total;
+
+    // Get paginated messages (metadata only)
+    const messagesStmt = db.prepare(`
+			SELECT
+				id, api, model_id, model_name, timestamp, duration, stop_reason,
+				input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, total_tokens,
+				cost_input, cost_output, cost_cache_read, cost_cache_write, cost_total
+			FROM messages ${whereClause}
+			ORDER BY timestamp DESC
+			LIMIT ? OFFSET ?
+		`);
+    const rows = messagesStmt.all(...params, limit, offset) as {
+      id: string;
+      api: string;
+      model_id: string;
+      model_name: string;
+      timestamp: number;
+      duration: number;
+      stop_reason: string;
+      input_tokens: number;
+      output_tokens: number;
+      cache_read_tokens: number;
+      cache_write_tokens: number;
+      total_tokens: number;
+      cost_input: number;
+      cost_output: number;
+      cost_cache_read: number;
+      cost_cache_write: number;
+      cost_total: number;
+    }[];
+
+    const messages = rows.map((row) => ({
+      id: row.id,
+      api: row.api,
+      modelId: row.model_id,
+      modelName: row.model_name,
+      timestamp: row.timestamp,
+      duration: row.duration,
+      stopReason: row.stop_reason,
+      tokens: {
+        input: row.input_tokens,
+        output: row.output_tokens,
+        cacheRead: row.cache_read_tokens,
+        cacheWrite: row.cache_write_tokens,
+        total: row.total_tokens,
+      },
+      cost: {
+        input: row.cost_input,
+        output: row.cost_output,
+        cacheRead: row.cost_cache_read,
+        cacheWrite: row.cost_cache_write,
+        total: row.cost_total,
+      },
+    }));
+
+    return {
+      messages,
+      pagination: {
+        total,
+        limit,
+        offset,
+        hasMore: offset + messages.length < total,
+      },
     };
   },
 

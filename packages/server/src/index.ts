@@ -8,7 +8,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 
 // Routes
-import { messagesRoutes, keysRoutes } from './routes/index.js';
+import { messagesRoutes, keysRoutes, usagesRoutes } from './routes/index.js';
 
 // Services
 export { KeyService, DbService } from './services/index.js';
@@ -26,6 +26,7 @@ app.get('/health', (c) => {
 // Mount routes
 app.route('/messages', messagesRoutes);
 app.route('/keys', keysRoutes);
+app.route('/usages', usagesRoutes);
 
 // Default export for direct execution
 export default app;
