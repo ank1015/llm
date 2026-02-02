@@ -22,6 +22,12 @@ src/
     index.ts            — LLM module exports
     complete.ts         — Central complete() dispatcher
     stream.ts           — Central stream() dispatcher
+  agent/
+    index.ts            — Agent module exports
+    runner.ts           — Stateless agent loop (runAgentLoop)
+    utils.ts            — Message builders (buildUserMessage, buildToolResultMessage)
+    mock.ts             — Mock message generator (getMockMessage)
+    types.ts            — Agent runner types
   utils/
     index.ts            — Utility exports
     event-stream.ts     — EventStream and AssistantMessageEventStream classes
@@ -79,6 +85,10 @@ tests/
 
 - `complete(model, context, options, id)` — Central completion dispatcher (use this!)
 - `stream(model, context, options, id)` — Central streaming dispatcher (use this!)
+- `runAgentLoop(config, messages, emit, signal, callbacks)` — Stateless agent loop
+- `buildUserMessage(input, attachments?)` — Build a UserMessage from text input
+- `buildToolResultMessage(toolCall, result, isError, errorDetails?)` — Build a ToolResultMessage
+- `getMockMessage(model)` — Create a mock BaseAssistantMessage for initial events
 - `MODELS` — All supported model definitions by provider
 - `getModel(api, modelId)` — Get a specific model
 - `getModels(api)` — Get all models for a provider
