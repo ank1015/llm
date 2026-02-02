@@ -1,6 +1,7 @@
 'use client';
 
 import { create } from 'zustand';
+import { createJSONStorage, persist } from 'zustand/middleware';
 
 import type { SessionRef } from '@/lib/contracts';
 import type { Api } from '@ank1015/llm-sdk';
@@ -115,192 +116,206 @@ function mergeWithGlobal(
   };
 }
 
-export const useChatSettingsStore = create<ChatSettingsStoreState>((set, get) => ({
-  ...initialState,
+export const useChatSettingsStore = create<ChatSettingsStoreState>()(
+  persist(
+    (set, get) => ({
+      ...initialState,
 
-  setActiveSession: (session) => {
-    if (!session) {
-      set({ activeSession: null });
-      return;
-    }
+      setActiveSession: (session) => {
+        if (!session) {
+          set({ activeSession: null });
+          return;
+        }
 
-    const normalized = normalizeSessionRef(session);
-    const key = getSessionKey(normalized);
+        const normalized = normalizeSessionRef(session);
+        const key = getSessionKey(normalized);
 
-    set((state) => ({
-      activeSession: normalized,
-      sessionSettingsBySession: {
-        ...state.sessionSettingsBySession,
-        [key]: state.sessionSettingsBySession[key] ?? cloneSettings(defaultSettings),
-      },
-    }));
-  },
-
-  setGlobalApi: (api) => {
-    set((state) => ({
-      globalSettings: {
-        ...state.globalSettings,
-        api,
-      },
-    }));
-  },
-
-  setGlobalModelId: (modelId) => {
-    set((state) => ({
-      globalSettings: {
-        ...state.globalSettings,
-        modelId,
-      },
-    }));
-  },
-
-  setGlobalSystemPrompt: (systemPrompt) => {
-    set((state) => ({
-      globalSettings: {
-        ...state.globalSettings,
-        systemPrompt,
-      },
-    }));
-  },
-
-  setGlobalProviderOptions: (providerOptions) => {
-    set((state) => ({
-      globalSettings: {
-        ...state.globalSettings,
-        providerOptions: { ...providerOptions },
-      },
-    }));
-  },
-
-  setGlobalProviderOption: (key, value) => {
-    set((state) => ({
-      globalSettings: {
-        ...state.globalSettings,
-        providerOptions: {
-          ...state.globalSettings.providerOptions,
-          [key]: value,
-        },
-      },
-    }));
-  },
-
-  clearGlobalProviderOption: (key) => {
-    set((state) => {
-      const nextProviderOptions = { ...state.globalSettings.providerOptions };
-      delete nextProviderOptions[key];
-
-      return {
-        globalSettings: {
-          ...state.globalSettings,
-          providerOptions: nextProviderOptions,
-        },
-      };
-    });
-  },
-
-  updateSessionSettings: (session, updater) => {
-    const resolvedSession = resolveSessionRef(session, get().activeSession);
-    if (!resolvedSession) {
-      return;
-    }
-
-    const sessionKey = getSessionKey(resolvedSession);
-
-    set((state) => {
-      const current = state.sessionSettingsBySession[sessionKey] ?? cloneSettings(defaultSettings);
-      const updated = updater(current);
-
-      return {
-        sessionSettingsBySession: {
-          ...state.sessionSettingsBySession,
-          [sessionKey]: {
-            ...updated,
-            providerOptions: { ...updated.providerOptions },
+        set((state) => ({
+          activeSession: normalized,
+          sessionSettingsBySession: {
+            ...state.sessionSettingsBySession,
+            [key]: state.sessionSettingsBySession[key] ?? cloneSettings(defaultSettings),
           },
-        },
-      };
-    });
-  },
-
-  setSessionApi: (api, session) => {
-    get().updateSessionSettings(session, (current) => ({
-      ...current,
-      api,
-    }));
-  },
-
-  setSessionModelId: (modelId, session) => {
-    get().updateSessionSettings(session, (current) => ({
-      ...current,
-      modelId,
-    }));
-  },
-
-  setSessionSystemPrompt: (systemPrompt, session) => {
-    get().updateSessionSettings(session, (current) => ({
-      ...current,
-      systemPrompt,
-    }));
-  },
-
-  setSessionProviderOptions: (providerOptions, session) => {
-    get().updateSessionSettings(session, (current) => ({
-      ...current,
-      providerOptions: { ...providerOptions },
-    }));
-  },
-
-  setSessionProviderOption: (key, value, session) => {
-    get().updateSessionSettings(session, (current) => ({
-      ...current,
-      providerOptions: {
-        ...current.providerOptions,
-        [key]: value,
+        }));
       },
-    }));
-  },
 
-  clearSessionProviderOption: (key, session) => {
-    get().updateSessionSettings(session, (current) => {
-      const nextProviderOptions = { ...current.providerOptions };
-      delete nextProviderOptions[key];
+      setGlobalApi: (api) => {
+        set((state) => ({
+          globalSettings: {
+            ...state.globalSettings,
+            api,
+          },
+        }));
+      },
 
-      return {
-        ...current,
-        providerOptions: nextProviderOptions,
-      };
-    });
-  },
+      setGlobalModelId: (modelId) => {
+        set((state) => ({
+          globalSettings: {
+            ...state.globalSettings,
+            modelId,
+          },
+        }));
+      },
 
-  getEffectiveSettings: (session) => {
-    const state = get();
-    const resolvedSession = resolveSessionRef(session, state.activeSession);
+      setGlobalSystemPrompt: (systemPrompt) => {
+        set((state) => ({
+          globalSettings: {
+            ...state.globalSettings,
+            systemPrompt,
+          },
+        }));
+      },
 
-    if (!resolvedSession) {
-      return cloneSettings(state.globalSettings);
+      setGlobalProviderOptions: (providerOptions) => {
+        set((state) => ({
+          globalSettings: {
+            ...state.globalSettings,
+            providerOptions: { ...providerOptions },
+          },
+        }));
+      },
+
+      setGlobalProviderOption: (key, value) => {
+        set((state) => ({
+          globalSettings: {
+            ...state.globalSettings,
+            providerOptions: {
+              ...state.globalSettings.providerOptions,
+              [key]: value,
+            },
+          },
+        }));
+      },
+
+      clearGlobalProviderOption: (key) => {
+        set((state) => {
+          const nextProviderOptions = { ...state.globalSettings.providerOptions };
+          delete nextProviderOptions[key];
+
+          return {
+            globalSettings: {
+              ...state.globalSettings,
+              providerOptions: nextProviderOptions,
+            },
+          };
+        });
+      },
+
+      updateSessionSettings: (session, updater) => {
+        const resolvedSession = resolveSessionRef(session, get().activeSession);
+        if (!resolvedSession) {
+          return;
+        }
+
+        const sessionKey = getSessionKey(resolvedSession);
+
+        set((state) => {
+          const current =
+            state.sessionSettingsBySession[sessionKey] ?? cloneSettings(defaultSettings);
+          const updated = updater(current);
+
+          return {
+            sessionSettingsBySession: {
+              ...state.sessionSettingsBySession,
+              [sessionKey]: {
+                ...updated,
+                providerOptions: { ...updated.providerOptions },
+              },
+            },
+          };
+        });
+      },
+
+      setSessionApi: (api, session) => {
+        get().updateSessionSettings(session, (current) => ({
+          ...current,
+          api,
+        }));
+      },
+
+      setSessionModelId: (modelId, session) => {
+        get().updateSessionSettings(session, (current) => ({
+          ...current,
+          modelId,
+        }));
+      },
+
+      setSessionSystemPrompt: (systemPrompt, session) => {
+        get().updateSessionSettings(session, (current) => ({
+          ...current,
+          systemPrompt,
+        }));
+      },
+
+      setSessionProviderOptions: (providerOptions, session) => {
+        get().updateSessionSettings(session, (current) => ({
+          ...current,
+          providerOptions: { ...providerOptions },
+        }));
+      },
+
+      setSessionProviderOption: (key, value, session) => {
+        get().updateSessionSettings(session, (current) => ({
+          ...current,
+          providerOptions: {
+            ...current.providerOptions,
+            [key]: value,
+          },
+        }));
+      },
+
+      clearSessionProviderOption: (key, session) => {
+        get().updateSessionSettings(session, (current) => {
+          const nextProviderOptions = { ...current.providerOptions };
+          delete nextProviderOptions[key];
+
+          return {
+            ...current,
+            providerOptions: nextProviderOptions,
+          };
+        });
+      },
+
+      getEffectiveSettings: (session) => {
+        const state = get();
+        const resolvedSession = resolveSessionRef(session, state.activeSession);
+
+        if (!resolvedSession) {
+          return cloneSettings(state.globalSettings);
+        }
+
+        const sessionKey = getSessionKey(resolvedSession);
+        const sessionSettings = state.sessionSettingsBySession[sessionKey];
+
+        return mergeWithGlobal(sessionSettings, state.globalSettings);
+      },
+
+      resetSessionSettings: (session) => {
+        const normalized = normalizeSessionRef(session);
+        const key = getSessionKey(normalized);
+
+        set((state) => ({
+          sessionSettingsBySession: {
+            ...state.sessionSettingsBySession,
+            [key]: cloneSettings(defaultSettings),
+          },
+        }));
+      },
+
+      reset: () => {
+        set(initialState);
+      },
+    }),
+    {
+      name: 'chat-app-chat-settings-store',
+      version: 1,
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        globalSettings: state.globalSettings,
+        sessionSettingsBySession: state.sessionSettingsBySession,
+      }),
     }
-
-    const sessionKey = getSessionKey(resolvedSession);
-    const sessionSettings = state.sessionSettingsBySession[sessionKey];
-
-    return mergeWithGlobal(sessionSettings, state.globalSettings);
-  },
-
-  resetSessionSettings: (session) => {
-    const normalized = normalizeSessionRef(session);
-    const key = getSessionKey(normalized);
-
-    set((state) => ({
-      sessionSettingsBySession: {
-        ...state.sessionSettingsBySession,
-        [key]: cloneSettings(defaultSettings),
-      },
-    }));
-  },
-
-  reset: () => {
-    set(initialState);
-  },
-}));
+  )
+);
 
 export type { ChatSettings, SessionRef };

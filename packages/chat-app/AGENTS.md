@@ -46,13 +46,17 @@ src/
       index.ts                — Contract exports
       api.ts                  — Shared API types (SessionRef, request/response types)
   stores/
-    index.ts                  — Store exports
+    index.ts                  — Store exports (imports coordination.ts)
+    coordination.ts           — Cross-store sync (activeSession, model selection)
     chat-store.ts             — Chat state per session (messages, streaming, pending prompts)
-    chat-settings-store.ts    — Chat settings per session (api, model, system prompt)
-    composer-store.ts         — Composer state per session (draft, attachments)
+    chat-settings-store.ts    — Chat settings per session (api, model, system prompt) [persisted]
+    composer-store.ts         — Composer state per session (draft, attachments) [persisted]
     providers-store.ts        — Providers/models catalog and selection
     sessions-store.ts         — Sessions list state (pagination, search, optimistic updates)
     ui-store.ts               — UI state (sidebar, settings, dialogs)
+tests/
+  integration/
+    api-routes.test.mjs       — Integration tests for API routes
 ```
 
 ## API Endpoints

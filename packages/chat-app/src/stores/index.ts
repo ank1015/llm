@@ -1,3 +1,5 @@
+import './coordination';
+
 export { useChatStore } from './chat-store';
 export { useChatSettingsStore } from './chat-settings-store';
 export { useComposerStore } from './composer-store';
