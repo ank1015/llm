@@ -82,3 +82,21 @@ export type {
   AgentLoopConfig,
   AgentEvent,
 } from './agent-types.js';
+
+// Session types
+export type {
+  BaseNode,
+  SessionHeader,
+  MessageNode,
+  CustomNode,
+  SessionNode,
+  AppendableNode,
+  SessionLocation,
+  SessionSummary,
+  Session,
+  BranchInfo,
+  CreateSessionInput,
+  AppendMessageInput,
+  AppendCustomInput,
+  UpdateSessionNameInput,
+} from './session.js';

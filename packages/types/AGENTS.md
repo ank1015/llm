@@ -21,6 +21,7 @@ src/
   request.ts        — API request types (MessageRequest)
   errors.ts         — Error types and classes (LLMError, etc.)
   agent-types.ts    — Agent types (AgentTool, AgentState, AgentEvent, etc.)
+  session.ts        — Session types (SessionHeader, MessageNode, CustomNode, etc.)
   providers/        — Provider-specific types
     index.ts        — Re-exports and type maps
     anthropic.ts    — Anthropic types
@@ -55,6 +56,18 @@ src/
 - `QueuedMessage<T>` — Message queued for injection at next turn
 - `ToolExecutionContext` — Context provided to tools during execution
 
+### Session Types
+
+- `BaseNode` — Base interface for all session nodes (id, parentId, branch, timestamp)
+- `SessionHeader` — First entry in session file (type: 'session', sessionName)
+- `MessageNode` — Message node (type: 'message', message, api, modelId, providerOptions)
+- `CustomNode` — Custom node (type: 'custom', payload)
+- `SessionNode` — Union of SessionHeader | MessageNode | CustomNode
+- `Session` — Full session with location, header, and nodes
+- `SessionSummary` — Metadata for listing sessions
+- `BranchInfo` — Branch metadata (name, branchPointId, nodeCount, latestNodeId)
+- `CreateSessionInput`, `AppendMessageInput`, `AppendCustomInput`, `UpdateSessionNameInput` — Service input types
+
 ### Error Types
 
 - `LLMError` — Base error class with code, message, and status code
@@ -73,4 +86,4 @@ src/
 ## Dependencies
 
 - Depends on: (none — uses SDK types as devDependencies)
-- Depended on by: @ank1015/llm-core, @ank1015/llm-sdk
+- Depended on by: @ank1015/llm-core, @ank1015/llm-sdk, @ank1015/llm-server
