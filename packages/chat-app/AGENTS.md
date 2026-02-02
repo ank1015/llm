@@ -24,9 +24,13 @@ src/
         [provider]/route.ts   — PUT: set key, DELETE: delete key
       models/route.ts         — GET: list models with filters
       providers/route.ts      — GET: list providers with capabilities
+      sessions/
+        route.ts              — GET: list sessions, POST: create session
+        [sessionId]/route.ts  — GET: get session, PATCH: rename, DELETE: delete
   lib/
     api/
       keys.ts                 — Keys adapter factory and helpers
+      sessions.ts             — Sessions adapter factory and helpers
       response.ts             — API response utilities
 ```
 
@@ -49,6 +53,20 @@ src/
 ### Providers API
 
 - `GET /api/providers` — List all providers with capabilities (hasKey, modelCount, supportsReasoning, supportsTools, supportedInputs)
+
+### Sessions API
+
+- `GET /api/sessions` — List sessions
+  - `?projectName=<name>` — Filter by project (default: "default")
+  - `?path=<path>` — Filter by path
+  - `?query=<search>` — Search sessions by name
+  - `?limit=<n>&offset=<n>` — Pagination
+- `POST /api/sessions` — Create session (body: `{ projectName?, path?, sessionName? }`)
+- `GET /api/sessions/[sessionId]` — Get session with branches and latest node
+  - `?projectName=<name>&path=<path>` — Session scope
+  - `?branch=<name>` — Filter latest node by branch
+- `PATCH /api/sessions/[sessionId]` — Rename session (body: `{ projectName?, path?, sessionName }`)
+- `DELETE /api/sessions/[sessionId]` — Delete session
 
 ## Dependencies
 
