@@ -10,7 +10,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@ank1015/llm-server": "workspace:^",
     "@ank1015/llm-types": "workspace:^",
     "@tanstack/react-query": "^5.90.20",
     "next": "16.1.6",

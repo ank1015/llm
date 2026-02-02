@@ -19,11 +19,9 @@ pnpm lint:fix         # Auto-fix ESLint issues
 pnpm clean            # Remove all build artifacts
 
 # Development
-pnpm dev:server       # Start API server (port 3001)
 pnpm dev:dashboard    # Start dashboard (port 3000)
 
 # Production
-pnpm start:server     # Start API server
 pnpm start:dashboard  # Start dashboard
 ```
 
@@ -32,9 +30,8 @@ pnpm start:dashboard  # Start dashboard
 ```
 packages/
   types/              # @ank1015/llm-types - Shared type definitions
-  core/               # @ank1015/llm-core - Core SDK utilities
-  sdk/                # @ank1015/llm-sdk - Unified SDK (facade for types + core)
-  server/             # @ank1015/llm-server - HTTP server (Hono)
+  core/               # @ank1015/llm-core - Core SDK (stateless, portable)
+  sdk/                # @ank1015/llm-sdk - Unified SDK with adapters for storage
   usage-dashboard/    # @ank1015/llm-usage-dashboard - Next.js usage dashboard
 ```
 
@@ -58,9 +55,8 @@ packages/
 ## Package Guide
 
 - [packages/types/AGENTS.md](packages/types/AGENTS.md) — Type definitions
-- [packages/core/AGENTS.md](packages/core/AGENTS.md) — Core SDK
-- [packages/sdk/AGENTS.md](packages/sdk/AGENTS.md) — Unified SDK facade
-- [packages/server/AGENTS.md](packages/server/AGENTS.md) — HTTP server
+- [packages/core/AGENTS.md](packages/core/AGENTS.md) — Core SDK (stateless)
+- [packages/sdk/AGENTS.md](packages/sdk/AGENTS.md) — Unified SDK with adapters
 - [packages/usage-dashboard/AGENTS.md](packages/usage-dashboard/AGENTS.md) — Usage dashboard
 
 ## Boundaries

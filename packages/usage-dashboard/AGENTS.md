@@ -86,6 +86,10 @@ src/
 
 ## Dependencies
 
-- Depends on: @ank1015/llm-server, @ank1015/llm-types
+- Depends on: @ank1015/llm-types
 - Runtime: recharts, @tanstack/react-query
 - Depended on by: (none — end-user application)
+
+## Migration Note
+
+This dashboard needs to be migrated to use SDK adapters directly via Next.js API routes instead of calling the removed server package.

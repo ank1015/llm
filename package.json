@@ -6,11 +6,9 @@
   "type": "module",
   "scripts": {
     "build": "turbo run build",
-    "build:packages": "turbo run build --filter=@ank1015/llm-types --filter=@ank1015/llm-core --filter=@ank1015/llm-sdk --filter=@ank1015/llm-server",
+    "build:packages": "turbo run build --filter=@ank1015/llm-types --filter=@ank1015/llm-core --filter=@ank1015/llm-sdk",
     "dev": "turbo run dev",
-    "dev:server": "pnpm --filter @ank1015/llm-server dev",
     "dev:dashboard": "pnpm --filter @ank1015/llm-usage-dashboard dev",
-    "start:server": "pnpm --filter @ank1015/llm-server start",
     "start:dashboard": "pnpm --filter @ank1015/llm-usage-dashboard start",
     "test": "turbo run test",
     "test:unit": "turbo run test -- tests/unit",
