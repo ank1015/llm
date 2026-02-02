@@ -3,54 +3,55 @@
  *
  * Unified SDK for LLM interactions with multiple providers.
  *
- * This package provides a unified entry point that:
- * - Uses direct provider calls when apiKey is provided
- * - Routes through the server (for usage tracking) when no apiKey is provided
+ * This package provides:
+ * - Adapter-based storage for API keys, usage tracking, and sessions
+ * - Conversation class for stateful agent interactions
+ * - Session management for conversation persistence
  */
 
-// Configuration
-export { setServerUrl, getServerUrl } from './config.js';
+// Adapters
+export {
+  // Keys adapter
+  FileKeysAdapter,
+  createFileKeysAdapter,
+  // Usage adapter
+  SqliteUsageAdapter,
+  createSqliteUsageAdapter,
+  // Sessions adapter
+  FileSessionsAdapter,
+  createFileSessionsAdapter,
+} from './adapters/index.js';
+export type {
+  KeysAdapter,
+  UsageAdapter,
+  SessionsAdapter,
+  UsageFilters,
+  UsageStats,
+  TokenBreakdown,
+  CostBreakdown,
+  CreateSessionInput,
+  AppendMessageInput,
+  AppendCustomInput,
+  SessionLocation,
+} from './adapters/index.js';
 
-// LLM functions (our wrapped versions)
+// LLM functions
 export { complete, stream } from './llm/index.js';
-
-// LLM Client (for dependency injection)
-export { DefaultLLMClient, getMockMessage } from './llm/llm-client.js';
-export type { LLMClient } from './llm/llm-client.js';
+export type { CompleteOptions, StreamOptions } from './llm/index.js';
 
 // Agent
-export {
-  Conversation,
-  DefaultAgentRunner,
-  buildUserMessage,
-  buildToolResultMessage,
-} from './agent/index.js';
-export type {
-  AgentOptions,
-  AgentRunner,
-  AgentRunnerCallbacks,
-  AgentRunnerOptions,
-} from './agent/index.js';
+export { Conversation } from './agent/index.js';
+export type { ConversationOptions } from './agent/index.js';
 
-// Session Client
-export { sessionClient, DefaultSessionClient } from './session/index.js';
+// Session Manager
+export { SessionManager, createSessionManager } from './session/index.js';
 export type {
-  SessionClient,
-  ListProjectsResponse,
-  ListSessionsResponse,
-  SearchSessionsResponse,
-  CreateSessionResponse,
-  DeleteSessionResponse,
-  UpdateSessionNameResponse,
-  AppendMessageResponse,
-  AppendCustomResponse,
-  GetBranchesResponse,
-  GetBranchHistoryResponse,
-  GetLatestNodeResponse,
-  GetMessagesResponse,
+  CreateSessionOptions,
+  AppendMessageOptions,
+  AppendCustomOptions,
 } from './session/index.js';
 
-// Re-export everything else from core (except complete/stream which we override)
+// Re-export everything from core
 export {
   VERSION,
   MODELS,
@@ -67,7 +68,12 @@ export {
   validateToolCall,
   validateToolArguments,
   generateUUID,
-  // Provider-specific functions (for direct access if needed)
+  // Agent loop (from core)
+  runAgentLoop,
+  buildUserMessage,
+  buildToolResultMessage,
+  getMockMessage,
+  // Provider-specific functions
   completeAnthropic,
   streamAnthropic,
   completeOpenAI,
@@ -83,7 +89,16 @@ export {
   streamKimi,
 } from '@ank1015/llm-core';
 
-export type { CompleteFunction, StreamFunction } from '@ank1015/llm-core';
+export type {
+  CompleteFunction,
+  StreamFunction,
+  AgentRunnerConfig,
+  AgentRunnerCallbacks,
+  AgentEventEmitter,
+  AgentRunnerResult,
+  AgentCompleteFunction,
+  AgentStreamFunction,
+} from '@ank1015/llm-core';
 
 // Re-export all types from types package
 export type {
@@ -156,13 +171,9 @@ export type {
   CustomNode,
   SessionNode,
   AppendableNode,
-  SessionLocation,
   SessionSummary,
   Session,
   BranchInfo,
-  CreateSessionInput,
-  AppendMessageInput,
-  AppendCustomInput,
   UpdateSessionNameInput,
 } from '@ank1015/llm-types';
 

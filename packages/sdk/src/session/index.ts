@@ -1,23 +1,12 @@
 /**
  * Session module
  *
- * Exports session client for managing conversation sessions.
+ * Exports session manager for managing conversation sessions.
  */
 
-export {
-  sessionClient,
-  DefaultSessionClient,
-  type SessionClient,
-  type ListProjectsResponse,
-  type ListSessionsResponse,
-  type SearchSessionsResponse,
-  type CreateSessionResponse,
-  type DeleteSessionResponse,
-  type UpdateSessionNameResponse,
-  type AppendMessageResponse,
-  type AppendCustomResponse,
-  type GetBranchesResponse,
-  type GetBranchHistoryResponse,
-  type GetLatestNodeResponse,
-  type GetMessagesResponse,
-} from './session-client.js';
+export { SessionManager, createSessionManager } from './session-manager.js';
+export type {
+  CreateSessionOptions,
+  AppendMessageOptions,
+  AppendCustomOptions,
+} from './session-manager.js';

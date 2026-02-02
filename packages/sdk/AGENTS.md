@@ -1,6 +1,6 @@
 # @ank1015/llm-sdk
 
-Unified SDK for LLM interactions with multiple providers. This is the main entry point for consuming the LLM SDK.
+Unified SDK for LLM interactions with multiple providers. Uses adapter pattern for storage operations (keys, usage, sessions).
 
 ## Commands
 
@@ -8,203 +8,171 @@ Unified SDK for LLM interactions with multiple providers. This is the main entry
 - `pnpm dev` — Watch mode compilation
 - `pnpm test` — Run all tests
 - `pnpm test:unit` — Run unit tests
-- `pnpm test:integration` — Run integration tests (requires API keys and server)
+- `pnpm test:integration` — Run integration tests (requires API keys)
 - `pnpm typecheck` — Type-check without emitting
 
 ## Structure
 
 ```
 src/
-  index.ts          — Public exports
-  config.ts         — Server URL configuration
+  index.ts              — Public exports
+  adapters/
+    index.ts            — Adapter exports
+    types.ts            — Adapter interfaces (KeysAdapter, UsageAdapter, SessionsAdapter)
+    file-keys.ts        — File-based encrypted keys adapter
+    sqlite-usage.ts     — SQLite-based usage tracking adapter
+    file-sessions.ts    — JSONL file-based sessions adapter
   llm/
-    index.ts        — LLM module exports
-    complete.ts     — Complete function (routes to core or server)
-    stream.ts       — Stream function (routes to core or server)
-    llm-client.ts   — LLMClient interface and DefaultLLMClient
+    index.ts            — LLM module exports
+    complete.ts         — Complete function with adapter support
+    stream.ts           — Stream function with adapter support
   agent/
-    index.ts        — Agent module exports
-    conversation.ts — Conversation class (state management, event emitting)
-    runner.ts       — AgentRunner interface and DefaultAgentRunner (execution logic)
-    utils.ts        — Utility functions (buildUserMessage, buildToolResultMessage)
+    index.ts            — Agent module exports
+    conversation.ts     — Conversation class (uses core's runAgentLoop)
   session/
-    index.ts        — Session module exports
-    session-client.ts — SessionClient interface and DefaultSessionClient
-tests/
-  unit/
-    llm/            — LLM function unit tests
-      complete.test.ts
-      stream.test.ts
-    conversation/   — Conversation unit tests
-      state.test.ts      — State management tests
-      runner.test.ts     — AgentRunner tests
-      execution.test.ts  — Tool execution tests
-  integration/
-    complete.test.ts     — LLM complete integration tests
-    stream.test.ts       — LLM stream integration tests
-    conversation/        — Conversation integration tests (per provider)
-      anthropic.test.ts
-      openai.test.ts
-      google.test.ts
-      deepseek.test.ts
-      kimi.test.ts
-      zai.test.ts
-      budget.test.ts     — Cost/context limit tests
+    index.ts            — Session module exports
+    session-manager.ts  — SessionManager class wrapping SessionsAdapter
 ```
 
 ## Key Exports
 
+### Adapters
+
+Adapters provide pluggable storage for keys, usage tracking, and sessions.
+
+**Interfaces:**
+
+- `KeysAdapter` — Store/retrieve API keys
+- `UsageAdapter` — Track LLM usage and costs
+- `SessionsAdapter` — Manage conversation sessions
+
+**Built-in Implementations:**
+
+- `FileKeysAdapter` — Encrypted file storage (~/.llm/global/keys/)
+- `SqliteUsageAdapter` — SQLite database (~/.llm/global/usages/messages.db)
+- `FileSessionsAdapter` — JSONL files (~/.llm/sessions/)
+
 ### LLM Functions
 
-- `complete(model, context, options?, id?)` — Complete a chat request
-- `stream(model, context, options?, id?)` — Stream a chat request
+- `complete(model, context, options?)` — Complete a chat request
+- `stream(model, context, options?)` — Stream a chat request
 
-These functions automatically route:
+Options include:
 
-- **With apiKey**: Calls provider directly via core package
-- **Without apiKey**: Calls server endpoints (uses stored keys, tracks usage)
+- `providerOptions` — Provider-specific options (apiKey optional)
+- `keysAdapter` — Adapter for API key lookup
+- `usageAdapter` — Adapter for usage tracking
+
+API key resolution: `providerOptions.apiKey` → `keysAdapter.get()` → error
 
 ### Agent
 
-- `Conversation` — Main agent class for managing conversations with tool execution
-- `DefaultAgentRunner` — Default implementation of the agent execution loop
-- `DefaultLLMClient` — Default LLM client implementation
-- `buildUserMessage(input, attachments?)` — Build a user message
-- `buildToolResultMessage(toolCall, result, isError, errorDetails?)` — Build a tool result message
+- `Conversation` — Stateful agent class with tool execution
+  - Uses core's `runAgentLoop` internally
+  - Accepts optional `keysAdapter` and `usageAdapter`
 
-### Configuration
+### Session Manager
 
-- `setServerUrl(url)` — Set the server URL (default: http://localhost:3001)
-- `getServerUrl()` — Get the current server URL
+- `SessionManager` — Wraps a SessionsAdapter for session operations
+- `createSessionManager(adapter)` — Create a SessionManager instance
 
-### Session Client
+### From Core (re-exported)
 
-- `sessionClient` — Default session client instance
-- `DefaultSessionClient` — Default implementation of SessionClient
-- `SessionClient` (interface) — Interface for dependency injection/testing
-
-Methods: `listProjects()`, `listSessions()`, `searchSessions()`, `createSession()`, `getSession()`, `deleteSession()`, `updateSessionName()`, `appendMessage()`, `appendCustom()`, `getBranches()`, `getBranchHistory()`, `getNode()`, `getLatestNode()`, `getMessages()`
-
-### From Core
-
-- `MODELS` — All supported model definitions
-- `getModel(api, modelId)` — Get a specific model
-- `getModels(api)` — Get all models for a provider
-- `calculateCost(model, usage)` — Calculate cost from token usage
-
-### Agent Types (from @ank1015/llm-types)
-
-- `AgentTool` — Tool definition with execute function
-- `AgentState` — Agent state (messages, tools, provider, usage)
-- `AgentLoopConfig` — Configuration for agent loop execution
-- `AgentEvent` — Events emitted during agent execution
-- `Attachment` — File/image attachment for user messages
+- `runAgentLoop` — Stateless agent loop function
+- `buildUserMessage`, `buildToolResultMessage` — Message builders
+- `getMockMessage` — Mock message generator
+- `MODELS`, `getModel`, `getModels`, `calculateCost` — Model utilities
 
 ## Usage
 
-### Basic LLM Usage
+### Basic LLM with Adapters
 
 ```typescript
-import { complete, getModel, setServerUrl } from '@ank1015/llm-sdk';
+import {
+  complete,
+  getModel,
+  createFileKeysAdapter,
+  createSqliteUsageAdapter,
+} from '@ank1015/llm-sdk';
 
-setServerUrl('http://localhost:3001');
-const response = await complete(getModel('anthropic', 'claude-sonnet-4-20250514'), {
-  messages: [{ role: 'user', content: [{ type: 'text', text: 'Hello!' }] }],
-});
+const keysAdapter = createFileKeysAdapter();
+const usageAdapter = createSqliteUsageAdapter();
+
+// Set an API key
+await keysAdapter.set('anthropic', 'sk-ant-...');
+
+// Complete with automatic key lookup and usage tracking
+const response = await complete(
+  getModel('anthropic', 'claude-sonnet-4-20250514')!,
+  { messages: [{ role: 'user', id: '1', content: [{ type: 'text', content: 'Hello!' }] }] },
+  { keysAdapter, usageAdapter }
+);
 ```
 
-### Agent with Tools
+### Direct API Key (no adapter)
 
 ```typescript
-import { Conversation, getModel } from '@ank1015/llm-sdk';
-import type { AgentTool } from '@ank1015/llm-sdk';
+import { complete, getModel } from '@ank1015/llm-sdk';
 
-const searchTool: AgentTool = {
-  name: 'search',
-  label: 'Web Search',
-  description: 'Search the web',
-  parameters: { type: 'object', properties: { query: { type: 'string' } } },
-  execute: async (toolCallId, params) => ({
-    content: [{ type: 'text', text: `Results for: ${params.query}` }],
-    details: {},
-  }),
-};
+const response = await complete(
+  getModel('anthropic', 'claude-sonnet-4-20250514')!,
+  { messages: [{ role: 'user', id: '1', content: [{ type: 'text', content: 'Hello!' }] }] },
+  { providerOptions: { apiKey: 'sk-ant-...' } }
+);
+```
 
-const conversation = new Conversation();
+### Conversation with Adapters
+
+```typescript
+import { Conversation, getModel, createFileKeysAdapter } from '@ank1015/llm-sdk';
+
+const keysAdapter = createFileKeysAdapter();
+const conversation = new Conversation({ keysAdapter });
+
 conversation.setProvider({ model: getModel('anthropic', 'claude-sonnet-4-20250514')! });
-conversation.setTools([searchTool]);
+conversation.subscribe((event) => console.log(event.type));
 
-// Subscribe to events
-conversation.subscribe((event) => {
-  console.log(event.type, event);
-});
-
-// Run a prompt
-const messages = await conversation.prompt('Search for TypeScript tutorials');
+const messages = await conversation.prompt('Hello!');
 ```
 
 ### Session Management
 
 ```typescript
-import { sessionClient, setServerUrl } from '@ank1015/llm-sdk';
+import { createSessionManager, createFileSessionsAdapter } from '@ank1015/llm-sdk';
 
-setServerUrl('http://localhost:3001');
+const sessionsAdapter = createFileSessionsAdapter();
+const sessionManager = createSessionManager(sessionsAdapter);
 
 // Create a session
-const { sessionId, header } = await sessionClient.createSession('my-project', '', 'My Chat');
+const { sessionId, header } = await sessionManager.createSession({
+  projectName: 'my-project',
+  sessionName: 'My Chat',
+});
 
 // Append a message
-await sessionClient.appendMessage(
-  'my-project',
+await sessionManager.appendMessage({
+  projectName: 'my-project',
   sessionId,
-  header.id, // parentId
-  'main', // branch
-  { role: 'user', id: 'msg-1', content: [{ type: 'text', text: 'Hello!' }] },
-  'anthropic',
-  'claude-sonnet-4-20250514'
-);
+  parentId: header.id,
+  branch: 'main',
+  message: { role: 'user', id: 'msg-1', content: [{ type: 'text', content: 'Hello!' }] },
+  api: 'anthropic',
+  modelId: 'claude-sonnet-4-20250514',
+});
 
 // Get the session
-const session = await sessionClient.getSession('my-project', sessionId);
-
-// List all sessions
-const { sessions } = await sessionClient.listSessions('my-project');
-```
-
-## Testing
-
-### Unit Tests
-
-Unit tests use mocks and don't require API keys or server:
-
-```bash
-pnpm test:unit
-```
-
-### Integration Tests
-
-Integration tests require:
-
-1. Server running on localhost:3001 with API keys configured
-2. Or environment variables set (ANTHROPIC_API_KEY, OPENAI_API_KEY, etc.)
-
-```bash
-# Start server first
-pnpm dev:server
-
-# Run integration tests
-pnpm test:integration
+const session = await sessionManager.getSession('my-project', sessionId);
 ```
 
 ## Conventions
 
-- Use this package as the primary import for consumers
-- Server URL defaults to http://localhost:3001
-- Options are optional; without apiKey, routes to server
+- Use adapters for storage operations (keys, usage, sessions)
+- No server dependency — SDK works standalone with adapters
+- API key resolution: explicit apiKey → adapter → error
 - Agent events are for UI updates; messages array is the source of truth
-- Use `exactOptionalPropertyTypes` — conditionally set optional properties, don't assign undefined
+- Use `exactOptionalPropertyTypes` — conditionally set optional properties
 
 ## Dependencies
 
-- Depends on: @ank1015/llm-types, @ank1015/llm-core
+- Depends on: @ank1015/llm-types, @ank1015/llm-core, better-sqlite3
 - Depended on by: (consumer applications)

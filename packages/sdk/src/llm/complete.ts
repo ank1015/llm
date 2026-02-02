@@ -1,94 +1,80 @@
 /**
  * SDK complete function
  *
- * Routes to core's complete function if apiKey is provided,
- * otherwise calls the server's /messages/complete endpoint.
+ * Calls core's complete function with API key from options or adapter.
+ * Optionally tracks usage via UsageAdapter.
  */
 
 import { complete as coreComplete } from '@ank1015/llm-core';
-import { ProviderError } from '@ank1015/llm-types';
+import { ApiKeyNotFoundError } from '@ank1015/llm-types';
 
-import { getServerUrl } from '../config.js';
+import type { KeysAdapter, UsageAdapter } from '../adapters/types.js';
+import type { Api, BaseAssistantMessage, Context, Model, OptionsForApi } from '@ank1015/llm-types';
 
-import type {
-  Api,
-  BaseAssistantMessage,
-  Context,
-  Model,
-  OptionsForApi,
-  MessageRequest,
-} from '@ank1015/llm-types';
+/**
+ * Options for the complete function.
+ */
+export interface CompleteOptions<TApi extends Api> {
+  /** Provider-specific options (apiKey optional if keysAdapter provided) */
+  providerOptions?: Partial<OptionsForApi<TApi>>;
+  /** Adapter for retrieving API keys */
+  keysAdapter?: KeysAdapter;
+  /** Adapter for tracking usage */
+  usageAdapter?: UsageAdapter;
+}
 
 /**
  * Complete a chat request.
  *
- * If options.apiKey is provided, calls the provider directly via core.
- * Otherwise, calls the server which uses stored API keys and tracks usage.
+ * API key resolution:
+ * 1. If providerOptions.apiKey is provided, use it
+ * 2. Else if keysAdapter is provided, get key from adapter
+ * 3. Else throw ApiKeyNotFoundError
+ *
+ * After completion, if usageAdapter is provided, tracks the usage.
  *
  * @param model - The model configuration
  * @param context - The conversation context (messages, system prompt, tools)
- * @param options - Provider-specific options (apiKey optional)
+ * @param options - Complete options including adapters
  * @param id - Unique request ID
  * @returns The assistant message response
  */
 export async function complete<TApi extends Api>(
   model: Model<TApi>,
   context: Context,
-  options: Partial<OptionsForApi<TApi>> = {},
+  options: CompleteOptions<TApi> = {},
   id?: string
 ): Promise<BaseAssistantMessage<TApi>> {
-  // If apiKey is provided, use core's complete directly
-  if ('apiKey' in options && options.apiKey) {
-    const requestId = id ?? `sdk-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
-    return coreComplete(model, context, options as OptionsForApi<TApi>, requestId);
+  const { providerOptions = {}, keysAdapter, usageAdapter } = options;
+
+  // Resolve API key
+  let apiKey: string | undefined;
+  if ('apiKey' in providerOptions && providerOptions.apiKey) {
+    apiKey = providerOptions.apiKey as string;
+  } else if (keysAdapter) {
+    apiKey = await keysAdapter.get(model.api);
   }
 
-  // Otherwise, call the server
-  const serverUrl = getServerUrl();
-
-  // Build request body
-  const request: MessageRequest<TApi> = {
-    api: model.api,
-    modelId: model.id,
-    messages: context.messages,
-  };
-
-  if (context.systemPrompt) {
-    request.systemPrompt = context.systemPrompt;
+  if (!apiKey) {
+    throw new ApiKeyNotFoundError(model.api);
   }
 
-  if (context.tools) {
-    request.tools = context.tools;
+  // Build final options with resolved API key
+  const finalOptions = {
+    ...providerOptions,
+    apiKey,
+  } as OptionsForApi<TApi>;
+
+  // Generate request ID
+  const requestId = id ?? `sdk-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+
+  // Call core's complete
+  const message = await coreComplete(model, context, finalOptions, requestId);
+
+  // Track usage if adapter provided
+  if (usageAdapter) {
+    await usageAdapter.track(message);
   }
 
-  // Pass through provider options (excluding apiKey and signal)
-  const {
-    apiKey: _,
-    signal,
-    ...providerOptions
-  } = options as Record<string, unknown> & { signal?: AbortSignal };
-  if (Object.keys(providerOptions).length > 0) {
-    request.providerOptions = providerOptions as Exclude<
-      MessageRequest<TApi>['providerOptions'],
-      undefined
-    >;
-  }
-
-  const fetchOptions: RequestInit = {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(request),
-  };
-  if (signal) {
-    fetchOptions.signal = signal;
-  }
-
-  const response = await fetch(`${serverUrl}/messages/complete`, fetchOptions);
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new ProviderError(model.api, errorData.message ?? 'Server request failed');
-  }
-
-  return response.json() as Promise<BaseAssistantMessage<TApi>>;
+  return message;
 }

@@ -37,10 +37,12 @@
   "license": "MIT",
   "dependencies": {
     "@ank1015/llm-core": "workspace:^",
-    "@ank1015/llm-types": "workspace:^"
+    "@ank1015/llm-types": "workspace:^",
+    "better-sqlite3": "^11.0.0"
   },
   "devDependencies": {
     "@sinclair/typebox": "^0.34.48",
+    "@types/better-sqlite3": "^7.6.11",
     "vitest": "^2.1.0"
   }
 }

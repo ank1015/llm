@@ -1,37 +1,51 @@
-import { getModel, generateUUID } from '@ank1015/llm-core';
+/**
+ * Conversation class for managing stateful agent interactions.
+ *
+ * Uses core's runAgentLoop for execution with optional adapter support
+ * for API key resolution and usage tracking.
+ */
 
-import { DefaultLLMClient } from '../llm/llm-client.js';
+import {
+  getModel,
+  generateUUID,
+  runAgentLoop,
+  buildUserMessage,
+  complete as coreComplete,
+  stream as coreStream,
+} from '@ank1015/llm-core';
+import { ApiKeyNotFoundError } from '@ank1015/llm-types';
 
-import { DefaultAgentRunner } from './runner.js';
-import { buildUserMessage } from './utils.js';
-
-import type { AgentRunner, AgentRunnerCallbacks } from './runner.js';
-import type { LLMClient } from '../llm/llm-client.js';
+import type { KeysAdapter, UsageAdapter } from '../adapters/types.js';
+import type { AgentRunnerCallbacks, AgentRunnerConfig } from '@ank1015/llm-core';
 import type {
   Api,
   CustomMessage,
   Message,
   AgentEvent,
-  AgentLoopConfig,
   AgentState,
   Attachment,
   Provider,
   QueuedMessage,
+  AgentTool,
 } from '@ank1015/llm-types';
 
-export interface AgentOptions {
+export interface ConversationOptions {
+  /** Initial state for the conversation */
   initialState?: Partial<AgentState>;
-  // Transform messages (for example - custom) to LLM-compatible messages before sending
+  /** Transform messages before sending to LLM */
   messageTransformer?: (messages: Message[]) => Message[] | Promise<Message[]>;
-  // Queue mode: "all" = send all queued messages at once, "one-at-a-time" = send one queued message per turn
+  /** Queue mode: "all" = send all queued messages at once, "one-at-a-time" = send one per turn */
   queueMode?: 'all' | 'one-at-a-time';
-  // LLM Client for dependency injection
-  client?: LLMClient;
-  // Agent Runner for dependency injection
-  runner?: AgentRunner;
-  // Optional limits
+  /** Adapter for retrieving API keys */
+  keysAdapter?: KeysAdapter;
+  /** Adapter for tracking usage */
+  usageAdapter?: UsageAdapter;
+  /** Optional cost limit */
   costLimit?: number;
+  /** Optional context limit */
   contextLimit?: number;
+  /** Whether to stream assistant messages (default: true) */
+  streamAssistantMessage?: boolean;
 }
 
 const defaultModel = getModel('google', 'gemini-3-flash-preview');
@@ -58,12 +72,12 @@ const defaultConversationState: AgentState = {
 };
 
 const defaultMessageTransformer = (messages: Message[]): Message[] => {
-  return messages.slice(); // Return a copy to avoid mutation of original array
+  return messages.slice();
 };
 
 export class Conversation {
-  private client: LLMClient;
-  private runner: AgentRunner;
+  private keysAdapter?: KeysAdapter;
+  private usageAdapter?: UsageAdapter;
   private _state: AgentState = defaultConversationState;
   private listeners = new Set<(e: AgentEvent) => void>();
   private abortController?: AbortController;
@@ -74,22 +88,26 @@ export class Conversation {
   private resolveRunningPrompt?: () => void;
   private streamAssistantMessage: boolean = true;
 
-  constructor(opts: AgentOptions = {}) {
+  constructor(opts: ConversationOptions = {}) {
     const initialState = opts.initialState ?? {};
-    this.client = opts.client ?? new DefaultLLMClient();
-    this.runner =
-      opts.runner ??
-      new DefaultAgentRunner(this.client, { streamAssistantMessage: this.streamAssistantMessage });
-    // Create fresh copies of reference types to avoid shared state between instances
+    if (opts.keysAdapter) {
+      this.keysAdapter = opts.keysAdapter;
+    }
+    if (opts.usageAdapter) {
+      this.usageAdapter = opts.usageAdapter;
+    }
+    this.streamAssistantMessage = opts.streamAssistantMessage ?? true;
+
+    // Create fresh copies of reference types
     const state: AgentState = {
       ...defaultConversationState,
       ...initialState,
-      // Override with fresh copies to ensure no shared references
       messages: initialState.messages ? [...initialState.messages] : [],
       tools: initialState.tools ? [...initialState.tools] : [],
       pendingToolCalls: new Set(initialState.pendingToolCalls ?? []),
       usage: initialState.usage ? { ...initialState.usage } : { ...defaultConversationState.usage },
     };
+
     // Conditionally set optional properties
     const costLimit = opts.costLimit ?? initialState.costLimit;
     const contextLimit = opts.contextLimit ?? initialState.contextLimit;
@@ -121,8 +139,6 @@ export class Conversation {
 
   setStreamAssistantMessage(stream: boolean): void {
     this.streamAssistantMessage = stream;
-    // Recreate runner with updated streaming setting
-    this.runner = new DefaultAgentRunner(this.client, { streamAssistantMessage: stream });
   }
 
   setCostLimit(limit: number): void {
@@ -141,7 +157,6 @@ export class Conversation {
     return this._state.contextLimit;
   }
 
-  // State mutators - update internal state without emitting events
   setSystemPrompt(v: string): void {
     this._state.systemPrompt = v;
   }
@@ -158,8 +173,16 @@ export class Conversation {
     return this.queueMode;
   }
 
-  setTools(t: typeof this._state.tools): void {
+  setTools(t: AgentTool[]): void {
     this._state.tools = t;
+  }
+
+  setKeysAdapter(adapter: KeysAdapter): void {
+    this.keysAdapter = adapter;
+  }
+
+  setUsageAdapter(adapter: UsageAdapter): void {
+    this.usageAdapter = adapter;
   }
 
   replaceMessages(ms: Message[]): void {
@@ -187,7 +210,6 @@ export class Conversation {
   }
 
   async queueMessage(m: Message): Promise<void> {
-    // Transform message and queue it for injection at next turn
     const transformed = await this.messageTransformer([m]);
     const queuedMessage: QueuedMessage<Message> = { original: m };
     if (transformed[0]) {
@@ -204,17 +226,10 @@ export class Conversation {
     this._state.messages = [];
   }
 
-  /**
-   * Remove all event listeners.
-   */
   clearListeners(): void {
     this.listeners.clear();
   }
 
-  /**
-   * Remove a message by its ID.
-   * @returns true if the message was found and removed, false otherwise.
-   */
   removeMessage(messageId: string): boolean {
     const index = this._state.messages.findIndex((m) => m.id === messageId);
     if (index === -1) return false;
@@ -225,12 +240,6 @@ export class Conversation {
     return true;
   }
 
-  /**
-   * Update a message by its ID using an updater function.
-   * @param messageId The ID of the message to update.
-   * @param updater A function that receives the current message and returns the updated message.
-   * @returns true if the message was found and updated, false otherwise.
-   */
   updateMessage(messageId: string, updater: (message: Message) => Message): boolean {
     const index = this._state.messages.findIndex((m) => m.id === messageId);
     if (index === -1) return false;
@@ -249,28 +258,18 @@ export class Conversation {
     this.abortController?.abort();
   }
 
-  /**
-   * Returns a promise that resolves when the current prompt completes.
-   * Returns immediately resolved promise if no prompt is running.
-   */
   waitForIdle(): Promise<void> {
     return this.runningPrompt ?? Promise.resolve();
   }
 
-  /**
-   * Clear all messages and state. Aborts any running prompt.
-   */
   reset(): void {
-    // Abort any running prompt first
     this.abortController?.abort();
     delete this.abortController;
 
-    // Resolve and clear running promise
     this.resolveRunningPrompt?.();
     delete this.runningPrompt;
     delete this.resolveRunningPrompt;
 
-    // Clear state
     this._state.messages = [];
     this._state.isStreaming = false;
     this._state.pendingToolCalls = new Set<string>();
@@ -278,10 +277,6 @@ export class Conversation {
     this.messageQueue = [];
   }
 
-  /**
-   * Internal cleanup after agent loop completes (success, error, or abort).
-   * Always called in finally block to ensure consistent state.
-   */
   private _cleanup(): void {
     this._state.isStreaming = false;
     this._state.pendingToolCalls.clear();
@@ -291,13 +286,8 @@ export class Conversation {
     delete this.resolveRunningPrompt;
   }
 
-  /**
-   * Append custom message to messages.
-   * Custom messages are inserted after running prompt resolves
-   */
   async addCustomMessage(message: Record<string, unknown>): Promise<void> {
     const messageId = generateUUID();
-    // emit message start event
     const customMessage: CustomMessage = {
       role: 'custom',
       id: messageId,
@@ -312,7 +302,6 @@ export class Conversation {
   }
 
   async prompt(input: string, attachments?: Attachment[]): Promise<Message[]> {
-    // Race condition protection - prevent concurrent prompts
     if (this._state.isStreaming) {
       throw new Error(
         'Cannot start a new prompt while another is running. Use waitForIdle() to wait for completion.'
@@ -329,19 +318,13 @@ export class Conversation {
     return newMessages;
   }
 
-  /**
-   * Continue from the current context without adding a new user message.
-   * Used for retry after overflow recovery when context already has user message or tool results.
-   */
   async continue(): Promise<Message[]> {
-    // Race condition protection - prevent concurrent prompts
     if (this._state.isStreaming) {
       throw new Error(
         'Cannot continue while another prompt is running. Use waitForIdle() to wait for completion.'
       );
     }
 
-    // Basic validation - detailed validation on transformed messages happens in _runAgentLoopContinue
     if (this._state.messages.length === 0) {
       throw new Error('No messages to continue from');
     }
@@ -351,12 +334,41 @@ export class Conversation {
   }
 
   /**
-   * Prepare for running the agent loop.
-   * Returns the config, transformed messages, and abort signal.
+   * Resolve API key from provider options or adapter.
    */
+  private async _resolveApiKey(): Promise<string> {
+    const providerOptions = this._state.provider.providerOptions as
+      | Record<string, unknown>
+      | undefined;
+
+    // Check if apiKey is in provider options
+    if (providerOptions && 'apiKey' in providerOptions && providerOptions.apiKey) {
+      return providerOptions.apiKey as string;
+    }
+
+    // Try to get from adapter
+    if (this.keysAdapter) {
+      const key = await this.keysAdapter.get(this._state.provider.model.api);
+      if (key) {
+        return key;
+      }
+    }
+
+    throw new ApiKeyNotFoundError(this._state.provider.model.api);
+  }
+
+  /**
+   * Track usage via adapter if available.
+   */
+  private async _trackUsage(message: Message): Promise<void> {
+    if (this.usageAdapter && message.role === 'assistant') {
+      await this.usageAdapter.track(message);
+    }
+  }
+
   private async _prepareRun(): Promise<{
     llmMessages: Message[];
-    cfg: AgentLoopConfig;
+    cfg: AgentRunnerConfig;
     signal: AbortSignal;
   }> {
     const model = this._state.provider.model;
@@ -368,6 +380,9 @@ export class Conversation {
       throw new Error('Cost limit exceeded');
     }
 
+    // Resolve API key before starting
+    const apiKey = await this._resolveApiKey();
+
     this.runningPrompt = new Promise<void>((resolve) => {
       this.resolveRunningPrompt = resolve;
     });
@@ -377,7 +392,7 @@ export class Conversation {
     this._state.isStreaming = true;
     delete this._state.error;
 
-    const budget: AgentLoopConfig['budget'] = {
+    const budget: AgentRunnerConfig['budget'] = {
       currentCost: this._state.usage.totalCost,
     };
     if (this._state.costLimit !== undefined) {
@@ -387,10 +402,27 @@ export class Conversation {
       budget.contextLimit = this._state.contextLimit;
     }
 
-    const cfg: AgentLoopConfig = {
+    // Create bound complete/stream functions with API key
+    const usageAdapter = this.usageAdapter;
+    const boundComplete: AgentRunnerConfig['complete'] = async (m, ctx, opts, id) => {
+      const result = await coreComplete(m, ctx, { ...opts, apiKey } as typeof opts, id);
+      if (usageAdapter) {
+        await usageAdapter.track(result);
+      }
+      return result;
+    };
+
+    const boundStream: AgentRunnerConfig['stream'] = (m, ctx, opts, id) => {
+      return coreStream(m, ctx, { ...opts, apiKey } as typeof opts, id);
+    };
+
+    const cfg: AgentRunnerConfig = {
       tools: this._state.tools,
       provider: this._state.provider,
       budget,
+      complete: boundComplete,
+      stream: boundStream,
+      streamAssistantMessage: this.streamAssistantMessage,
       getQueuedMessages: async <T>() => {
         if (this.queueMode === 'one-at-a-time') {
           if (this.messageQueue.length > 0) {
@@ -414,9 +446,6 @@ export class Conversation {
     return { llmMessages, cfg, signal };
   }
 
-  /**
-   * Internal: Run the agent loop with a new user message.
-   */
   private async _runAgentLoop(userMessage: Message): Promise<Message[]> {
     try {
       const { llmMessages, cfg, signal } = await this._prepareRun();
@@ -438,14 +467,15 @@ export class Conversation {
       this.appendMessage(userMessage);
 
       const callbacks = this._createRunnerCallbacks();
-      const newMessages = await this.runner.run(
+      const result = await runAgentLoop(
         cfg,
         updatedMessages,
         (e) => this.emit(e),
         signal,
         callbacks
       );
-      return newMessages;
+
+      return result.messages;
     } catch (e) {
       this._state.error = e instanceof Error ? e.message : String(e);
       throw e;
@@ -458,7 +488,6 @@ export class Conversation {
     try {
       const { llmMessages, cfg, signal } = await this._prepareRun();
 
-      // Validate that we can continue from this context
       const lastMessage = llmMessages[llmMessages.length - 1];
       if (!lastMessage) {
         throw new Error('Cannot continue: no messages in context');
@@ -473,14 +502,15 @@ export class Conversation {
       this.emit({ type: 'turn_start' });
 
       const callbacks = this._createRunnerCallbacks();
-      const newMessages = await this.runner.run(
+      const result = await runAgentLoop(
         cfg,
         [...llmMessages],
         (e) => this.emit(e),
         signal,
         callbacks
       );
-      return newMessages;
+
+      return result.messages;
     } catch (e) {
       this._state.error = e instanceof Error ? e.message : String(e);
       throw e;
@@ -489,9 +519,6 @@ export class Conversation {
     }
   }
 
-  /**
-   * Create callbacks for AgentRunner to interact with Conversation state.
-   */
   private _createRunnerCallbacks(): AgentRunnerCallbacks {
     return {
       appendMessage: (m) => this.appendMessage(m),
