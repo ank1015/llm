@@ -39,6 +39,8 @@ src/
   stores/
     index.ts                  — Store exports
     chat-store.ts             — Chat state per session (messages, streaming, pending prompts)
+    chat-settings-store.ts    — Chat settings per session (api, model, system prompt)
+    composer-store.ts         — Composer state per session (draft, attachments)
     providers-store.ts        — Providers/models catalog and selection
     sessions-store.ts         — Sessions list state (pagination, search, optimistic updates)
     ui-store.ts               — UI state (sidebar, settings, dialogs)
