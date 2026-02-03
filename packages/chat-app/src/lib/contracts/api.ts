@@ -5,6 +5,7 @@ import type {
   Message,
   MessageNode,
   Model,
+  SessionHeader,
   SessionSummary,
 } from '@ank1015/llm-sdk';
 
@@ -41,6 +42,36 @@ export type SessionsListResponse = {
   total: number;
   count: number;
   sessions: SessionSummary[];
+};
+
+export type CreateSessionRequest = SessionScope & {
+  sessionName?: string;
+};
+
+export type CreateSessionResponse = {
+  ok: true;
+  projectName: string;
+  path: string;
+  sessionId: string;
+  header: SessionHeader;
+};
+
+export type RenameSessionRequest = SessionRef & {
+  sessionName: string;
+};
+
+export type RenameSessionResponse = {
+  ok: true;
+  sessionId: string;
+  header: SessionHeader;
+};
+
+export type DeleteSessionRequest = SessionRef;
+
+export type DeleteSessionResponse = {
+  ok: true;
+  sessionId: string;
+  deleted: boolean;
 };
 
 export type SessionMessagesRequest = SessionRef & {

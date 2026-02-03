@@ -40,7 +40,7 @@ src/
       index.ts                — Client API exports
       http.ts                 — HTTP utilities (apiRequestJson, buildQueryString)
       catalog.ts              — getProvidersCatalog, getModelsCatalog
-      sessions.ts             — listSessions
+      sessions.ts             — listSessions, createSession, renameSession, deleteSession
       conversation.ts         — getSessionMessages, promptConversation, streamConversation
     contracts/
       index.ts                — Contract exports
@@ -54,7 +54,7 @@ src/
     chat-settings-store.ts    — Chat settings per session (api, model, system prompt) [persisted]
     composer-store.ts         — Composer state per session (draft, attachments) [persisted]
     providers-store.ts        — Providers/models catalog and selection
-    sessions-store.ts         — Sessions list state (pagination, search, optimistic updates)
+    sessions-store.ts         — Sessions list state (pagination, search, CRUD, optimistic updates)
     ui-store.ts               — UI state (sidebar, settings, dialogs)
 tests/
   integration/

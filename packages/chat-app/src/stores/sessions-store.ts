@@ -2,10 +2,15 @@
 
 import { create } from 'zustand';
 
-import type { SessionScope } from '@/lib/contracts';
+import type { SessionRef, SessionScope } from '@/lib/contracts';
 import type { SessionSummary } from '@ank1015/llm-sdk';
 
-import { listSessions } from '@/lib/client-api';
+import {
+  createSession as createSessionApi,
+  deleteSession as deleteSessionApi,
+  listSessions,
+  renameSession as renameSessionApi,
+} from '@/lib/client-api';
 
 type SessionsStoreState = {
   sessions: SessionSummary[];
@@ -19,11 +24,23 @@ type SessionsStoreState = {
   isLoadingMore: boolean;
   isRefreshing: boolean;
   error: string | null;
+  isCreating: boolean;
+  renamingSessionId: string | null;
+  deletingSessionId: string | null;
+  mutationError: string | null;
   setQuery: (query: string) => void;
   setScope: (scope: SessionScope) => void;
+  clearMutationError: () => void;
   fetchFirstPage: () => Promise<void>;
   fetchNextPage: () => Promise<void>;
   refresh: () => Promise<void>;
+  createSession: (input?: { sessionName?: string; scope?: SessionScope }) => Promise<SessionRef>;
+  renameSession: (input: {
+    sessionId: string;
+    sessionName: string;
+    scope?: SessionScope;
+  }) => Promise<void>;
+  deleteSession: (input: { sessionId: string; scope?: SessionScope }) => Promise<void>;
   reset: () => void;
   optimisticRenameSession: (sessionId: string, sessionName: string) => void;
   optimisticRemoveSession: (sessionId: string) => void;
@@ -80,6 +97,10 @@ const initialState = {
   isLoadingMore: false,
   isRefreshing: false,
   error: null as string | null,
+  isCreating: false,
+  renamingSessionId: null as string | null,
+  deletingSessionId: null as string | null,
+  mutationError: null as string | null,
 };
 
 export const useSessionsStore = create<SessionsStoreState>((set, get) => ({
@@ -105,6 +126,10 @@ export const useSessionsStore = create<SessionsStoreState>((set, get) => ({
       hasMore: false,
       error: null,
     });
+  },
+
+  clearMutationError: () => {
+    set({ mutationError: null });
   },
 
   fetchFirstPage: async () => {
@@ -232,6 +257,113 @@ export const useSessionsStore = create<SessionsStoreState>((set, get) => ({
       set({
         isRefreshing: false,
         error: getErrorMessage(error),
+      });
+    }
+  },
+
+  createSession: async (input) => {
+    const scope = input?.scope ?? get().scope;
+
+    set({
+      isCreating: true,
+      mutationError: null,
+    });
+
+    try {
+      const payload = await createSessionApi({
+        projectName: scope.projectName,
+        path: scope.path,
+        sessionName: input?.sessionName,
+      });
+
+      await get().refresh();
+
+      return {
+        sessionId: payload.sessionId,
+        projectName: payload.projectName,
+        path: payload.path,
+      };
+    } catch (error) {
+      const message = getErrorMessage(error);
+      set({ mutationError: message });
+      throw error;
+    } finally {
+      set({ isCreating: false });
+    }
+  },
+
+  renameSession: async ({ sessionId, sessionName, scope }) => {
+    const trimmedName = sessionName.trim();
+    if (trimmedName.length === 0) {
+      throw new Error('Session name cannot be empty.');
+    }
+
+    const targetScope = scope ?? get().scope;
+    const previousSession = get().sessions.find((session) => session.sessionId === sessionId);
+    const previousName = previousSession?.sessionName;
+
+    set({
+      renamingSessionId: sessionId,
+      mutationError: null,
+    });
+
+    get().optimisticRenameSession(sessionId, trimmedName);
+
+    try {
+      await renameSessionApi({
+        sessionId,
+        projectName: targetScope.projectName,
+        path: targetScope.path,
+        sessionName: trimmedName,
+      });
+    } catch (error) {
+      if (previousName) {
+        get().optimisticRenameSession(sessionId, previousName);
+      }
+
+      set({
+        mutationError: getErrorMessage(error),
+      });
+      throw error;
+    } finally {
+      set({
+        renamingSessionId: null,
+      });
+    }
+  },
+
+  deleteSession: async ({ sessionId, scope }) => {
+    const targetScope = scope ?? get().scope;
+    const hadSession = get().sessions.some((session) => session.sessionId === sessionId);
+
+    set({
+      deletingSessionId: sessionId,
+      mutationError: null,
+    });
+
+    if (hadSession) {
+      get().optimisticRemoveSession(sessionId);
+    }
+
+    try {
+      await deleteSessionApi({
+        sessionId,
+        projectName: targetScope.projectName,
+        path: targetScope.path,
+      });
+    } catch (error) {
+      set({
+        mutationError: getErrorMessage(error),
+      });
+
+      if (hadSession) {
+        await get().refresh();
+      }
+
+      throw error;
+    } finally {
+      set({
+        deletingSessionId: null,
       });
     }
   },
