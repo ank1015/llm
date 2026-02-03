@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
 
+import { ChatInput } from '@/components/chat/chat-input';
 import { RootLayout } from '@/components/root';
-import '../globals.css';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import '../globals.css';
 
 export const metadata: Metadata = {
   title: 'Create Next App',
@@ -18,6 +19,7 @@ export default function Root({
     <TooltipProvider>
       <RootLayout>
         <div className="relative flex h-full w-full flex-col">{children}</div>
+        <ChatInput />
       </RootLayout>
     </TooltipProvider>
   );
