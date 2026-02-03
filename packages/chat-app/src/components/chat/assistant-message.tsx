@@ -1,12 +1,19 @@
 import type { Api, BaseAssistantMessage } from '@ank1015/llm-sdk';
 
 import { Message, MessageContent } from '@/components/ai/message';
+import { TextShimmer } from '@/components/ai/text-shimmer';
 import { getTextFromBaseAssistantMessage } from '@/lib/messages/utils';
+
+type AssistantRenderableMessage =
+  | Pick<BaseAssistantMessage<Api>, 'content'>
+  | Pick<Omit<BaseAssistantMessage<Api>, 'message'>, 'content'>;
 
 export const AssistantMessageComponent = ({
   assistantMessage,
+  isStreaming = false,
 }: {
-  assistantMessage: BaseAssistantMessage<Api>;
+  assistantMessage: AssistantRenderableMessage;
+  isStreaming?: boolean;
 }) => {
   const text = getTextFromBaseAssistantMessage(assistantMessage);
 
@@ -19,6 +26,11 @@ export const AssistantMessageComponent = ({
         >
           {text}
         </MessageContent>
+      )}
+      {isStreaming && (
+        <TextShimmer className="text-xs text-muted-foreground" duration={2} spread={15}>
+          Streaming...
+        </TextShimmer>
       )}
     </Message>
   );

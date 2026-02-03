@@ -1,4 +1,4 @@
-import { Fragment, useMemo } from 'react';
+import { Fragment, memo, useMemo } from 'react';
 
 import { AssistantMessageComponent } from './assistant-message';
 import { COTMessageComponent } from './cot-message';
@@ -15,6 +15,7 @@ import type {
 import { useChatStore } from '@/stores/chat-store';
 
 const EMPTY_MESSAGES: MessageNode[] = [];
+const EMPTY_STREAMING_ASSISTANT: Omit<BaseAssistantMessage<Api>, 'message'> | null = null;
 
 function getSessionKey(session: {
   sessionId: string;
@@ -31,6 +32,20 @@ type MessageTurn = {
   cotMessages: Message[];
   assistantNode: MessageNode | null;
 };
+
+const MessageTurnRow = memo(function MessageTurnRow({ turn }: { turn: MessageTurn }) {
+  return (
+    <Fragment>
+      {turn.userNode && <UserMessageComponent userMessage={turn.userNode.message as UserMessage} />}
+      {turn.cotMessages.length > 1 && <COTMessageComponent messages={turn.cotMessages} />}
+      {turn.assistantNode && (
+        <AssistantMessageComponent
+          assistantMessage={turn.assistantNode.message as BaseAssistantMessage<Api>}
+        />
+      )}
+    </Fragment>
+  );
+});
 
 function groupIntoTurns(nodes: MessageNode[]): MessageTurn[] {
   const turns: MessageTurn[] = [];
@@ -85,33 +100,34 @@ function groupIntoTurns(nodes: MessageNode[]): MessageTurn[] {
 }
 
 export function ChatMessages() {
-  const activeSession = useChatStore((state) => state.activeSession);
-  const messages = useChatStore((state) => {
-    if (!activeSession) return EMPTY_MESSAGES;
-    const key = getSessionKey(activeSession);
-    return state.messagesBySession[key] ?? EMPTY_MESSAGES;
+  const activeSessionKey = useChatStore((state) => {
+    if (!state.activeSession) return null;
+    return getSessionKey(state.activeSession);
   });
+
+  const messages = useChatStore((state) => {
+    if (!activeSessionKey) return EMPTY_MESSAGES;
+    return state.messagesBySession[activeSessionKey] ?? EMPTY_MESSAGES;
+  });
+  const streamingAssistant = useChatStore((state) => {
+    if (!activeSessionKey) return EMPTY_STREAMING_ASSISTANT;
+    return state.streamingAssistantBySession[activeSessionKey] ?? EMPTY_STREAMING_ASSISTANT;
+  });
+
   const turns = useMemo(() => groupIntoTurns(messages), [messages]);
 
-  if (turns.length === 0) {
+  if (turns.length === 0 && !streamingAssistant) {
     return null;
   }
 
   return (
     <div className="flex w-full flex-col items-start gap-4 mt-8">
       {turns.map((turn, idx) => (
-        <Fragment key={turn.userNode?.id ?? `turn-${idx}`}>
-          {turn.userNode && (
-            <UserMessageComponent userMessage={turn.userNode.message as UserMessage} />
-          )}
-          {turn.cotMessages.length > 1 && <COTMessageComponent messages={turn.cotMessages} />}
-          {turn.assistantNode && (
-            <AssistantMessageComponent
-              assistantMessage={turn.assistantNode.message as BaseAssistantMessage<Api>}
-            />
-          )}
-        </Fragment>
+        <MessageTurnRow key={turn.userNode?.id ?? `turn-${idx}`} turn={turn} />
       ))}
+      {streamingAssistant && (
+        <AssistantMessageComponent assistantMessage={streamingAssistant} isStreaming />
+      )}
     </div>
   );
 }

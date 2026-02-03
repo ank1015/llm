@@ -3,7 +3,14 @@
 import { create } from 'zustand';
 
 import type { ConversationTurnRequest, SessionRef } from '@/lib/contracts';
-import type { AgentEvent, Message, MessageNode } from '@ank1015/llm-sdk';
+import type {
+  AgentEvent,
+  Api,
+  BaseAssistantEvent,
+  BaseAssistantMessage,
+  Message,
+  MessageNode,
+} from '@ank1015/llm-sdk';
 
 import { getSessionMessages, promptConversation, streamConversation } from '@/lib/client-api';
 
@@ -21,6 +28,7 @@ type ChatStoreState = {
   activeSession: SessionRef | null;
   messagesBySession: Record<string, MessageNode[]>;
   activeBranchBySession: Record<string, string>;
+  streamingAssistantBySession: Record<string, Omit<BaseAssistantMessage<Api>, 'message'> | null>;
   pendingPromptsBySession: Record<string, PendingPrompt[]>;
   agentEventsBySession: Record<string, AgentEvent[]>;
   isLoadingMessagesBySession: Record<string, boolean>;
@@ -242,10 +250,26 @@ function getLatestBranch(messages: MessageNode[]): string | undefined {
   return normalizeText(messages[messages.length - 1]?.branch);
 }
 
+function getStreamingAssistantMessage(
+  eventMessage: Message | BaseAssistantEvent<Api>
+): Omit<BaseAssistantMessage<Api>, 'message'> | null {
+  if (typeof eventMessage !== 'object' || eventMessage === null || !('type' in eventMessage)) {
+    return null;
+  }
+
+  const candidate = (eventMessage as BaseAssistantEvent<Api>).message;
+  if (!candidate || candidate.role !== 'assistant') {
+    return null;
+  }
+
+  return candidate;
+}
+
 export const useChatStore = create<ChatStoreState>((set, get) => ({
   activeSession: null,
   messagesBySession: {},
   activeBranchBySession: {},
+  streamingAssistantBySession: {},
   pendingPromptsBySession: {},
   agentEventsBySession: {},
   isLoadingMessagesBySession: {},
@@ -283,6 +307,10 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
         ...state.activeBranchBySession,
         [key]: state.activeBranchBySession[key] ?? 'main',
       },
+      streamingAssistantBySession: {
+        ...state.streamingAssistantBySession,
+        [key]: state.streamingAssistantBySession[key] ?? null,
+      },
     }));
   },
 
@@ -307,6 +335,11 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     set((state) => ({
       activeBranchBySession: (() => {
         const next = { ...state.activeBranchBySession };
+        delete next[key];
+        return next;
+      })(),
+      streamingAssistantBySession: (() => {
+        const next = { ...state.streamingAssistantBySession };
         delete next[key];
         return next;
       })(),
@@ -520,6 +553,10 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
         ...state.agentEventsBySession,
         [key]: [],
       },
+      streamingAssistantBySession: {
+        ...state.streamingAssistantBySession,
+        [key]: null,
+      },
       isStreamingBySession: {
         ...state.isStreamingBySession,
         [key]: true,
@@ -551,29 +588,6 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
             if (eventName === 'agent_event') {
               const agentEvent = data as AgentEvent;
 
-              if (agentEvent.type === 'message_end') {
-                const optimisticNode = createOptimisticNode({
-                  message: agentEvent.message,
-                  parentId: optimisticParentId,
-                  branch: streamBranch,
-                  api: requestInput.api,
-                  modelId: requestInput.modelId,
-                  providerOptions: requestInput.providerOptions,
-                });
-
-                optimisticParentId = optimisticNode.id;
-
-                set((state) => ({
-                  messagesBySession: {
-                    ...state.messagesBySession,
-                    [key]: upsertOptimisticMessageNode(
-                      state.messagesBySession[key] ?? [],
-                      optimisticNode
-                    ),
-                  },
-                }));
-              }
-
               set((state) => {
                 const existingEvents = state.agentEventsBySession[key] ?? [];
                 const nextEvents = [...existingEvents, agentEvent];
@@ -582,12 +596,55 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
                   nextEvents.splice(0, nextEvents.length - MAX_AGENT_EVENTS);
                 }
 
-                return {
+                const nextState: Partial<ChatStoreState> = {
                   agentEventsBySession: {
                     ...state.agentEventsBySession,
                     [key]: nextEvents,
                   },
                 };
+
+                if (
+                  agentEvent.type === 'message_update' &&
+                  agentEvent.messageType === 'assistant'
+                ) {
+                  const streamingAssistant = getStreamingAssistantMessage(agentEvent.message);
+                  if (streamingAssistant) {
+                    nextState.streamingAssistantBySession = {
+                      ...state.streamingAssistantBySession,
+                      [key]: streamingAssistant,
+                    };
+                  }
+                }
+
+                if (agentEvent.type === 'message_end') {
+                  const optimisticNode = createOptimisticNode({
+                    message: agentEvent.message,
+                    parentId: optimisticParentId,
+                    branch: streamBranch,
+                    api: requestInput.api,
+                    modelId: requestInput.modelId,
+                    providerOptions: requestInput.providerOptions,
+                  });
+
+                  optimisticParentId = optimisticNode.id;
+
+                  nextState.messagesBySession = {
+                    ...state.messagesBySession,
+                    [key]: upsertOptimisticMessageNode(
+                      state.messagesBySession[key] ?? [],
+                      optimisticNode
+                    ),
+                  };
+
+                  if (agentEvent.messageType === 'assistant') {
+                    nextState.streamingAssistantBySession = {
+                      ...state.streamingAssistantBySession,
+                      [key]: null,
+                    };
+                  }
+                }
+
+                return nextState;
               });
             }
 
@@ -597,6 +654,10 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
                 errorsBySession: {
                   ...state.errorsBySession,
                   [key]: message,
+                },
+                streamingAssistantBySession: {
+                  ...state.streamingAssistantBySession,
+                  [key]: null,
                 },
               }));
             }
@@ -613,6 +674,10 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
           key,
           pending.id
         ),
+        streamingAssistantBySession: {
+          ...state.streamingAssistantBySession,
+          [key]: null,
+        },
       }));
     } catch (error) {
       if (controller.signal.aborted) {
@@ -622,6 +687,10 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
             key,
             pending.id
           ),
+          streamingAssistantBySession: {
+            ...state.streamingAssistantBySession,
+            [key]: null,
+          },
         }));
       } else {
         const message = getErrorMessage(error);
@@ -636,6 +705,10 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
           errorsBySession: {
             ...state.errorsBySession,
             [key]: message,
+          },
+          streamingAssistantBySession: {
+            ...state.streamingAssistantBySession,
+            [key]: null,
           },
         }));
       }

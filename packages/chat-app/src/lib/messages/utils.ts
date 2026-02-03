@@ -5,7 +5,9 @@ export function getTextFromUserMessage(msg: UserMessage): string {
   return textContentBlocks.map((t) => t.content).join('\n');
 }
 
-export function getTextFromBaseAssistantMessage(msg: BaseAssistantMessage<Api>): string {
+export function getTextFromBaseAssistantMessage(
+  msg: Pick<BaseAssistantMessage<Api>, 'content'>
+): string {
   const responseBlocks = msg.content.filter((c) => c.type === 'response');
   return responseBlocks
     .map((r) => {
