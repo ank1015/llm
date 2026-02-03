@@ -1,6 +1,7 @@
 'use client';
 
 import { Ellipsis, Pencil, Trash2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
 import type { SessionSummary } from '@ank1015/llm-sdk';
@@ -234,8 +235,8 @@ export function ChatList() {
 
   const activeSession = useChatStore((state) => state.activeSession);
   const setActiveSession = useChatStore((state) => state.setActiveSession);
-  const loadMessages = useChatStore((state) => state.loadMessages);
 
+  const router = useRouter();
   const [renameTarget, setRenameTarget] = useState<SessionSummary | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<SessionSummary | null>(null);
 
@@ -250,7 +251,7 @@ export function ChatList() {
       path: scope.path,
     };
     setActiveSession(ref);
-    void loadMessages({ session: ref });
+    router.push(`/chat/${session.sessionId}`);
   };
 
   if (isLoading && sessions.length === 0) {

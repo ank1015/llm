@@ -7,8 +7,8 @@ import { PromptInputWithActions } from './prompt-input';
 import { cn } from '@/lib/utils';
 
 export const ChatInput = () => {
-  const { threadId: currentThreadId } = useParams();
-  const size = currentThreadId ? 'base' : 'sm';
+  const { id } = useParams();
+  const size = id ? 'base' : 'sm';
 
   const renderChatBottom = () => (
     <>
@@ -21,7 +21,7 @@ export const ChatInput = () => {
     <div
       className={cn(
         'bg-secondary w-full',
-        currentThreadId
+        id
           ? 'absolute bottom-0'
           : 'absolute inset-0 flex h-full w-full flex-col items-center justify-center'
       )}
@@ -33,7 +33,7 @@ export const ChatInput = () => {
         )}
       >
         <div className={'w-full pb-4 items-start flex-col flex justify-start h-full'}>
-          {!currentThreadId && (
+          {!id && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
