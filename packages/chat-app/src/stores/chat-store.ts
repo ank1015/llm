@@ -3,7 +3,7 @@
 import { create } from 'zustand';
 
 import type { ConversationTurnRequest, SessionRef } from '@/lib/contracts';
-import type { AgentEvent, MessageNode } from '@ank1015/llm-sdk';
+import type { AgentEvent, Message, MessageNode } from '@ank1015/llm-sdk';
 
 import { getSessionMessages, promptConversation, streamConversation } from '@/lib/client-api';
 
@@ -20,12 +20,14 @@ type PendingPrompt = {
 type ChatStoreState = {
   activeSession: SessionRef | null;
   messagesBySession: Record<string, MessageNode[]>;
+  activeBranchBySession: Record<string, string>;
   pendingPromptsBySession: Record<string, PendingPrompt[]>;
   agentEventsBySession: Record<string, AgentEvent[]>;
   isLoadingMessagesBySession: Record<string, boolean>;
   isStreamingBySession: Record<string, boolean>;
   errorsBySession: Record<string, string | null>;
   setActiveSession: (session: SessionRef | null) => void;
+  setActiveBranch: (session: SessionRef, branch: string) => void;
   clearSessionState: (session: SessionRef) => void;
   clearSessionError: (session: SessionRef) => void;
   loadMessages: (options?: {
@@ -109,6 +111,60 @@ function mergeMessageNodes(existing: MessageNode[], incoming: MessageNode[]): Me
   return merged;
 }
 
+function toIsoTimestamp(value: unknown): string {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return new Date(value).toISOString();
+  }
+
+  if (typeof value === 'string' && value.trim().length > 0) {
+    const parsed = Date.parse(value);
+    if (Number.isFinite(parsed)) {
+      return new Date(parsed).toISOString();
+    }
+  }
+
+  return new Date().toISOString();
+}
+
+function upsertOptimisticMessageNode(
+  existing: MessageNode[],
+  incoming: MessageNode
+): MessageNode[] {
+  const incomingMessageId = incoming.message.id;
+  const next = [...existing];
+  const index = next.findIndex((node) => node.message.id === incomingMessageId);
+
+  if (index === -1) {
+    next.push(incoming);
+  } else {
+    next[index] = incoming;
+  }
+
+  next.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  return next;
+}
+
+function createOptimisticNode(input: {
+  message: Message;
+  parentId: string | null;
+  branch: string;
+  api: ConversationTurnRequest['api'];
+  modelId: string;
+  providerOptions?: Record<string, unknown>;
+}): MessageNode {
+  return {
+    type: 'message',
+    id: `optimistic:${input.message.id}`,
+    parentId: input.parentId,
+    branch: input.branch,
+    timestamp: toIsoTimestamp(input.message.timestamp),
+    message: input.message,
+    api: input.api,
+    modelId: input.modelId,
+    providerOptions: { ...(input.providerOptions ?? {}) },
+  };
+}
+
 function resolveSession(options: {
   activeSession: SessionRef | null;
   session?: SessionRef;
@@ -182,9 +238,14 @@ function normalizePromptInput(input: ChatPromptInput): ChatPromptInput {
   };
 }
 
+function getLatestBranch(messages: MessageNode[]): string | undefined {
+  return normalizeText(messages[messages.length - 1]?.branch);
+}
+
 export const useChatStore = create<ChatStoreState>((set, get) => ({
   activeSession: null,
   messagesBySession: {},
+  activeBranchBySession: {},
   pendingPromptsBySession: {},
   agentEventsBySession: {},
   isLoadingMessagesBySession: {},
@@ -218,6 +279,22 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
         ...state.errorsBySession,
         [key]: state.errorsBySession[key] ?? null,
       },
+      activeBranchBySession: {
+        ...state.activeBranchBySession,
+        [key]: state.activeBranchBySession[key] ?? 'main',
+      },
+    }));
+  },
+
+  setActiveBranch: (session, branch) => {
+    const key = getSessionKey(normalizeSessionRef(session));
+    const normalizedBranch = normalizeText(branch) ?? 'main';
+
+    set((state) => ({
+      activeBranchBySession: {
+        ...state.activeBranchBySession,
+        [key]: normalizedBranch,
+      },
     }));
   },
 
@@ -228,6 +305,11 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     streamAbortControllers.delete(key);
 
     set((state) => ({
+      activeBranchBySession: (() => {
+        const next = { ...state.activeBranchBySession };
+        delete next[key];
+        return next;
+      })(),
       messagesBySession: {
         ...state.messagesBySession,
         [key]: [],
@@ -294,19 +376,30 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     }));
 
     try {
+      const requestedBranch = normalizeText(options?.branch);
       const payload = await getSessionMessages({
         ...session,
-        branch: options?.branch,
+        branch: requestedBranch,
       });
 
       if ((messageLoadRequestIds.get(key) ?? 0) !== nextRequestId) {
         return;
       }
 
+      const resolvedBranch =
+        normalizeText(payload.branch ?? undefined) ??
+        getLatestBranch(payload.messages) ??
+        get().activeBranchBySession[key] ??
+        'main';
+
       set((state) => ({
         messagesBySession: {
           ...state.messagesBySession,
           [key]: payload.messages,
+        },
+        activeBranchBySession: {
+          ...state.activeBranchBySession,
+          [key]: resolvedBranch,
         },
         isLoadingMessagesBySession: {
           ...state.isLoadingMessagesBySession,
@@ -335,6 +428,11 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     const normalizedInput = normalizePromptInput(input);
     const session = normalizeSessionRef(normalizedInput);
     const key = getSessionKey(session);
+    const branch = normalizedInput.branch ?? get().activeBranchBySession[key] ?? 'main';
+    const requestInput: ChatPromptInput = {
+      ...normalizedInput,
+      branch,
+    };
     const prompt = normalizedInput.prompt.trim();
 
     if (prompt.length === 0) {
@@ -352,12 +450,16 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     }));
 
     try {
-      const payload = await promptConversation(normalizedInput);
+      const payload = await promptConversation(requestInput);
 
       set((state) => ({
         messagesBySession: {
           ...state.messagesBySession,
           [key]: mergeMessageNodes(state.messagesBySession[key] ?? [], payload.nodes),
+        },
+        activeBranchBySession: {
+          ...state.activeBranchBySession,
+          [key]: payload.branch,
         },
         pendingPromptsBySession: removePendingPrompt(
           state.pendingPromptsBySession,
@@ -389,6 +491,11 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     const normalizedInput = normalizePromptInput(input);
     const session = normalizeSessionRef(normalizedInput);
     const key = getSessionKey(session);
+    const branch = normalizedInput.branch ?? get().activeBranchBySession[key] ?? 'main';
+    const requestInput: ChatPromptInput = {
+      ...normalizedInput,
+      branch,
+    };
     const prompt = normalizedInput.prompt.trim();
 
     if (prompt.length === 0) {
@@ -404,6 +511,8 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     const pending = createPendingPrompt(prompt);
     const controller = new AbortController();
     streamAbortControllers.set(key, controller);
+    let streamBranch = branch;
+    let optimisticParentId = (get().messagesBySession[key] ?? []).at(-1)?.id ?? null;
 
     set((state) => ({
       pendingPromptsBySession: upsertPendingPrompt(state.pendingPromptsBySession, key, pending),
@@ -423,13 +532,51 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
 
     try {
       await streamConversation(
-        normalizedInput,
+        requestInput,
         {
           onEvent: (eventName, data) => {
+            if (eventName === 'ready') {
+              const readyBranch = normalizeText((data as { branch?: string }).branch);
+              if (readyBranch) {
+                streamBranch = readyBranch;
+                set((state) => ({
+                  activeBranchBySession: {
+                    ...state.activeBranchBySession,
+                    [key]: readyBranch,
+                  },
+                }));
+              }
+            }
+
             if (eventName === 'agent_event') {
+              const agentEvent = data as AgentEvent;
+
+              if (agentEvent.type === 'message_end') {
+                const optimisticNode = createOptimisticNode({
+                  message: agentEvent.message,
+                  parentId: optimisticParentId,
+                  branch: streamBranch,
+                  api: requestInput.api,
+                  modelId: requestInput.modelId,
+                  providerOptions: requestInput.providerOptions,
+                });
+
+                optimisticParentId = optimisticNode.id;
+
+                set((state) => ({
+                  messagesBySession: {
+                    ...state.messagesBySession,
+                    [key]: upsertOptimisticMessageNode(
+                      state.messagesBySession[key] ?? [],
+                      optimisticNode
+                    ),
+                  },
+                }));
+              }
+
               set((state) => {
                 const existingEvents = state.agentEventsBySession[key] ?? [];
-                const nextEvents = [...existingEvents, data as AgentEvent];
+                const nextEvents = [...existingEvents, agentEvent];
 
                 if (nextEvents.length > MAX_AGENT_EVENTS) {
                   nextEvents.splice(0, nextEvents.length - MAX_AGENT_EVENTS);
@@ -458,7 +605,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
         controller.signal
       );
 
-      await get().loadMessages({ session, branch: normalizedInput.branch, force: true });
+      await get().loadMessages({ session, branch: requestInput.branch, force: true });
 
       set((state) => ({
         pendingPromptsBySession: removePendingPrompt(
