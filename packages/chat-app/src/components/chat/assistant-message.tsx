@@ -1,7 +1,6 @@
 import type { Api, BaseAssistantMessage } from '@ank1015/llm-sdk';
 
 import { Message, MessageContent } from '@/components/ai/message';
-import { TextShimmer } from '@/components/ai/text-shimmer';
 import { getTextFromBaseAssistantMessage } from '@/lib/messages/utils';
 
 type AssistantRenderableMessage =
@@ -18,7 +17,7 @@ export const AssistantMessageComponent = ({
   const text = getTextFromBaseAssistantMessage(assistantMessage);
 
   return (
-    <Message className="max-w-[90%]">
+    <Message className="max-w-[90%]" data-streaming={isStreaming ? 'true' : 'false'}>
       {text && (
         <MessageContent
           markdown
@@ -26,11 +25,6 @@ export const AssistantMessageComponent = ({
         >
           {text}
         </MessageContent>
-      )}
-      {isStreaming && (
-        <TextShimmer className="text-xs text-muted-foreground" duration={2} spread={15}>
-          Streaming...
-        </TextShimmer>
       )}
     </Message>
   );

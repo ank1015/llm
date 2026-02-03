@@ -28,16 +28,45 @@ function getSessionKey(session: {
 }
 
 type MessageTurn = {
+  userMessageId: string | null;
   userNode: MessageNode | null;
   cotMessages: Message[];
   assistantNode: MessageNode | null;
 };
 
-const MessageTurnRow = memo(function MessageTurnRow({ turn }: { turn: MessageTurn }) {
+const MessageTurnRow = memo(function MessageTurnRow({
+  turn,
+  isStreamingTurn,
+  sessionKey,
+  streamingAssistant,
+}: {
+  turn: MessageTurn;
+  isStreamingTurn: boolean;
+  sessionKey: string | null;
+  streamingAssistant: Omit<BaseAssistantMessage<Api>, 'message'> | null;
+}) {
+  const cotMessages = useMemo(() => {
+    if (!isStreamingTurn || !streamingAssistant) {
+      return turn.cotMessages;
+    }
+
+    return [...turn.cotMessages, streamingAssistant];
+  }, [isStreamingTurn, turn.cotMessages, streamingAssistant]);
+
+  const showCot = isStreamingTurn || turn.cotMessages.length > 0;
+
   return (
     <Fragment>
       {turn.userNode && <UserMessageComponent userMessage={turn.userNode.message as UserMessage} />}
-      {turn.cotMessages.length > 1 && <COTMessageComponent messages={turn.cotMessages} />}
+      {showCot && (
+        <COTMessageComponent
+          messages={cotMessages}
+          isStreaming={isStreamingTurn}
+          sessionKey={sessionKey}
+          turnUserMessageId={turn.userMessageId}
+          live={isStreamingTurn}
+        />
+      )}
       {turn.assistantNode && (
         <AssistantMessageComponent
           assistantMessage={turn.assistantNode.message as BaseAssistantMessage<Api>}
@@ -68,7 +97,7 @@ function groupIntoTurns(nodes: MessageNode[]): MessageTurn[] {
       assistantNode = betweenNodes[betweenNodes.length - 1];
     }
 
-    turns.push({ userNode: null, cotMessages, assistantNode });
+    turns.push({ userMessageId: null, userNode: null, cotMessages, assistantNode });
   }
 
   while (i < nodes.length) {
@@ -93,7 +122,7 @@ function groupIntoTurns(nodes: MessageNode[]): MessageTurn[] {
       assistantNode = betweenNodes[betweenNodes.length - 1];
     }
 
-    turns.push({ userNode, cotMessages, assistantNode });
+    turns.push({ userMessageId: userNode.message.id, userNode, cotMessages, assistantNode });
   }
 
   return turns;
@@ -123,7 +152,13 @@ export function ChatMessages() {
   return (
     <div className="flex w-full flex-col items-start gap-4 mt-8">
       {turns.map((turn, idx) => (
-        <MessageTurnRow key={turn.userNode?.id ?? `turn-${idx}`} turn={turn} />
+        <MessageTurnRow
+          key={turn.userNode?.id ?? `turn-${idx}`}
+          turn={turn}
+          isStreamingTurn={Boolean(streamingAssistant) && idx === turns.length - 1}
+          sessionKey={activeSessionKey}
+          streamingAssistant={streamingAssistant}
+        />
       ))}
       {streamingAssistant && (
         <AssistantMessageComponent assistantMessage={streamingAssistant} isStreaming />
