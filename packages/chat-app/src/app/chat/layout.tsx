@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import { ChatInput } from '@/components/chat/chat-input';
+import { Header } from '@/components/header';
 import { RootLayout } from '@/components/root';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import '../globals.css';
@@ -18,7 +19,10 @@ export default function Root({
   return (
     <TooltipProvider>
       <RootLayout>
-        <div className="relative flex h-full w-full flex-col">{children}</div>
+        <div className="relative flex h-full w-full flex-col">
+          <Header />
+          {children}
+        </div>
         <ChatInput />
       </RootLayout>
     </TooltipProvider>

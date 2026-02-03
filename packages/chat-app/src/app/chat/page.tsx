@@ -1,13 +1,7 @@
 import type { FC } from 'react';
 
-import { Header } from '@/components/header';
-
 const ChatPage: FC = () => {
-  return (
-    <div>
-      <Header />
-    </div>
-  );
+  return <div></div>;
 };
 
 export default ChatPage;
