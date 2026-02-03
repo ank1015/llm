@@ -5,10 +5,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { SessionRef } from '@/lib/contracts';
 import type {
   AgentEvent,
+  Api,
   Attachment,
   Content,
   Message,
   MessageNode,
+  Model,
   SessionSummary,
 } from '@ank1015/llm-sdk';
 
@@ -165,6 +167,8 @@ const EMPTY_MESSAGES: MessageNode[] = [];
 const EMPTY_PENDING: never[] = [];
 const EMPTY_EVENTS: AgentEvent[] = [];
 const EMPTY_ATTACHMENTS: Attachment[] = [];
+const EMPTY_MODELS: Model<Api>[] = [];
+type SettingsScopeMode = 'global' | 'session';
 
 function isAbortError(error: unknown): boolean {
   if (!error) {
@@ -246,6 +250,20 @@ function formatBytes(bytes: number | undefined): string {
 
   const mib = kib / 1024;
   return `${mib.toFixed(1)} MB`;
+}
+
+function parseProviderOptionsJson(value: string): Record<string, unknown> {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    return {};
+  }
+
+  const parsed = JSON.parse(trimmed) as unknown;
+  if (!isObjectRecord(parsed)) {
+    throw new Error('Provider options must be a JSON object.');
+  }
+
+  return parsed;
 }
 
 function getRegeneratePrompt(node: MessageNode, nodes: MessageNode[]): string | undefined {
@@ -489,12 +507,27 @@ export function AppShell(): React.ReactElement {
     return activeSession ? getSessionKey(activeSession) : undefined;
   }, [activeSession]);
 
+  const providers = useProvidersStore((state) => state.providers);
+  const modelsByApi = useProvidersStore((state) => state.modelsByApi);
   const selectedApi = useProvidersStore((state) => state.selectedApi);
   const selectedModelId = useProvidersStore((state) => state.selectedModelId);
+  const setSelectedApi = useProvidersStore((state) => state.setSelectedApi);
+  const setSelectedModelId = useProvidersStore((state) => state.setSelectedModelId);
   const providersError = useProvidersStore((state) => state.error);
   const refreshCatalog = useProvidersStore((state) => state.refreshCatalog);
 
+  const globalSettings = useChatSettingsStore((state) => state.globalSettings);
   const getEffectiveSettings = useChatSettingsStore((state) => state.getEffectiveSettings);
+  const setGlobalApi = useChatSettingsStore((state) => state.setGlobalApi);
+  const setGlobalModelId = useChatSettingsStore((state) => state.setGlobalModelId);
+  const setGlobalSystemPrompt = useChatSettingsStore((state) => state.setGlobalSystemPrompt);
+  const setGlobalProviderOptions = useChatSettingsStore((state) => state.setGlobalProviderOptions);
+  const setSessionApi = useChatSettingsStore((state) => state.setSessionApi);
+  const setSessionModelId = useChatSettingsStore((state) => state.setSessionModelId);
+  const setSessionSystemPrompt = useChatSettingsStore((state) => state.setSessionSystemPrompt);
+  const setSessionProviderOptions = useChatSettingsStore(
+    (state) => state.setSessionProviderOptions
+  );
 
   const composerDraft = useComposerStore((state) => {
     if (!activeSessionKey) {
@@ -521,6 +554,9 @@ export function AppShell(): React.ReactElement {
   const [renameDraft, setRenameDraft] = useState('');
   const [composerError, setComposerError] = useState<string | null>(null);
   const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
+  const [settingsScope, setSettingsScope] = useState<SettingsScopeMode>('global');
+  const [providerOptionsDraft, setProviderOptionsDraft] = useState('{}');
+  const [providerOptionsError, setProviderOptionsError] = useState<string | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -555,6 +591,12 @@ export function AppShell(): React.ReactElement {
     const session = sessions.find((item) => item.sessionId === renameSessionId);
     setRenameDraft(session?.sessionName ?? '');
   }, [renameSessionId, sessions]);
+
+  useEffect(() => {
+    if (settingsScope === 'session' && !activeSession) {
+      setSettingsScope('global');
+    }
+  }, [activeSession, settingsScope]);
 
   const activeMessages = useChatStore((state) => {
     if (!activeSessionKey) {
@@ -599,6 +641,19 @@ export function AppShell(): React.ReactElement {
   const effectiveSettings = getEffectiveSettings(activeSession ?? undefined);
   const resolvedApi = effectiveSettings.api ?? selectedApi;
   const resolvedModelId = effectiveSettings.modelId ?? selectedModelId;
+  const panelSettings =
+    settingsScope === 'session' && activeSession
+      ? getEffectiveSettings(activeSession)
+      : globalSettings;
+  const panelApi = panelSettings.api;
+  const panelModelId = panelSettings.modelId;
+  const panelModels = panelApi ? (modelsByApi[panelApi] ?? EMPTY_MODELS) : EMPTY_MODELS;
+  const canUseSessionScope = Boolean(activeSession);
+
+  useEffect(() => {
+    setProviderOptionsDraft(JSON.stringify(panelSettings.providerOptions, null, 2));
+    setProviderOptionsError(null);
+  }, [panelSettings.providerOptions, settingsScope, activeSessionKey]);
 
   const streamPreviewText = useMemo(() => {
     return extractStreamingPreview(activeAgentEvents);
@@ -880,6 +935,87 @@ export function AppShell(): React.ReactElement {
     }
 
     abortStream(activeSession);
+  };
+
+  const setPanelApi = (api: Api | null): void => {
+    if (settingsScope === 'session' && activeSession) {
+      setSessionApi(api, activeSession);
+    } else {
+      setGlobalApi(api);
+      setSelectedApi(api);
+    }
+  };
+
+  const setPanelModelId = (modelId: string | null): void => {
+    if (settingsScope === 'session' && activeSession) {
+      setSessionModelId(modelId, activeSession);
+    } else {
+      setGlobalModelId(modelId);
+      setSelectedModelId(modelId);
+    }
+  };
+
+  const handleProviderChange = (api: Api | null): void => {
+    setPanelApi(api);
+
+    if (!api) {
+      setPanelModelId(null);
+      return;
+    }
+
+    const models = modelsByApi[api] ?? EMPTY_MODELS;
+    const nextModelId = models[0]?.id ?? null;
+    setPanelModelId(nextModelId);
+  };
+
+  const handleSystemPromptChange = (value: string): void => {
+    if (settingsScope === 'session' && activeSession) {
+      setSessionSystemPrompt(value, activeSession);
+      return;
+    }
+
+    setGlobalSystemPrompt(value);
+  };
+
+  const applyProviderOptions = (value: string): void => {
+    const options = parseProviderOptionsJson(value);
+
+    if (settingsScope === 'session' && activeSession) {
+      setSessionProviderOptions(options, activeSession);
+      return;
+    }
+
+    setGlobalProviderOptions(options);
+  };
+
+  const handleApplyProviderOptions = (): void => {
+    try {
+      applyProviderOptions(providerOptionsDraft);
+      setProviderOptionsError(null);
+      setProviderOptionsDraft((current) =>
+        JSON.stringify(parseProviderOptionsJson(current), null, 2)
+      );
+    } catch (error) {
+      if (error instanceof Error) {
+        setProviderOptionsError(error.message);
+      } else {
+        setProviderOptionsError('Invalid provider options JSON.');
+      }
+    }
+  };
+
+  const handleResetProviderOptions = (): void => {
+    try {
+      applyProviderOptions('{}');
+      setProviderOptionsDraft('{}');
+      setProviderOptionsError(null);
+    } catch (error) {
+      if (error instanceof Error) {
+        setProviderOptionsError(error.message);
+      } else {
+        setProviderOptionsError('Could not reset provider options.');
+      }
+    }
   };
 
   const activeSessionName =
@@ -1300,8 +1436,39 @@ export function AppShell(): React.ReactElement {
             <>
               <p className="font-medium">General</p>
               <p className="text-[var(--text-muted)]">
-                Theme, defaults, and session preferences will live here.
+                Choose whether model settings apply globally or only to the active session.
               </p>
+
+              <div className="space-y-2 rounded-lg border border-[var(--border-default)] p-3">
+                <label className="flex items-center gap-2 text-xs">
+                  <input
+                    type="radio"
+                    name="settings-scope"
+                    checked={settingsScope === 'global'}
+                    onChange={() => setSettingsScope('global')}
+                  />
+                  Apply settings globally
+                </label>
+
+                <label className="flex items-center gap-2 text-xs">
+                  <input
+                    type="radio"
+                    name="settings-scope"
+                    checked={settingsScope === 'session'}
+                    onChange={() => setSettingsScope('session')}
+                    disabled={!canUseSessionScope}
+                  />
+                  Apply to current session only
+                </label>
+
+                <p className="text-xs text-[var(--text-muted)]">
+                  {settingsScope === 'session'
+                    ? activeSession
+                      ? `Session: ${activeSession.sessionId}`
+                      : 'Select a session to use session-level settings.'
+                    : 'Global defaults are used for new chats and sessions without overrides.'}
+                </p>
+              </div>
             </>
           ) : null}
 
@@ -1309,8 +1476,95 @@ export function AppShell(): React.ReactElement {
             <>
               <p className="font-medium">Model</p>
               <p className="text-[var(--text-muted)]">
-                Provider and model selection UI will be connected next.
+                Scope: {settingsScope === 'session' ? 'Session override' : 'Global default'}
               </p>
+
+              <label className="block">
+                <span className="mb-1 block text-xs text-[var(--text-muted)]">Provider</span>
+                <select
+                  value={panelApi ?? ''}
+                  onChange={(event) => {
+                    const nextValue = event.target.value.trim();
+                    handleProviderChange(nextValue ? (nextValue as Api) : null);
+                  }}
+                  className="w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-canvas)] px-2.5 py-2 text-sm outline-none focus:border-[var(--accent)]"
+                >
+                  <option value="">Select provider</option>
+                  {providers.map((provider) => (
+                    <option key={provider.api} value={provider.api}>
+                      {provider.api} {provider.hasKey ? '' : '(no key)'}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block">
+                <span className="mb-1 block text-xs text-[var(--text-muted)]">Model</span>
+                <select
+                  value={panelModelId ?? ''}
+                  onChange={(event) => {
+                    const nextValue = event.target.value.trim();
+                    setPanelModelId(nextValue || null);
+                  }}
+                  disabled={!panelApi}
+                  className="w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-canvas)] px-2.5 py-2 text-sm outline-none focus:border-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <option value="">Select model</option>
+                  {panelModels.map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block">
+                <span className="mb-1 block text-xs text-[var(--text-muted)]">System prompt</span>
+                <textarea
+                  rows={4}
+                  value={panelSettings.systemPrompt}
+                  onChange={(event) => handleSystemPromptChange(event.target.value)}
+                  placeholder="Optional instructions for the assistant..."
+                  className="w-full resize-y rounded-md border border-[var(--border-default)] bg-[var(--surface-canvas)] px-2.5 py-2 text-sm outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--accent)]"
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-1 block text-xs text-[var(--text-muted)]">
+                  Provider options (JSON)
+                </span>
+                <textarea
+                  rows={8}
+                  value={providerOptionsDraft}
+                  onChange={(event) => {
+                    setProviderOptionsDraft(event.target.value);
+                    setProviderOptionsError(null);
+                  }}
+                  spellCheck={false}
+                  className="w-full resize-y rounded-md border border-[var(--border-default)] bg-[var(--surface-canvas)] px-2.5 py-2 font-mono text-xs outline-none focus:border-[var(--accent)]"
+                />
+              </label>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleApplyProviderOptions}
+                  className="rounded-md bg-[var(--accent)] px-3 py-1.5 text-xs text-white"
+                >
+                  Apply JSON
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResetProviderOptions}
+                  className="rounded-md border border-[var(--border-default)] px-3 py-1.5 text-xs"
+                >
+                  Reset
+                </button>
+              </div>
+
+              {providerOptionsError ? (
+                <p className="text-xs text-red-500">{providerOptionsError}</p>
+              ) : null}
             </>
           ) : null}
 
@@ -1318,8 +1572,22 @@ export function AppShell(): React.ReactElement {
             <>
               <p className="font-medium">API Keys</p>
               <p className="text-[var(--text-muted)]">
-                Per-provider key management panel goes here.
+                Key status by provider (management UI can be added next).
               </p>
+
+              <div className="space-y-2">
+                {providers.map((provider) => (
+                  <div
+                    key={provider.api}
+                    className="flex items-center justify-between rounded-md border border-[var(--border-default)] bg-[var(--surface-canvas)] px-3 py-2 text-xs"
+                  >
+                    <span>{provider.api}</span>
+                    <span className={provider.hasKey ? 'text-emerald-500' : 'text-amber-500'}>
+                      {provider.hasKey ? 'Key set' : 'Missing key'}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </>
           ) : null}
         </div>
