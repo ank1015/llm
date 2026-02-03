@@ -168,64 +168,56 @@ export type Message = UserMessage | ToolResultMessage | BaseAssistantMessage<Api
 // ################################################################
 
 /**
- * Assistant message during streaming (without native message).
- */
-export type BaseAssistantEventMessage<TApi extends Api> = Omit<
-  BaseAssistantMessage<TApi>,
-  'message'
->;
-
-/**
  * Streaming events emitted during assistant response generation.
  */
 export type BaseAssistantEvent<TApi extends Api> =
-  | { type: 'start'; message: BaseAssistantEventMessage<TApi> }
-  | { type: 'text_start'; contentIndex: number; message: BaseAssistantEventMessage<TApi> }
+  | { type: 'start'; message: BaseAssistantMessage<TApi> }
+  | { type: 'text_start'; contentIndex: number; message: BaseAssistantMessage<TApi> }
   | {
       type: 'text_delta';
       contentIndex: number;
       delta: string;
-      message: BaseAssistantEventMessage<TApi>;
+      message: BaseAssistantMessage<TApi>;
     }
   | {
       type: 'text_end';
       contentIndex: number;
       content: Content;
-      message: BaseAssistantEventMessage<TApi>;
+      message: BaseAssistantMessage<TApi>;
     }
-  | { type: 'thinking_start'; contentIndex: number; message: BaseAssistantEventMessage<TApi> }
+  | { type: 'thinking_start'; contentIndex: number; message: BaseAssistantMessage<TApi> }
   | {
       type: 'thinking_delta';
       contentIndex: number;
       delta: string;
-      message: BaseAssistantEventMessage<TApi>;
+      message: BaseAssistantMessage<TApi>;
     }
   | {
       type: 'thinking_end';
       contentIndex: number;
       content: string;
-      message: BaseAssistantEventMessage<TApi>;
+      message: BaseAssistantMessage<TApi>;
     }
-  | { type: 'toolcall_start'; contentIndex: number; message: BaseAssistantEventMessage<TApi> }
+  | { type: 'toolcall_start'; contentIndex: number; message: BaseAssistantMessage<TApi> }
   | {
       type: 'toolcall_delta';
       contentIndex: number;
       delta: string;
-      message: BaseAssistantEventMessage<TApi>;
+      message: BaseAssistantMessage<TApi>;
     }
   | {
       type: 'toolcall_end';
       contentIndex: number;
       toolCall: AssistantToolCall;
-      message: BaseAssistantEventMessage<TApi>;
+      message: BaseAssistantMessage<TApi>;
     }
   | {
       type: 'done';
       reason: Extract<StopReason, 'stop' | 'length' | 'toolUse'>;
-      message: BaseAssistantEventMessage<TApi>;
+      message: BaseAssistantMessage<TApi>;
     }
   | {
       type: 'error';
       reason: Extract<StopReason, 'aborted' | 'error'>;
-      message: BaseAssistantEventMessage<TApi>;
+      message: BaseAssistantMessage<TApi>;
     };

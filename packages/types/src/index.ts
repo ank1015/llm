@@ -48,7 +48,6 @@ export type {
   BaseAssistantMessage,
   CustomMessage,
   Message,
-  BaseAssistantEventMessage,
   BaseAssistantEvent,
 } from './message.js';
 
