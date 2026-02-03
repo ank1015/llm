@@ -68,6 +68,12 @@ export const CommandMenu = () => {
             <OpenAIOptions />
           ) : selectedApi === 'google' ? (
             <GoogleOptions />
+          ) : selectedApi === 'deepseek' ? (
+            <DeepSeekOptions />
+          ) : selectedApi === 'zai' ? (
+            <ZaiOptions />
+          ) : selectedApi === 'kimi' ? (
+            <KimiOptions />
           ) : (
             <CommandEmpty>No options found.</CommandEmpty>
           )}
@@ -374,6 +380,224 @@ const OpenAIOptions = () => {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+        </div>
+      </CommandGroup>
+    </>
+  );
+};
+
+const DeepSeekOptions = () => {
+  const providerOptions = useChatSettingsStore((state) => state.globalSettings.providerOptions);
+  const setOption = useChatSettingsStore((state) => state.setGlobalProviderOption);
+
+  const temperature =
+    typeof providerOptions.temperature === 'number' ? providerOptions.temperature : 1;
+  const maxTokens =
+    typeof providerOptions.max_tokens === 'number' ? providerOptions.max_tokens : 4096;
+
+  return (
+    <>
+      <CommandGroup heading="Temperature">
+        <div className="px-2 py-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs text-muted-foreground">Controls randomness</Label>
+            <span className="text-xs font-mono tabular-nums">{temperature.toFixed(1)}</span>
+          </div>
+          <Slider
+            min={0}
+            max={2}
+            step={0.1}
+            value={[temperature]}
+            onValueChange={(value) => {
+              const v = value[0];
+              if (v !== undefined) setOption('temperature', v);
+            }}
+          />
+        </div>
+      </CommandGroup>
+
+      <CommandGroup heading="Max Tokens">
+        <div className="px-2 py-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs text-muted-foreground">Maximum response length</Label>
+            <span className="text-xs font-mono tabular-nums">{maxTokens.toLocaleString()}</span>
+          </div>
+          <Slider
+            min={1}
+            max={64000}
+            step={1024}
+            value={[maxTokens]}
+            onValueChange={(value) => {
+              const v = value[0];
+              if (v !== undefined) setOption('max_tokens', v);
+            }}
+          />
+        </div>
+      </CommandGroup>
+    </>
+  );
+};
+
+const ZaiOptions = () => {
+  const providerOptions = useChatSettingsStore((state) => state.globalSettings.providerOptions);
+  const setOption = useChatSettingsStore((state) => state.setGlobalProviderOption);
+  const clearOption = useChatSettingsStore((state) => state.clearGlobalProviderOption);
+
+  const temperature =
+    typeof providerOptions.temperature === 'number' ? providerOptions.temperature : 1;
+  const maxTokens =
+    typeof providerOptions.max_tokens === 'number' ? providerOptions.max_tokens : 4096;
+
+  const thinking = providerOptions.thinking as
+    | { type: 'enabled' | 'disabled'; clear_thinking?: boolean }
+    | undefined;
+  const isThinkingEnabled = thinking?.type === 'enabled';
+  const clearThinking = thinking?.clear_thinking ?? false;
+
+  const handleThinkingToggle = useCallback(
+    (checked: boolean) => {
+      if (checked) {
+        setOption('thinking', { type: 'enabled', clear_thinking: clearThinking });
+      } else {
+        clearOption('thinking');
+      }
+    },
+    [setOption, clearOption, clearThinking]
+  );
+
+  const handleClearThinkingToggle = useCallback(
+    (checked: boolean) => {
+      setOption('thinking', { type: 'enabled', clear_thinking: checked });
+    },
+    [setOption]
+  );
+
+  return (
+    <>
+      <CommandGroup heading="Temperature">
+        <div className="px-2 py-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs text-muted-foreground">Controls randomness</Label>
+            <span className="text-xs font-mono tabular-nums">{temperature.toFixed(1)}</span>
+          </div>
+          <Slider
+            min={0}
+            max={2}
+            step={0.1}
+            value={[temperature]}
+            onValueChange={(value) => {
+              const v = value[0];
+              if (v !== undefined) setOption('temperature', v);
+            }}
+          />
+        </div>
+      </CommandGroup>
+
+      <CommandGroup heading="Max Tokens">
+        <div className="px-2 py-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs text-muted-foreground">Maximum response length</Label>
+            <span className="text-xs font-mono tabular-nums">{maxTokens.toLocaleString()}</span>
+          </div>
+          <Slider
+            min={1}
+            max={128000}
+            step={1024}
+            value={[maxTokens]}
+            onValueChange={(value) => {
+              const v = value[0];
+              if (v !== undefined) setOption('max_tokens', v);
+            }}
+          />
+        </div>
+      </CommandGroup>
+
+      <CommandGroup heading="Thinking">
+        <div className="px-2 py-3 space-y-3">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs text-muted-foreground">Enable thinking</Label>
+            <Switch checked={isThinkingEnabled} onCheckedChange={handleThinkingToggle} />
+          </div>
+          {isThinkingEnabled && (
+            <div className="flex items-center justify-between">
+              <Label className="text-xs text-muted-foreground">Clear prior thinking</Label>
+              <Switch checked={clearThinking} onCheckedChange={handleClearThinkingToggle} />
+            </div>
+          )}
+        </div>
+      </CommandGroup>
+    </>
+  );
+};
+
+const KimiOptions = () => {
+  const providerOptions = useChatSettingsStore((state) => state.globalSettings.providerOptions);
+  const setOption = useChatSettingsStore((state) => state.setGlobalProviderOption);
+  const clearOption = useChatSettingsStore((state) => state.clearGlobalProviderOption);
+
+  const temperature =
+    typeof providerOptions.temperature === 'number' ? providerOptions.temperature : 1;
+  const maxTokens =
+    typeof providerOptions.max_tokens === 'number' ? providerOptions.max_tokens : 4096;
+
+  const thinking = providerOptions.thinking as { type: 'enabled' | 'disabled' } | undefined;
+  const isThinkingEnabled = thinking?.type === 'enabled';
+
+  return (
+    <>
+      <CommandGroup heading="Temperature">
+        <div className="px-2 py-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs text-muted-foreground">Controls randomness</Label>
+            <span className="text-xs font-mono tabular-nums">{temperature.toFixed(1)}</span>
+          </div>
+          <Slider
+            min={0}
+            max={2}
+            step={0.1}
+            value={[temperature]}
+            onValueChange={(value) => {
+              const v = value[0];
+              if (v !== undefined) setOption('temperature', v);
+            }}
+          />
+        </div>
+      </CommandGroup>
+
+      <CommandGroup heading="Max Tokens">
+        <div className="px-2 py-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs text-muted-foreground">Maximum response length</Label>
+            <span className="text-xs font-mono tabular-nums">{maxTokens.toLocaleString()}</span>
+          </div>
+          <Slider
+            min={1}
+            max={128000}
+            step={1024}
+            value={[maxTokens]}
+            onValueChange={(value) => {
+              const v = value[0];
+              if (v !== undefined) setOption('max_tokens', v);
+            }}
+          />
+        </div>
+      </CommandGroup>
+
+      <CommandGroup heading="Thinking">
+        <div className="px-2 py-3 space-y-3">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs text-muted-foreground">Enable thinking</Label>
+            <Switch
+              checked={isThinkingEnabled}
+              onCheckedChange={(checked) => {
+                if (checked) {
+                  setOption('thinking', { type: 'enabled' });
+                } else {
+                  clearOption('thinking');
+                }
+              }}
+            />
           </div>
         </div>
       </CommandGroup>
