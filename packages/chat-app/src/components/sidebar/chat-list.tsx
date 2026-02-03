@@ -174,6 +174,7 @@ type DeleteDialogProps = {
 
 function DeleteDialog({ session, open, onOpenChange }: DeleteDialogProps) {
   const [isDeleting, setIsDeleting] = useState(false);
+  const router = useRouter();
   const deleteSession = useSessionsStore((state) => state.deleteSession);
   const activeSession = useChatStore((state) => state.activeSession);
   const setActiveSession = useChatStore((state) => state.setActiveSession);
@@ -187,6 +188,7 @@ function DeleteDialog({ session, open, onOpenChange }: DeleteDialogProps) {
       if (activeSession?.sessionId === session.sessionId) {
         clearSessionState(activeSession);
         setActiveSession(null);
+        router.push('/chat');
       }
       onOpenChange(false);
     } catch {

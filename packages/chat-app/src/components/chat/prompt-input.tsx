@@ -1,6 +1,7 @@
 'use client';
 
 import { ArrowUp, FileText, Globe, Paperclip, Square, X } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { SessionRef } from '@/lib/contracts';
@@ -17,7 +18,6 @@ import { useChatSettingsStore } from '@/stores/chat-settings-store';
 import { useChatStore } from '@/stores/chat-store';
 import { useProvidersStore } from '@/stores/providers-store';
 import { useSessionsStore } from '@/stores/sessions-store';
-
 
 function createAttachmentId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -103,6 +103,7 @@ export function PromptInputWithActions() {
   const [useWebSearch, setUseWebSearch] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
 
   const previewUrls = useMemo(
     () => files.map((file) => (isImageFile(file) ? URL.createObjectURL(file) : null)),
@@ -146,6 +147,7 @@ export function PromptInputWithActions() {
       if (!session) {
         const created = await createSession({ sessionName: 'New chat' });
         setActiveSession(created);
+        router.push(`/chat/${created.sessionId}`);
         await loadMessages({ session: created, force: true });
         session = created;
       }
@@ -170,9 +172,9 @@ export function PromptInputWithActions() {
       const providerOptions: Record<string, unknown> = {
         ...settings.providerOptions,
       };
-      if (useWebSearch) {
-        providerOptions.useWebSearch = true;
-      }
+      // if (useWebSearch) {
+      //   providerOptions.useWebSearch = true;
+      // }
 
       setInput('');
       setFiles([]);
