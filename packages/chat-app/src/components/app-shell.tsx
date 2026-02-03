@@ -169,6 +169,13 @@ const EMPTY_EVENTS: AgentEvent[] = [];
 const EMPTY_ATTACHMENTS: Attachment[] = [];
 const EMPTY_MODELS: Model<Api>[] = [];
 type SettingsScopeMode = 'global' | 'session';
+type ToastTone = 'success' | 'error' | 'info';
+
+type ToastItem = {
+  id: number;
+  message: string;
+  tone: ToastTone;
+};
 
 function isAbortError(error: unknown): boolean {
   if (!error) {
@@ -298,6 +305,7 @@ type SessionListProps = {
   onRename: (session: SessionSummary) => void;
   onDelete: (session: SessionSummary) => void;
   onLoadMore: () => void;
+  emptyMessage: string;
 };
 
 function SessionList(props: SessionListProps): React.ReactElement {
@@ -314,14 +322,27 @@ function SessionList(props: SessionListProps): React.ReactElement {
     onRename,
     onDelete,
     onLoadMore,
+    emptyMessage,
   } = props;
 
   if (isLoading && sessions.length === 0) {
-    return <p className="px-1 text-xs text-[var(--text-muted)]">Loading sessions...</p>;
+    return (
+      <div className="space-y-2">
+        {Array.from({ length: 5 }).map((_, index) => (
+          <div
+            key={`session-skeleton-${index}`}
+            className="animate-pulse rounded-md border border-[var(--border-subtle)] bg-[var(--surface-canvas)] px-3 py-3"
+          >
+            <div className="h-3 w-3/4 rounded bg-[var(--surface-muted)]" />
+            <div className="mt-2 h-2 w-1/2 rounded bg-[var(--surface-muted)]" />
+          </div>
+        ))}
+      </div>
+    );
   }
 
   if (sessions.length === 0) {
-    return <p className="px-1 text-xs text-[var(--text-muted)]">No sessions found.</p>;
+    return <p className="px-1 text-xs text-[var(--text-muted)]">{emptyMessage}</p>;
   }
 
   return (
@@ -457,6 +478,25 @@ function MessageThread(props: MessageThreadProps): React.ReactElement {
   );
 }
 
+function MessageThreadSkeleton(): React.ReactElement {
+  return (
+    <div className="mx-auto w-full max-w-3xl space-y-3">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div
+          key={`message-skeleton-${index}`}
+          className={`animate-pulse rounded-xl border border-[var(--border-default)] bg-[var(--surface-panel)] p-3 ${
+            index % 2 === 0 ? 'mr-auto max-w-[85%]' : 'ml-auto max-w-[75%]'
+          }`}
+        >
+          <div className="h-3 w-16 rounded bg-[var(--surface-muted)]" />
+          <div className="mt-3 h-3 w-full rounded bg-[var(--surface-muted)]" />
+          <div className="mt-2 h-3 w-2/3 rounded bg-[var(--surface-muted)]" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // eslint-disable-next-line sonarjs/cognitive-complexity
 export function AppShell(): React.ReactElement {
   const isSidebarCollapsed = useUiStore((state) => state.isSidebarCollapsed);
@@ -557,7 +597,10 @@ export function AppShell(): React.ReactElement {
   const [settingsScope, setSettingsScope] = useState<SettingsScopeMode>('global');
   const [providerOptionsDraft, setProviderOptionsDraft] = useState('{}');
   const [providerOptionsError, setProviderOptionsError] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
+  const toastIdRef = useRef(0);
+  const toastTimeoutsRef = useRef<number[]>([]);
 
   useEffect(() => {
     const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
@@ -637,6 +680,13 @@ export function AppShell(): React.ReactElement {
 
     return state.isStreamingBySession[activeSessionKey] ?? false;
   });
+  const isLoadingMessages = useChatStore((state) => {
+    if (!activeSessionKey) {
+      return false;
+    }
+
+    return state.isLoadingMessagesBySession[activeSessionKey] ?? false;
+  });
 
   const effectiveSettings = getEffectiveSettings(activeSession ?? undefined);
   const resolvedApi = effectiveSettings.api ?? selectedApi;
@@ -654,6 +704,30 @@ export function AppShell(): React.ReactElement {
     setProviderOptionsDraft(JSON.stringify(panelSettings.providerOptions, null, 2));
     setProviderOptionsError(null);
   }, [panelSettings.providerOptions, settingsScope, activeSessionKey]);
+
+  useEffect(() => {
+    return () => {
+      for (const timeoutId of toastTimeoutsRef.current) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, []);
+
+  const dismissToast = (toastId: number): void => {
+    setToasts((current) => current.filter((toast) => toast.id !== toastId));
+  };
+
+  const pushToast = (message: string, tone: ToastTone = 'info'): void => {
+    const id = ++toastIdRef.current;
+    setToasts((current) => [...current, { id, message, tone }]);
+
+    const timeoutId = window.setTimeout(() => {
+      dismissToast(id);
+      toastTimeoutsRef.current = toastTimeoutsRef.current.filter((value) => value !== timeoutId);
+    }, 3200);
+
+    toastTimeoutsRef.current.push(timeoutId);
+  };
 
   const streamPreviewText = useMemo(() => {
     return extractStreamingPreview(activeAgentEvents);
@@ -695,8 +769,12 @@ export function AppShell(): React.ReactElement {
 
     try {
       await loadMessages({ session: sessionRef });
-    } catch {
-      // chat errors are in store
+    } catch (error) {
+      if (error instanceof Error) {
+        pushToast(error.message, 'error');
+      } else {
+        pushToast('Failed to load session messages.', 'error');
+      }
     }
   };
 
@@ -711,8 +789,14 @@ export function AppShell(): React.ReactElement {
       setActiveSession(created);
       closeMobileSidebar();
       await loadMessages({ session: created, force: true });
+      pushToast('Session created.', 'success');
       return created;
-    } catch {
+    } catch (error) {
+      if (error instanceof Error) {
+        pushToast(error.message, 'error');
+      } else {
+        pushToast('Failed to create session.', 'error');
+      }
       return undefined;
     }
   };
@@ -734,8 +818,13 @@ export function AppShell(): React.ReactElement {
         sessionName: renameDraft,
       });
       closeRenameSessionDialog();
-    } catch {
-      // mutation error is in store
+      pushToast('Session renamed.', 'success');
+    } catch (error) {
+      if (error instanceof Error) {
+        pushToast(error.message, 'error');
+      } else {
+        pushToast('Failed to rename session.', 'error');
+      }
     }
   };
 
@@ -758,8 +847,13 @@ export function AppShell(): React.ReactElement {
       }
 
       closeDeleteSessionDialog();
-    } catch {
-      // mutation error is in store
+      pushToast('Session deleted.', 'success');
+    } catch (error) {
+      if (error instanceof Error) {
+        pushToast(error.message, 'error');
+      } else {
+        pushToast('Failed to delete session.', 'error');
+      }
     }
   };
 
@@ -816,10 +910,12 @@ export function AppShell(): React.ReactElement {
 
       if (error instanceof Error) {
         setComposerError(error.message);
+        pushToast(error.message, 'error');
         return;
       }
 
       setComposerError('Failed to send message.');
+      pushToast('Failed to send message.', 'error');
     }
   };
 
@@ -839,10 +935,12 @@ export function AppShell(): React.ReactElement {
 
       if (error instanceof Error) {
         setComposerError(error.message);
+        pushToast(error.message, 'error');
         return;
       }
 
       setComposerError('Failed to regenerate response.');
+      pushToast('Failed to regenerate response.', 'error');
     }
   };
 
@@ -879,8 +977,10 @@ export function AppShell(): React.ReactElement {
     } catch (error) {
       if (error instanceof Error) {
         setComposerError(error.message);
+        pushToast(error.message, 'error');
       } else {
         setComposerError('Failed to process attachments.');
+        pushToast('Failed to process attachments.', 'error');
       }
     } finally {
       setIsUploadingAttachments(false);
@@ -935,6 +1035,24 @@ export function AppShell(): React.ReactElement {
     }
 
     abortStream(activeSession);
+    pushToast('Streaming stopped.', 'info');
+  };
+
+  const handleRetryMessages = async (): Promise<void> => {
+    if (!activeSession) {
+      return;
+    }
+
+    try {
+      await loadMessages({ session: activeSession, force: true });
+      pushToast('Messages reloaded.', 'success');
+    } catch (error) {
+      if (error instanceof Error) {
+        pushToast(error.message, 'error');
+      } else {
+        pushToast('Failed to reload messages.', 'error');
+      }
+    }
   };
 
   const setPanelApi = (api: Api | null): void => {
@@ -995,11 +1113,14 @@ export function AppShell(): React.ReactElement {
       setProviderOptionsDraft((current) =>
         JSON.stringify(parseProviderOptionsJson(current), null, 2)
       );
+      pushToast('Provider options applied.', 'success');
     } catch (error) {
       if (error instanceof Error) {
         setProviderOptionsError(error.message);
+        pushToast(error.message, 'error');
       } else {
         setProviderOptionsError('Invalid provider options JSON.');
+        pushToast('Invalid provider options JSON.', 'error');
       }
     }
   };
@@ -1009,11 +1130,14 @@ export function AppShell(): React.ReactElement {
       applyProviderOptions('{}');
       setProviderOptionsDraft('{}');
       setProviderOptionsError(null);
+      pushToast('Provider options reset.', 'info');
     } catch (error) {
       if (error instanceof Error) {
         setProviderOptionsError(error.message);
+        pushToast(error.message, 'error');
       } else {
         setProviderOptionsError('Could not reset provider options.');
+        pushToast('Could not reset provider options.', 'error');
       }
     }
   };
@@ -1021,6 +1145,10 @@ export function AppShell(): React.ReactElement {
   const activeSessionName =
     sessions.find((session) => session.sessionId === activeSessionId)?.sessionName ??
     'No session selected';
+  const hasSessionSearch = searchInput.trim().length > 0;
+  const sessionsEmptyMessage = hasSessionSearch
+    ? `No sessions match "${searchInput.trim()}".`
+    : 'No sessions yet. Create a chat to get started.';
 
   const sidebarContent = (
     <>
@@ -1069,8 +1197,23 @@ export function AppShell(): React.ReactElement {
         ) : null}
       </div>
 
-      {sessionsError ? <p className="mb-2 text-xs text-red-500">{sessionsError}</p> : null}
-      {mutationError ? <p className="mb-2 text-xs text-red-500">{mutationError}</p> : null}
+      {sessionsError ? (
+        <div className="mb-2 rounded-md border border-red-500/40 bg-red-500/10 p-2 text-xs text-red-600">
+          <p>{sessionsError}</p>
+          <button
+            type="button"
+            onClick={() => void fetchFirstPage()}
+            className="mt-2 rounded border border-red-500/40 px-2 py-1 text-[11px] hover:bg-red-500/15"
+          >
+            Retry
+          </button>
+        </div>
+      ) : null}
+      {mutationError ? (
+        <div className="mb-2 rounded-md border border-red-500/40 bg-red-500/10 p-2 text-xs text-red-600">
+          {mutationError}
+        </div>
+      ) : null}
 
       <div className="flex-1 overflow-y-auto">
         <SessionList
@@ -1086,6 +1229,7 @@ export function AppShell(): React.ReactElement {
           onRename={handleOpenRenameDialog}
           onDelete={handleOpenDeleteDialog}
           onLoadMore={() => void fetchNextPage()}
+          emptyMessage={sessionsEmptyMessage}
         />
       </div>
     </>
@@ -1153,8 +1297,23 @@ export function AppShell(): React.ReactElement {
           </button>
         </div>
 
-        {sessionsError ? <p className="mb-2 text-xs text-red-500">{sessionsError}</p> : null}
-        {mutationError ? <p className="mb-2 text-xs text-red-500">{mutationError}</p> : null}
+        {sessionsError ? (
+          <div className="mb-2 rounded-md border border-red-500/40 bg-red-500/10 p-2 text-xs text-red-600">
+            <p>{sessionsError}</p>
+            <button
+              type="button"
+              onClick={() => void fetchFirstPage()}
+              className="mt-2 rounded border border-red-500/40 px-2 py-1 text-[11px] hover:bg-red-500/15"
+            >
+              Retry
+            </button>
+          </div>
+        ) : null}
+        {mutationError ? (
+          <div className="mb-2 rounded-md border border-red-500/40 bg-red-500/10 p-2 text-xs text-red-600">
+            {mutationError}
+          </div>
+        ) : null}
 
         <div className="flex-1 overflow-y-auto">
           <SessionList
@@ -1170,6 +1329,7 @@ export function AppShell(): React.ReactElement {
             onRename={handleOpenRenameDialog}
             onDelete={handleOpenDeleteDialog}
             onLoadMore={() => void fetchNextPage()}
+            emptyMessage={sessionsEmptyMessage}
           />
         </div>
       </aside>
@@ -1221,14 +1381,21 @@ export function AppShell(): React.ReactElement {
           <section className="flex min-h-0 flex-1 flex-col">
             <div className="flex-1 overflow-y-auto p-4">
               {activeSession ? (
-                <MessageThread
-                  messages={activeMessages}
-                  isStreaming={isStreaming}
-                  onRegenerate={(node) => void handleRegenerate(node)}
-                />
+                isLoadingMessages ? (
+                  <MessageThreadSkeleton />
+                ) : (
+                  <MessageThread
+                    messages={activeMessages}
+                    isStreaming={isStreaming}
+                    onRegenerate={(node) => void handleRegenerate(node)}
+                  />
+                )
               ) : (
                 <div className="mx-auto w-full max-w-3xl rounded-xl border border-dashed border-[var(--border-default)] bg-[var(--surface-panel)] p-8 text-center text-sm text-[var(--text-muted)]">
-                  Create or select a session from the sidebar to start chatting.
+                  <p className="font-medium text-[var(--text-primary)]">No active chat</p>
+                  <p className="mt-2">
+                    Create or select a session from the sidebar to start chatting.
+                  </p>
                 </div>
               )}
 
@@ -1257,9 +1424,16 @@ export function AppShell(): React.ReactElement {
               ) : null}
 
               {activeChatError ? (
-                <p className="mx-auto mt-3 w-full max-w-3xl text-sm text-red-500">
-                  {activeChatError}
-                </p>
+                <div className="mx-auto mt-3 w-full max-w-3xl rounded-xl border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-600">
+                  <p>{activeChatError}</p>
+                  <button
+                    type="button"
+                    onClick={() => void handleRetryMessages()}
+                    className="mt-2 rounded border border-red-500/40 px-2 py-1 text-xs hover:bg-red-500/15"
+                  >
+                    Retry loading messages
+                  </button>
+                </div>
               ) : null}
             </div>
 
@@ -1592,6 +1766,35 @@ export function AppShell(): React.ReactElement {
           ) : null}
         </div>
       </aside>
+
+      {toasts.length > 0 ? (
+        <div className="pointer-events-none fixed right-4 top-4 z-50 flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2">
+          {toasts.map((toast) => (
+            <div
+              key={toast.id}
+              className={`pointer-events-auto rounded-lg border px-3 py-2 text-sm shadow-sm ${
+                toast.tone === 'success'
+                  ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700'
+                  : toast.tone === 'error'
+                    ? 'border-red-500/40 bg-red-500/10 text-red-700'
+                    : 'border-[var(--border-default)] bg-[var(--surface-panel)] text-[var(--text-primary)]'
+              }`}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-xs leading-5">{toast.message}</p>
+                <button
+                  type="button"
+                  onClick={() => dismissToast(toast.id)}
+                  className="rounded px-1 text-[11px] hover:bg-black/10"
+                  aria-label="Dismiss toast"
+                >
+                  x
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       {renameSessionId ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/35 p-4">

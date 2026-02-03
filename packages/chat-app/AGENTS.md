@@ -125,3 +125,4 @@ tests/
 - Style UI with Tailwind classes referencing CSS variables (e.g. `bg-[var(--surface-panel)]`)
 - Zustand selectors returning arrays must use module-level empty constants (not `?? []`) to avoid infinite re-render loops
 - Composer: Enter sends, Shift/Alt+Enter adds newline, Esc stops streaming; supports file attachments via base64
+- Toast notifications for mutation feedback; skeleton loaders for sessions and messages
