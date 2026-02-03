@@ -23,11 +23,7 @@ import { useChatSettingsStore } from '@/stores/chat-settings-store';
 import { useProvidersStore } from '@/stores/providers-store';
 
 export const ModelProvider = () => {
-  return (
-    <div className="flex items-center justify-between pt-2 px-4 absolute top-0 left-0 right-0 z-10">
-      <ModelSelectorComponent />
-    </div>
-  );
+  return <ModelSelectorComponent />;
 };
 
 const ModelSelectorComponent = () => {
