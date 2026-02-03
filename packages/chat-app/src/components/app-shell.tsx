@@ -3,9 +3,12 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import type { SessionRef } from '@/lib/contracts';
-import type { SessionSummary } from '@ank1015/llm-sdk';
+import type { AgentEvent, Content, Message, MessageNode, SessionSummary } from '@ank1015/llm-sdk';
 
+import { useChatSettingsStore } from '@/stores/chat-settings-store';
 import { useChatStore } from '@/stores/chat-store';
+import { useComposerStore } from '@/stores/composer-store';
+import { useProvidersStore } from '@/stores/providers-store';
 import { useSessionsStore } from '@/stores/sessions-store';
 import { useUiStore } from '@/stores/ui-store';
 
@@ -31,6 +34,167 @@ function applyTheme(theme: ThemeMode): void {
   }
 
   document.documentElement.setAttribute('data-theme', theme);
+}
+
+function normalizeText(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed && trimmed.length > 0 ? trimmed : undefined;
+}
+
+function getSessionKey(session: SessionRef): string {
+  const projectName = normalizeText(session.projectName) ?? '';
+  const path = normalizeText(session.path) ?? '';
+  return `${projectName}::${path}::${session.sessionId}`;
+}
+
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function contentToText(content: Content): string {
+  const parts: string[] = [];
+
+  for (const block of content) {
+    if (block.type === 'text') {
+      const text = block.content.trim();
+      if (text.length > 0) {
+        parts.push(text);
+      }
+      continue;
+    }
+
+    if (block.type === 'image') {
+      parts.push('[Image]');
+      continue;
+    }
+
+    if (block.type === 'file') {
+      parts.push(`[File: ${block.filename}]`);
+    }
+  }
+
+  return parts.join('\n');
+}
+
+// eslint-disable-next-line sonarjs/cognitive-complexity
+function messageToText(message: Message): string {
+  if (message.role === 'user') {
+    return contentToText(message.content);
+  }
+
+  if (message.role === 'toolResult') {
+    return contentToText(message.content);
+  }
+
+  if (message.role === 'assistant') {
+    const segments: string[] = [];
+
+    for (const part of message.content) {
+      if (part.type === 'response') {
+        const text = contentToText(part.content);
+        if (text.length > 0) {
+          segments.push(text);
+        }
+        continue;
+      }
+
+      if (part.type === 'thinking') {
+        const thinking = part.thinkingText.trim();
+        if (thinking.length > 0) {
+          segments.push(`[Thinking] ${thinking}`);
+        }
+        continue;
+      }
+
+      if (part.type === 'toolCall') {
+        segments.push(`[Tool call] ${part.name}`);
+      }
+    }
+
+    return segments.join('\n');
+  }
+
+  try {
+    return JSON.stringify(message.content);
+  } catch {
+    return '[Custom message]';
+  }
+}
+
+function formatMessageTimestamp(value: string): string {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return '';
+  }
+
+  return parsed.toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function extractStreamingPreview(events: AgentEvent[]): string {
+  let preview = '';
+
+  for (const event of events) {
+    if (event.type !== 'message_update' || event.messageType !== 'assistant') {
+      continue;
+    }
+
+    const message = event.message;
+    if (!isObjectRecord(message)) {
+      continue;
+    }
+
+    if (message.type === 'text_delta' && typeof message.delta === 'string') {
+      preview += message.delta;
+    }
+  }
+
+  return preview.trim();
+}
+
+const EMPTY_MESSAGES: MessageNode[] = [];
+const EMPTY_PENDING: never[] = [];
+const EMPTY_EVENTS: AgentEvent[] = [];
+
+function isAbortError(error: unknown): boolean {
+  if (!error) {
+    return false;
+  }
+
+  if (typeof DOMException !== 'undefined' && error instanceof DOMException) {
+    return error.name === 'AbortError';
+  }
+
+  if (error instanceof Error) {
+    return (
+      error.name === 'AbortError' ||
+      error.message.toLowerCase().includes('aborted') ||
+      error.message.toLowerCase().includes('abort')
+    );
+  }
+
+  return false;
+}
+
+function getRegeneratePrompt(node: MessageNode, nodes: MessageNode[]): string | undefined {
+  if (node.message.role !== 'assistant') {
+    return undefined;
+  }
+
+  const parentId = node.parentId;
+  if (!parentId) {
+    return undefined;
+  }
+
+  const parentNode = nodes.find((item) => item.id === parentId);
+  if (!parentNode || parentNode.message.role !== 'user') {
+    return undefined;
+  }
+
+  const prompt = messageToText(parentNode.message).trim();
+  return prompt.length > 0 ? prompt : undefined;
 }
 
 type SessionListProps = {
@@ -141,6 +305,70 @@ function SessionList(props: SessionListProps): React.ReactElement {
   );
 }
 
+type MessageThreadProps = {
+  messages: MessageNode[];
+  isStreaming: boolean;
+  onRegenerate: (node: MessageNode) => void;
+};
+
+function MessageThread(props: MessageThreadProps): React.ReactElement {
+  const { messages, isStreaming, onRegenerate } = props;
+
+  if (messages.length === 0) {
+    return (
+      <div className="mx-auto w-full max-w-3xl rounded-xl border border-dashed border-[var(--border-default)] bg-[var(--surface-panel)] p-6 text-sm text-[var(--text-muted)]">
+        No messages yet. Start the conversation with your first prompt.
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto w-full max-w-3xl space-y-3">
+      {messages.map((node) => {
+        const role = node.message.role;
+        const isUser = role === 'user';
+        const text = messageToText(node.message) || '[No renderable text]';
+        const timestamp = formatMessageTimestamp(node.timestamp);
+        const canRegenerate = role === 'assistant';
+
+        return (
+          <article
+            key={node.id}
+            className={`rounded-xl border p-3 ${
+              isUser
+                ? 'ml-auto max-w-[90%] border-[var(--accent)]/45 bg-[var(--accent)]/10'
+                : 'mr-auto max-w-[90%] border-[var(--border-default)] bg-[var(--surface-panel)]'
+            }`}
+          >
+            <div className="mb-1 flex items-center justify-between gap-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
+                {role}
+              </p>
+              {timestamp ? (
+                <p className="text-[11px] text-[var(--text-muted)]">{timestamp}</p>
+              ) : null}
+            </div>
+            <p className="whitespace-pre-wrap break-words text-sm leading-6">{text}</p>
+
+            {canRegenerate ? (
+              <div className="mt-2 flex justify-end">
+                <button
+                  type="button"
+                  disabled={isStreaming}
+                  onClick={() => onRegenerate(node)}
+                  className="rounded border border-[var(--border-default)] px-2 py-1 text-[11px] hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Regenerate
+                </button>
+              </div>
+            ) : null}
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
 // eslint-disable-next-line sonarjs/cognitive-complexity
 export function AppShell(): React.ReactElement {
   const isSidebarCollapsed = useUiStore((state) => state.isSidebarCollapsed);
@@ -184,11 +412,34 @@ export function AppShell(): React.ReactElement {
   const activeSession = useChatStore((state) => state.activeSession);
   const setActiveSession = useChatStore((state) => state.setActiveSession);
   const loadMessages = useChatStore((state) => state.loadMessages);
+  const startStream = useChatStore((state) => state.startStream);
+  const abortStream = useChatStore((state) => state.abortStream);
   const clearSessionState = useChatStore((state) => state.clearSessionState);
+  const activeSessionKey = useMemo(() => {
+    return activeSession ? getSessionKey(activeSession) : undefined;
+  }, [activeSession]);
+
+  const selectedApi = useProvidersStore((state) => state.selectedApi);
+  const selectedModelId = useProvidersStore((state) => state.selectedModelId);
+  const providersError = useProvidersStore((state) => state.error);
+  const refreshCatalog = useProvidersStore((state) => state.refreshCatalog);
+
+  const getEffectiveSettings = useChatSettingsStore((state) => state.getEffectiveSettings);
+
+  const composerDraft = useComposerStore((state) => {
+    if (!activeSessionKey) {
+      return '';
+    }
+
+    return state.draftsBySession[activeSessionKey] ?? '';
+  });
+  const setComposerDraft = useComposerStore((state) => state.setDraft);
+  const markComposerSubmitted = useComposerStore((state) => state.markSubmitted);
 
   const [theme, setTheme] = useState<ThemeMode>('light');
   const [searchInput, setSearchInput] = useState(query);
   const [renameDraft, setRenameDraft] = useState('');
+  const [composerError, setComposerError] = useState<string | null>(null);
 
   useEffect(() => {
     const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
@@ -197,6 +448,10 @@ export function AppShell(): React.ReactElement {
     setTheme(resolvedTheme);
     applyTheme(resolvedTheme);
   }, []);
+
+  useEffect(() => {
+    void refreshCatalog();
+  }, [refreshCatalog]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -219,6 +474,57 @@ export function AppShell(): React.ReactElement {
     setRenameDraft(session?.sessionName ?? '');
   }, [renameSessionId, sessions]);
 
+  const activeMessages = useChatStore((state) => {
+    if (!activeSessionKey) {
+      return EMPTY_MESSAGES;
+    }
+
+    return state.messagesBySession[activeSessionKey] ?? EMPTY_MESSAGES;
+  });
+
+  const activePendingPrompts = useChatStore((state) => {
+    if (!activeSessionKey) {
+      return EMPTY_PENDING;
+    }
+
+    return state.pendingPromptsBySession[activeSessionKey] ?? EMPTY_PENDING;
+  });
+
+  const activeAgentEvents = useChatStore((state) => {
+    if (!activeSessionKey) {
+      return EMPTY_EVENTS;
+    }
+
+    return state.agentEventsBySession[activeSessionKey] ?? EMPTY_EVENTS;
+  });
+
+  const activeChatError = useChatStore((state) => {
+    if (!activeSessionKey) {
+      return null;
+    }
+
+    return state.errorsBySession[activeSessionKey] ?? null;
+  });
+
+  const isStreaming = useChatStore((state) => {
+    if (!activeSessionKey) {
+      return false;
+    }
+
+    return state.isStreamingBySession[activeSessionKey] ?? false;
+  });
+
+  const effectiveSettings = getEffectiveSettings(activeSession ?? undefined);
+  const resolvedApi = effectiveSettings.api ?? selectedApi;
+  const resolvedModelId = effectiveSettings.modelId ?? selectedModelId;
+
+  const streamPreviewText = useMemo(() => {
+    return extractStreamingPreview(activeAgentEvents);
+  }, [activeAgentEvents]);
+
+  const activeSessionId = activeSession?.sessionId;
+  const hasModelSelection = Boolean(resolvedApi && resolvedModelId);
+
   const toggleTheme = (): void => {
     const nextTheme: ThemeMode = theme === 'light' ? 'dark' : 'light';
 
@@ -235,8 +541,6 @@ export function AppShell(): React.ReactElement {
     return 'w-80';
   }, [isSidebarCollapsed]);
 
-  const activeSessionId = activeSession?.sessionId;
-
   const toSessionRef = (sessionId: string): SessionRef => {
     return {
       sessionId,
@@ -250,16 +554,18 @@ export function AppShell(): React.ReactElement {
     setActiveSession(sessionRef);
     closeMobileSidebar();
     clearMutationError();
+    setComposerError(null);
 
     try {
       await loadMessages({ session: sessionRef });
     } catch {
-      // errors are tracked in store and surfaced in the chat area later
+      // chat errors are in store
     }
   };
 
-  const handleCreateSession = async (): Promise<void> => {
+  const handleCreateSession = async (): Promise<SessionRef | undefined> => {
     clearMutationError();
+    setComposerError(null);
 
     try {
       const created = await createSession({
@@ -268,8 +574,9 @@ export function AppShell(): React.ReactElement {
       setActiveSession(created);
       closeMobileSidebar();
       await loadMessages({ session: created, force: true });
+      return created;
     } catch {
-      // mutation error is already stored in sessions store
+      return undefined;
     }
   };
 
@@ -291,7 +598,7 @@ export function AppShell(): React.ReactElement {
       });
       closeRenameSessionDialog();
     } catch {
-      // mutation error is already stored in sessions store
+      // mutation error is in store
     }
   };
 
@@ -315,8 +622,108 @@ export function AppShell(): React.ReactElement {
 
       closeDeleteSessionDialog();
     } catch {
-      // mutation error is already stored in sessions store
+      // mutation error is in store
     }
+  };
+
+  const handleStreamPrompt = async (prompt: string): Promise<void> => {
+    setComposerError(null);
+
+    const trimmedPrompt = prompt.trim();
+    if (trimmedPrompt.length === 0) {
+      return;
+    }
+
+    let session: SessionRef | undefined = activeSession ?? undefined;
+    if (!session) {
+      session = await handleCreateSession();
+    }
+
+    if (!session) {
+      throw new Error('Could not create or select a session.');
+    }
+
+    const settings = getEffectiveSettings(session);
+    const api = settings.api ?? selectedApi;
+    const modelId = settings.modelId ?? selectedModelId;
+
+    if (!api || !modelId) {
+      throw new Error('Select a provider and model in Settings before sending a message.');
+    }
+
+    await startStream({
+      sessionId: session.sessionId,
+      projectName: session.projectName,
+      path: session.path,
+      prompt: trimmedPrompt,
+      api,
+      modelId,
+      systemPrompt: settings.systemPrompt.trim().length > 0 ? settings.systemPrompt : undefined,
+      providerOptions: settings.providerOptions,
+    });
+
+    markComposerSubmitted(session);
+  };
+
+  const handleSend = async (): Promise<void> => {
+    try {
+      await handleStreamPrompt(composerDraft);
+    } catch (error) {
+      if (isAbortError(error)) {
+        return;
+      }
+
+      if (error instanceof Error) {
+        setComposerError(error.message);
+        return;
+      }
+
+      setComposerError('Failed to send message.');
+    }
+  };
+
+  const handleRegenerate = async (node: MessageNode): Promise<void> => {
+    const prompt = getRegeneratePrompt(node, activeMessages);
+    if (!prompt) {
+      setComposerError('Could not resolve a prompt to regenerate.');
+      return;
+    }
+
+    try {
+      await handleStreamPrompt(prompt);
+    } catch (error) {
+      if (isAbortError(error)) {
+        return;
+      }
+
+      if (error instanceof Error) {
+        setComposerError(error.message);
+        return;
+      }
+
+      setComposerError('Failed to regenerate response.');
+    }
+  };
+
+  const handleComposerKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>): void => {
+    if (event.key !== 'Enter' || event.shiftKey) {
+      return;
+    }
+
+    event.preventDefault();
+    if (isStreaming) {
+      return;
+    }
+
+    void handleSend();
+  };
+
+  const handleStopStream = (): void => {
+    if (!activeSession) {
+      return;
+    }
+
+    abortStream(activeSession);
   };
 
   const activeSessionName =
@@ -490,6 +897,16 @@ export function AppShell(): React.ReactElement {
             {activeSessionName}
           </p>
 
+          {isStreaming ? (
+            <button
+              type="button"
+              onClick={handleStopStream}
+              className="ml-auto rounded-md border border-red-500/50 bg-red-500/10 px-3 py-1.5 text-xs text-red-600 hover:bg-red-500/20"
+            >
+              Stop
+            </button>
+          ) : null}
+
           <div className="ml-auto flex items-center gap-2">
             <button
               type="button"
@@ -511,37 +928,105 @@ export function AppShell(): React.ReactElement {
         <main className="flex min-h-0 flex-1 flex-col">
           <section className="flex min-h-0 flex-1 flex-col">
             <div className="flex-1 overflow-y-auto p-4">
-              <div className="mx-auto w-full max-w-3xl space-y-4">
-                <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-panel)] p-4">
-                  <p className="mb-1 text-xs text-[var(--text-muted)]">Assistant</p>
-                  <p className="text-sm">
-                    Sessions sidebar is now live with search, pagination, selection, create, rename,
-                    and delete.
-                  </p>
+              {activeSession ? (
+                <MessageThread
+                  messages={activeMessages}
+                  isStreaming={isStreaming}
+                  onRegenerate={(node) => void handleRegenerate(node)}
+                />
+              ) : (
+                <div className="mx-auto w-full max-w-3xl rounded-xl border border-dashed border-[var(--border-default)] bg-[var(--surface-panel)] p-8 text-center text-sm text-[var(--text-muted)]">
+                  Create or select a session from the sidebar to start chatting.
                 </div>
+              )}
 
-                <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-panel)] p-4">
-                  <p className="mb-1 text-xs text-[var(--text-muted)]">User</p>
-                  <p className="text-sm">
-                    Next step: bind message timeline + composer to chat store.
-                  </p>
+              {streamPreviewText.length > 0 ? (
+                <div className="mx-auto mt-3 w-full max-w-3xl rounded-xl border border-[var(--border-default)] bg-[var(--surface-panel)] p-3">
+                  <p className="mb-1 text-xs text-[var(--text-muted)]">Assistant (streaming)</p>
+                  <p className="whitespace-pre-wrap text-sm leading-6">{streamPreviewText}</p>
                 </div>
-              </div>
+              ) : null}
+
+              {activePendingPrompts.length > 0 ? (
+                <div className="mx-auto mt-3 w-full max-w-3xl space-y-2">
+                  {activePendingPrompts.map((pending) => (
+                    <div
+                      key={pending.id}
+                      className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-panel)] px-3 py-2 text-xs"
+                    >
+                      <p className="text-[var(--text-muted)]">
+                        {pending.status === 'pending' ? 'Pending prompt' : 'Failed prompt'}
+                      </p>
+                      <p className="truncate">{pending.prompt}</p>
+                      {pending.error ? <p className="mt-1 text-red-500">{pending.error}</p> : null}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              {activeChatError ? (
+                <p className="mx-auto mt-3 w-full max-w-3xl text-sm text-red-500">
+                  {activeChatError}
+                </p>
+              ) : null}
             </div>
 
             <footer className="border-t border-[var(--border-default)] bg-[var(--surface-panel)] p-4">
-              <div className="mx-auto flex w-full max-w-3xl items-end gap-2">
-                <textarea
-                  rows={1}
-                  placeholder="Type a message..."
-                  className="max-h-36 min-h-11 flex-1 resize-y rounded-lg border border-[var(--border-default)] bg-[var(--surface-canvas)] px-3 py-2 text-sm outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--accent)]"
-                />
-                <button
-                  type="button"
-                  className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:opacity-90"
-                >
-                  Send
-                </button>
+              <div className="mx-auto w-full max-w-3xl">
+                <div className="mb-2 flex items-center justify-between text-xs text-[var(--text-muted)]">
+                  <p>
+                    Model:{' '}
+                    {resolvedApi && resolvedModelId
+                      ? `${resolvedApi}/${resolvedModelId}`
+                      : 'Not selected'}
+                  </p>
+                  {!hasModelSelection ? (
+                    <p className="text-amber-500">Select provider/model in Settings</p>
+                  ) : null}
+                </div>
+
+                <div className="flex items-end gap-2">
+                  <textarea
+                    rows={1}
+                    value={composerDraft}
+                    onChange={(event) => {
+                      setComposerError(null);
+                      setComposerDraft({
+                        session: activeSession ?? undefined,
+                        draft: event.target.value,
+                      });
+                    }}
+                    onKeyDown={handleComposerKeyDown}
+                    placeholder="Type a message..."
+                    className="max-h-36 min-h-11 flex-1 resize-y rounded-lg border border-[var(--border-default)] bg-[var(--surface-canvas)] px-3 py-2 text-sm outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--accent)]"
+                  />
+
+                  {isStreaming ? (
+                    <button
+                      type="button"
+                      onClick={handleStopStream}
+                      className="rounded-lg border border-red-500/50 px-4 py-2 text-sm text-red-600 hover:bg-red-500/10"
+                    >
+                      Stop
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => void handleSend()}
+                      disabled={!composerDraft.trim() || !hasModelSelection}
+                      className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Send
+                    </button>
+                  )}
+                </div>
+
+                {composerError ? (
+                  <p className="mt-2 text-xs text-red-500">{composerError}</p>
+                ) : null}
+                {providersError ? (
+                  <p className="mt-2 text-xs text-red-500">{providersError}</p>
+                ) : null}
               </div>
             </footer>
           </section>

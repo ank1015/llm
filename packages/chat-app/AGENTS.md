@@ -46,7 +46,7 @@ src/
       index.ts                — Contract exports
       api.ts                  — Shared API types (SessionRef, request/response types)
   components/
-    app-shell.tsx             — Root client shell (layout, sidebar, header, settings panel, theme)
+    app-shell.tsx             — Root client shell (sidebar, header, message thread, composer, settings panel, theme)
   stores/
     index.ts                  — Store exports (imports coordination.ts)
     coordination.ts           — Cross-store sync (activeSession, model selection)
