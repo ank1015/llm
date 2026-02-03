@@ -79,21 +79,42 @@ export async function GET(request: Request, context: MessagesRouteContext): Prom
   try {
     const sessionsAdapter = createSessionsAdapter();
     const location = toSessionLocation(scope, sessionId);
-    const messages = await sessionsAdapter.getMessages(location, branch);
-
-    if (!messages) {
+    const allMessages = await sessionsAdapter.getMessages(location);
+    if (!allMessages) {
       return apiError(404, {
         code: 'SESSION_NOT_FOUND',
         message: `Session not found: ${sessionId}`,
       });
     }
 
-    const paged = messages.slice(offset, limit === undefined ? undefined : offset + limit);
+    if (branch) {
+      const branches = await sessionsAdapter.getBranches(location);
+      const branchExists = branches?.some((item) => item.name === branch) ?? false;
+      if (!branchExists) {
+        return apiError(404, {
+          code: 'BRANCH_NOT_FOUND',
+          message: `Branch not found: ${branch}`,
+        });
+      }
+    }
+
+    const resolvedBranch = branch ?? allMessages[allMessages.length - 1]?.branch ?? 'main';
+
+    const branchHistory = await sessionsAdapter.getBranchHistory(location, resolvedBranch);
+    if (!branchHistory) {
+      return apiError(404, {
+        code: 'SESSION_NOT_FOUND',
+        message: `Session not found: ${sessionId}`,
+      });
+    }
+
+    const branchMessages = branchHistory.filter((node) => node.type === 'message');
+    const paged = branchMessages.slice(offset, limit === undefined ? undefined : offset + limit);
 
     return Response.json({
       ok: true,
-      branch: branch ?? null,
-      total: messages.length,
+      branch: resolvedBranch,
+      total: branchMessages.length,
       count: paged.length,
       messages: paged,
     });
