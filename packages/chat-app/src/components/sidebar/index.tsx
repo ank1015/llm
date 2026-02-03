@@ -1,6 +1,7 @@
 'use client';
 
 import { Settings, Plus, Search } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { memo, useState } from 'react';
 
 import { Button } from '../ui/button';
@@ -15,6 +16,7 @@ import { useUiStore } from '@/stores';
 function SidebarComponent() {
   const isSidebarCollapsed = useUiStore((state) => state.isSidebarCollapsed);
   const toggleSidebarCollapsed = useUiStore((state) => state.toggleSidebarCollapsed);
+  const router = useRouter();
   const [searchOpen, setSearchOpen] = useState(false);
 
   const handleContainerClick = () => {
@@ -44,7 +46,7 @@ function SidebarComponent() {
               // eslint-disable-next-line sonarjs/no-duplicate-string
               'justify-center cursor-pointer'
             )}
-            onClick={() => {}}
+            onClick={() => router.push('/chat')}
           >
             <Plus size={16} strokeWidth={2} />
             {!isSidebarCollapsed && 'New Chat'}
