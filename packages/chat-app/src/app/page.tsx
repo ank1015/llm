@@ -1,3 +1,5 @@
+import { AppShell } from '@/components/app-shell';
+
 export default function HomePage(): React.ReactElement {
-  return <main className="min-h-screen bg-zinc-950" />;
+  return <AppShell />;
 }

@@ -45,6 +45,8 @@ src/
     contracts/
       index.ts                — Contract exports
       api.ts                  — Shared API types (SessionRef, request/response types)
+  components/
+    app-shell.tsx             — Root client shell (layout, sidebar, header, settings panel, theme)
   stores/
     index.ts                  — Store exports (imports coordination.ts)
     coordination.ts           — Cross-store sync (activeSession, model selection)
@@ -117,5 +119,7 @@ tests/
 
 - Use App Router (Next.js 14+)
 - Use strict TypeScript
-- Server Components by default
+- Server Components by default; `'use client'` only for interactive components
 - Scaffold new API routes first, then fill business logic incrementally
+- Theme: CSS custom properties (`--surface-*`, `--text-*`, `--border-*`, `--accent`) in globals.css; supports light/dark via `data-theme` attribute and `prefers-color-scheme`
+- Style UI with Tailwind classes referencing CSS variables (e.g. `bg-[var(--surface-panel)]`)

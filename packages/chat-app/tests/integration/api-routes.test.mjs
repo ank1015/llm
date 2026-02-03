@@ -101,9 +101,7 @@ before(async () => {
   tempRoot = await mkdtemp(join(tmpdir(), 'chat-app-integration-'));
   const requestedPort = Number.parseInt(process.env.CHAT_APP_TEST_PORT ?? '', 10);
   port =
-    Number.isFinite(requestedPort) && requestedPort > 0
-      ? requestedPort
-      : await findAvailablePort();
+    Number.isFinite(requestedPort) && requestedPort > 0 ? requestedPort : await findAvailablePort();
   baseUrl = `http://localhost:${port}`;
 
   const sessionsDir = join(tempRoot, 'sessions');
