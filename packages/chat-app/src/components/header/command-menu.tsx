@@ -13,6 +13,13 @@ import {
 } from '@/components/ui/command';
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { useChatSettingsStore } from '@/stores/chat-settings-store';
@@ -57,6 +64,8 @@ export const CommandMenu = () => {
         <CommandList>
           {selectedApi === 'anthropic' ? (
             <AnthropicOptions />
+          ) : selectedApi === 'openai' ? (
+            <OpenAIOptions />
           ) : (
             <CommandEmpty>No options found.</CommandEmpty>
           )}
@@ -181,6 +190,104 @@ const AnthropicOptions = () => {
               />
             </div>
           )}
+        </div>
+      </CommandGroup>
+    </>
+  );
+};
+
+const EFFORT_OPTIONS = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh'] as const;
+const SUMMARY_OPTIONS = ['auto', 'concise', 'detailed'] as const;
+
+const OpenAIOptions = () => {
+  const providerOptions = useChatSettingsStore((state) => state.globalSettings.providerOptions);
+  const setOption = useChatSettingsStore((state) => state.setGlobalProviderOption);
+
+  const maxOutputTokens =
+    typeof providerOptions.max_output_tokens === 'number'
+      ? providerOptions.max_output_tokens
+      : 4096;
+
+  const reasoning = providerOptions.reasoning as
+    | { effort?: string | null; summary?: string | null }
+    | undefined;
+  const effort = reasoning?.effort ?? 'medium';
+  const summary = reasoning?.summary ?? 'auto';
+
+  const handleMaxOutputTokensChange = useCallback(
+    (value: number[]) => {
+      const v = value[0];
+      if (v !== undefined) {
+        setOption('max_output_tokens', v);
+      }
+    },
+    [setOption]
+  );
+
+  const updateReasoning = useCallback(
+    (patch: Record<string, string>) => {
+      setOption('reasoning', { ...reasoning, ...patch });
+    },
+    [setOption, reasoning]
+  );
+
+  return (
+    <>
+      <CommandGroup heading="Max Output Tokens">
+        <div className="px-2 py-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs text-muted-foreground">Maximum response length</Label>
+            <span className="text-xs font-mono tabular-nums">
+              {maxOutputTokens.toLocaleString()}
+            </span>
+          </div>
+          <Slider
+            min={1}
+            max={128000}
+            step={1024}
+            value={[maxOutputTokens]}
+            onValueChange={handleMaxOutputTokensChange}
+          />
+        </div>
+      </CommandGroup>
+
+      <CommandGroup heading="Reasoning Effort">
+        <div className="px-2 py-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs text-muted-foreground">Controls reasoning depth</Label>
+            <Select value={effort} onValueChange={(v) => updateReasoning({ effort: v })}>
+              <SelectTrigger className="w-[120px] h-7 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {EFFORT_OPTIONS.map((opt) => (
+                  <SelectItem key={opt} value={opt} className="text-xs">
+                    {opt}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </CommandGroup>
+
+      <CommandGroup heading="Reasoning Summary">
+        <div className="px-2 py-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs text-muted-foreground">Reasoning summary detail</Label>
+            <Select value={summary} onValueChange={(v) => updateReasoning({ summary: v })}>
+              <SelectTrigger className="w-[120px] h-7 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SUMMARY_OPTIONS.map((opt) => (
+                  <SelectItem key={opt} value={opt} className="text-xs">
+                    {opt}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </CommandGroup>
     </>
