@@ -41,7 +41,7 @@ export type { CompleteOptions, StreamOptions } from './llm/index.js';
 
 // Agent
 export { Conversation } from './agent/index.js';
-export type { ConversationOptions } from './agent/index.js';
+export type { ConversationExternalCallback, ConversationOptions } from './agent/index.js';
 
 // Session Manager
 export { SessionManager, createSessionManager } from './session/index.js';

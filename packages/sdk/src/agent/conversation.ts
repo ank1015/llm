@@ -48,6 +48,8 @@ export interface ConversationOptions {
   streamAssistantMessage?: boolean;
 }
 
+export type ConversationExternalCallback = (message: Message) => void | Promise<void>;
+
 const defaultModel = getModel('google', 'gemini-3-flash-preview');
 if (!defaultModel) {
   throw new Error("Default model 'gemini-3-flash-preview' not found in models configuration");
@@ -301,7 +303,11 @@ export class Conversation {
     this.emit({ type: 'message_end', messageId, messageType: 'custom', message: customMessage });
   }
 
-  async prompt(input: string, attachments?: Attachment[]): Promise<Message[]> {
+  async prompt(
+    input: string,
+    attachments?: Attachment[],
+    externalCallback?: ConversationExternalCallback
+  ): Promise<Message[]> {
     if (this._state.isStreaming) {
       throw new Error(
         'Cannot start a new prompt while another is running. Use waitForIdle() to wait for completion.'
@@ -314,11 +320,11 @@ export class Conversation {
     }
 
     const userMessage = buildUserMessage(input, attachments);
-    const newMessages = await this._runAgentLoop(userMessage);
+    const newMessages = await this._runAgentLoop(userMessage, externalCallback);
     return newMessages;
   }
 
-  async continue(): Promise<Message[]> {
+  async continue(externalCallback?: ConversationExternalCallback): Promise<Message[]> {
     if (this._state.isStreaming) {
       throw new Error(
         'Cannot continue while another prompt is running. Use waitForIdle() to wait for completion.'
@@ -329,7 +335,7 @@ export class Conversation {
       throw new Error('No messages to continue from');
     }
 
-    const newMessages = await this._runAgentLoopContinue();
+    const newMessages = await this._runAgentLoopContinue(externalCallback);
     return newMessages;
   }
 
@@ -446,7 +452,55 @@ export class Conversation {
     return { llmMessages, cfg, signal };
   }
 
-  private async _runAgentLoop(userMessage: Message): Promise<Message[]> {
+  private createExternalCallbackQueue(externalCallback?: ConversationExternalCallback): {
+    enqueue: (message: Message) => void;
+    flush: () => Promise<void>;
+  } {
+    let chain = Promise.resolve();
+    let hasError = false;
+    let firstError: unknown;
+
+    const enqueue = (message: Message): void => {
+      if (!externalCallback) {
+        return;
+      }
+
+      chain = chain
+        .then(async () => {
+          if (hasError) {
+            return;
+          }
+
+          await externalCallback(message);
+        })
+        .catch((error) => {
+          if (!hasError) {
+            hasError = true;
+            firstError = error;
+            this.abort();
+          }
+        });
+    };
+
+    const flush = async (): Promise<void> => {
+      await chain;
+      if (hasError) {
+        throw firstError;
+      }
+    };
+
+    return {
+      enqueue,
+      flush,
+    };
+  }
+
+  private async _runAgentLoop(
+    userMessage: Message,
+    externalCallback?: ConversationExternalCallback
+  ): Promise<Message[]> {
+    const callbackQueue = this.createExternalCallbackQueue(externalCallback);
+
     try {
       const { llmMessages, cfg, signal } = await this._prepareRun();
       const updatedMessages = [...llmMessages, userMessage];
@@ -465,8 +519,9 @@ export class Conversation {
         message: userMessage,
       });
       this.appendMessage(userMessage);
+      callbackQueue.enqueue(userMessage);
 
-      const callbacks = this._createRunnerCallbacks();
+      const callbacks = this._createRunnerCallbacks(callbackQueue.enqueue);
       const result = await runAgentLoop(
         cfg,
         updatedMessages,
@@ -480,6 +535,7 @@ export class Conversation {
         throw new Error(result.error);
       }
 
+      await callbackQueue.flush();
       return result.messages;
     } catch (e) {
       this._state.error = e instanceof Error ? e.message : String(e);
@@ -489,7 +545,11 @@ export class Conversation {
     }
   }
 
-  private async _runAgentLoopContinue(): Promise<Message[]> {
+  private async _runAgentLoopContinue(
+    externalCallback?: ConversationExternalCallback
+  ): Promise<Message[]> {
+    const callbackQueue = this.createExternalCallbackQueue(externalCallback);
+
     try {
       const { llmMessages, cfg, signal } = await this._prepareRun();
 
@@ -506,7 +566,7 @@ export class Conversation {
       this.emit({ type: 'agent_start' });
       this.emit({ type: 'turn_start' });
 
-      const callbacks = this._createRunnerCallbacks();
+      const callbacks = this._createRunnerCallbacks(callbackQueue.enqueue);
       const result = await runAgentLoop(
         cfg,
         [...llmMessages],
@@ -520,6 +580,7 @@ export class Conversation {
         throw new Error(result.error);
       }
 
+      await callbackQueue.flush();
       return result.messages;
     } catch (e) {
       this._state.error = e instanceof Error ? e.message : String(e);
@@ -529,10 +590,22 @@ export class Conversation {
     }
   }
 
-  private _createRunnerCallbacks(): AgentRunnerCallbacks {
+  private _createRunnerCallbacks(
+    onMessageAppended?: (message: Message) => void
+  ): AgentRunnerCallbacks {
     return {
-      appendMessage: (m) => this.appendMessage(m),
-      appendMessages: (ms) => this.appendMessages(ms),
+      appendMessage: (m) => {
+        this.appendMessage(m);
+        onMessageAppended?.(m);
+      },
+      appendMessages: (ms) => {
+        this.appendMessages(ms);
+        if (onMessageAppended) {
+          for (const message of ms) {
+            onMessageAppended(message);
+          }
+        }
+      },
       addPendingToolCall: (id) => this._state.pendingToolCalls.add(id),
       removePendingToolCall: (id) => this._state.pendingToolCalls.delete(id),
     };
