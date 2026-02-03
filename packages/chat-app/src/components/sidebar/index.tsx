@@ -1,15 +1,21 @@
 'use client';
 
-import { memo } from 'react';
+import { Plus, Search } from 'lucide-react';
+import { memo, useState } from 'react';
 
+import { Button } from '../ui/button';
+
+import { SearchChatsDialog } from './search-chats';
 import { SidebarHeader } from './sidebar-header';
 
 import { cn } from '@/lib/utils';
 import { useUiStore } from '@/stores';
 
+
 function SidebarComponent() {
   const isSidebarCollapsed = useUiStore((state) => state.isSidebarCollapsed);
   const toggleSidebarCollapsed = useUiStore((state) => state.toggleSidebarCollapsed);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const handleContainerClick = () => {
     if (isSidebarCollapsed) {
@@ -28,7 +34,35 @@ function SidebarComponent() {
     >
       <div className="w-full flex-1 flex flex-col items-start overflow-hidden">
         <SidebarHeader />
+        <div className="flex flex-col gap-1 px-2 w-full mt-4 gap-2">
+          <Button
+            size={!isSidebarCollapsed ? 'sm' : 'icon-sm'}
+            variant="outline"
+            className={cn(
+              !isSidebarCollapsed && 'relative w-full',
+              'justify-center cursor-pointer'
+            )}
+            onClick={() => {}}
+          >
+            <Plus size={16} strokeWidth={2} />
+            {!isSidebarCollapsed && 'New Chat'}
+          </Button>
+          <Button
+            size={!isSidebarCollapsed ? 'sm' : 'icon-sm'}
+            variant="outline"
+            className={cn(
+              !isSidebarCollapsed && 'relative w-full',
+              'justify-center cursor-pointer'
+            )}
+            onClick={() => setSearchOpen(true)}
+          >
+            <Search size={10} strokeWidth={2} />
+            {!isSidebarCollapsed && 'Search Chats'}
+          </Button>
+        </div>
       </div>
+
+      <SearchChatsDialog open={searchOpen} onOpenChange={setSearchOpen} />
     </div>
   );
 }
