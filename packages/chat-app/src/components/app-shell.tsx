@@ -1,9 +1,16 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { SessionRef } from '@/lib/contracts';
-import type { AgentEvent, Content, Message, MessageNode, SessionSummary } from '@ank1015/llm-sdk';
+import type {
+  AgentEvent,
+  Attachment,
+  Content,
+  Message,
+  MessageNode,
+  SessionSummary,
+} from '@ank1015/llm-sdk';
 
 import { useChatSettingsStore } from '@/stores/chat-settings-store';
 import { useChatStore } from '@/stores/chat-store';
@@ -157,6 +164,7 @@ function extractStreamingPreview(events: AgentEvent[]): string {
 const EMPTY_MESSAGES: MessageNode[] = [];
 const EMPTY_PENDING: never[] = [];
 const EMPTY_EVENTS: AgentEvent[] = [];
+const EMPTY_ATTACHMENTS: Attachment[] = [];
 
 function isAbortError(error: unknown): boolean {
   if (!error) {
@@ -176,6 +184,68 @@ function isAbortError(error: unknown): boolean {
   }
 
   return false;
+}
+
+function createAttachmentId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      if (typeof reader.result !== 'string') {
+        reject(new Error(`Could not read file: ${file.name}`));
+        return;
+      }
+
+      const [, base64 = ''] = reader.result.split(',', 2);
+      resolve(base64);
+    };
+
+    reader.onerror = () => {
+      reject(new Error(`Could not read file: ${file.name}`));
+    };
+
+    reader.readAsDataURL(file);
+  });
+}
+
+async function toAttachment(file: File): Promise<Attachment> {
+  const base64 = await fileToBase64(file);
+  const mimeType = file.type.trim() || 'application/octet-stream';
+
+  return {
+    id: createAttachmentId(),
+    type: mimeType.startsWith('image/') ? 'image' : 'file',
+    fileName: file.name || 'file',
+    mimeType,
+    size: file.size,
+    content: base64,
+  };
+}
+
+function formatBytes(bytes: number | undefined): string {
+  if (!bytes || bytes <= 0) {
+    return '';
+  }
+
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+
+  const kib = bytes / 1024;
+  if (kib < 1024) {
+    return `${kib.toFixed(1)} KB`;
+  }
+
+  const mib = kib / 1024;
+  return `${mib.toFixed(1)} MB`;
 }
 
 function getRegeneratePrompt(node: MessageNode, nodes: MessageNode[]): string | undefined {
@@ -433,13 +503,25 @@ export function AppShell(): React.ReactElement {
 
     return state.draftsBySession[activeSessionKey] ?? '';
   });
+  const composerAttachments = useComposerStore((state) => {
+    if (!activeSessionKey) {
+      return EMPTY_ATTACHMENTS;
+    }
+
+    return state.attachmentsBySession[activeSessionKey] ?? EMPTY_ATTACHMENTS;
+  });
   const setComposerDraft = useComposerStore((state) => state.setDraft);
+  const addComposerAttachment = useComposerStore((state) => state.addAttachment);
+  const removeComposerAttachment = useComposerStore((state) => state.removeAttachment);
+  const clearComposerAttachments = useComposerStore((state) => state.clearAttachments);
   const markComposerSubmitted = useComposerStore((state) => state.markSubmitted);
 
   const [theme, setTheme] = useState<ThemeMode>('light');
   const [searchInput, setSearchInput] = useState(query);
   const [renameDraft, setRenameDraft] = useState('');
   const [composerError, setComposerError] = useState<string | null>(null);
+  const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
+  const attachmentInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
@@ -626,7 +708,10 @@ export function AppShell(): React.ReactElement {
     }
   };
 
-  const handleStreamPrompt = async (prompt: string): Promise<void> => {
+  const handleStreamPrompt = async (
+    prompt: string,
+    attachments: Attachment[] = []
+  ): Promise<void> => {
     setComposerError(null);
 
     const trimmedPrompt = prompt.trim();
@@ -660,6 +745,7 @@ export function AppShell(): React.ReactElement {
       modelId,
       systemPrompt: settings.systemPrompt.trim().length > 0 ? settings.systemPrompt : undefined,
       providerOptions: settings.providerOptions,
+      attachments: attachments.length > 0 ? attachments : undefined,
     });
 
     markComposerSubmitted(session);
@@ -667,7 +753,7 @@ export function AppShell(): React.ReactElement {
 
   const handleSend = async (): Promise<void> => {
     try {
-      await handleStreamPrompt(composerDraft);
+      await handleStreamPrompt(composerDraft, composerAttachments);
     } catch (error) {
       if (isAbortError(error)) {
         return;
@@ -705,8 +791,78 @@ export function AppShell(): React.ReactElement {
     }
   };
 
+  const openAttachmentPicker = (): void => {
+    attachmentInputRef.current?.click();
+  };
+
+  const handleAttachmentInput = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ): Promise<void> => {
+    const files = event.target.files ? Array.from(event.target.files) : [];
+    event.currentTarget.value = '';
+
+    if (files.length === 0) {
+      return;
+    }
+
+    if (!activeSession) {
+      setComposerError('Create/select a session before attaching files.');
+      return;
+    }
+
+    setComposerError(null);
+    setIsUploadingAttachments(true);
+
+    try {
+      const attachments = await Promise.all(files.map((file) => toAttachment(file)));
+      for (const attachment of attachments) {
+        addComposerAttachment({
+          session: activeSession,
+          attachment,
+        });
+      }
+    } catch (error) {
+      if (error instanceof Error) {
+        setComposerError(error.message);
+      } else {
+        setComposerError('Failed to process attachments.');
+      }
+    } finally {
+      setIsUploadingAttachments(false);
+    }
+  };
+
+  const handleRemoveAttachment = (attachmentId: string): void => {
+    if (!activeSession) {
+      return;
+    }
+
+    removeComposerAttachment({
+      session: activeSession,
+      attachmentId,
+    });
+  };
+
+  const handleClearAttachments = (): void => {
+    if (!activeSession) {
+      return;
+    }
+
+    clearComposerAttachments(activeSession);
+  };
+
   const handleComposerKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>): void => {
-    if (event.key !== 'Enter' || event.shiftKey) {
+    if (event.nativeEvent.isComposing) {
+      return;
+    }
+
+    if (event.key === 'Escape' && isStreaming) {
+      event.preventDefault();
+      handleStopStream();
+      return;
+    }
+
+    if (event.key !== 'Enter' || event.shiftKey || event.altKey) {
       return;
     }
 
@@ -985,7 +1141,60 @@ export function AppShell(): React.ReactElement {
                   ) : null}
                 </div>
 
+                {composerAttachments.length > 0 ? (
+                  <div className="mb-2 flex flex-wrap items-center gap-2">
+                    {composerAttachments.map((attachment) => (
+                      <span
+                        key={attachment.id}
+                        className="inline-flex items-center gap-1 rounded-md border border-[var(--border-default)] bg-[var(--surface-canvas)] px-2 py-1 text-xs"
+                      >
+                        <span className="truncate max-w-48" title={attachment.fileName}>
+                          {attachment.fileName}
+                        </span>
+                        {attachment.size ? (
+                          <span className="text-[var(--text-muted)]">
+                            ({formatBytes(attachment.size)})
+                          </span>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveAttachment(attachment.id)}
+                          className="rounded px-1 text-[var(--text-muted)] hover:bg-[var(--surface-muted)]"
+                          aria-label={`Remove ${attachment.fileName}`}
+                        >
+                          x
+                        </button>
+                      </span>
+                    ))}
+
+                    <button
+                      type="button"
+                      onClick={handleClearAttachments}
+                      className="rounded border border-[var(--border-default)] px-2 py-1 text-xs hover:bg-[var(--surface-muted)]"
+                    >
+                      Clear attachments
+                    </button>
+                  </div>
+                ) : null}
+
                 <div className="flex items-end gap-2">
+                  <input
+                    ref={attachmentInputRef}
+                    type="file"
+                    multiple
+                    className="hidden"
+                    onChange={(event) => void handleAttachmentInput(event)}
+                  />
+
+                  <button
+                    type="button"
+                    onClick={openAttachmentPicker}
+                    disabled={!activeSession || isUploadingAttachments || isStreaming}
+                    className="rounded-lg border border-[var(--border-default)] px-3 py-2 text-xs hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isUploadingAttachments ? 'Adding...' : 'Attach'}
+                  </button>
+
                   <textarea
                     rows={1}
                     value={composerDraft}
@@ -997,8 +1206,11 @@ export function AppShell(): React.ReactElement {
                       });
                     }}
                     onKeyDown={handleComposerKeyDown}
-                    placeholder="Type a message..."
-                    className="max-h-36 min-h-11 flex-1 resize-y rounded-lg border border-[var(--border-default)] bg-[var(--surface-canvas)] px-3 py-2 text-sm outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--accent)]"
+                    placeholder={
+                      activeSession ? 'Type a message...' : 'Select a session to start typing'
+                    }
+                    disabled={!activeSession}
+                    className="max-h-36 min-h-11 flex-1 resize-y rounded-lg border border-[var(--border-default)] bg-[var(--surface-canvas)] px-3 py-2 text-sm outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-60"
                   />
 
                   {isStreaming ? (
@@ -1013,13 +1225,17 @@ export function AppShell(): React.ReactElement {
                     <button
                       type="button"
                       onClick={() => void handleSend()}
-                      disabled={!composerDraft.trim() || !hasModelSelection}
+                      disabled={!activeSession || !composerDraft.trim() || !hasModelSelection}
                       className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       Send
                     </button>
                   )}
                 </div>
+
+                <p className="mt-2 text-[11px] text-[var(--text-muted)]">
+                  Enter sends, Shift+Enter adds newline, Esc stops streaming.
+                </p>
 
                 {composerError ? (
                   <p className="mt-2 text-xs text-red-500">{composerError}</p>
