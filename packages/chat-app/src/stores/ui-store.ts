@@ -4,8 +4,16 @@ import { create } from 'zustand';
 
 type SettingsTab = 'general' | 'model' | 'keys';
 
+type SideDrawerProps = {
+  open: boolean;
+  badge?: number;
+  title: string | (() => React.ReactNode);
+  renderContent: () => React.ReactNode;
+};
+
 type UiStoreState = {
   isSidebarCollapsed: boolean;
+  sideDrawer: SideDrawerProps;
   isMobileSidebarOpen: boolean;
   isSettingsOpen: boolean;
   activeSettingsTab: SettingsTab;
@@ -13,6 +21,9 @@ type UiStoreState = {
   deleteSessionId: string | null;
   setSidebarCollapsed: (collapsed: boolean) => void;
   toggleSidebarCollapsed: () => void;
+  openSideDrawer: (props: Omit<SideDrawerProps, 'open'>) => void;
+  updateSideDrawer: (props: Partial<SideDrawerProps>) => void;
+  dismissSideDrawer: () => void;
   openMobileSidebar: () => void;
   closeMobileSidebar: () => void;
   toggleMobileSidebar: () => void;
@@ -28,6 +39,7 @@ type UiStoreState = {
 
 const initialState = {
   isSidebarCollapsed: false,
+  sideDrawer: { open: false, title: '', renderContent: () => null, badge: undefined },
   isMobileSidebarOpen: false,
   isSettingsOpen: false,
   activeSettingsTab: 'general' as SettingsTab,
@@ -40,6 +52,17 @@ export const useUiStore = create<UiStoreState>((set) => ({
 
   setSidebarCollapsed: (collapsed) => set({ isSidebarCollapsed: collapsed }),
   toggleSidebarCollapsed: () => set((state) => ({ isSidebarCollapsed: !state.isSidebarCollapsed })),
+  openSideDrawer: (props: Omit<SideDrawerProps, 'open'>) => {
+    set({ sideDrawer: { ...props, open: true } });
+  },
+  updateSideDrawer: (props: Partial<SideDrawerProps>) =>
+    set((state) => ({
+      sideDrawer: { ...state.sideDrawer, ...props },
+    })),
+  dismissSideDrawer: () =>
+    set({
+      sideDrawer: { open: false, title: '', renderContent: () => null, badge: undefined },
+    }),
 
   openMobileSidebar: () => set({ isMobileSidebarOpen: true }),
   closeMobileSidebar: () => set({ isMobileSidebarOpen: false }),

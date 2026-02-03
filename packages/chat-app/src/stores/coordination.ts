@@ -131,4 +131,6 @@ export function initializeStoreCoordination(): void {
   });
 }
 
-initializeStoreCoordination();
+if (typeof window !== 'undefined') {
+  initializeStoreCoordination();
+}

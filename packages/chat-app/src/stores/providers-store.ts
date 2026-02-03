@@ -274,6 +274,15 @@ export const useProvidersStore = create<ProvidersStoreState>((set) => ({
       }
 
       const modelsForApi = state.modelsByApi[api] ?? [];
+
+      // Catalog not loaded yet — accept the api and preserve existing modelId
+      if (modelsForApi.length === 0) {
+        return {
+          selectedApi: api,
+          selectedModelId: state.selectedApi === api ? state.selectedModelId : null,
+        };
+      }
+
       const selectedModelStillValid =
         state.selectedApi === api &&
         state.selectedModelId !== null &&
@@ -303,6 +312,14 @@ export const useProvidersStore = create<ProvidersStoreState>((set) => ({
       }
 
       const modelsForApi = state.modelsByApi[state.selectedApi] ?? [];
+
+      // Catalog not loaded yet — accept the modelId without validation
+      if (modelsForApi.length === 0) {
+        return {
+          selectedModelId: modelId,
+        };
+      }
+
       const exists = modelsForApi.some((model) => model.id === modelId);
 
       return {

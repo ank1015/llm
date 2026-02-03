@@ -25,7 +25,7 @@ export const MODELS = {
 		} satisfies Model<"openai">,
 		"gpt-5.2-codex": {
 			id: "gpt-5.2-codex",
-			name: "GPT-5.2-Codex",
+			name: "GPT-5.2 Codex",
 			api: "openai",
 			baseUrl: openaiBaseUrl,
 			reasoning: true,
@@ -163,7 +163,7 @@ export const MODELS = {
 		} satisfies Model<"google">,
 		"gemini-3-pro-image-preview": {
 			id: "gemini-3-pro-image-preview",
-			name: "Gemini 3 Pro Image Preview",
+			name: "Nano Banana",
 			api: "google",
 			baseUrl: googleBaseUrl,
 			reasoning: true,
@@ -201,7 +201,7 @@ export const MODELS = {
 	anthropic: {
 		"claude-haiku-4-5": {
 			id: "claude-haiku-4-5",
-			name: "Claude Haiku 4.5 (latest)",
+			name: "Haiku 4.5",
 			api: "anthropic",
 			baseUrl: anthropicBaseUrl,
 			reasoning: true,
@@ -218,7 +218,7 @@ export const MODELS = {
 		} satisfies Model<"anthropic">,
 		"claude-opus-4-5": {
 			id: "claude-opus-4-5",
-			name: "Claude Opus 4.5 (latest)",
+			name: "Opus 4.5",
 			api: "anthropic",
 			baseUrl: anthropicBaseUrl,
 			reasoning: true,
@@ -235,7 +235,7 @@ export const MODELS = {
 		} satisfies Model<"anthropic">,
 		"claude-sonnet-4-5": {
 			id: "claude-sonnet-4-5",
-			name: "Claude Sonnet 4.5 (latest)",
+			name: "Sonnet 4.5",
 			api: "anthropic",
 			baseUrl: anthropicBaseUrl,
 			reasoning: true,
@@ -278,23 +278,6 @@ export const MODELS = {
 			baseUrl: "https://api.moonshot.ai/v1",
 			reasoning: true,
 			input: ["text", "image"],
-			cost: {
-				input: 0.6,
-				output: 3.0,
-				cacheRead: 0.1,
-				cacheWrite: 0,
-			},
-			contextWindow: 262144,
-			maxTokens: 32768,
-			tools: ["function_calling"],
-		} satisfies Model<"kimi">,
-		"kimi-k2-turbo-preview": {
-			id: "kimi-k2-turbo-preview",
-			name: "Kimi K2 Turbo Preview",
-			api: "kimi",
-			baseUrl: "https://api.moonshot.ai/v1",
-			reasoning: false,
-			input: ["text"],
 			cost: {
 				input: 0.6,
 				output: 3.0,
