@@ -246,6 +246,42 @@ describe('Conversation Execution', () => {
       expect(events.some((e) => e.type === 'message_end')).toBe(true);
     });
 
+    it('should call external callback for messages appended during the run', async () => {
+      const mockKeysAdapter = createMockKeysAdapter();
+      const conversation = new Conversation({ keysAdapter: mockKeysAdapter });
+      conversation.setProvider({ model: mockModel, providerOptions: {} });
+
+      vi.mocked(core.runAgentLoop).mockImplementation(
+        async (_cfg, _msgs, _emit, _signal, callbacks) => {
+          callbacks.appendMessage(mockAssistantMessage);
+          return {
+            messages: [mockAssistantMessage],
+            totalCost: mockAssistantMessage.usage.cost.total,
+            aborted: false,
+          };
+        }
+      );
+
+      const callback = vi.fn(async () => undefined);
+      await conversation.prompt('Hello', undefined, callback);
+
+      expect(callback).toHaveBeenCalledTimes(2);
+      expect(callback.mock.calls[0]?.[0].role).toBe('user');
+      expect(callback.mock.calls[1]?.[0].role).toBe('assistant');
+    });
+
+    it('should surface external callback errors', async () => {
+      const mockKeysAdapter = createMockKeysAdapter();
+      const conversation = new Conversation({ keysAdapter: mockKeysAdapter });
+      conversation.setProvider({ model: mockModel, providerOptions: {} });
+
+      await expect(
+        conversation.prompt('Hello', undefined, async () => {
+          throw new Error('persist failed');
+        })
+      ).rejects.toThrow('persist failed');
+    });
+
     it('should update state.isStreaming during execution', async () => {
       const mockKeysAdapter = createMockKeysAdapter();
       const conversation = new Conversation({ keysAdapter: mockKeysAdapter });
