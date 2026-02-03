@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 
 import { RootLayout } from '@/components/root';
 import '../globals.css';
+import { TooltipProvider } from '@/components/ui/tooltip';
 
 export const metadata: Metadata = {
   title: 'Create Next App',
@@ -14,8 +15,10 @@ export default function Root({
   children: React.ReactNode;
 }>) {
   return (
-    <RootLayout>
-      <div className="relative flex h-full w-full flex-col">{children}</div>
-    </RootLayout>
+    <TooltipProvider>
+      <RootLayout>
+        <div className="relative flex h-full w-full flex-col">{children}</div>
+      </RootLayout>
+    </TooltipProvider>
   );
 }

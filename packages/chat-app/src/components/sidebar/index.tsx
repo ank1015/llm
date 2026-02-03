@@ -1,16 +1,16 @@
 'use client';
 
-import { Plus, Search } from 'lucide-react';
+import { Settings, Plus, Search } from 'lucide-react';
 import { memo, useState } from 'react';
 
 import { Button } from '../ui/button';
 
+import { ChatList } from './chat-list';
 import { SearchChatsDialog } from './search-chats';
 import { SidebarHeader } from './sidebar-header';
 
 import { cn } from '@/lib/utils';
 import { useUiStore } from '@/stores';
-
 
 function SidebarComponent() {
   const isSidebarCollapsed = useUiStore((state) => state.isSidebarCollapsed);
@@ -39,7 +39,9 @@ function SidebarComponent() {
             size={!isSidebarCollapsed ? 'sm' : 'icon-sm'}
             variant="outline"
             className={cn(
+              // eslint-disable-next-line sonarjs/no-duplicate-string
               !isSidebarCollapsed && 'relative w-full',
+              // eslint-disable-next-line sonarjs/no-duplicate-string
               'justify-center cursor-pointer'
             )}
             onClick={() => {}}
@@ -60,8 +62,30 @@ function SidebarComponent() {
             {!isSidebarCollapsed && 'Search Chats'}
           </Button>
         </div>
-      </div>
 
+        {!isSidebarCollapsed && (
+          <div className="mt-4 flex w-full min-h-0 flex-1 flex-col overflow-hidden pt-2 pb-4">
+            <p className="mb-2 px-3 text-[12px] text-muted-foreground">Your chats</p>
+            <div className="flex-1 overflow-y-auto">
+              <ChatList />
+            </div>
+          </div>
+        )}
+
+        <div className={cn('mt-auto w-full px-2 pb-2 justify-center')}>
+          <Button
+            size={!isSidebarCollapsed ? 'sm' : 'icon-sm'}
+            variant="outline"
+            className={cn(
+              !isSidebarCollapsed && 'relative w-full',
+              'justify-center cursor-pointer'
+            )}
+          >
+            <Settings size={14} strokeWidth={2} />
+            {!isSidebarCollapsed && 'Settings'}
+          </Button>
+        </div>
+      </div>
       <SearchChatsDialog open={searchOpen} onOpenChange={setSearchOpen} />
     </div>
   );
