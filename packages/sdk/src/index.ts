@@ -143,7 +143,6 @@ export type {
   BaseAssistantMessage,
   CustomMessage,
   Message,
-  BaseAssistantEventMessage,
   BaseAssistantEvent,
   // Tool
   Tool,
