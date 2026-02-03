@@ -10,7 +10,6 @@ import type {
   AssistantResponseContent,
   AssistantThinkingContent,
   AssistantToolCall,
-  BaseAssistantEventMessage,
   BaseAssistantMessage,
   Context,
   KimiProviderOptions,
@@ -38,11 +37,15 @@ export const streamKimi: StreamFunction<'kimi'> = (
 
   (async () => {
     const startTimestamp = Date.now();
-    const output: BaseAssistantEventMessage<'kimi'> = {
+    // Build final ChatCompletion from streamed chunks
+    let finalResponse: ChatCompletion = getMockKimiMessage();
+
+    const output: BaseAssistantMessage<'kimi'> = {
       role: 'assistant',
       api: model.api,
       model: model,
       id,
+      message: finalResponse,
       content: [],
       usage: {
         input: 0,
@@ -56,9 +59,6 @@ export const streamKimi: StreamFunction<'kimi'> = (
       timestamp: startTimestamp,
       duration: 0,
     };
-
-    // Build final ChatCompletion from streamed chunks
-    let finalResponse: ChatCompletion = getMockKimiMessage();
     let accumulatedContent = '';
     let accumulatedReasoningContent = '';
     const accumulatedToolCalls: Map<
@@ -376,6 +376,7 @@ export const streamKimi: StreamFunction<'kimi'> = (
           total_tokens: output.usage.totalTokens,
         },
       };
+      output.message = finalResponse;
 
       // Add reasoning_content to the message if present
       if (accumulatedReasoningContent) {
@@ -387,38 +388,28 @@ export const streamKimi: StreamFunction<'kimi'> = (
         }
       }
 
+      output.timestamp = Date.now();
+      output.duration = Date.now() - startTimestamp;
       stream.push({
         type: 'done',
         reason: output.stopReason,
-        message: { ...output, timestamp: Date.now() },
+        message: output,
       });
-
-      const baseAssistantMessage: BaseAssistantMessage<'kimi'> = {
-        ...output,
-        message: finalResponse,
-        timestamp: Date.now(),
-        duration: Date.now() - startTimestamp,
-      };
-      stream.end(baseAssistantMessage);
+      stream.end(output);
     } catch (error) {
       for (const block of output.content) {
         delete (block as { partialJson?: string }).partialJson;
       }
       output.stopReason = options?.signal?.aborted ? 'aborted' : 'error';
       output.errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+      output.timestamp = Date.now();
+      output.duration = Date.now() - startTimestamp;
       stream.push({
         type: 'error',
         reason: output.stopReason,
-        message: { ...output, timestamp: Date.now() },
+        message: output,
       });
-
-      const baseAssistantMessage: BaseAssistantMessage<'kimi'> = {
-        ...output,
-        message: finalResponse,
-        timestamp: Date.now(),
-        duration: Date.now() - startTimestamp,
-      };
-      stream.end(baseAssistantMessage);
+      stream.end(output);
     }
   })();
 

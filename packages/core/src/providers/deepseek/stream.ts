@@ -10,7 +10,6 @@ import type {
   AssistantResponseContent,
   AssistantThinkingContent,
   AssistantToolCall,
-  BaseAssistantEventMessage,
   BaseAssistantMessage,
   Context,
   DeepSeekProviderOptions,
@@ -39,11 +38,15 @@ export const streamDeepSeek: StreamFunction<'deepseek'> = (
 
   (async () => {
     const startTimestamp = Date.now();
-    const output: BaseAssistantEventMessage<'deepseek'> = {
+    // Build final ChatCompletion from streamed chunks
+    let finalResponse: ChatCompletion = getMockDeepSeekMessage();
+
+    const output: BaseAssistantMessage<'deepseek'> = {
       role: 'assistant',
       api: model.api,
       model: model,
       id,
+      message: finalResponse,
       content: [],
       usage: {
         input: 0,
@@ -57,9 +60,6 @@ export const streamDeepSeek: StreamFunction<'deepseek'> = (
       timestamp: startTimestamp,
       duration: 0,
     };
-
-    // Build final ChatCompletion from streamed chunks
-    let finalResponse: ChatCompletion = getMockDeepSeekMessage();
     let accumulatedContent = '';
     let accumulatedReasoningContent = '';
     const accumulatedToolCalls: Map<
@@ -374,6 +374,7 @@ export const streamDeepSeek: StreamFunction<'deepseek'> = (
           total_tokens: output.usage.totalTokens,
         },
       };
+      output.message = finalResponse;
 
       // Add reasoning_content to the message if present
       if (accumulatedReasoningContent) {
@@ -385,38 +386,28 @@ export const streamDeepSeek: StreamFunction<'deepseek'> = (
         }
       }
 
+      output.timestamp = Date.now();
+      output.duration = Date.now() - startTimestamp;
       stream.push({
         type: 'done',
         reason: output.stopReason,
-        message: { ...output, timestamp: Date.now() },
+        message: output,
       });
-
-      const baseAssistantMessage: BaseAssistantMessage<'deepseek'> = {
-        ...output,
-        message: finalResponse,
-        timestamp: Date.now(),
-        duration: Date.now() - startTimestamp,
-      };
-      stream.end(baseAssistantMessage);
+      stream.end(output);
     } catch (error) {
       for (const block of output.content) {
         delete (block as { partialJson?: string }).partialJson;
       }
       output.stopReason = options?.signal?.aborted ? 'aborted' : 'error';
       output.errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+      output.timestamp = Date.now();
+      output.duration = Date.now() - startTimestamp;
       stream.push({
         type: 'error',
         reason: output.stopReason,
-        message: { ...output, timestamp: Date.now() },
+        message: output,
       });
-
-      const baseAssistantMessage: BaseAssistantMessage<'deepseek'> = {
-        ...output,
-        message: finalResponse,
-        timestamp: Date.now(),
-        duration: Date.now() - startTimestamp,
-      };
-      stream.end(baseAssistantMessage);
+      stream.end(output);
     }
   })();
 

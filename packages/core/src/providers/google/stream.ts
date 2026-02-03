@@ -9,7 +9,6 @@ import type {
   AssistantResponseContent,
   AssistantThinkingContent,
   AssistantToolCall,
-  BaseAssistantEventMessage,
   BaseAssistantMessage,
   Context,
   GoogleProviderOptions,
@@ -28,11 +27,20 @@ export const streamGoogle: StreamFunction<'google'> = (
 
   (async () => {
     const startTimestamp = Date.now();
-    const output: BaseAssistantEventMessage<'google'> = {
+    let finalResponse: GenerateContentResponse = {
+      text: '',
+      data: '',
+      functionCalls: [],
+      executableCode: '',
+      codeExecutionResult: '',
+    };
+
+    const output: BaseAssistantMessage<'google'> = {
       role: 'assistant',
       api: model.api,
       model: model,
       id,
+      message: finalResponse,
       content: [],
       usage: {
         input: 0,
@@ -45,14 +53,6 @@ export const streamGoogle: StreamFunction<'google'> = (
       stopReason: 'stop',
       timestamp: startTimestamp,
       duration: 0,
-    };
-
-    let finalResponse: GenerateContentResponse = {
-      text: '',
-      data: '',
-      functionCalls: [],
-      executableCode: '',
-      codeExecutionResult: '',
     };
 
     // Counter for generating unique tool call IDs
@@ -73,6 +73,7 @@ export const streamGoogle: StreamFunction<'google'> = (
 
       for await (const chunk of googleStream) {
         finalResponse = chunk;
+        output.message = finalResponse;
         const candidate = chunk.candidates?.[0];
 
         if (candidate?.content?.parts) {
@@ -306,37 +307,26 @@ export const streamGoogle: StreamFunction<'google'> = (
           content: messageInput,
         });
       }
+      output.timestamp = Date.now();
+      output.duration = Date.now() - startTimestamp;
       stream.push({
         type: 'done',
         reason: output.stopReason,
-        message: { ...output, timestamp: Date.now() },
+        message: output,
       });
-
-      const baseAssistantMessage: BaseAssistantMessage<'google'> = {
-        ...output,
-        message: finalResponse,
-        timestamp: Date.now(),
-        duration: Date.now() - startTimestamp,
-      };
-      stream.end(baseAssistantMessage);
+      stream.end(output);
     } catch (error) {
       for (const block of output.content) delete (block as any).index;
       output.stopReason = options?.signal?.aborted ? 'aborted' : 'error';
       output.errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+      output.timestamp = Date.now();
+      output.duration = Date.now() - startTimestamp;
       stream.push({
         type: 'error',
         reason: output.stopReason,
-        message: { ...output, timestamp: Date.now() },
+        message: output,
       });
-
-      const baseAssistantMessage: BaseAssistantMessage<'google'> = {
-        ...output,
-        message: finalResponse,
-        timestamp: Date.now(),
-        duration: Date.now() - startTimestamp,
-        errorMessage: error instanceof Error ? error.message : String(error),
-      };
-      stream.end(baseAssistantMessage);
+      stream.end(output);
     }
   })();
 

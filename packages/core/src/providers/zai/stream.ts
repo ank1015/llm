@@ -10,7 +10,6 @@ import type {
   AssistantResponseContent,
   AssistantThinkingContent,
   AssistantToolCall,
-  BaseAssistantEventMessage,
   BaseAssistantMessage,
   Context,
   Model,
@@ -40,11 +39,15 @@ export const streamZai: StreamFunction<'zai'> = (
 
   (async () => {
     const startTimestamp = Date.now();
-    const output: BaseAssistantEventMessage<'zai'> = {
+    // Build final ChatCompletion from streamed chunks
+    let finalResponse: ChatCompletion = getMockZaiMessage();
+
+    const output: BaseAssistantMessage<'zai'> = {
       role: 'assistant',
       api: model.api,
       model: model,
       id,
+      message: finalResponse,
       content: [],
       usage: {
         input: 0,
@@ -58,9 +61,6 @@ export const streamZai: StreamFunction<'zai'> = (
       timestamp: startTimestamp,
       duration: 0,
     };
-
-    // Build final ChatCompletion from streamed chunks
-    let finalResponse: ChatCompletion = getMockZaiMessage();
     let accumulatedContent = '';
     let accumulatedReasoningContent = '';
     const accumulatedToolCalls: Map<
@@ -375,6 +375,7 @@ export const streamZai: StreamFunction<'zai'> = (
           total_tokens: output.usage.totalTokens,
         },
       };
+      output.message = finalResponse;
 
       // Add reasoning_content to the message if present
       if (accumulatedReasoningContent) {
@@ -386,38 +387,28 @@ export const streamZai: StreamFunction<'zai'> = (
         }
       }
 
+      output.timestamp = Date.now();
+      output.duration = Date.now() - startTimestamp;
       stream.push({
         type: 'done',
         reason: output.stopReason,
-        message: { ...output, timestamp: Date.now() },
+        message: output,
       });
-
-      const baseAssistantMessage: BaseAssistantMessage<'zai'> = {
-        ...output,
-        message: finalResponse,
-        timestamp: Date.now(),
-        duration: Date.now() - startTimestamp,
-      };
-      stream.end(baseAssistantMessage);
+      stream.end(output);
     } catch (error) {
       for (const block of output.content) {
         delete (block as { partialJson?: string }).partialJson;
       }
       output.stopReason = options?.signal?.aborted ? 'aborted' : 'error';
       output.errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+      output.timestamp = Date.now();
+      output.duration = Date.now() - startTimestamp;
       stream.push({
         type: 'error',
         reason: output.stopReason,
-        message: { ...output, timestamp: Date.now() },
+        message: output,
       });
-
-      const baseAssistantMessage: BaseAssistantMessage<'zai'> = {
-        ...output,
-        message: finalResponse,
-        timestamp: Date.now(),
-        duration: Date.now() - startTimestamp,
-      };
-      stream.end(baseAssistantMessage);
+      stream.end(output);
     }
   })();
 

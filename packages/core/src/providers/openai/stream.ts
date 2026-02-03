@@ -10,7 +10,6 @@ import type {
   AssistantResponseContent,
   AssistantThinkingContent,
   AssistantToolCall,
-  BaseAssistantEventMessage,
   BaseAssistantMessage,
   Context,
   Model,
@@ -35,24 +34,6 @@ export const streamOpenAI: StreamFunction<'openai'> = (
 
   (async () => {
     const startTimestamp = Date.now();
-    const output: BaseAssistantEventMessage<'openai'> = {
-      role: 'assistant',
-      api: model.api,
-      model: model,
-      id,
-      content: [],
-      usage: {
-        input: 0,
-        output: 0,
-        cacheRead: 0,
-        cacheWrite: 0,
-        totalTokens: 0,
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-      },
-      stopReason: 'stop',
-      timestamp: startTimestamp,
-      duration: 0,
-    };
     let finalResponse: Response = {
       id: 'resp_123',
       object: 'response',
@@ -85,6 +66,26 @@ export const streamOpenAI: StreamFunction<'openai'> = (
         total_tokens: 0,
       },
       metadata: {},
+    };
+
+    const output: BaseAssistantMessage<'openai'> = {
+      role: 'assistant',
+      api: model.api,
+      model: model,
+      id,
+      message: finalResponse,
+      content: [],
+      usage: {
+        input: 0,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: 0,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+      },
+      stopReason: 'stop',
+      timestamp: startTimestamp,
+      duration: 0,
     };
 
     try {
@@ -331,6 +332,7 @@ export const streamOpenAI: StreamFunction<'openai'> = (
           const response = event.response;
           // Update the final Response
           finalResponse = response;
+          output.message = finalResponse;
           if (response?.usage) {
             const cachedTokens = response.usage.input_tokens_details?.cached_tokens || 0;
             output.usage = {
@@ -368,39 +370,30 @@ export const streamOpenAI: StreamFunction<'openai'> = (
         );
       }
 
+      output.timestamp = Date.now();
+      output.duration = Date.now() - startTimestamp;
       stream.push({
         type: 'done',
         reason: output.stopReason,
-        message: { ...output, timestamp: Date.now() },
+        message: output,
       });
-
-      const baseAssistantMessage: BaseAssistantMessage<'openai'> = {
-        ...output,
-        message: finalResponse,
-        timestamp: Date.now(),
-        duration: Date.now() - startTimestamp,
-      };
-      stream.end(baseAssistantMessage);
+      stream.end(output);
     } catch (error) {
       for (const block of output.content) delete (block as any).index;
       output.stopReason = options?.signal?.aborted ? 'aborted' : 'error';
       output.errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
-      stream.push({
-        type: 'error',
-        reason: output.stopReason,
-        message: { ...output, timestamp: Date.now() },
-      });
 
       // Update finalResponse to reflect the error state
       finalResponse.status = options?.signal?.aborted ? 'cancelled' : 'failed';
 
-      const baseAssistantMessage: BaseAssistantMessage<'openai'> = {
-        ...output,
-        message: finalResponse,
-        timestamp: Date.now(),
-        duration: Date.now() - startTimestamp,
-      };
-      stream.end(baseAssistantMessage);
+      output.timestamp = Date.now();
+      output.duration = Date.now() - startTimestamp;
+      stream.push({
+        type: 'error',
+        reason: output.stopReason,
+        message: output,
+      });
+      stream.end(output);
     }
   })();
 

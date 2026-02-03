@@ -10,7 +10,6 @@ import type {
   AssistantResponseContent,
   AssistantThinkingContent,
   AssistantToolCall,
-  BaseAssistantEventMessage,
   BaseAssistantMessage,
   Context,
   Model,
@@ -34,25 +33,6 @@ export const streamAnthropic: StreamFunction<'anthropic'> = (
 
   (async () => {
     const startTimestamp = Date.now();
-    const output: BaseAssistantEventMessage<'anthropic'> = {
-      role: 'assistant',
-      api: model.api,
-      model: model,
-      id,
-      content: [],
-      usage: {
-        input: 0,
-        output: 0,
-        cacheRead: 0,
-        cacheWrite: 0,
-        totalTokens: 0,
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-      },
-      stopReason: 'stop',
-      timestamp: startTimestamp,
-      duration: 0,
-    };
-
     const finalResponse: AnthropicMessage = {
       id: 'msg_01XFDUDYJgAACzvnptvVoYEL',
       type: 'message',
@@ -70,6 +50,26 @@ export const streamAnthropic: StreamFunction<'anthropic'> = (
         server_tool_use: null,
         service_tier: null,
       },
+    };
+
+    const output: BaseAssistantMessage<'anthropic'> = {
+      role: 'assistant',
+      api: model.api,
+      model: model,
+      id,
+      message: finalResponse,
+      content: [],
+      usage: {
+        input: 0,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: 0,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+      },
+      stopReason: 'stop',
+      timestamp: startTimestamp,
+      duration: 0,
     };
 
     type Block = (
@@ -284,38 +284,30 @@ export const streamAnthropic: StreamFunction<'anthropic'> = (
       // Populate finalResponse.content with accumulated content blocks
       finalResponse.content = accumulatedContent as ContentBlock[];
 
+      output.timestamp = Date.now();
+      output.duration = Date.now() - startTimestamp;
       stream.push({
         type: 'done',
         reason: output.stopReason,
-        message: { ...output, timestamp: Date.now() },
+        message: output,
       });
-      const baseAssistantMessage: BaseAssistantMessage<'anthropic'> = {
-        ...output,
-        message: finalResponse,
-        timestamp: Date.now(),
-        duration: Date.now() - startTimestamp,
-      };
-      stream.end(baseAssistantMessage);
+      stream.end(output);
     } catch (error) {
       for (const block of output.content) delete (block as any).index;
       output.stopReason = options?.signal?.aborted ? 'aborted' : 'error';
       output.errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
-      stream.push({
-        type: 'error',
-        reason: output.stopReason,
-        message: { ...output, timestamp: Date.now() },
-      });
 
       // Populate finalResponse.content with accumulated content blocks even on error
       finalResponse.content = accumulatedContent as ContentBlock[];
 
-      const baseAssistantMessage: BaseAssistantMessage<'anthropic'> = {
-        ...output,
-        message: finalResponse,
-        timestamp: Date.now(),
-        duration: Date.now() - startTimestamp,
-      };
-      stream.end(baseAssistantMessage);
+      output.timestamp = Date.now();
+      output.duration = Date.now() - startTimestamp;
+      stream.push({
+        type: 'error',
+        reason: output.stopReason,
+        message: output,
+      });
+      stream.end(output);
     }
   })();
 
