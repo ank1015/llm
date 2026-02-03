@@ -4,6 +4,7 @@ import type {
   AgentEvent,
   Api,
   Attachment,
+  ConversationExternalCallback,
   FileSessionsAdapter,
   Message,
   MessageNode,
@@ -346,14 +347,14 @@ async function getBranchMessages(
     .map((node) => node.message);
 }
 
-async function persistNewMessages(
-  prepared: PreparedConversationTurn,
-  messages: Message[]
-): Promise<MessageNode[]> {
+function createPersistenceCallback(prepared: PreparedConversationTurn): {
+  callback: ConversationExternalCallback;
+  nodes: MessageNode[];
+} {
   const nodes: MessageNode[] = [];
   let parentId = prepared.parentId;
 
-  for (const message of messages) {
+  const callback: ConversationExternalCallback = async (message) => {
     const result = await prepared.sessionsAdapter.appendMessage({
       projectName: prepared.projectName,
       path: prepared.path,
@@ -368,9 +369,12 @@ async function persistNewMessages(
 
     nodes.push(result.node);
     parentId = result.node.id;
-  }
+  };
 
-  return nodes;
+  return {
+    callback,
+    nodes,
+  };
 }
 
 export async function runConversationTurn(
@@ -417,12 +421,16 @@ export async function runConversationTurn(
   }
 
   try {
-    const newMessages = await conversation.prompt(prepared.prompt, prepared.attachments);
-    const nodes = await persistNewMessages(prepared, newMessages);
+    const persistence = createPersistenceCallback(prepared);
+    const newMessages = await conversation.prompt(
+      prepared.prompt,
+      prepared.attachments,
+      persistence.callback
+    );
 
     return {
       newMessages,
-      nodes,
+      nodes: persistence.nodes,
       branch: prepared.branch,
     };
   } finally {
