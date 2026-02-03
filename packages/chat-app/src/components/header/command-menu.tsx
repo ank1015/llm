@@ -66,6 +66,8 @@ export const CommandMenu = () => {
             <AnthropicOptions />
           ) : selectedApi === 'openai' ? (
             <OpenAIOptions />
+          ) : selectedApi === 'google' ? (
+            <GoogleOptions />
           ) : (
             <CommandEmpty>No options found.</CommandEmpty>
           )}
@@ -190,6 +192,91 @@ const AnthropicOptions = () => {
               />
             </div>
           )}
+        </div>
+      </CommandGroup>
+    </>
+  );
+};
+
+const THINKING_LEVEL_OPTIONS = ['MINIMAL', 'LOW', 'MEDIUM', 'HIGH'] as const;
+
+const GoogleOptions = () => {
+  const providerOptions = useChatSettingsStore((state) => state.globalSettings.providerOptions);
+  const setOption = useChatSettingsStore((state) => state.setGlobalProviderOption);
+
+  const maxOutputTokens =
+    typeof providerOptions.maxOutputTokens === 'number' ? providerOptions.maxOutputTokens : 8192;
+
+  const thinkingConfig = providerOptions.thinkingConfig as
+    | { includeThoughts?: boolean; thinkingLevel?: string }
+    | undefined;
+  const includeThoughts = thinkingConfig?.includeThoughts ?? false;
+  const thinkingLevel = thinkingConfig?.thinkingLevel ?? 'MEDIUM';
+
+  const handleMaxOutputTokensChange = useCallback(
+    (value: number[]) => {
+      const v = value[0];
+      if (v !== undefined) {
+        setOption('maxOutputTokens', v);
+      }
+    },
+    [setOption]
+  );
+
+  const updateThinkingConfig = useCallback(
+    (patch: Record<string, unknown>) => {
+      setOption('thinkingConfig', { ...thinkingConfig, ...patch });
+    },
+    [setOption, thinkingConfig]
+  );
+
+  return (
+    <>
+      <CommandGroup heading="Max Output Tokens">
+        <div className="px-2 py-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs text-muted-foreground">Maximum response length</Label>
+            <span className="text-xs font-mono tabular-nums">
+              {maxOutputTokens.toLocaleString()}
+            </span>
+          </div>
+          <Slider
+            min={1}
+            max={65536}
+            step={1024}
+            value={[maxOutputTokens]}
+            onValueChange={handleMaxOutputTokensChange}
+          />
+        </div>
+      </CommandGroup>
+
+      <CommandGroup heading="Thinking">
+        <div className="px-2 py-3 space-y-3">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs text-muted-foreground">Include thoughts</Label>
+            <Switch
+              checked={includeThoughts}
+              onCheckedChange={(v) => updateThinkingConfig({ includeThoughts: v })}
+            />
+          </div>
+          <div className="flex items-center justify-between">
+            <Label className="text-xs text-muted-foreground">Thinking level</Label>
+            <Select
+              value={thinkingLevel}
+              onValueChange={(v) => updateThinkingConfig({ thinkingLevel: v })}
+            >
+              <SelectTrigger className="w-[120px] h-7 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {THINKING_LEVEL_OPTIONS.map((opt) => (
+                  <SelectItem key={opt} value={opt} className="text-xs">
+                    {opt.toLowerCase()}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </CommandGroup>
     </>
