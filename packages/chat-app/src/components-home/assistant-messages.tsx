@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo } from 'react';
+import { Check, Copy, GitBranch, RefreshCw } from 'lucide-react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { ActivityDrawerContent } from './activity-drawer';
 import { ChatMarkdown } from './markdown-renderer';
@@ -166,8 +167,21 @@ export function AssistantMessages({
 
   const displayText = assistantText ?? streamingText;
 
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(async () => {
+    if (!displayText) return;
+    try {
+      await navigator.clipboard.writeText(displayText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard API may not be available
+    }
+  }, [displayText]);
+
   return (
-    <div className="flex w-full flex-col gap-2">
+    <div className="group/assistant flex w-full flex-col gap-2">
       {/* Reasoning / thinking bar */}
       {showThinkingBar && (
         <div>
@@ -186,6 +200,32 @@ export function AssistantMessages({
           <ChatMarkdown className="text-foreground">{displayText}</ChatMarkdown>
         </div>
       )}
+
+      {/* Action buttons — space always reserved, visible on hover */}
+      <div className="flex h-7 items-center gap-1 opacity-0 transition-opacity group-hover/assistant:opacity-100">
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="text-muted-foreground hover:text-foreground cursor-pointer rounded p-1.5 transition-colors"
+          aria-label={copied ? 'Copied' : 'Copy message'}
+        >
+          {copied ? <Check className="size-4 text-green-500" /> : <Copy className="size-4" />}
+        </button>
+        <button
+          type="button"
+          className="text-muted-foreground hover:text-foreground cursor-pointer rounded p-1.5 transition-colors"
+          aria-label="Branch conversation"
+        >
+          <GitBranch className="size-4" />
+        </button>
+        <button
+          type="button"
+          className="text-muted-foreground hover:text-foreground cursor-pointer rounded p-1.5 transition-colors"
+          aria-label="Regenerate response"
+        >
+          <RefreshCw className="size-4" />
+        </button>
+      </div>
     </div>
   );
 }
