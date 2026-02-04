@@ -89,7 +89,7 @@ const ChatItem: FC<ChatItemProps> = ({ session, isActive, onSelect, onRename, on
           isActive ? 'bg-home-hover' : 'hover:bg-home-hover'
         )}
       >
-        <span className="flex-1 truncate text-foreground">{session.sessionName}</span>
+        <span className="flex-1 truncate text-foreground text-[14px]">{session.sessionName}</span>
         <DropdownMenuTrigger asChild>
           <button
             className={cn(
@@ -207,9 +207,9 @@ const ChatList: FC<{ collapsed?: boolean }> = ({ collapsed }) => {
       {!collapsed && (
         <button
           onClick={() => setIsSectionCollapsed(!isSectionCollapsed)}
-          className="flex cursor-pointer items-center gap-1 whitespace-nowrap px-3 pt-4 pb-1"
+          className="flex cursor-pointer items-center gap-1 whitespace-nowrap px-3 pt-4 pb-1 mb-1"
         >
-          <span className="text-muted-foreground text-xs">Your chats</span>
+          <span className="text-muted-foreground text-[14px]">Your chats</span>
           <ChevronDown
             size={12}
             strokeWidth={2}
@@ -339,6 +339,7 @@ function SidebarComponent() {
   const isSidebarCollapsed = useUiStore((state) => state.isSidebarCollapsed);
   const toggleSidebarCollapsed = useUiStore((state) => state.toggleSidebarCollapsed);
   const theme = useUiStore((state) => state.theme);
+  const setActiveSession = useChatStore((state) => state.setActiveSession);
   const [isHovered, setIsHovered] = useState(false);
   const router = useRouter();
 
@@ -402,6 +403,7 @@ function SidebarComponent() {
           label="New chat"
           shortcut="⇧⌘O"
           onClick={() => {
+            setActiveSession(null);
             router.push('/');
           }}
           collapsed={isSidebarCollapsed}

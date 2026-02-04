@@ -19,7 +19,6 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useChatSettingsStore, useChatStore, useProvidersStore, useSessionsStore } from '@/stores';
 
-
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                           */
 /* ------------------------------------------------------------------ */
@@ -157,7 +156,7 @@ function PromptInputWithActions() {
       if (!session) {
         const created = await createSession({ sessionName: 'New chat' });
         setActiveSession(created);
-        router.push(`/chat/${created.sessionId}`);
+        router.push(`/${created.sessionId}`);
         await loadMessages({ session: created, force: true });
         session = created;
       }
@@ -293,7 +292,7 @@ function PromptInputWithActions() {
               className={cn(
                 'rounded-full',
                 useWebSearch &&
-                  'border-blue-500/10 bg-blue-500/10 text-blue-500 hover:bg-blue-500/10 hover:text-blue-500'
+                  'border-blue-500/10 bg-blue-500/10 text-blue-500 hover:bg-blue-500/10 hover:text-blue-500 dark:border-[#98CEFF]/10 dark:bg-[#98CEFF]/10 dark:text-[#98CEFF] dark:hover:bg-[#98CEFF]/10 dark:hover:text-[#98CEFF]'
               )}
             >
               <Globe size={18} />
