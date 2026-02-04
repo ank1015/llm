@@ -4,7 +4,6 @@ import {
   Archive,
   ChevronDown,
   Ellipsis,
-  FolderOpen,
   Images,
   LifeBuoy,
   LogOut,
@@ -18,19 +17,26 @@ import {
   SparklesIcon,
   SquarePen,
   Trash2,
-  UserRoundPlus,
 } from 'lucide-react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { memo, useEffect, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 
 import { SearchChatsDialog } from './search-chats';
 
 import type { SessionSummary } from '@ank1015/llm-sdk';
-import type { FC, ReactNode } from 'react';
+import type { FC, FormEvent, ReactNode } from 'react';
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -109,10 +115,6 @@ const ChatItem: FC<ChatItemProps> = ({ session, isActive, onSelect, onRename, on
           <Share size={16} />
           Share
         </DropdownMenuItem>
-        <DropdownMenuItem>
-          <UserRoundPlus size={16} />
-          Start a group chat
-        </DropdownMenuItem>
         <DropdownMenuItem
           onClick={(e) => {
             e.stopPropagation();
@@ -122,16 +124,6 @@ const ChatItem: FC<ChatItemProps> = ({ session, isActive, onSelect, onRename, on
           <Pen size={16} />
           Rename
         </DropdownMenuItem>
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger>
-            <FolderOpen size={16} />
-            Move to project
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent>
-            <DropdownMenuItem>Project A</DropdownMenuItem>
-            <DropdownMenuItem>Project B</DropdownMenuItem>
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
         <DropdownMenuItem>
           <Pin size={16} />
           Pin chat
@@ -188,16 +180,29 @@ const ChatList: FC<{ collapsed?: boolean }> = ({ collapsed }) => {
     router.push(`/${session.sessionId}`);
   };
 
+  const [renamingSession, setRenamingSession] = useState<SessionSummary | null>(null);
+  const [deletingSession, setDeletingSession] = useState<SessionSummary | null>(null);
+
   const handleRename = (session: SessionSummary) => {
-    const newName = prompt('Rename chat', session.sessionName);
-    if (newName && newName.trim()) {
-      void renameSession({ sessionId: session.sessionId, sessionName: newName.trim() });
-    }
+    setRenamingSession(session);
   };
 
-  const handleDelete = async (session: SessionSummary) => {
-    await deleteSession({ sessionId: session.sessionId });
-    if (activeSession?.sessionId === session.sessionId) {
+  const handleDelete = (session: SessionSummary) => {
+    setDeletingSession(session);
+  };
+
+  const confirmRename = (newName: string) => {
+    if (!renamingSession) return;
+    void renameSession({ sessionId: renamingSession.sessionId, sessionName: newName });
+    setRenamingSession(null);
+  };
+
+  const confirmDelete = async () => {
+    if (!deletingSession) return;
+    const sessionId = deletingSession.sessionId;
+    setDeletingSession(null);
+    await deleteSession({ sessionId });
+    if (activeSession?.sessionId === sessionId) {
       clearSessionState(activeSession);
       setActiveSession(null);
       router.push('/');
@@ -260,7 +265,126 @@ const ChatList: FC<{ collapsed?: boolean }> = ({ collapsed }) => {
           )}
         </div>
       )}
+
+      {/* Rename dialog */}
+      <RenameDialog
+        session={renamingSession}
+        onOpenChange={(open) => !open && setRenamingSession(null)}
+        onConfirm={confirmRename}
+      />
+
+      {/* Delete confirmation dialog */}
+      <DeleteDialog
+        session={deletingSession}
+        onOpenChange={(open) => !open && setDeletingSession(null)}
+        onConfirm={() => void confirmDelete()}
+      />
     </div>
+  );
+};
+
+const RenameDialog: FC<{
+  session: SessionSummary | null;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: (newName: string) => void;
+}> = ({ session, onOpenChange, onConfirm }) => {
+  const [name, setName] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (session) {
+      setName(session.sessionName);
+      // Focus after dialog animation
+      setTimeout(() => inputRef.current?.select(), 0);
+    }
+  }, [session]);
+
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    const trimmed = name.trim();
+    if (trimmed && trimmed !== session?.sessionName) {
+      onConfirm(trimmed);
+    } else {
+      onOpenChange(false);
+    }
+  };
+
+  return (
+    <Dialog open={!!session} onOpenChange={onOpenChange}>
+      <DialogContent
+        className="bg-home-page border-home-border sm:max-w-sm"
+        showCloseButton={false}
+      >
+        <DialogHeader>
+          <DialogTitle className="text-foreground text-base">Rename chat</DialogTitle>
+          <DialogDescription className="sr-only">Enter a new name for this chat.</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit}>
+          <input
+            ref={inputRef}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="bg-home-panel border-home-border text-foreground placeholder:text-muted-foreground w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-foreground/20"
+            placeholder="Chat name"
+          />
+          <DialogFooter className="mt-4">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => onOpenChange(false)}
+              className="cursor-pointer"
+            >
+              Cancel
+            </Button>
+            <Button type="submit" className="cursor-pointer" disabled={!name.trim()}>
+              Rename
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+const DeleteDialog: FC<{
+  session: SessionSummary | null;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: () => void;
+}> = ({ session, onOpenChange, onConfirm }) => {
+  return (
+    <Dialog open={!!session} onOpenChange={onOpenChange}>
+      <DialogContent
+        className="bg-home-page border-home-border sm:max-w-sm"
+        showCloseButton={false}
+      >
+        <DialogHeader>
+          <DialogTitle className="text-foreground text-base">Delete chat?</DialogTitle>
+          <DialogDescription className="text-muted-foreground text-sm">
+            This will delete{' '}
+            <span className="text-foreground font-medium">{session?.sessionName}</span>. This action
+            cannot be undone.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="mt-2">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => onOpenChange(false)}
+            className="cursor-pointer"
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={onConfirm}
+            className="cursor-pointer"
+          >
+            Delete
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
 
