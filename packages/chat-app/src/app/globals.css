@@ -10,6 +10,7 @@
   --color-home-page: var(--home-page);
   --color-home-panel: var(--home-panel);
   --color-home-border: var(--home-border);
+  --color-home-hover: var(--home-hover);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --color-sidebar-ring: var(--sidebar-ring);
@@ -55,6 +56,7 @@
   --home-page: #ffffff;
   --home-panel: #f9f9f9;
   --home-border: #e5e5e5;
+  --home-hover: #efefef;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --tertiary: oklch(95.51% 0 0);
@@ -93,6 +95,7 @@
   --home-page: #212121;
   --home-panel: #181818;
   --home-border: #2e2e2e;
+  --home-hover: #303030;
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --tertiary: oklch(19.13% 0 0);

@@ -1,12 +1,39 @@
 'use client';
 
-import { PanelLeft } from 'lucide-react';
+import { Images, PanelLeft, Search, SquarePen } from 'lucide-react';
 import Image from 'next/image';
 import { memo, useState } from 'react';
+
+import type { FC, ReactNode } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useUiStore } from '@/stores';
+
+
+type SidebarItemProps = {
+  icon: ReactNode;
+  label: string;
+  shortcut?: string;
+  onClick?: () => void;
+};
+
+const SidebarItem: FC<SidebarItemProps> = ({ icon, label, shortcut, onClick }) => {
+  return (
+    <button
+      onClick={onClick}
+      className="group flex h-10 w-full cursor-pointer items-center gap-2 rounded-lg px-3 text-sm text-foreground hover:bg-home-hover"
+    >
+      <span className="shrink-0">{icon}</span>
+      <span className="flex-1 text-left text-[14px]">{label}</span>
+      {shortcut && (
+        <span className="text-muted-foreground text-xs opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+          {shortcut}
+        </span>
+      )}
+    </button>
+  );
+};
 
 function SidebarComponent() {
   const isSidebarCollapsed = useUiStore((state) => state.isSidebarCollapsed);
@@ -67,8 +94,25 @@ function SidebarComponent() {
         )}
       </div>
 
-      {/* Sidebar content will go here */}
-      {!isSidebarCollapsed && <div className="flex-1 px-3" />}
+      {/* Navigation items */}
+      {!isSidebarCollapsed && (
+        <div className="mt-2 flex flex-col gap-0.5 px-2">
+          <SidebarItem
+            icon={<SquarePen size={18} strokeWidth={1.8} />}
+            label="New chat"
+            shortcut="⇧⌘O"
+          />
+          <SidebarItem
+            icon={<Search size={18} strokeWidth={1.8} />}
+            label="Search chats"
+            shortcut="⇧⌘K"
+          />
+          <SidebarItem icon={<Images size={18} strokeWidth={1.8} />} label="Images" />
+        </div>
+      )}
+
+      {/* Spacer */}
+      {!isSidebarCollapsed && <div className="flex-1" />}
     </div>
   );
 }
