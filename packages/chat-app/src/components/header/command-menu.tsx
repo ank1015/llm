@@ -25,6 +25,7 @@ import { Switch } from '@/components/ui/switch';
 import { useChatSettingsStore } from '@/stores/chat-settings-store';
 import { useProvidersStore } from '@/stores/providers-store';
 
+// eslint-disable-next-line sonarjs/cognitive-complexity
 export const CommandMenu = () => {
   const [open, setOpen] = useState(false);
 

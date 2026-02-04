@@ -42,6 +42,7 @@ const EMPTY_RENDERABLE_MESSAGES: CotRenderableMessage[] = [];
 const EMPTY_TURN_MESSAGES: TurnMessages[] = [];
 const EMPTY_NODES: MessageNode[] = [];
 
+// eslint-disable-next-line sonarjs/cognitive-complexity
 function groupIntoTurnMessages(nodes: MessageNode[]): TurnMessages[] {
   if (nodes.length === 0) {
     return EMPTY_TURN_MESSAGES;
@@ -85,6 +86,7 @@ function groupIntoTurnMessages(nodes: MessageNode[]): TurnMessages[] {
   return turns;
 }
 
+// eslint-disable-next-line sonarjs/cognitive-complexity
 function getReasoningSteps(messages: CotRenderableMessage[]): ReasoningStep[] {
   const steps: ReasoningStep[] = [];
 

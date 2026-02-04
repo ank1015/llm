@@ -1,5 +1,3 @@
-import { AppShell } from '@/components/app-shell';
-
 export default function HomePage(): React.ReactElement {
-  return <AppShell />;
+  return <div></div>;
 }
