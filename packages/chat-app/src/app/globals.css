@@ -163,3 +163,37 @@
   scrollbar-width: none;
   /* Firefox */
 }
+
+/* ---- Shiki dual-theme support ---- */
+:root .shiki span {
+  color: var(--shiki-light);
+  font-style: var(--shiki-light-font-style);
+  font-weight: var(--shiki-light-font-weight);
+  text-decoration: var(--shiki-light-text-decoration);
+}
+
+.dark .shiki span {
+  color: var(--shiki-dark);
+  font-style: var(--shiki-dark-font-style);
+  font-weight: var(--shiki-dark-font-weight);
+  text-decoration: var(--shiki-dark-text-decoration);
+}
+
+.shiki {
+  background-color: transparent !important;
+}
+
+.shiki > code {
+  min-width: fit-content;
+  display: block;
+}
+
+/* ---- Chat markdown list markers ---- */
+.chat-markdown ul > li::marker {
+  color: var(--muted-foreground);
+}
+
+.chat-markdown ol > li::marker {
+  color: var(--muted-foreground);
+  font-weight: 500;
+}

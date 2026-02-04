@@ -3,10 +3,10 @@
 import { useMemo } from 'react';
 
 import { ActivityDrawerContent } from './activity-drawer';
+import { ChatMarkdown } from './markdown-renderer';
 
 import type { Api, BaseAssistantMessage, Message, MessageNode } from '@ank1015/llm-sdk';
 
-import { Message as MessageWrapper, MessageContent } from '@/components/ai/message';
 import { ThinkingBar } from '@/components/ai/thinking-bar';
 import { getTextFromBaseAssistantMessage } from '@/lib/messages/utils';
 import { useUiStore } from '@/stores';
@@ -163,7 +163,7 @@ export function AssistantMessages({
     <div className="flex w-full flex-col gap-2">
       {/* Reasoning / thinking bar */}
       {showThinkingBar && (
-        <div className="px-2">
+        <div>
           <ThinkingBar
             text={label}
             className="cursor-pointer"
@@ -175,14 +175,9 @@ export function AssistantMessages({
 
       {/* Final assistant response */}
       {displayText && (
-        <MessageWrapper className="max-w-[90%]" data-streaming={isStreaming ? 'true' : 'false'}>
-          <MessageContent
-            markdown
-            className="bg-home-page text-foreground whitespace-pre-wrap text-[15px] leading-relaxed"
-          >
-            {displayText}
-          </MessageContent>
-        </MessageWrapper>
+        <div className="max-w-[90%]" data-streaming={isStreaming ? 'true' : 'false'}>
+          <ChatMarkdown className="text-foreground">{displayText}</ChatMarkdown>
+        </div>
       )}
     </div>
   );
