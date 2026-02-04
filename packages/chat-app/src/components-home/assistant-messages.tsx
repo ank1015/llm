@@ -28,6 +28,8 @@ type AssistantMessagesProps = {
   isStreaming: boolean;
   /** The streaming assistant message (partial, not yet a node) */
   streamingAssistant: AssistantStreamingMessage | null;
+  /** The API provider used for this turn */
+  api: Api | null;
   /** Session key for live reasoning drawer updates */
   sessionKey: string | null;
   /** The user message id that started this turn */
@@ -109,6 +111,7 @@ export function AssistantMessages({
   assistantNode,
   isStreaming,
   streamingAssistant,
+  api,
   sessionKey,
   turnUserMessageId,
   userTimestamp,
@@ -132,9 +135,7 @@ export function AssistantMessages({
   const showThinkingBar = isStreaming || hasReasoning;
 
   const label = isStreaming
-    ? hasReasoning
-      ? 'Reasoning'
-      : 'Thinking'
+    ? 'Reasoning'
     : duration !== undefined
       ? `Reasoned for ${duration.toFixed(1)}s`
       : 'Reasoned';
@@ -153,6 +154,7 @@ export function AssistantMessages({
           sessionKey={sessionKey}
           turnUserMessageId={turnUserMessageId}
           fallbackMessages={effectiveMessages}
+          api={api}
         />
       ),
     });

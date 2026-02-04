@@ -1,7 +1,9 @@
 'use client';
-
+/* eslint-disable sonarjs/no-duplicate-string */
 import { Globe, Wrench } from 'lucide-react';
 import { useMemo } from 'react';
+
+import { ChatMarkdown } from './markdown-renderer';
 
 import type { Api, BaseAssistantMessage, Message, MessageNode } from '@ank1015/llm-sdk';
 
@@ -19,6 +21,7 @@ type ActivityItem = {
   type: 'thinking-paragraph' | 'toolCall' | 'toolResult';
   title: string;
   body: string;
+  format: 'plain' | 'markdown';
   toolName?: string;
 };
 
@@ -83,12 +86,30 @@ function stripBold(text: string): string {
   return text.replace(/^\*\*|\*\*$/g, '').trim();
 }
 
+/** APIs that use structured bold-heading format (split into title/body pairs) */
+const STRUCTURED_THINKING_APIS: Set<string> = new Set(['google', 'openai', 'deepseek']);
+
 /**
  * Splits thinking text into grouped items.
- * If a paragraph is a bold heading (`**...**`), it merges with the
- * following paragraph(s) as one item (heading = title, rest = body).
+ * For google/openai/deepseek: splits by bold headings into title/body pairs.
+ * For anthropic/kimi/zai: renders as a single markdown block per thinking content.
  */
-function splitThinkingIntoItems(text: string, messageId: string): ActivityItem[] {
+// eslint-disable-next-line sonarjs/cognitive-complexity
+function splitThinkingIntoItems(text: string, messageId: string, api: Api | null): ActivityItem[] {
+  // For providers with structured markdown thinking, render as-is
+  if (api && !STRUCTURED_THINKING_APIS.has(api)) {
+    return [
+      {
+        id: `${messageId}-thinking-md`,
+        type: 'thinking-paragraph',
+        title: '',
+        body: text.trim(),
+        format: 'markdown',
+      },
+    ];
+  }
+
+  // For google/openai/deepseek: split by bold headings
   const rawParagraphs = text
     .split(/\n\n+/)
     .map((p) => p.trim())
@@ -101,19 +122,18 @@ function splitThinkingIntoItems(text: string, messageId: string): ActivityItem[]
     const para = rawParagraphs[i];
 
     if (isBoldHeading(para)) {
-      // Merge heading with the next paragraph as its body
       const title = stripBold(para);
       const body = i + 1 < rawParagraphs.length ? rawParagraphs[i + 1] : '';
       items.push({
         id: `${messageId}-thinking-p${i}`,
-        // eslint-disable-next-line sonarjs/no-duplicate-string
+
         type: 'thinking-paragraph',
         title,
         body,
+        format: 'plain',
       });
       i += body ? 2 : 1;
     } else {
-      // First line = title, rest = body
       const newlineIdx = para.indexOf('\n');
       if (newlineIdx === -1) {
         items.push({
@@ -121,6 +141,7 @@ function splitThinkingIntoItems(text: string, messageId: string): ActivityItem[]
           type: 'thinking-paragraph',
           title: para,
           body: '',
+          format: 'plain',
         });
       } else {
         items.push({
@@ -128,6 +149,7 @@ function splitThinkingIntoItems(text: string, messageId: string): ActivityItem[]
           type: 'thinking-paragraph',
           title: para.slice(0, newlineIdx).trim(),
           body: para.slice(newlineIdx + 1).trim(),
+          format: 'plain',
         });
       }
       i++;
@@ -143,7 +165,10 @@ function isWebSearchTool(name: string): boolean {
 }
 
 // eslint-disable-next-line sonarjs/cognitive-complexity
-function buildActivitySections(messages: CotRenderableMessage[]): ActivitySection[] {
+function buildActivitySections(
+  messages: CotRenderableMessage[],
+  api: Api | null
+): ActivitySection[] {
   const sections: ActivitySection[] = [];
   let currentThinkingItems: ActivityItem[] = [];
   let thinkingCounter = 0;
@@ -164,7 +189,7 @@ function buildActivitySections(messages: CotRenderableMessage[]): ActivitySectio
     if (message.role === 'assistant') {
       for (const content of message.content) {
         if (content.type === 'thinking') {
-          const thinkingItems = splitThinkingIntoItems(content.thinkingText, message.id);
+          const thinkingItems = splitThinkingIntoItems(content.thinkingText, message.id, api);
           currentThinkingItems.push(...thinkingItems);
           continue;
         }
@@ -187,6 +212,7 @@ function buildActivitySections(messages: CotRenderableMessage[]): ActivitySectio
                 type: 'toolCall',
                 title: `${content.name}`,
                 body: args,
+                format: 'plain',
                 toolName: content.name,
               },
             ],
@@ -215,6 +241,7 @@ function buildActivitySections(messages: CotRenderableMessage[]): ActivitySectio
           type: 'toolResult',
           title: `Result`,
           body: text.length > 0 ? text : '(no textual output)',
+          format: 'plain',
           toolName: message.toolName,
         });
       } else {
@@ -227,6 +254,7 @@ function buildActivitySections(messages: CotRenderableMessage[]): ActivitySectio
               type: 'toolResult',
               title: `Result: ${message.toolName}`,
               body: text.length > 0 ? text : '(no textual output)',
+              format: 'plain',
               toolName: message.toolName,
             },
           ],
@@ -268,13 +296,30 @@ function ActivityItemDot({ type, toolName }: { type: ActivityItem['type']; toolN
 function ActivityItemRow({ item }: { item: ActivityItem }) {
   const cleanTitle = item.title.replace(/^\*\*|\*\*$/g, '');
 
+  if (item.format === 'markdown') {
+    return (
+      <div className="flex gap-3">
+        <div className="flex flex-col items-center pt-1">
+          <ActivityItemDot type={item.type} toolName={item.toolName} />
+        </div>
+        <div className="min-w-0 flex-1 pb-5">
+          <ChatMarkdown className="text-muted-foreground text-[13px] leading-relaxed [&_h1]:text-sm [&_h2]:text-sm [&_h3]:text-[13px] [&_h4]:text-[13px] [&_h5]:text-[13px] [&_h6]:text-[13px] [&_p]:text-[13px] [&_p]:mb-2 [&_p]:leading-relaxed [&_li]:text-[13px] [&_ul]:my-1.5 [&_ol]:my-1.5 [&_strong]:text-foreground">
+            {item.body}
+          </ChatMarkdown>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex gap-3">
       <div className="flex flex-col items-center pt-1">
         <ActivityItemDot type={item.type} toolName={item.toolName} />
       </div>
       <div className="min-w-0 flex-1 pb-5">
-        <p className="text-foreground text-[13px] font-medium leading-snug">{cleanTitle}</p>
+        {cleanTitle && (
+          <p className="text-foreground text-[13px] font-medium leading-snug">{cleanTitle}</p>
+        )}
         {item.body && (
           <p className="text-foreground mt-1 whitespace-pre-wrap text-[13px] leading-relaxed">
             {item.body}
@@ -309,11 +354,13 @@ export function ActivityDrawerContent({
   sessionKey,
   turnUserMessageId,
   fallbackMessages,
+  api,
 }: {
   live: boolean;
   sessionKey?: string | null;
   turnUserMessageId: string | null;
   fallbackMessages: CotRenderableMessage[];
+  api?: Api | null;
 }) {
   const nodes = useChatStore((state) => {
     if (!live || !sessionKey) return EMPTY_NODES;
@@ -351,7 +398,10 @@ export function ActivityDrawerContent({
     turnUserMessageId,
   ]);
 
-  const sections = useMemo(() => buildActivitySections(selectedMessages), [selectedMessages]);
+  const sections = useMemo(
+    () => buildActivitySections(selectedMessages, api ?? null),
+    [selectedMessages, api]
+  );
   const isComplete = !live || !isSessionStreaming;
 
   if (sections.length === 0) {

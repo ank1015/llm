@@ -14,6 +14,7 @@ import type {
 } from '@ank1015/llm-sdk';
 
 import { useChatStore } from '@/stores/chat-store';
+import { useProvidersStore } from '@/stores/providers-store';
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                         */
@@ -101,11 +102,13 @@ const MessageTurnRow = memo(function MessageTurnRow({
   isStreamingTurn,
   sessionKey,
   streamingAssistant,
+  selectedApi,
 }: {
   turn: MessageTurn;
   isStreamingTurn: boolean;
   sessionKey: string | null;
   streamingAssistant: Omit<BaseAssistantMessage<Api>, 'message'> | null;
+  selectedApi: Api | null;
 }) {
   return (
     <Fragment>
@@ -115,6 +118,7 @@ const MessageTurnRow = memo(function MessageTurnRow({
         assistantNode={turn.assistantNode}
         isStreaming={isStreamingTurn}
         streamingAssistant={streamingAssistant}
+        api={(turn.assistantNode?.api as Api | undefined) ?? selectedApi}
         userTimestamp={
           typeof turn.userNode?.message.timestamp === 'number'
             ? turn.userNode.message.timestamp
@@ -147,6 +151,8 @@ export function ChatMessages() {
     return state.streamingAssistantBySession[activeSessionKey] ?? EMPTY_STREAMING_ASSISTANT;
   });
 
+  const selectedApi = useProvidersStore((state) => state.selectedApi);
+
   const turns = useMemo(() => groupIntoTurns(messages), [messages]);
 
   if (turns.length === 0 && !streamingAssistant) {
@@ -162,6 +168,7 @@ export function ChatMessages() {
           isStreamingTurn={Boolean(streamingAssistant) && idx === turns.length - 1}
           sessionKey={activeSessionKey}
           streamingAssistant={streamingAssistant}
+          selectedApi={selectedApi}
         />
       ))}
     </div>
