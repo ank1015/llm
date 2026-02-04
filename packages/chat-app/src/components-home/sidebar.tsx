@@ -24,6 +24,8 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { memo, useEffect, useState } from 'react';
 
+import { SearchChatsDialog } from './search-chats';
+
 import type { SessionSummary } from '@ank1015/llm-sdk';
 import type { FC, ReactNode } from 'react';
 
@@ -341,6 +343,7 @@ function SidebarComponent() {
   const theme = useUiStore((state) => state.theme);
   const setActiveSession = useChatStore((state) => state.setActiveSession);
   const [isHovered, setIsHovered] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const router = useRouter();
 
   const logoSrc = theme === 'dark' ? '/logo-light.png' : '/logo-dark.png';
@@ -350,7 +353,7 @@ function SidebarComponent() {
     <div
       className={cn(
         'border-home-border flex h-full shrink-0 flex-col overflow-hidden border-r transition-all duration-300 ease-in-out',
-        isSidebarCollapsed ? 'w-[50px] bg-home-page cursor-pointer' : 'w-[260px] bg-home-panel'
+        isSidebarCollapsed ? 'w-[50px] bg-home-page cursor-w-resize' : 'w-[260px] bg-home-panel'
       )}
       onMouseEnter={() => isSidebarCollapsed && setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -413,6 +416,7 @@ function SidebarComponent() {
           label="Search chats"
           shortcut="⇧⌘K"
           collapsed={isSidebarCollapsed}
+          onClick={() => setIsSearchOpen(true)}
         />
         <SidebarItem
           icon={<Images size={18} strokeWidth={1.8} />}
@@ -429,6 +433,8 @@ function SidebarComponent() {
       <div className="px-2 pt-2 pb-3">
         <AccountMenu collapsed={isSidebarCollapsed} />
       </div>
+
+      <SearchChatsDialog open={isSearchOpen} onOpenChange={setIsSearchOpen} />
     </div>
   );
 }

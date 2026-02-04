@@ -7,16 +7,11 @@ import { ThemeInit } from './theme-init';
 
 import type { FC, ReactNode } from 'react';
 
-import { cn } from '@/lib/utils';
-import { useUiStore } from '@/stores';
-
 export type HomeLayoutProps = {
   children: ReactNode;
 };
 
 export const HomeLayout: FC<HomeLayoutProps> = ({ children }) => {
-  const sideDrawer = useUiStore((state) => state.sideDrawer);
-
   return (
     <>
       <ThemeInit />
@@ -29,14 +24,6 @@ export const HomeLayout: FC<HomeLayoutProps> = ({ children }) => {
           <Header />
           <main className="relative flex-1 overflow-auto">{children}</main>
         </div>
-
-        {/* Side drawer border — visible when drawer is open */}
-        <div
-          className={cn(
-            'bg-home-border w-px shrink-0 transition-opacity duration-300',
-            sideDrawer.open ? 'opacity-100' : 'opacity-0'
-          )}
-        />
 
         {/* Side drawer */}
         <SideDrawer />
