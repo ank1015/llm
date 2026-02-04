@@ -1,14 +1,12 @@
 'use client';
 
-import { Moon, PanelLeft, PanelRight, Sun } from 'lucide-react';
+import { Moon, PanelRight, Sun } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useUiStore } from '@/stores';
 
 export function Header() {
-  const isSidebarCollapsed = useUiStore((state) => state.isSidebarCollapsed);
-  const toggleSidebarCollapsed = useUiStore((state) => state.toggleSidebarCollapsed);
   const sideDrawer = useUiStore((state) => state.sideDrawer);
   const theme = useUiStore((state) => state.theme);
   const toggleTheme = useUiStore((state) => state.toggleTheme);
@@ -27,20 +25,7 @@ export function Header() {
   };
 
   return (
-    <header className="flex h-12 w-full shrink-0 items-center justify-between px-3">
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        onClick={toggleSidebarCollapsed}
-        className="cursor-pointer text-muted-foreground hover:text-foreground"
-      >
-        <PanelLeft
-          size={18}
-          strokeWidth={1.8}
-          className={cn('transition-transform duration-200', isSidebarCollapsed && 'scale-x-[-1]')}
-        />
-      </Button>
-
+    <header className="flex h-12 w-full shrink-0 items-center justify-end px-3">
       <div className="flex items-center gap-1">
         <Button
           variant="ghost"
