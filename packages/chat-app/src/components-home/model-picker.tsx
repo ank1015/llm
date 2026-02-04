@@ -14,7 +14,7 @@ import {
   CommandList,
 } from '@/components/ui/command';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
-import { getDefaultProviderSettingsForApi } from '@/lib/models/default-provider-settings';
+import { getDefaultProviderSettingsForApi } from '@/lib/models/default-settings';
 import { cn } from '@/lib/utils';
 import { useChatSettingsStore } from '@/stores/chat-settings-store';
 import { useProvidersStore } from '@/stores/providers-store';

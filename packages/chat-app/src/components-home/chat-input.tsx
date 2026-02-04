@@ -110,7 +110,6 @@ const Greeting = () => {
 function PromptInputWithActions() {
   const [input, setInput] = useState('');
   const [files, setFiles] = useState<File[]>([]);
-  const [useWebSearch, setUseWebSearch] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
@@ -140,6 +139,13 @@ function PromptInputWithActions() {
     return state.isStreamingBySession[key] ?? false;
   });
 
+  const useWebSearch = useChatSettingsStore((state) => {
+    if (!activeSession) return state.globalSettings.useWebSearch;
+    const key = getSessionKey(activeSession);
+    return state.sessionSettingsBySession[key]?.useWebSearch ?? state.globalSettings.useWebSearch;
+  });
+  const setSessionWebSearch = useChatSettingsStore((state) => state.setSessionWebSearch);
+  const setGlobalWebSearch = useChatSettingsStore((state) => state.setGlobalWebSearch);
   const getEffectiveSettings = useChatSettingsStore((state) => state.getEffectiveSettings);
   const selectedApi = useProvidersStore((state) => state.selectedApi);
   const selectedModelId = useProvidersStore((state) => state.selectedModelId);
@@ -234,7 +240,12 @@ function PromptInputWithActions() {
   };
 
   const toggleWebSearch = () => {
-    setUseWebSearch((prev) => !prev);
+    const next = !useWebSearch;
+    if (activeSession) {
+      setSessionWebSearch(next, activeSession);
+    } else {
+      setGlobalWebSearch(next);
+    }
   };
 
   const handleStop = () => {

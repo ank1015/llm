@@ -8,7 +8,7 @@ import { useProvidersStore } from './providers-store';
 import type { SessionRef } from '@/lib/contracts';
 import type { Api } from '@ank1015/llm-sdk';
 
-import { getDefaultProviderSettingsForApi } from '@/lib/models/default-provider-settings';
+import { getDefaultProviderSettingsForApi } from '@/lib/models/default-settings';
 
 let coordinationInitialized = false;
 

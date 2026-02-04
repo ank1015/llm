@@ -6,10 +6,13 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import type { SessionRef } from '@/lib/contracts';
 import type { Api } from '@ank1015/llm-sdk';
 
+import { createDefaultSystemPrompt } from '@/lib/models/default-settings';
+
 type ChatSettings = {
   api: Api | null;
   modelId: string | null;
   systemPrompt: string;
+  useWebSearch: boolean;
   providerOptions: Record<string, unknown>;
 };
 
@@ -37,6 +40,8 @@ type ChatSettingsStoreState = {
   ) => void;
   setSessionProviderOption: (key: string, value: unknown, session?: SessionRef) => void;
   clearSessionProviderOption: (key: string, session?: SessionRef) => void;
+  setGlobalWebSearch: (useWebSearch: boolean) => void;
+  setSessionWebSearch: (useWebSearch: boolean, session?: SessionRef) => void;
   getEffectiveSettings: (session?: SessionRef) => ChatSettings;
   resetSessionSettings: (session: SessionRef) => void;
   reset: () => void;
@@ -46,6 +51,7 @@ const defaultSettings: ChatSettings = {
   api: null,
   modelId: null,
   systemPrompt: '',
+  useWebSearch: false,
   providerOptions: {},
 };
 
@@ -93,6 +99,7 @@ function cloneSettings(settings: ChatSettings): ChatSettings {
     api: settings.api,
     modelId: settings.modelId,
     systemPrompt: settings.systemPrompt,
+    useWebSearch: settings.useWebSearch,
     providerOptions: { ...settings.providerOptions },
   };
 }
@@ -109,6 +116,7 @@ function mergeWithGlobal(
     api: sessionSettings.api ?? globalSettings.api,
     modelId: sessionSettings.modelId ?? globalSettings.modelId,
     systemPrompt: sessionSettings.systemPrompt,
+    useWebSearch: sessionSettings.useWebSearch,
     providerOptions: {
       ...globalSettings.providerOptions,
       ...sessionSettings.providerOptions,
@@ -276,18 +284,43 @@ export const useChatSettingsStore = create<ChatSettingsStoreState>()(
         });
       },
 
+      setGlobalWebSearch: (useWebSearch) => {
+        set((state) => ({
+          globalSettings: {
+            ...state.globalSettings,
+            useWebSearch,
+          },
+        }));
+      },
+
+      setSessionWebSearch: (useWebSearch, session) => {
+        get().updateSessionSettings(session, (current) => ({
+          ...current,
+          useWebSearch,
+        }));
+      },
+
       getEffectiveSettings: (session) => {
         const state = get();
         const resolvedSession = resolveSessionRef(session, state.activeSession);
 
+        let merged: ChatSettings;
+
         if (!resolvedSession) {
-          return cloneSettings(state.globalSettings);
+          merged = cloneSettings(state.globalSettings);
+        } else {
+          const sessionKey = getSessionKey(resolvedSession);
+          const sessionSettings = state.sessionSettingsBySession[sessionKey];
+          merged = mergeWithGlobal(sessionSettings, state.globalSettings);
         }
 
-        const sessionKey = getSessionKey(resolvedSession);
-        const sessionSettings = state.sessionSettingsBySession[sessionKey];
+        // When no custom system prompt is set, generate the default one
+        // (computed at read-time so the date is always fresh)
+        if (merged.systemPrompt.trim().length === 0) {
+          merged.systemPrompt = createDefaultSystemPrompt(merged.useWebSearch);
+        }
 
-        return mergeWithGlobal(sessionSettings, state.globalSettings);
+        return merged;
       },
 
       resetSessionSettings: (session) => {
@@ -308,7 +341,7 @@ export const useChatSettingsStore = create<ChatSettingsStoreState>()(
     }),
     {
       name: 'chat-app-chat-settings-store',
-      version: 1,
+      version: 2,
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         globalSettings: state.globalSettings,
