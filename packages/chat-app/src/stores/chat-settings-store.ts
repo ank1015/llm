@@ -142,7 +142,7 @@ export const useChatSettingsStore = create<ChatSettingsStoreState>()(
           activeSession: normalized,
           sessionSettingsBySession: {
             ...state.sessionSettingsBySession,
-            [key]: state.sessionSettingsBySession[key] ?? cloneSettings(defaultSettings),
+            [key]: state.sessionSettingsBySession[key] ?? cloneSettings(state.globalSettings),
           },
         }));
       },

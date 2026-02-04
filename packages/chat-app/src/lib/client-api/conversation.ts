@@ -65,6 +65,10 @@ function buildConversationBody(input: ConversationTurnRequest): Record<string, u
     body.attachments = input.attachments;
   }
 
+  if (input.useWebSearch) {
+    body.useWebSearch = true;
+  }
+
   return body;
 }
 

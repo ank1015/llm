@@ -217,6 +217,7 @@ function PromptInputWithActions() {
         systemPrompt: settings.systemPrompt.trim().length > 0 ? settings.systemPrompt : undefined,
         providerOptions: Object.keys(providerOptions).length > 0 ? providerOptions : undefined,
         attachments,
+        useWebSearch: settings.useWebSearch || undefined,
       });
     } catch (err) {
       if (isAbortError(err)) return;

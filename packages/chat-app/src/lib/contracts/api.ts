@@ -107,6 +107,7 @@ export type ConversationTurnRequest = SessionRef & {
   providerOptions?: Record<string, unknown>;
   systemPrompt?: string;
   attachments?: Attachment[];
+  useWebSearch?: boolean;
 };
 
 export type ConversationTurnResponse = {

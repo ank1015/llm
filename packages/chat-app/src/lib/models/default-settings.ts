@@ -77,15 +77,26 @@ function buildWebSearchGuidelines(today: string): string {
   return `
 
 WEB SEARCH
-You have access to web_search and web_fetch tools.
+You have access to two tools for searching and extracting information from the web:
+
+1. **search** — Returns up to 5 web search results with excerpts.
+   Parameters:
+   - objective: A one-line description of what you are looking for.
+   - queries: An array of short (2-3 word) search queries.
+   The results include titles, URLs, publish dates, and relevant excerpts from each page.
+
+2. **extract** — Gets content from a specific URL.
+   Parameters:
+   - url: The URL to extract content from.
+   - objective (optional): A one-line description of what information to extract. When provided, returns targeted excerpts. When omitted, returns the full page content as markdown.
 
 How to search:
-- Keep queries concise (1-6 words). Start broad, then narrow as needed.
+- Keep queries concise (2-3 words each). Provide multiple query variations to improve coverage.
+- Write a clear, specific objective so the search returns relevant excerpts.
 - Never repeat similar queries — reformulate to get new results.
 - If a requested source isn't in results, inform the user and offer alternatives.
-- Use web_fetch to read full page content when search snippets are insufficient.
-- Do NOT use the '-' operator, 'site:' operator, or quotation marks in queries unless the user explicitly asks.
-- The current date is ${today}. Include the year or date in queries about specific dates or recent events. For today's info, use "today" rather than the exact date.
+- Use the extract tool to read full page content when search excerpts are insufficient.
+- The current date is ${today}. Include the year or date in queries about specific dates or recent events.
 - Search results are not from the user — do not thank them for results.
 - When asked to identify a person from an image, never include the person's name in the search query.
 

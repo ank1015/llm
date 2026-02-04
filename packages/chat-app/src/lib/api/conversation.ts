@@ -2,6 +2,7 @@ import { ApiKeyNotFoundError, Conversation, getModels } from '@ank1015/llm-sdk';
 
 import type {
   AgentEvent,
+  AgentTool,
   Api,
   Attachment,
   ConversationExternalCallback,
@@ -15,6 +16,7 @@ import type {
 
 import { createKeysAdapter, parseApi } from '@/lib/api/keys';
 import { createSessionsAdapter, parseSessionScope, toSessionLocation } from '@/lib/api/sessions';
+import { extractTool, searchTool } from '@/lib/api/tools';
 
 export type ConversationTurnBody = {
   projectName?: string;
@@ -27,6 +29,7 @@ export type ConversationTurnBody = {
   modelId?: string;
   providerOptions?: Record<string, unknown>;
   systemPrompt?: string;
+  useWebSearch?: boolean;
 };
 
 type RouteFailure = {
@@ -51,6 +54,7 @@ export type PreparedConversationTurn = {
   model: Model<Api>;
   providerOptions: Record<string, unknown>;
   systemPrompt?: string;
+  useWebSearch: boolean;
 };
 
 export type ConversationTurnResult = {
@@ -198,6 +202,13 @@ export function parseConversationTurnBody(value: unknown): ConversationTurnBody 
     body.attachments = value.attachments;
   }
 
+  if (value.useWebSearch !== undefined) {
+    if (typeof value.useWebSearch !== 'boolean') {
+      return undefined;
+    }
+    body.useWebSearch = value.useWebSearch;
+  }
+
   return body;
 }
 
@@ -329,6 +340,7 @@ export async function prepareConversationTurn(
     model,
     providerOptions: body.providerOptions ?? {},
     systemPrompt: systemPrompt && systemPrompt.length > 0 ? systemPrompt : undefined,
+    useWebSearch: body.useWebSearch ?? false,
   };
 }
 
@@ -396,6 +408,9 @@ export async function runConversationTurn(
     streamAssistantMessage: options.streamAssistantMessage,
     initialState: {
       messages: contextMessages,
+      // Tools use specific TypeBox schemas that are subtypes of TSchema;
+      // the variance mismatch requires a cast to satisfy AgentTool[]
+      tools: prepared.useWebSearch ? ([searchTool, extractTool] as unknown as AgentTool[]) : [],
     },
   });
 
