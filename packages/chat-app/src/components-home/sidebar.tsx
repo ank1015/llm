@@ -1,12 +1,34 @@
 'use client';
 
-import { Images, PanelLeft, Search, SquarePen } from 'lucide-react';
+import {
+  Images,
+  LifeBuoy,
+  LogOut,
+  PanelLeft,
+  Search,
+  Settings,
+  Smile,
+  SparklesIcon,
+  SquarePen,
+} from 'lucide-react';
 import Image from 'next/image';
 import { memo, useState } from 'react';
 
 import type { FC, ReactNode } from 'react';
 
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { useUiStore } from '@/stores';
 
@@ -35,6 +57,79 @@ const SidebarItem: FC<SidebarItemProps> = ({ icon, label, shortcut, collapsed, o
         </span>
       )}
     </button>
+  );
+};
+
+const AccountMenu: FC<{ collapsed?: boolean }> = ({ collapsed }) => {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          className={cn(
+            'group flex h-10 w-full items-center whitespace-nowrap rounded-lg pl-[5px] pr-3 text-sm text-foreground hover:bg-home-hover',
+            !collapsed && 'cursor-pointer gap-2'
+          )}
+        >
+          <Avatar className="size-6">
+            <AvatarFallback className="bg-muted-foreground/20 text-[10px] font-medium">
+              SU
+            </AvatarFallback>
+          </Avatar>
+          {!collapsed && <span className="flex-1 text-left text-[14px]">sugarkid</span>}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent side="top" align="start" className="w-[240px]">
+        {/* User info */}
+        <div className="flex items-center gap-3 px-2 py-2">
+          <Avatar className="size-8">
+            <AvatarFallback className="bg-muted-foreground/20 text-xs font-medium">
+              SU
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex flex-col">
+            <span className="text-sm font-medium">sugarkid</span>
+            <span className="text-muted-foreground text-xs">@sugarkid</span>
+          </div>
+        </div>
+        <DropdownMenuSeparator />
+
+        {/* Main actions */}
+        <DropdownMenuGroup>
+          <DropdownMenuItem>
+            <SparklesIcon />
+            Upgrade plan
+          </DropdownMenuItem>
+          <DropdownMenuItem>
+            <Smile />
+            Personalization
+          </DropdownMenuItem>
+          <DropdownMenuItem>
+            <Settings />
+            Settings
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+
+        {/* Help submenu */}
+        <DropdownMenuGroup>
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger>
+              <LifeBuoy />
+              Help
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent>
+              <DropdownMenuItem>Documentation</DropdownMenuItem>
+              <DropdownMenuItem>Support</DropdownMenuItem>
+              <DropdownMenuItem>Feedback</DropdownMenuItem>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+          <DropdownMenuItem>
+            <LogOut />
+            Log out
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 };
 
@@ -120,6 +215,11 @@ function SidebarComponent() {
 
       {/* Spacer */}
       <div className="flex-1" />
+
+      {/* Account menu — pinned to bottom */}
+      <div className="px-2 pb-3">
+        <AccountMenu collapsed={isSidebarCollapsed} />
+      </div>
     </div>
   );
 }
