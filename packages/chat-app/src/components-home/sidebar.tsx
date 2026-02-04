@@ -1,19 +1,30 @@
+/* eslint-disable sonarjs/no-duplicate-string */
 'use client';
-
 import {
+  Archive,
+  ChevronDown,
+  Ellipsis,
+  FolderOpen,
   Images,
   LifeBuoy,
   LogOut,
   PanelLeft,
+  Pen,
+  Pin,
   Search,
   Settings,
+  Share,
   Smile,
   SparklesIcon,
   SquarePen,
+  Trash2,
+  UserRoundPlus,
 } from 'lucide-react';
 import Image from 'next/image';
-import { memo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { memo, useEffect, useState } from 'react';
 
+import type { SessionSummary } from '@ank1015/llm-sdk';
 import type { FC, ReactNode } from 'react';
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -30,7 +41,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import { useUiStore } from '@/stores';
+import { useChatStore, useSessionsStore, useUiStore } from '@/stores';
 
 type SidebarItemProps = {
   icon: ReactNode;
@@ -57,6 +68,195 @@ const SidebarItem: FC<SidebarItemProps> = ({ icon, label, shortcut, collapsed, o
         </span>
       )}
     </button>
+  );
+};
+
+type ChatItemProps = {
+  session: SessionSummary;
+  isActive: boolean;
+  onSelect: (session: SessionSummary) => void;
+  onRename: (session: SessionSummary) => void;
+  onDelete: (session: SessionSummary) => void;
+};
+
+const ChatItem: FC<ChatItemProps> = ({ session, isActive, onSelect, onRename, onDelete }) => {
+  return (
+    <DropdownMenu>
+      <div
+        onClick={() => onSelect(session)}
+        className={cn(
+          'group flex h-9 w-full cursor-pointer items-center rounded-lg pr-1 pl-3 text-[13px]',
+          isActive ? 'bg-home-hover' : 'hover:bg-home-hover'
+        )}
+      >
+        <span className="flex-1 truncate text-foreground">{session.sessionName}</span>
+        <DropdownMenuTrigger asChild>
+          <button
+            className={cn(
+              'text-muted-foreground hover:text-foreground flex h-6 w-6 shrink-0 items-center justify-center rounded-md opacity-0 transition-opacity group-hover:opacity-100',
+              isActive && 'opacity-100'
+            )}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Ellipsis size={16} strokeWidth={2} />
+          </button>
+        </DropdownMenuTrigger>
+      </div>
+      <DropdownMenuContent side="right" align="start" className="w-[200px]">
+        <DropdownMenuItem>
+          <Share size={16} />
+          Share
+        </DropdownMenuItem>
+        <DropdownMenuItem>
+          <UserRoundPlus size={16} />
+          Start a group chat
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={(e) => {
+            e.stopPropagation();
+            onRename(session);
+          }}
+        >
+          <Pen size={16} />
+          Rename
+        </DropdownMenuItem>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>
+            <FolderOpen size={16} />
+            Move to project
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent>
+            <DropdownMenuItem>Project A</DropdownMenuItem>
+            <DropdownMenuItem>Project B</DropdownMenuItem>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+        <DropdownMenuItem>
+          <Pin size={16} />
+          Pin chat
+        </DropdownMenuItem>
+        <DropdownMenuItem>
+          <Archive size={16} />
+          Archive
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          variant="destructive"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(session);
+          }}
+        >
+          <Trash2 size={16} />
+          Delete
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+};
+
+const ChatList: FC = () => {
+  const [isSectionCollapsed, setIsSectionCollapsed] = useState(false);
+
+  const sessions = useSessionsStore((state) => state.sessions);
+  const isLoading = useSessionsStore((state) => state.isLoading);
+  const hasMore = useSessionsStore((state) => state.hasMore);
+  const isLoadingMore = useSessionsStore((state) => state.isLoadingMore);
+  const fetchFirstPage = useSessionsStore((state) => state.fetchFirstPage);
+  const fetchNextPage = useSessionsStore((state) => state.fetchNextPage);
+  const scope = useSessionsStore((state) => state.scope);
+  const renameSession = useSessionsStore((state) => state.renameSession);
+  const deleteSession = useSessionsStore((state) => state.deleteSession);
+
+  const activeSession = useChatStore((state) => state.activeSession);
+  const setActiveSession = useChatStore((state) => state.setActiveSession);
+  const clearSessionState = useChatStore((state) => state.clearSessionState);
+
+  const router = useRouter();
+
+  useEffect(() => {
+    void fetchFirstPage();
+  }, [fetchFirstPage]);
+
+  const handleSelect = (session: SessionSummary) => {
+    const ref = {
+      sessionId: session.sessionId,
+      projectName: scope.projectName,
+      path: scope.path,
+    };
+    setActiveSession(ref);
+    router.push(`/chat/${session.sessionId}`);
+  };
+
+  const handleRename = (session: SessionSummary) => {
+    const newName = prompt('Rename chat', session.sessionName);
+    if (newName && newName.trim()) {
+      void renameSession({ sessionId: session.sessionId, sessionName: newName.trim() });
+    }
+  };
+
+  const handleDelete = async (session: SessionSummary) => {
+    await deleteSession({ sessionId: session.sessionId });
+    if (activeSession?.sessionId === session.sessionId) {
+      clearSessionState(activeSession);
+      setActiveSession(null);
+      router.push('/');
+    }
+  };
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <button
+        onClick={() => setIsSectionCollapsed(!isSectionCollapsed)}
+        className="flex cursor-pointer items-center gap-1 px-3 pt-4 pb-1"
+      >
+        <span className="text-muted-foreground text-xs">Your chats</span>
+        <ChevronDown
+          size={12}
+          strokeWidth={2}
+          className={cn(
+            'text-muted-foreground transition-transform duration-200',
+            isSectionCollapsed && '-rotate-90'
+          )}
+        />
+      </button>
+      {!isSectionCollapsed && (
+        <div className="no-scrollbar flex-1 overflow-y-auto px-2">
+          {isLoading && sessions.length === 0 ? (
+            <div className="space-y-1 px-1">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={`skel-${i}`} className="bg-home-hover/50 h-9 animate-pulse rounded-lg" />
+              ))}
+            </div>
+          ) : sessions.length === 0 ? (
+            <p className="text-muted-foreground flex justify-center py-2 mt-12 text-xs">
+              No chats yet.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-0.5">
+              {sessions.map((session) => (
+                <ChatItem
+                  key={session.sessionId}
+                  session={session}
+                  isActive={activeSession?.sessionId === session.sessionId}
+                  onSelect={handleSelect}
+                  onRename={handleRename}
+                  onDelete={(s) => void handleDelete(s)}
+                />
+              ))}
+              {hasMore && (
+                <button
+                  type="button"
+                  onClick={() => void fetchNextPage()}
+                  disabled={isLoadingMore}
+                  className="text-muted-foreground hover:bg-home-hover mt-1 w-full rounded-lg px-3 py-1.5 text-xs disabled:opacity-50"
+                >
+                  {isLoadingMore ? 'Loading...' : 'Load more'}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -213,11 +413,12 @@ function SidebarComponent() {
         />
       </div>
 
-      {/* Spacer */}
-      <div className="flex-1" />
+      {/* Chat list — scrollable, fills remaining space */}
+      {!isSidebarCollapsed ? <ChatList /> : <div className="flex-1" />}
 
       {/* Account menu — pinned to bottom */}
-      <div className="px-2 pb-3">
+      {!isSidebarCollapsed && <div className="border-home-border mx-2 border-t" />}
+      <div className="px-2 pt-2 pb-3">
         <AccountMenu collapsed={isSidebarCollapsed} />
       </div>
     </div>
