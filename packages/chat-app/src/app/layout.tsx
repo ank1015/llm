@@ -2,6 +2,8 @@ import { Geist, Geist_Mono } from 'next/font/google';
 
 import type { Metadata } from 'next';
 
+import { HomeLayout } from '@/components-home/root-layout';
+
 import './globals.css';
 
 const geistSans = Geist({
@@ -26,7 +28,9 @@ export default function RootLayout({
 }>): React.ReactElement {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>{children}</body>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <HomeLayout>{children}</HomeLayout>
+      </body>
     </html>
   );
 }

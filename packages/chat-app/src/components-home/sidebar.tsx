@@ -183,7 +183,7 @@ const ChatList: FC<{ collapsed?: boolean }> = ({ collapsed }) => {
       path: scope.path,
     };
     setActiveSession(ref);
-    router.push(`/chat/${session.sessionId}`);
+    router.push(`/${session.sessionId}`);
   };
 
   const handleRename = (session: SessionSummary) => {
@@ -340,6 +340,7 @@ function SidebarComponent() {
   const toggleSidebarCollapsed = useUiStore((state) => state.toggleSidebarCollapsed);
   const theme = useUiStore((state) => state.theme);
   const [isHovered, setIsHovered] = useState(false);
+  const router = useRouter();
 
   const logoSrc = theme === 'dark' ? '/logo-light.png' : '/logo-dark.png';
   const showToggleIcon = isSidebarCollapsed && isHovered;
@@ -400,6 +401,9 @@ function SidebarComponent() {
           icon={<SquarePen size={18} strokeWidth={1.8} />}
           label="New chat"
           shortcut="⇧⌘O"
+          onClick={() => {
+            router.push('/');
+          }}
           collapsed={isSidebarCollapsed}
         />
         <SidebarItem
