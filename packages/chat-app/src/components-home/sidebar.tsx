@@ -10,23 +10,26 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useUiStore } from '@/stores';
 
-
 type SidebarItemProps = {
   icon: ReactNode;
   label: string;
   shortcut?: string;
+  collapsed?: boolean;
   onClick?: () => void;
 };
 
-const SidebarItem: FC<SidebarItemProps> = ({ icon, label, shortcut, onClick }) => {
+const SidebarItem: FC<SidebarItemProps> = ({ icon, label, shortcut, collapsed, onClick }) => {
   return (
     <button
       onClick={onClick}
-      className="group flex h-10 w-full cursor-pointer items-center gap-2 rounded-lg px-3 text-sm text-foreground hover:bg-home-hover"
+      className={cn(
+        'group flex h-10 w-full items-center whitespace-nowrap rounded-lg pl-[8px] pr-3 text-sm text-foreground hover:bg-home-hover',
+        !collapsed && 'cursor-pointer gap-2'
+      )}
     >
       <span className="shrink-0">{icon}</span>
-      <span className="flex-1 text-left text-[14px]">{label}</span>
-      {shortcut && (
+      {!collapsed && <span className="flex-1 text-left text-[14px]">{label}</span>}
+      {!collapsed && shortcut && (
         <span className="text-muted-foreground text-xs opacity-0 transition-opacity duration-150 group-hover:opacity-100">
           {shortcut}
         </span>
@@ -47,7 +50,7 @@ function SidebarComponent() {
   return (
     <div
       className={cn(
-        'border-home-border flex h-full shrink-0 flex-col border-r transition-all duration-300 ease-in-out',
+        'border-home-border flex h-full shrink-0 flex-col overflow-hidden border-r transition-all duration-300 ease-in-out',
         isSidebarCollapsed ? 'w-[50px] bg-home-page cursor-pointer' : 'w-[260px] bg-home-panel'
       )}
       onMouseEnter={() => isSidebarCollapsed && setIsHovered(true)}
@@ -94,25 +97,29 @@ function SidebarComponent() {
         )}
       </div>
 
-      {/* Navigation items */}
-      {!isSidebarCollapsed && (
-        <div className="mt-2 flex flex-col gap-0.5 px-2">
-          <SidebarItem
-            icon={<SquarePen size={18} strokeWidth={1.8} />}
-            label="New chat"
-            shortcut="⇧⌘O"
-          />
-          <SidebarItem
-            icon={<Search size={18} strokeWidth={1.8} />}
-            label="Search chats"
-            shortcut="⇧⌘K"
-          />
-          <SidebarItem icon={<Images size={18} strokeWidth={1.8} />} label="Images" />
-        </div>
-      )}
+      {/* Navigation items — always rendered, icon position fixed via px-2 + pl-[8px] = 16px */}
+      <div className="mt-2 flex flex-col gap-0.5 px-2">
+        <SidebarItem
+          icon={<SquarePen size={18} strokeWidth={1.8} />}
+          label="New chat"
+          shortcut="⇧⌘O"
+          collapsed={isSidebarCollapsed}
+        />
+        <SidebarItem
+          icon={<Search size={18} strokeWidth={1.8} />}
+          label="Search chats"
+          shortcut="⇧⌘K"
+          collapsed={isSidebarCollapsed}
+        />
+        <SidebarItem
+          icon={<Images size={18} strokeWidth={1.8} />}
+          label="Images"
+          collapsed={isSidebarCollapsed}
+        />
+      </div>
 
       {/* Spacer */}
-      {!isSidebarCollapsed && <div className="flex-1" />}
+      <div className="flex-1" />
     </div>
   );
 }
