@@ -186,7 +186,7 @@ export function AssistantMessages({
     <div className="group/assistant flex w-full flex-col gap-2">
       {/* Reasoning / thinking bar */}
       {showThinkingBar && (
-        <div>
+        <div className="ml-[2%]">
           <ThinkingBar
             text={label}
             className="cursor-pointer"
@@ -198,20 +198,20 @@ export function AssistantMessages({
 
       {/* Final assistant response */}
       {displayText && (
-        <div className="max-w-[90%]" data-streaming={isStreaming ? 'true' : 'false'}>
+        <div className="max-w-[96%] ml-[2%]" data-streaming={isStreaming ? 'true' : 'false'}>
           <ChatMarkdown className="text-foreground">{displayText}</ChatMarkdown>
         </div>
       )}
 
       {/* Action buttons — space always reserved, visible on hover */}
-      <div className="flex h-7 items-center gap-1 opacity-0 transition-opacity group-hover/assistant:opacity-100">
+      <div className="flex ml-[2%] mt-1 h-6 items-center gap-1 opacity-0 transition-opacity group-hover/assistant:opacity-100">
         <button
           type="button"
           onClick={handleCopy}
           className="text-muted-foreground hover:text-foreground cursor-pointer rounded p-1.5 transition-colors"
           aria-label={copied ? 'Copied' : 'Copy message'}
         >
-          {copied ? <Check className="size-4 text-green-500" /> : <Copy className="size-4" />}
+          {copied ? <Check className="size-4 text-blue-500" /> : <Copy className="size-4" />}
         </button>
         <button
           type="button"

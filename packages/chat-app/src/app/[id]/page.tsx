@@ -4,7 +4,7 @@ import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useStickToBottom } from 'use-stick-to-bottom';
 
-import { ChatMessages } from '@/components-home/chat-messages';
+import { ChatMessages } from '@/components/chat-messages';
 import { useChatStore } from '@/stores/chat-store';
 import { useSessionsStore } from '@/stores/sessions-store';
 
