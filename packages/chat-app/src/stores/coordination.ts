@@ -6,8 +6,17 @@ import { useComposerStore } from './composer-store';
 import { useProvidersStore } from './providers-store';
 
 import type { SessionRef } from '@/lib/contracts';
+import type { Api } from '@ank1015/llm-sdk';
+
+import { getDefaultProviderSettingsForApi } from '@/lib/models/default-provider-settings';
 
 let coordinationInitialized = false;
+
+function getSessionKey(session: SessionRef): string {
+  const projectName = session.projectName?.trim() || '';
+  const path = session.path?.trim() || '';
+  return `${projectName}::${path}::${session.sessionId}`;
+}
 
 function sameSession(a: SessionRef | null, b: SessionRef | null): boolean {
   if (a === b) {
@@ -128,6 +137,54 @@ export function initializeStoreCoordination(): void {
     }
 
     syncSettingsToProviders();
+  });
+
+  // When messages are loaded for the active session, sync model from last assistant message
+  let lastSyncedKey: string | null = null;
+
+  useChatStore.subscribe((state, previous) => {
+    const session = state.activeSession;
+    if (!session) return;
+
+    const key = getSessionKey(session);
+    const messages = state.messagesBySession[key];
+    const prevMessages = previous.messagesBySession[key];
+
+    // Only react when messages actually changed for this session
+    if (messages === prevMessages) return;
+    // Don't re-sync the same session if messages haven't changed identity
+    if (key === lastSyncedKey && messages === prevMessages) return;
+
+    if (!messages || messages.length === 0) return;
+
+    // Find the last assistant message node
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const node = messages[i];
+      if (
+        node?.type === 'message' &&
+        node.message.role === 'assistant' &&
+        node.api &&
+        node.modelId
+      ) {
+        lastSyncedKey = key;
+        const api = node.api as Api;
+        const modelId = node.modelId;
+
+        const providersState = useProvidersStore.getState();
+        if (providersState.selectedApi !== api || providersState.selectedModelId !== modelId) {
+          providersState.setSelectedApi(api);
+          providersState.setSelectedModelId(modelId);
+
+          const settingsState = useChatSettingsStore.getState();
+          settingsState.setGlobalApi(api);
+          settingsState.setGlobalModelId(modelId);
+          settingsState.setGlobalProviderOptions(
+            getDefaultProviderSettingsForApi(api) as Record<string, unknown>
+          );
+        }
+        return;
+      }
+    }
   });
 }
 
