@@ -9,6 +9,8 @@ export type {
   CreateSessionResponse,
   RenameSessionRequest,
   RenameSessionResponse,
+  GenerateNameRequest,
+  GenerateNameResponse,
   DeleteSessionRequest,
   DeleteSessionResponse,
   SessionMessagesRequest,

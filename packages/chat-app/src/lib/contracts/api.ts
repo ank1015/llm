@@ -66,6 +66,16 @@ export type RenameSessionResponse = {
   header: SessionHeader;
 };
 
+export type GenerateNameRequest = SessionRef & {
+  query: string;
+};
+
+export type GenerateNameResponse = {
+  ok: true;
+  sessionId: string;
+  sessionName: string;
+};
+
 export type DeleteSessionRequest = SessionRef;
 
 export type DeleteSessionResponse = {

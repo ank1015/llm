@@ -16,6 +16,7 @@ import type { SessionRef } from '@/lib/contracts';
 import type { Attachment } from '@ank1015/llm-sdk';
 
 import { Button } from '@/components/ui/button';
+import { generateSessionName } from '@/lib/client-api';
 import { cn } from '@/lib/utils';
 import { useChatSettingsStore, useChatStore, useProvidersStore, useSessionsStore } from '@/stores';
 
@@ -143,6 +144,7 @@ function PromptInputWithActions() {
   const selectedApi = useProvidersStore((state) => state.selectedApi);
   const selectedModelId = useProvidersStore((state) => state.selectedModelId);
   const createSession = useSessionsStore((state) => state.createSession);
+  const optimisticRenameSession = useSessionsStore((state) => state.optimisticRenameSession);
 
   const handleSubmit = async () => {
     const trimmed = input.trim();
@@ -159,6 +161,20 @@ function PromptInputWithActions() {
         router.push(`/${created.sessionId}`);
         await loadMessages({ session: created, force: true });
         session = created;
+
+        // Generate a topic name asynchronously — don't block the main flow
+        void generateSessionName({
+          sessionId: created.sessionId,
+          projectName: created.projectName,
+          path: created.path,
+          query: trimmed,
+        })
+          .then((result) => {
+            optimisticRenameSession(created.sessionId, result.sessionName);
+          })
+          .catch(() => {
+            // Naming failed silently — keep "New chat"
+          });
       }
 
       if (!session) {

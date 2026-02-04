@@ -5,6 +5,8 @@ import type {
   CreateSessionResponse,
   DeleteSessionRequest,
   DeleteSessionResponse,
+  GenerateNameRequest,
+  GenerateNameResponse,
   RenameSessionRequest,
   RenameSessionResponse,
   SessionsListRequest,
@@ -81,6 +83,34 @@ export async function renameSession(request: RenameSessionRequest): Promise<Rena
     `/api/sessions/${encodeURIComponent(request.sessionId)}/name`,
     {
       method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    }
+  );
+}
+
+export async function generateSessionName(
+  request: GenerateNameRequest
+): Promise<GenerateNameResponse> {
+  const normalized = normalizeScope(request);
+  const body: Record<string, unknown> = {
+    query: request.query,
+  };
+
+  if (normalized.projectName) {
+    body.projectName = normalized.projectName;
+  }
+
+  if (normalized.path) {
+    body.path = normalized.path;
+  }
+
+  return apiRequestJson<GenerateNameResponse>(
+    `/api/sessions/${encodeURIComponent(request.sessionId)}/generate-name`,
+    {
+      method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
