@@ -52,10 +52,7 @@ export function initializeStoreCoordination(): void {
     try {
       useComposerStore.getState().setActiveSession(session);
       useChatSettingsStore.getState().setActiveSession(session);
-
-      if (!session) {
-        useUiStore.getState().dismissSideDrawer();
-      }
+      useUiStore.getState().dismissSideDrawer();
     } finally {
       syncingSession = false;
     }

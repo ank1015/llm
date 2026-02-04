@@ -56,7 +56,7 @@ export function CodeBlockThemed({ code, language = 'plaintext', className }: Cod
   }, [trimmedCode, language]);
 
   return (
-    <div className={cn('border-home-border my-3 overflow-hidden rounded-lg border', className)}>
+    <div className={cn('border-home-border my-5 overflow-hidden rounded-lg border', className)}>
       {/* Header: language label + copy button */}
       <div className="border-home-border bg-home-panel flex items-center justify-between border-b px-4 py-2">
         <span className="text-muted-foreground text-xs font-medium tracking-wide">

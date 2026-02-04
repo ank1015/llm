@@ -9,7 +9,7 @@ export const UserMessageComponent = ({ userMessage }: { userMessage: UserMessage
   return (
     <Message className="max-w-[70%] self-end">
       {text && (
-        <MessageContent className="bg-home-hover text-foreground whitespace-pre-wrap text-[15px] leading-relaxed">
+        <MessageContent className="bg-home-hover text-foreground whitespace-pre-wrap text-[15px] leading-relaxed px-3 py-3">
           {text}
         </MessageContent>
       )}

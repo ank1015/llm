@@ -34,26 +34,26 @@ function extractLanguage(className?: string): string {
 
 const CHAT_COMPONENTS: Partial<Components> = {
   h1: ({ children }) => (
-    <h1 className="text-foreground mt-5 mb-2 text-lg font-semibold">{children}</h1>
+    <h1 className="text-foreground mt-7 mb-3 text-xl font-semibold">{children}</h1>
   ),
   h2: ({ children }) => (
-    <h2 className="text-foreground mt-4 mb-2 text-base font-semibold">{children}</h2>
+    <h2 className="text-foreground mt-6 mb-3 text-lg font-semibold">{children}</h2>
   ),
   h3: ({ children }) => (
-    <h3 className="text-foreground mt-3 mb-1.5 text-[15px] font-semibold">{children}</h3>
+    <h3 className="text-foreground mt-5 mb-2 text-base font-semibold">{children}</h3>
   ),
   h4: ({ children }) => (
-    <h4 className="text-foreground mt-3 mb-1 text-[15px] font-medium">{children}</h4>
+    <h4 className="text-foreground mt-4 mb-2 text-[15px] font-semibold">{children}</h4>
   ),
   h5: ({ children }) => (
-    <h5 className="text-foreground mt-3 mb-1 text-[15px] font-medium">{children}</h5>
+    <h5 className="text-foreground mt-4 mb-2 text-[15px] font-medium">{children}</h5>
   ),
   h6: ({ children }) => (
-    <h6 className="text-foreground mt-3 mb-1 text-[15px] font-medium">{children}</h6>
+    <h6 className="text-foreground mt-4 mb-2 text-[15px] font-medium">{children}</h6>
   ),
 
   p: ({ children }) => (
-    <p className="text-foreground mb-3 text-[15px] leading-relaxed last:mb-0">{children}</p>
+    <p className="text-foreground mb-4 text-[15px] leading-[1.8] last:mb-0">{children}</p>
   ),
 
   a: ({ href, children }) => (
@@ -72,24 +72,22 @@ const CHAT_COMPONENTS: Partial<Components> = {
   em: ({ children }) => <em className="italic">{children}</em>,
 
   blockquote: ({ children }) => (
-    <blockquote className="border-home-border bg-home-panel/50 text-muted-foreground my-3 rounded-r-lg border-l-[3px] py-2 pr-3 pl-4 [&>p:last-child]:mb-0 [&>p]:mb-1">
+    <blockquote className="border-home-border bg-home-panel/50 text-muted-foreground my-4 rounded-r-lg border-l-[3px] py-3 pr-4 pl-4 [&>p:last-child]:mb-0 [&>p]:mb-2">
       {children}
     </blockquote>
   ),
 
   ul: ({ children }) => (
-    <ul className="my-3 list-disc space-y-1.5 pl-5 text-[15px] [&>li]:leading-relaxed">
-      {children}
-    </ul>
+    <ul className="my-4 list-disc space-y-2 pl-6 text-[15px] [&>li]:leading-[1.8]">{children}</ul>
   ),
 
   ol: ({ children }) => (
-    <ol className="my-3 list-decimal space-y-1.5 pl-5 text-[15px] [&>li]:leading-relaxed">
+    <ol className="my-4 list-decimal space-y-2 pl-6 text-[15px] [&>li]:leading-[1.8]">
       {children}
     </ol>
   ),
 
-  li: ({ children }) => <li className="text-foreground leading-relaxed">{children}</li>,
+  li: ({ children }) => <li className="text-foreground leading-[1.8]">{children}</li>,
 
   code: function CodeComponent({ className, children, ...props }) {
     const isInline =
@@ -111,7 +109,7 @@ const CHAT_COMPONENTS: Partial<Components> = {
   pre: ({ children }) => <>{children}</>,
 
   table: ({ children }) => (
-    <div className="border-home-border my-3 w-full overflow-x-auto rounded-lg border">
+    <div className="border-home-border my-5 w-full overflow-x-auto rounded-lg border">
       <table className="w-full border-collapse text-[14px]">{children}</table>
     </div>
   ),
@@ -172,7 +170,7 @@ function ChatMarkdownComponent({ children, id, className }: ChatMarkdownProps) {
   const blocks = useMemo(() => parseMarkdownIntoBlocks(children), [children]);
 
   return (
-    <div className={cn('chat-markdown text-[15px] leading-relaxed', className)}>
+    <div className={cn('chat-markdown text-[15px] leading-[1.8]', className)}>
       {blocks.map((block, index) => (
         <MemoizedChatBlock key={`${blockId}-block-${index}`} content={block} />
       ))}
