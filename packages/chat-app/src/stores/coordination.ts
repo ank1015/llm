@@ -4,6 +4,7 @@ import { useChatSettingsStore } from './chat-settings-store';
 import { useChatStore } from './chat-store';
 import { useComposerStore } from './composer-store';
 import { useProvidersStore } from './providers-store';
+import { useUiStore } from './ui-store';
 
 import type { SessionRef } from '@/lib/contracts';
 import type { Api } from '@ank1015/llm-sdk';
@@ -51,6 +52,10 @@ export function initializeStoreCoordination(): void {
     try {
       useComposerStore.getState().setActiveSession(session);
       useChatSettingsStore.getState().setActiveSession(session);
+
+      if (!session) {
+        useUiStore.getState().dismissSideDrawer();
+      }
     } finally {
       syncingSession = false;
     }

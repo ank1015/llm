@@ -113,6 +113,8 @@ export function AssistantMessages({
   userTimestamp,
 }: AssistantMessagesProps) {
   const openDrawer = useUiStore((state) => state.openSideDrawer);
+  const dismissDrawer = useUiStore((state) => state.dismissSideDrawer);
+  const isDrawerOpen = useUiStore((state) => state.sideDrawer.open);
 
   const effectiveMessages = useMemo(() => {
     if (!isStreaming || !streamingAssistant) return cotMessages;
@@ -136,7 +138,12 @@ export function AssistantMessages({
       ? `Reasoned for ${duration.toFixed(1)}s`
       : 'Reasoned';
 
-  const openActivityDrawer = () => {
+  const toggleActivityDrawer = () => {
+    if (isDrawerOpen) {
+      dismissDrawer();
+      return;
+    }
+
     openDrawer({
       title: 'Activity',
       renderContent: () => (
@@ -167,7 +174,7 @@ export function AssistantMessages({
           <ThinkingBar
             text={label}
             className="cursor-pointer"
-            onClick={openActivityDrawer}
+            onClick={toggleActivityDrawer}
             stop={!isStreaming}
           />
         </div>
