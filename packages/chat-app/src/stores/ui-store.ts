@@ -11,7 +11,10 @@ type SideDrawerProps = {
   renderContent: () => React.ReactNode;
 };
 
+type Theme = 'light' | 'dark';
+
 type UiStoreState = {
+  theme: Theme;
   isSidebarCollapsed: boolean;
   sideDrawer: SideDrawerProps;
   isMobileSidebarOpen: boolean;
@@ -19,6 +22,8 @@ type UiStoreState = {
   activeSettingsTab: SettingsTab;
   renameSessionId: string | null;
   deleteSessionId: string | null;
+  setTheme: (theme: Theme) => void;
+  toggleTheme: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   toggleSidebarCollapsed: () => void;
   openSideDrawer: (props: Omit<SideDrawerProps, 'open'>) => void;
@@ -38,6 +43,7 @@ type UiStoreState = {
 };
 
 const initialState = {
+  theme: 'light' as Theme,
   isSidebarCollapsed: false,
   sideDrawer: { open: false, title: '', renderContent: () => null, badge: undefined },
   isMobileSidebarOpen: false,
@@ -50,6 +56,19 @@ const initialState = {
 export const useUiStore = create<UiStoreState>((set) => ({
   ...initialState,
 
+  setTheme: (theme) => {
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+    localStorage.setItem('theme', theme);
+    set({ theme });
+  },
+  toggleTheme: () => {
+    set((state) => {
+      const next = state.theme === 'light' ? 'dark' : 'light';
+      document.documentElement.classList.toggle('dark', next === 'dark');
+      localStorage.setItem('theme', next);
+      return { theme: next };
+    });
+  },
   setSidebarCollapsed: (collapsed) => set({ isSidebarCollapsed: collapsed }),
   toggleSidebarCollapsed: () => set((state) => ({ isSidebarCollapsed: !state.isSidebarCollapsed })),
   openSideDrawer: (props: Omit<SideDrawerProps, 'open'>) => {

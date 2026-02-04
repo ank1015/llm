@@ -1,3 +1,11 @@
+'use client';
+
+import { HomeLayout } from '@/components-home/root-layout';
+
 export default function HomePage(): React.ReactElement {
-  return <div></div>;
+  return (
+    <HomeLayout>
+      <div />
+    </HomeLayout>
+  );
 }
