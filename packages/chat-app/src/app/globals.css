@@ -188,6 +188,18 @@
   display: block;
 }
 
+/* ---- KaTeX theme integration ---- */
+.chat-markdown .katex {
+  color: var(--foreground);
+  font-size: 1em;
+}
+
+.chat-markdown .katex-display {
+  margin: 1rem 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
 /* ---- Chat markdown list markers ---- */
 .chat-markdown ul > li::marker {
   color: var(--muted-foreground);

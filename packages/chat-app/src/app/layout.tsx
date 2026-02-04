@@ -5,6 +5,7 @@ import type { Metadata } from 'next';
 import { ChatInput } from '@/components-home/chat-input';
 import { HomeLayout } from '@/components-home/root-layout';
 
+import 'katex/dist/katex.min.css';
 import './globals.css';
 
 const geistSans = Geist({

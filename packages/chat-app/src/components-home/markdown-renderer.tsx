@@ -4,8 +4,10 @@
 import { marked } from 'marked';
 import { memo, useId, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
+import rehypeKatex from 'rehype-katex';
 import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
 
 import { CodeBlockThemed } from './code-block-themed';
 
@@ -144,7 +146,11 @@ const CHAT_COMPONENTS: Partial<Components> = {
 const MemoizedChatBlock = memo(
   function ChatBlock({ content }: { content: string }) {
     return (
-      <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} components={CHAT_COMPONENTS}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm, remarkBreaks, remarkMath]}
+        rehypePlugins={[rehypeKatex]}
+        components={CHAT_COMPONENTS}
+      >
         {content}
       </ReactMarkdown>
     );
