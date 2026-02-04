@@ -153,7 +153,7 @@ const ChatItem: FC<ChatItemProps> = ({ session, isActive, onSelect, onRename, on
   );
 };
 
-const ChatList: FC = () => {
+const ChatList: FC<{ collapsed?: boolean }> = ({ collapsed }) => {
   const [isSectionCollapsed, setIsSectionCollapsed] = useState(false);
 
   const sessions = useSessionsStore((state) => state.sessions);
@@ -204,21 +204,23 @@ const ChatList: FC = () => {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <button
-        onClick={() => setIsSectionCollapsed(!isSectionCollapsed)}
-        className="flex cursor-pointer items-center gap-1 px-3 pt-4 pb-1"
-      >
-        <span className="text-muted-foreground text-xs">Your chats</span>
-        <ChevronDown
-          size={12}
-          strokeWidth={2}
-          className={cn(
-            'text-muted-foreground transition-transform duration-200',
-            isSectionCollapsed && '-rotate-90'
-          )}
-        />
-      </button>
-      {!isSectionCollapsed && (
+      {!collapsed && (
+        <button
+          onClick={() => setIsSectionCollapsed(!isSectionCollapsed)}
+          className="flex cursor-pointer items-center gap-1 whitespace-nowrap px-3 pt-4 pb-1"
+        >
+          <span className="text-muted-foreground text-xs">Your chats</span>
+          <ChevronDown
+            size={12}
+            strokeWidth={2}
+            className={cn(
+              'text-muted-foreground transition-transform duration-200',
+              isSectionCollapsed && '-rotate-90'
+            )}
+          />
+        </button>
+      )}
+      {!isSectionCollapsed && !collapsed && (
         <div className="no-scrollbar flex-1 overflow-y-auto px-2">
           {isLoading && sessions.length === 0 ? (
             <div className="space-y-1 px-1">
@@ -227,7 +229,7 @@ const ChatList: FC = () => {
               ))}
             </div>
           ) : sessions.length === 0 ? (
-            <p className="text-muted-foreground flex justify-center py-2 mt-12 text-xs">
+            <p className="text-muted-foreground flex justify-center whitespace-nowrap py-2 mt-12 text-xs">
               No chats yet.
             </p>
           ) : (
@@ -413,8 +415,8 @@ function SidebarComponent() {
         />
       </div>
 
-      {/* Chat list — scrollable, fills remaining space */}
-      {!isSidebarCollapsed ? <ChatList /> : <div className="flex-1" />}
+      {/* Chat list — always mounted, content hidden when collapsed */}
+      <ChatList collapsed={isSidebarCollapsed} />
 
       {/* Account menu — pinned to bottom */}
       {!isSidebarCollapsed && <div className="border-home-border mx-2 border-t" />}
