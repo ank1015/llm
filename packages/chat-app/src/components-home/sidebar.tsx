@@ -79,6 +79,44 @@ const SidebarItem: FC<SidebarItemProps> = ({ icon, label, shortcut, collapsed, o
   );
 };
 
+function useTypewriter(text: string, speed = 30): string {
+  const [display, setDisplay] = useState(text);
+  const prevRef = useRef(text);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (prevRef.current === text) return;
+    prevRef.current = text;
+
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+
+    let i = 0;
+    setDisplay('');
+
+    const tick = () => {
+      i++;
+      setDisplay(text.slice(0, i));
+      if (i < text.length) {
+        timerRef.current = setTimeout(tick, speed);
+      }
+    };
+
+    timerRef.current = setTimeout(tick, speed);
+
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [text, speed]);
+
+  return display;
+}
+
 type ChatItemProps = {
   session: SessionSummary;
   isActive: boolean;
@@ -88,6 +126,8 @@ type ChatItemProps = {
 };
 
 const ChatItem: FC<ChatItemProps> = ({ session, isActive, onSelect, onRename, onDelete }) => {
+  const displayName = useTypewriter(session.sessionName);
+
   return (
     <DropdownMenu>
       <div
@@ -97,7 +137,7 @@ const ChatItem: FC<ChatItemProps> = ({ session, isActive, onSelect, onRename, on
           isActive ? 'bg-home-hover' : 'hover:bg-home-hover'
         )}
       >
-        <span className="flex-1 truncate text-foreground text-[14px]">{session.sessionName}</span>
+        <span className="flex-1 truncate text-foreground text-[14px]">{displayName}</span>
         <DropdownMenuTrigger asChild>
           <button
             className={cn(
