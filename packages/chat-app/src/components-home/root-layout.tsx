@@ -1,6 +1,5 @@
 'use client';
 
-import { ChatInput } from './chat-input';
 import { Header } from './header';
 import { SideDrawer } from './side-drawer';
 import { Sidebar } from './sidebar';
@@ -28,10 +27,7 @@ export const HomeLayout: FC<HomeLayoutProps> = ({ children }) => {
         {/* Main content area */}
         <div className="flex min-w-0 flex-1 flex-col">
           <Header />
-          <main className="relative flex-1 overflow-auto">
-            {children}
-            <ChatInput />
-          </main>
+          <main className="relative flex-1 overflow-auto">{children}</main>
         </div>
 
         {/* Side drawer border — visible when drawer is open */}

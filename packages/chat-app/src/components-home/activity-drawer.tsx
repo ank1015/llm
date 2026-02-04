@@ -1,0 +1,378 @@
+'use client';
+
+import { Globe, Wrench } from 'lucide-react';
+import { useMemo } from 'react';
+
+import type { Api, BaseAssistantMessage, Message, MessageNode } from '@ank1015/llm-sdk';
+
+import { useChatStore } from '@/stores/chat-store';
+
+/* ------------------------------------------------------------------ */
+/*  Types                                                             */
+/* ------------------------------------------------------------------ */
+
+type AssistantStreamingMessage = Omit<BaseAssistantMessage<Api>, 'message'>;
+type CotRenderableMessage = Message | AssistantStreamingMessage;
+
+type ActivityItem = {
+  id: string;
+  type: 'thinking-paragraph' | 'toolCall' | 'toolResult';
+  title: string;
+  body: string;
+  toolName?: string;
+};
+
+type ActivitySection = {
+  id: string;
+  heading: string;
+  items: ActivityItem[];
+};
+
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                           */
+/* ------------------------------------------------------------------ */
+
+const EMPTY_NODES: MessageNode[] = [];
+
+type TurnMessages = {
+  userMessageId: string | null;
+  cotMessages: Message[];
+};
+
+// eslint-disable-next-line sonarjs/cognitive-complexity
+function groupIntoTurnMessages(nodes: MessageNode[]): TurnMessages[] {
+  if (nodes.length === 0) return [];
+
+  const turns: TurnMessages[] = [];
+  let i = 0;
+
+  if (i < nodes.length && nodes[i]?.message.role !== 'user') {
+    const leading: Message[] = [];
+    while (i < nodes.length && nodes[i]?.message.role !== 'user') {
+      const message = nodes[i]?.message;
+      if (message) leading.push(message);
+      i++;
+    }
+    turns.push({ userMessageId: null, cotMessages: leading });
+  }
+
+  while (i < nodes.length) {
+    const userNode = nodes[i];
+    if (!userNode) break;
+    i++;
+
+    const between: Message[] = [];
+    while (i < nodes.length && nodes[i]?.message.role !== 'user') {
+      const message = nodes[i]?.message;
+      if (message) between.push(message);
+      i++;
+    }
+
+    turns.push({ userMessageId: userNode.message.id, cotMessages: between });
+  }
+
+  return turns;
+}
+
+function isBoldHeading(text: string): boolean {
+  const trimmed = text.trim();
+  return trimmed.startsWith('**') && trimmed.endsWith('**') && trimmed.length > 4;
+}
+
+function stripBold(text: string): string {
+  return text.replace(/^\*\*|\*\*$/g, '').trim();
+}
+
+/**
+ * Splits thinking text into grouped items.
+ * If a paragraph is a bold heading (`**...**`), it merges with the
+ * following paragraph(s) as one item (heading = title, rest = body).
+ */
+function splitThinkingIntoItems(text: string, messageId: string): ActivityItem[] {
+  const rawParagraphs = text
+    .split(/\n\n+/)
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0);
+
+  const items: ActivityItem[] = [];
+  let i = 0;
+
+  while (i < rawParagraphs.length) {
+    const para = rawParagraphs[i];
+
+    if (isBoldHeading(para)) {
+      // Merge heading with the next paragraph as its body
+      const title = stripBold(para);
+      const body = i + 1 < rawParagraphs.length ? rawParagraphs[i + 1] : '';
+      items.push({
+        id: `${messageId}-thinking-p${i}`,
+        // eslint-disable-next-line sonarjs/no-duplicate-string
+        type: 'thinking-paragraph',
+        title,
+        body,
+      });
+      i += body ? 2 : 1;
+    } else {
+      // First line = title, rest = body
+      const newlineIdx = para.indexOf('\n');
+      if (newlineIdx === -1) {
+        items.push({
+          id: `${messageId}-thinking-p${i}`,
+          type: 'thinking-paragraph',
+          title: para,
+          body: '',
+        });
+      } else {
+        items.push({
+          id: `${messageId}-thinking-p${i}`,
+          type: 'thinking-paragraph',
+          title: para.slice(0, newlineIdx).trim(),
+          body: para.slice(newlineIdx + 1).trim(),
+        });
+      }
+      i++;
+    }
+  }
+
+  return items;
+}
+
+function isWebSearchTool(name: string): boolean {
+  const lower = name.toLowerCase();
+  return lower.includes('web') || lower.includes('search') || lower.includes('browse');
+}
+
+// eslint-disable-next-line sonarjs/cognitive-complexity
+function buildActivitySections(messages: CotRenderableMessage[]): ActivitySection[] {
+  const sections: ActivitySection[] = [];
+  let currentThinkingItems: ActivityItem[] = [];
+  let thinkingCounter = 0;
+
+  const flushThinking = () => {
+    if (currentThinkingItems.length > 0) {
+      thinkingCounter++;
+      sections.push({
+        id: `thinking-section-${thinkingCounter}`,
+        heading: 'Thinking',
+        items: currentThinkingItems,
+      });
+      currentThinkingItems = [];
+    }
+  };
+
+  for (const message of messages) {
+    if (message.role === 'assistant') {
+      for (const content of message.content) {
+        if (content.type === 'thinking') {
+          const thinkingItems = splitThinkingIntoItems(content.thinkingText, message.id);
+          currentThinkingItems.push(...thinkingItems);
+          continue;
+        }
+
+        if (content.type === 'toolCall') {
+          // Flush any accumulated thinking before a tool call
+          flushThinking();
+
+          const args =
+            typeof content.arguments === 'string'
+              ? content.arguments
+              : JSON.stringify(content.arguments, null, 2);
+
+          sections.push({
+            id: `${message.id}-toolcall-${content.name}`,
+            heading: '',
+            items: [
+              {
+                id: `${message.id}-toolcall-item`,
+                type: 'toolCall',
+                title: `${content.name}`,
+                body: args,
+                toolName: content.name,
+              },
+            ],
+          });
+        }
+      }
+      continue;
+    }
+
+    if (message.role === 'toolResult') {
+      const text = message.content
+        .filter((c) => c.type === 'text')
+        .map((c) => c.content)
+        .join('\n')
+        .trim();
+
+      // Attach tool result to previous section if it was a tool call
+      const lastSection = sections[sections.length - 1];
+      if (
+        lastSection &&
+        lastSection.items.length === 1 &&
+        lastSection.items[0].type === 'toolCall'
+      ) {
+        lastSection.items.push({
+          id: `${message.id}-toolresult`,
+          type: 'toolResult',
+          title: `Result`,
+          body: text.length > 0 ? text : '(no textual output)',
+          toolName: message.toolName,
+        });
+      } else {
+        sections.push({
+          id: `${message.id}-toolresult-section`,
+          heading: '',
+          items: [
+            {
+              id: `${message.id}-toolresult`,
+              type: 'toolResult',
+              title: `Result: ${message.toolName}`,
+              body: text.length > 0 ? text : '(no textual output)',
+              toolName: message.toolName,
+            },
+          ],
+        });
+      }
+    }
+  }
+
+  // Flush remaining thinking
+  flushThinking();
+
+  return sections;
+}
+
+/* ------------------------------------------------------------------ */
+/*  UI Components                                                     */
+/* ------------------------------------------------------------------ */
+
+function ActivityItemDot({ type, toolName }: { type: ActivityItem['type']; toolName?: string }) {
+  if (type === 'toolCall') {
+    return (
+      <div className="bg-home-page text-muted-foreground z-10 flex size-5 shrink-0 items-center justify-center rounded-full">
+        {toolName && isWebSearchTool(toolName) ? (
+          <Globe size={14} strokeWidth={2} />
+        ) : (
+          <Wrench size={14} strokeWidth={2} />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="z-10 flex size-5 shrink-0 items-center justify-center">
+      <div className="bg-foreground size-[7px] rounded-full" />
+    </div>
+  );
+}
+
+function ActivityItemRow({ item }: { item: ActivityItem }) {
+  const cleanTitle = item.title.replace(/^\*\*|\*\*$/g, '');
+
+  return (
+    <div className="flex gap-3">
+      <div className="flex flex-col items-center pt-1">
+        <ActivityItemDot type={item.type} toolName={item.toolName} />
+      </div>
+      <div className="min-w-0 flex-1 pb-5">
+        <p className="text-foreground text-[13px] font-medium leading-snug">{cleanTitle}</p>
+        {item.body && (
+          <p className="text-foreground mt-1 whitespace-pre-wrap text-[13px] leading-relaxed">
+            {item.body}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ActivitySectionView({ section }: { section: ActivitySection }) {
+  return (
+    <div>
+      <div className="relative">
+        {/* Vertical progress line */}
+        <div className="bg-border absolute top-3 bottom-3 left-[9px] w-px" />
+
+        {section.items.map((item) => (
+          <ActivityItemRow key={item.id} item={item} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  ActivityDrawerContent (live-updating)                              */
+/* ------------------------------------------------------------------ */
+
+export function ActivityDrawerContent({
+  live,
+  sessionKey,
+  turnUserMessageId,
+  fallbackMessages,
+}: {
+  live: boolean;
+  sessionKey?: string | null;
+  turnUserMessageId: string | null;
+  fallbackMessages: CotRenderableMessage[];
+}) {
+  const nodes = useChatStore((state) => {
+    if (!live || !sessionKey) return EMPTY_NODES;
+    return state.messagesBySession[sessionKey] ?? EMPTY_NODES;
+  });
+  const isSessionStreaming = useChatStore((state) => {
+    if (!live || !sessionKey) return false;
+    return state.isStreamingBySession[sessionKey] ?? false;
+  });
+  const streamingAssistant = useChatStore((state) => {
+    if (!live || !sessionKey) return null;
+    return state.streamingAssistantBySession[sessionKey] ?? null;
+  });
+
+  const selectedMessages = useMemo(() => {
+    if (!live || !sessionKey || nodes.length === 0) return fallbackMessages;
+
+    const turns = groupIntoTurnMessages(nodes);
+    if (turns.length === 0) return fallbackMessages;
+
+    const latestTurn = turns[turns.length - 1];
+    const targetTurn = turns.find((turn) => turn.userMessageId === turnUserMessageId) ?? latestTurn;
+    const baseMessages = targetTurn?.cotMessages ?? [];
+    const shouldIncludeStreamingAssistant = targetTurn === latestTurn && isSessionStreaming;
+
+    if (!shouldIncludeStreamingAssistant || !streamingAssistant) return baseMessages;
+    return [...baseMessages, streamingAssistant];
+  }, [
+    fallbackMessages,
+    isSessionStreaming,
+    live,
+    nodes,
+    sessionKey,
+    streamingAssistant,
+    turnUserMessageId,
+  ]);
+
+  const sections = useMemo(() => buildActivitySections(selectedMessages), [selectedMessages]);
+  const isComplete = !live || !isSessionStreaming;
+
+  if (sections.length === 0) {
+    return <div className="text-muted-foreground text-sm">No activity yet.</div>;
+  }
+
+  return (
+    <div className="flex flex-col gap-4 py-2">
+      {sections.map((section) => (
+        <ActivitySectionView key={section.id} section={section} />
+      ))}
+      {isComplete && (
+        <div className="relative">
+          <div className="flex gap-3">
+            <div className="flex size-5 shrink-0 items-center justify-center">
+              <div className="bg-foreground size-[7px] rounded-full" />
+            </div>
+            <p className="text-foreground text-[13px] font-medium">Reasoning complete</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

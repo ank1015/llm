@@ -2,6 +2,7 @@ import { Geist, Geist_Mono } from 'next/font/google';
 
 import type { Metadata } from 'next';
 
+import { ChatInput } from '@/components-home/chat-input';
 import { HomeLayout } from '@/components-home/root-layout';
 
 import './globals.css';
@@ -29,7 +30,10 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <HomeLayout>{children}</HomeLayout>
+        <HomeLayout>
+          <div className="relative flex h-full w-full flex-col">{children}</div>
+          <ChatInput />
+        </HomeLayout>
       </body>
     </html>
   );

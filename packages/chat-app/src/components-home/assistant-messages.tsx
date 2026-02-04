@@ -2,20 +2,14 @@
 
 import { useMemo } from 'react';
 
+import { ActivityDrawerContent } from './activity-drawer';
+
 import type { Api, BaseAssistantMessage, Message, MessageNode } from '@ank1015/llm-sdk';
 
-import {
-  ChainOfThought,
-  ChainOfThoughtContent,
-  ChainOfThoughtItem,
-  ChainOfThoughtStep,
-  ChainOfThoughtTrigger,
-} from '@/components/ai/chain-of-thought';
 import { Message as MessageWrapper, MessageContent } from '@/components/ai/message';
 import { ThinkingBar } from '@/components/ai/thinking-bar';
 import { getTextFromBaseAssistantMessage } from '@/lib/messages/utils';
 import { useUiStore } from '@/stores';
-import { useChatStore } from '@/stores/chat-store';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                             */
@@ -50,48 +44,6 @@ type ReasoningStep = {
   title: string;
   body: string;
 };
-
-const EMPTY_NODES: MessageNode[] = [];
-
-type TurnMessages = {
-  userMessageId: string | null;
-  cotMessages: Message[];
-};
-
-// eslint-disable-next-line sonarjs/cognitive-complexity
-function groupIntoTurnMessages(nodes: MessageNode[]): TurnMessages[] {
-  if (nodes.length === 0) return [];
-
-  const turns: TurnMessages[] = [];
-  let i = 0;
-
-  if (i < nodes.length && nodes[i]?.message.role !== 'user') {
-    const leading: Message[] = [];
-    while (i < nodes.length && nodes[i]?.message.role !== 'user') {
-      const message = nodes[i]?.message;
-      if (message) leading.push(message);
-      i++;
-    }
-    turns.push({ userMessageId: null, cotMessages: leading });
-  }
-
-  while (i < nodes.length) {
-    const userNode = nodes[i];
-    if (!userNode) break;
-    i++;
-
-    const between: Message[] = [];
-    while (i < nodes.length && nodes[i]?.message.role !== 'user') {
-      const message = nodes[i]?.message;
-      if (message) between.push(message);
-      i++;
-    }
-
-    turns.push({ userMessageId: userNode.message.id, cotMessages: between });
-  }
-
-  return turns;
-}
 
 // eslint-disable-next-line sonarjs/cognitive-complexity
 function getReasoningSteps(messages: CotRenderableMessage[]): ReasoningStep[] {
@@ -148,77 +100,6 @@ function getDurationInSeconds(
 }
 
 /* ------------------------------------------------------------------ */
-/*  Reasoning drawer content (live-updating)                          */
-/* ------------------------------------------------------------------ */
-
-function ReasoningDrawerContent({
-  live,
-  sessionKey,
-  turnUserMessageId,
-  fallbackMessages,
-}: {
-  live: boolean;
-  sessionKey?: string | null;
-  turnUserMessageId: string | null;
-  fallbackMessages: CotRenderableMessage[];
-}) {
-  const nodes = useChatStore((state) => {
-    if (!live || !sessionKey) return EMPTY_NODES;
-    return state.messagesBySession[sessionKey] ?? EMPTY_NODES;
-  });
-  const isSessionStreaming = useChatStore((state) => {
-    if (!live || !sessionKey) return false;
-    return state.isStreamingBySession[sessionKey] ?? false;
-  });
-  const streamingAssistant = useChatStore((state) => {
-    if (!live || !sessionKey) return null;
-    return state.streamingAssistantBySession[sessionKey] ?? null;
-  });
-
-  const selectedMessages = useMemo(() => {
-    if (!live || !sessionKey || nodes.length === 0) return fallbackMessages;
-
-    const turns = groupIntoTurnMessages(nodes);
-    if (turns.length === 0) return fallbackMessages;
-
-    const latestTurn = turns[turns.length - 1];
-    const targetTurn = turns.find((turn) => turn.userMessageId === turnUserMessageId) ?? latestTurn;
-    const baseMessages = targetTurn?.cotMessages ?? [];
-    const shouldIncludeStreamingAssistant = targetTurn === latestTurn && isSessionStreaming;
-
-    if (!shouldIncludeStreamingAssistant || !streamingAssistant) return baseMessages;
-    return [...baseMessages, streamingAssistant];
-  }, [
-    fallbackMessages,
-    isSessionStreaming,
-    live,
-    nodes,
-    sessionKey,
-    streamingAssistant,
-    turnUserMessageId,
-  ]);
-
-  const steps = useMemo(() => getReasoningSteps(selectedMessages), [selectedMessages]);
-
-  if (steps.length === 0) {
-    return <div className="text-muted-foreground text-sm">No reasoning details yet.</div>;
-  }
-
-  return (
-    <ChainOfThought>
-      {steps.map((step) => (
-        <ChainOfThoughtStep key={step.id}>
-          <ChainOfThoughtTrigger hideChevron>{step.title}</ChainOfThoughtTrigger>
-          <ChainOfThoughtContent>
-            <ChainOfThoughtItem className="whitespace-pre-wrap">{step.body}</ChainOfThoughtItem>
-          </ChainOfThoughtContent>
-        </ChainOfThoughtStep>
-      ))}
-    </ChainOfThought>
-  );
-}
-
-/* ------------------------------------------------------------------ */
 /*  AssistantMessages                                                 */
 /* ------------------------------------------------------------------ */
 
@@ -255,11 +136,11 @@ export function AssistantMessages({
       ? `Reasoned for ${duration.toFixed(1)}s`
       : 'Reasoned';
 
-  const openReasoningDrawer = () => {
+  const openActivityDrawer = () => {
     openDrawer({
-      title: 'Reasoning',
+      title: 'Activity',
       renderContent: () => (
-        <ReasoningDrawerContent
+        <ActivityDrawerContent
           live={isStreaming}
           sessionKey={sessionKey}
           turnUserMessageId={turnUserMessageId}
@@ -286,7 +167,7 @@ export function AssistantMessages({
           <ThinkingBar
             text={label}
             className="cursor-pointer"
-            onClick={openReasoningDrawer}
+            onClick={openActivityDrawer}
             stop={!isStreaming}
           />
         </div>
