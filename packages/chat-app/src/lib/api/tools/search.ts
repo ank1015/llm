@@ -15,7 +15,7 @@ export const searchTool: AgentTool<typeof searchSchema> = {
   name: 'search',
   label: 'search',
   description:
-    'Returns 5 web search results based on objective and search queries. Each search contains the url and excerpts from the url based on the objective.',
+    'Returns 6 web search results based on objective and search queries. Each search contains the url and excerpts from the url based on the objective.',
   parameters: searchSchema,
   execute: async (
     _toolCallId: string,
@@ -26,10 +26,10 @@ export const searchTool: AgentTool<typeof searchSchema> = {
     const search = await client.beta.search({
       objective,
       search_queries: queries,
-      max_results: 5,
+      max_results: 6,
       mode: 'agentic',
       excerpts: {
-        max_chars_per_result: 5000,
+        max_chars_per_result: 6000,
       },
     });
 
@@ -40,8 +40,11 @@ export const searchTool: AgentTool<typeof searchSchema> = {
     formattedResults.push(`\nFound ${search.results.length} results:\n`);
     formattedResults.push('='.repeat(80));
 
+    const urls = [];
+
     for (let i = 0; i < search.results.length; i++) {
       const result = search.results[i];
+      urls.push(result.url);
       formattedResults.push(`\n${i + 1}. ${result.title}`);
       formattedResults.push(`   URL: ${result.url}`);
 
@@ -68,6 +71,7 @@ export const searchTool: AgentTool<typeof searchSchema> = {
       details: {
         search_id: search.search_id,
         result_count: search.results.length,
+        urls: urls,
       },
     };
   },

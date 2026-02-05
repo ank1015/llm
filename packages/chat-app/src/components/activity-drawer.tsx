@@ -23,6 +23,8 @@ type ActivityItem = {
   body: string;
   format: 'plain' | 'markdown';
   toolName?: string;
+  /** URLs for search tool results */
+  urls?: string[];
 };
 
 type ActivitySection = {
@@ -187,7 +189,8 @@ function buildActivitySections(
 
   for (const message of messages) {
     if (message.role === 'assistant') {
-      for (const content of message.content) {
+      for (let contentIdx = 0; contentIdx < message.content.length; contentIdx++) {
+        const content = message.content[contentIdx];
         if (content.type === 'thinking') {
           const thinkingItems = splitThinkingIntoItems(content.thinkingText, message.id, api);
           currentThinkingItems.push(...thinkingItems);
@@ -198,22 +201,46 @@ function buildActivitySections(
           // Flush any accumulated thinking before a tool call
           flushThinking();
 
-          const args =
-            typeof content.arguments === 'string'
-              ? content.arguments
-              : JSON.stringify(content.arguments, null, 2);
+          let title = content.name;
+          let body = '';
+          let urls: string[] | undefined;
+
+          // Special formatting for search tool
+          if (content.name === 'search') {
+            const args =
+              typeof content.arguments === 'object' && content.arguments !== null
+                ? (content.arguments as { objective?: string })
+                : {};
+            title = `Searching for ${args.objective ?? 'results'}`;
+          } else if (content.name === 'extract') {
+            // Special formatting for extract tool - show "Reading" with URL pill
+            const args =
+              typeof content.arguments === 'object' && content.arguments !== null
+                ? (content.arguments as { url?: string })
+                : {};
+            title = 'Reading';
+            if (args.url) {
+              urls = [args.url];
+            }
+          } else {
+            body =
+              typeof content.arguments === 'string'
+                ? content.arguments
+                : JSON.stringify(content.arguments, null, 2);
+          }
 
           sections.push({
-            id: `${message.id}-toolcall-${content.name}`,
+            id: `${message.id}-toolcall-${content.name}-${contentIdx}`,
             heading: '',
             items: [
               {
-                id: `${message.id}-toolcall-item`,
+                id: `${message.id}-toolcall-item-${contentIdx}`,
                 type: 'toolCall',
-                title: `${content.name}`,
-                body: args,
+                title,
+                body,
                 format: 'plain',
                 toolName: content.name,
+                urls,
               },
             ],
           });
@@ -223,11 +250,25 @@ function buildActivitySections(
     }
 
     if (message.role === 'toolResult') {
+      // Skip extract tool results - we only show the toolCall with URL
+      if (message.toolName === 'extract') {
+        continue;
+      }
+
       const text = message.content
         .filter((c) => c.type === 'text')
         .map((c) => c.content)
         .join('\n')
         .trim();
+
+      // Extract URLs from search tool results
+      let urls: string[] | undefined;
+      if (message.toolName === 'search' && message.details) {
+        const details = message.details as { urls?: string[] };
+        if (Array.isArray(details.urls)) {
+          urls = details.urls;
+        }
+      }
 
       // Attach tool result to previous section if it was a tool call
       const lastSection = sections[sections.length - 1];
@@ -240,9 +281,10 @@ function buildActivitySections(
           id: `${message.id}-toolresult`,
           type: 'toolResult',
           title: `Result`,
-          body: text.length > 0 ? text : '(no textual output)',
+          body: urls ? '' : text.length > 0 ? text : '(no textual output)',
           format: 'plain',
           toolName: message.toolName,
+          urls,
         });
       } else {
         sections.push({
@@ -253,9 +295,10 @@ function buildActivitySections(
               id: `${message.id}-toolresult`,
               type: 'toolResult',
               title: `Result: ${message.toolName}`,
-              body: text.length > 0 ? text : '(no textual output)',
+              body: urls ? '' : text.length > 0 ? text : '(no textual output)',
               format: 'plain',
               toolName: message.toolName,
+              urls,
             },
           ],
         });
@@ -272,6 +315,51 @@ function buildActivitySections(
 /* ------------------------------------------------------------------ */
 /*  UI Components                                                     */
 /* ------------------------------------------------------------------ */
+
+function getDomainFromUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
+}
+
+function UrlPills({ urls }: { urls: string[] }) {
+  const MAX_VISIBLE = 3;
+  const visible = urls.slice(0, MAX_VISIBLE);
+  const remaining = urls.length - MAX_VISIBLE;
+
+  return (
+    <div className="mt-2 flex flex-wrap gap-2">
+      {visible.map((url) => (
+        <a
+          key={url}
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="bg-surface-secondary hover:bg-surface-tertiary inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs transition-colors"
+        >
+          <img
+            src={`https://www.google.com/s2/favicons?domain=${getDomainFromUrl(url)}&sz=32`}
+            alt=""
+            className="size-4 rounded-sm"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+            }}
+          />
+          <span className="text-foreground">{getDomainFromUrl(url)}</span>
+        </a>
+      ))}
+      {remaining > 0 && (
+        <span className="bg-surface-secondary text-muted-foreground inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs">
+          <Globe size={14} />
+          {remaining} more
+        </span>
+      )}
+    </div>
+  );
+}
 
 function ActivityItemDot({ type, toolName }: { type: ActivityItem['type']; toolName?: string }) {
   if (type === 'toolCall') {
@@ -325,6 +413,7 @@ function ActivityItemRow({ item }: { item: ActivityItem }) {
             {item.body}
           </p>
         )}
+        {item.urls && item.urls.length > 0 && <UrlPills urls={item.urls} />}
       </div>
     </div>
   );

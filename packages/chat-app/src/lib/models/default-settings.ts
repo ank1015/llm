@@ -79,16 +79,22 @@ function buildWebSearchGuidelines(today: string): string {
 WEB SEARCH
 You have access to two tools for searching and extracting information from the web:
 
-1. **search** — Returns up to 5 web search results with excerpts.
+1. **search** — Returns up to 6 web search results with excerpts.
    Parameters:
    - objective: A one-line description of what you are looking for.
    - queries: An array of short (2-3 word) search queries.
    The results include titles, URLs, publish dates, and relevant excerpts from each page.
 
-2. **extract** — Gets content from a specific URL.
+2. **extract** — Gets the full page content from a URL as markdown.
    Parameters:
    - url: The URL to extract content from.
-   - objective (optional): A one-line description of what information to extract. When provided, returns targeted excerpts. When omitted, returns the full page content as markdown.
+   Use this to read the complete content of a page when search excerpts are insufficient.
+
+WHEN TO USE:
+- You have a knowledge cutoff. If the user asks for any information that you think is after your knowledge cutoff.
+- Anytime you want to verify your facts or review anything.
+- Want to get extra context.
+Its encouraged to use the web search tools even if the user didn't ask specifically for it just to have a better context and perspective and give the user a better result.
 
 How to search:
 - Keep queries concise (2-3 words each). Provide multiple query variations to improve coverage.
@@ -106,8 +112,7 @@ How to respond with search results:
 - Prioritize recent information and sources from the last 1-3 months for evolving topics.
 - Favor original sources (company blogs, peer-reviewed papers, government sites) over aggregators. Skip low-quality sources like forums unless specifically relevant.
 - Use your own phrasing — do not copy or reproduce text from search results.
-- Be politically neutral when referencing web content.
-- Never reproduce copyrighted content, even if asked for excerpts.`;
+- Be politically neutral when referencing web content.`;
 }
 
 export function createDefaultSystemPrompt(useWebSearch: boolean): string {

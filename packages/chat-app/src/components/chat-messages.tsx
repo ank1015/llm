@@ -99,13 +99,11 @@ function groupIntoTurns(nodes: MessageNode[]): MessageTurn[] {
 
 const MessageTurnRow = memo(function MessageTurnRow({
   turn,
-  isStreamingTurn,
   sessionKey,
   streamingAssistant,
   selectedApi,
 }: {
   turn: MessageTurn;
-  isStreamingTurn: boolean;
   sessionKey: string | null;
   streamingAssistant: Omit<BaseAssistantMessage<Api>, 'message'> | null;
   selectedApi: Api | null;
@@ -116,7 +114,7 @@ const MessageTurnRow = memo(function MessageTurnRow({
       <AssistantMessages
         cotMessages={turn.cotMessages}
         assistantNode={turn.assistantNode}
-        isStreaming={isStreamingTurn}
+        // isStreaming={isStreamingTurn}
         streamingAssistant={streamingAssistant}
         api={(turn.assistantNode?.api as Api | undefined) ?? selectedApi}
         userTimestamp={
@@ -165,7 +163,6 @@ export function ChatMessages() {
         <MessageTurnRow
           key={turn.userNode?.id ?? `turn-${idx}`}
           turn={turn}
-          isStreamingTurn={Boolean(streamingAssistant) && idx === turns.length - 1}
           sessionKey={activeSessionKey}
           streamingAssistant={streamingAssistant}
           selectedApi={selectedApi}

@@ -6,11 +6,12 @@ import { useCallback, useMemo, useState } from 'react';
 import { ActivityDrawerContent } from './activity-drawer';
 import { ChatMarkdown } from './markdown-renderer';
 
+import type { SessionRef } from '@/lib/contracts';
 import type { Api, BaseAssistantMessage, Message, MessageNode } from '@ank1015/llm-sdk';
 
 import { ThinkingBar } from '@/components/ai/thinking-bar';
 import { getTextFromBaseAssistantMessage } from '@/lib/messages/utils';
-import { useUiStore } from '@/stores';
+import { useChatStore, useUiStore } from '@/stores';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                             */
@@ -25,7 +26,7 @@ type AssistantMessagesProps = {
   /** The final assistant node for this turn (if completed) */
   assistantNode: MessageNode | null;
   /** Whether this is the currently streaming turn */
-  isStreaming: boolean;
+  // isStreaming: boolean;
   /** The streaming assistant message (partial, not yet a node) */
   streamingAssistant: AssistantStreamingMessage | null;
   /** The API provider used for this turn */
@@ -109,7 +110,7 @@ function getDurationInSeconds(
 export function AssistantMessages({
   cotMessages,
   assistantNode,
-  isStreaming,
+  // isStreaming,
   streamingAssistant,
   api,
   sessionKey,
@@ -119,6 +120,18 @@ export function AssistantMessages({
   const openDrawer = useUiStore((state) => state.openSideDrawer);
   const dismissDrawer = useUiStore((state) => state.dismissSideDrawer);
   const isDrawerOpen = useUiStore((state) => state.sideDrawer.open);
+
+  function getSessionKey(session: SessionRef): string {
+    const projectName = session.projectName?.trim() ?? '';
+    const path = session.path?.trim() ?? '';
+    return `${projectName}::${path}::${session.sessionId}`;
+  }
+  const activeSession = useChatStore((state) => state.activeSession);
+  const isStreaming = useChatStore((state) => {
+    if (!activeSession) return false;
+    const key = getSessionKey(activeSession);
+    return state.isStreamingBySession[key] ?? false;
+  });
 
   const effectiveMessages = useMemo(() => {
     if (!isStreaming || !streamingAssistant) return cotMessages;
@@ -204,30 +217,32 @@ export function AssistantMessages({
       )}
 
       {/* Action buttons — space always reserved, visible on hover */}
-      <div className="flex ml-[2%] mt-1 h-6 items-center gap-1 opacity-0 transition-opacity group-hover/assistant:opacity-100">
-        <button
-          type="button"
-          onClick={handleCopy}
-          className="text-muted-foreground hover:text-foreground cursor-pointer rounded p-1.5 transition-colors"
-          aria-label={copied ? 'Copied' : 'Copy message'}
-        >
-          {copied ? <Check className="size-4 text-blue-500" /> : <Copy className="size-4" />}
-        </button>
-        <button
-          type="button"
-          className="text-muted-foreground hover:text-foreground cursor-pointer rounded p-1.5 transition-colors"
-          aria-label="Branch conversation"
-        >
-          <GitBranch className="size-4" />
-        </button>
-        <button
-          type="button"
-          className="text-muted-foreground hover:text-foreground cursor-pointer rounded p-1.5 transition-colors"
-          aria-label="Regenerate response"
-        >
-          <RefreshCw className="size-4" />
-        </button>
-      </div>
+      {!isStreaming && (
+        <div className="flex ml-[2%] mt-1 h-6 items-center gap-1 opacity-0 transition-opacity group-hover/assistant:opacity-100">
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="text-muted-foreground hover:text-foreground cursor-pointer rounded p-1.5 transition-colors"
+            aria-label={copied ? 'Copied' : 'Copy message'}
+          >
+            {copied ? <Check className="size-4 text-blue-500" /> : <Copy className="size-4" />}
+          </button>
+          <button
+            type="button"
+            className="text-muted-foreground hover:text-foreground cursor-pointer rounded p-1.5 transition-colors"
+            aria-label="Branch conversation"
+          >
+            <GitBranch className="size-4" />
+          </button>
+          <button
+            type="button"
+            className="text-muted-foreground hover:text-foreground cursor-pointer rounded p-1.5 transition-colors"
+            aria-label="Regenerate response"
+          >
+            <RefreshCw className="size-4" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
