@@ -7,52 +7,17 @@
 
 import type { SessionsAdapter, SessionLocation } from '../adapters/types.js';
 import type {
+  AppendCustomInput,
+  AppendMessageInput,
   BranchInfo,
+  CreateSessionInput,
   CustomNode,
-  Message,
   MessageNode,
   Session,
   SessionHeader,
   SessionNode,
   SessionSummary,
-  Api,
 } from '@ank1015/llm-types';
-
-/**
- * Options for creating a new session.
- */
-export interface CreateSessionOptions {
-  projectName: string;
-  path?: string;
-  sessionName?: string;
-}
-
-/**
- * Options for appending a message.
- */
-export interface AppendMessageOptions {
-  projectName: string;
-  sessionId: string;
-  parentId: string;
-  branch: string;
-  message: Message;
-  api: Api;
-  modelId: string;
-  path?: string;
-  providerOptions?: Record<string, unknown>;
-}
-
-/**
- * Options for appending a custom node.
- */
-export interface AppendCustomOptions {
-  projectName: string;
-  sessionId: string;
-  parentId: string;
-  branch: string;
-  payload: Record<string, unknown>;
-  path?: string;
-}
 
 /**
  * Session Manager provides a clean interface for session operations.
@@ -64,9 +29,9 @@ export class SessionManager {
    * Create a new session.
    */
   async createSession(
-    options: CreateSessionOptions
+    input: CreateSessionInput
   ): Promise<{ sessionId: string; header: SessionHeader }> {
-    return this.adapter.createSession(options);
+    return this.adapter.createSession(input);
   }
 
   /**
@@ -120,33 +85,16 @@ export class SessionManager {
    * Append a message to a session.
    */
   async appendMessage(
-    options: AppendMessageOptions
+    input: AppendMessageInput
   ): Promise<{ sessionId: string; node: MessageNode }> {
-    return this.adapter.appendMessage({
-      projectName: options.projectName,
-      path: options.path ?? '',
-      sessionId: options.sessionId,
-      parentId: options.parentId,
-      branch: options.branch,
-      message: options.message,
-      api: options.api,
-      modelId: options.modelId,
-      providerOptions: options.providerOptions ?? {},
-    });
+    return this.adapter.appendMessage(input);
   }
 
   /**
    * Append a custom node to a session.
    */
-  async appendCustom(options: AppendCustomOptions): Promise<CustomNode | undefined> {
-    return this.adapter.appendCustom({
-      projectName: options.projectName,
-      path: options.path ?? '',
-      sessionId: options.sessionId,
-      parentId: options.parentId,
-      branch: options.branch,
-      payload: options.payload,
-    });
+  async appendCustom(input: AppendCustomInput): Promise<CustomNode | undefined> {
+    return this.adapter.appendCustom(input);
   }
 
   /**

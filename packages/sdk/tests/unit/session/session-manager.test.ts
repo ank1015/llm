@@ -179,7 +179,7 @@ describe('SessionManager', () => {
   });
 
   describe('appendMessage()', () => {
-    it('should delegate to adapter with correct input', async () => {
+    it('should pass input through to adapter directly', async () => {
       const mockResult = {
         sessionId: 'session-123',
         node: { type: 'message', id: 'node-1' } as MessageNode,
@@ -193,33 +193,25 @@ describe('SessionManager', () => {
         timestamp: Date.now(),
       };
 
-      const result = await manager.appendMessage({
+      const input = {
         projectName: 'my-project',
+        path: 'sub/path',
         sessionId: 'session-123',
         parentId: 'parent-1',
         branch: 'main',
         message,
-        api: 'anthropic',
+        api: 'anthropic' as const,
         modelId: 'claude-sonnet-4-20250514',
-        path: 'sub/path',
         providerOptions: { temperature: 0.5 },
-      });
+      };
 
-      expect(mockAdapter.appendMessage).toHaveBeenCalledWith({
-        projectName: 'my-project',
-        path: 'sub/path',
-        sessionId: 'session-123',
-        parentId: 'parent-1',
-        branch: 'main',
-        message,
-        api: 'anthropic',
-        modelId: 'claude-sonnet-4-20250514',
-        providerOptions: { temperature: 0.5 },
-      });
+      const result = await manager.appendMessage(input);
+
+      expect(mockAdapter.appendMessage).toHaveBeenCalledWith(input);
       expect(result).toEqual(mockResult);
     });
 
-    it('should use defaults for optional fields', async () => {
+    it('should pass through optional fields as-is (adapter handles defaults)', async () => {
       const mockResult = {
         sessionId: 'session-123',
         node: { type: 'message', id: 'node-1' } as MessageNode,
@@ -233,32 +225,24 @@ describe('SessionManager', () => {
         timestamp: Date.now(),
       };
 
-      await manager.appendMessage({
-        projectName: 'my-project',
-        sessionId: 'session-123',
-        parentId: 'parent-1',
-        branch: 'main',
-        message,
-        api: 'anthropic',
-        modelId: 'claude-sonnet-4-20250514',
-      });
-
-      expect(mockAdapter.appendMessage).toHaveBeenCalledWith({
+      const input = {
         projectName: 'my-project',
         path: '',
-        sessionId: 'session-123',
         parentId: 'parent-1',
         branch: 'main',
         message,
-        api: 'anthropic',
+        api: 'anthropic' as const,
         modelId: 'claude-sonnet-4-20250514',
-        providerOptions: {},
-      });
+      };
+
+      await manager.appendMessage(input);
+
+      expect(mockAdapter.appendMessage).toHaveBeenCalledWith(input);
     });
   });
 
   describe('appendCustom()', () => {
-    it('should delegate to adapter with correct input', async () => {
+    it('should pass input through to adapter directly', async () => {
       const mockNode: CustomNode = {
         type: 'custom',
         id: 'custom-1',
@@ -269,23 +253,18 @@ describe('SessionManager', () => {
       };
       vi.mocked(mockAdapter.appendCustom).mockResolvedValue(mockNode);
 
-      const result = await manager.appendCustom({
+      const input = {
         projectName: 'my-project',
+        path: 'sub/path',
         sessionId: 'session-123',
         parentId: 'parent-1',
         branch: 'main',
         payload: { data: 'test' },
-        path: 'sub/path',
-      });
+      };
 
-      expect(mockAdapter.appendCustom).toHaveBeenCalledWith({
-        projectName: 'my-project',
-        path: 'sub/path',
-        sessionId: 'session-123',
-        parentId: 'parent-1',
-        branch: 'main',
-        payload: { data: 'test' },
-      });
+      const result = await manager.appendCustom(input);
+
+      expect(mockAdapter.appendCustom).toHaveBeenCalledWith(input);
       expect(result).toEqual(mockNode);
     });
   });

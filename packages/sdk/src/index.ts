@@ -34,11 +34,6 @@ export type { ConversationExternalCallback, ConversationOptions } from './agent/
 
 // Session Manager
 export { SessionManager, createSessionManager } from './session/index.js';
-export type {
-  CreateSessionOptions,
-  AppendMessageOptions,
-  AppendCustomOptions,
-} from './session/index.js';
 
 // Re-export everything from core
 export {
