@@ -158,7 +158,7 @@ export function createChatCompletionStream<
                   type: 'text_end',
                   contentIndex: blockIndex(),
                   content: currentBlock.content,
-                  message: { ...output, timestamp: Date.now() },
+                  message: output,
                 });
               }
             }
@@ -167,7 +167,7 @@ export function createChatCompletionStream<
             stream.push({
               type: 'thinking_start',
               contentIndex: blockIndex(),
-              message: { ...output, timestamp: Date.now() },
+              message: output,
             });
           }
 
@@ -177,7 +177,7 @@ export function createChatCompletionStream<
               type: 'thinking_delta',
               contentIndex: blockIndex(),
               delta: delta.reasoning_content,
-              message: { ...output, timestamp: Date.now() },
+              message: output,
             });
           }
         }
@@ -192,7 +192,7 @@ export function createChatCompletionStream<
                 type: 'thinking_end',
                 contentIndex: blockIndex(),
                 content: currentBlock.thinkingText,
-                message: { ...output, timestamp: Date.now() },
+                message: output,
               });
             }
             currentBlock = { type: 'response', content: [{ type: 'text', content: '' }] };
@@ -200,7 +200,7 @@ export function createChatCompletionStream<
             stream.push({
               type: 'text_start',
               contentIndex: blockIndex(),
-              message: { ...output, timestamp: Date.now() },
+              message: output,
             });
           }
 
@@ -213,7 +213,7 @@ export function createChatCompletionStream<
               type: 'text_delta',
               contentIndex: blockIndex(),
               delta: delta.content,
-              message: { ...output, timestamp: Date.now() },
+              message: output,
             });
           }
         }
@@ -226,14 +226,14 @@ export function createChatCompletionStream<
                 type: 'text_end',
                 contentIndex: blockIndex(),
                 content: currentBlock.content,
-                message: { ...output, timestamp: Date.now() },
+                message: output,
               });
             } else if (currentBlock.type === 'thinking') {
               stream.push({
                 type: 'thinking_end',
                 contentIndex: blockIndex(),
                 content: currentBlock.thinkingText,
-                message: { ...output, timestamp: Date.now() },
+                message: output,
               });
             }
             currentBlock = null;
@@ -275,7 +275,7 @@ export function createChatCompletionStream<
               stream.push({
                 type: 'toolcall_start',
                 contentIndex: blockIndex(),
-                message: { ...output, timestamp: Date.now() },
+                message: output,
               });
             }
 
@@ -294,7 +294,7 @@ export function createChatCompletionStream<
                 type: 'toolcall_delta',
                 contentIndex: blocks.indexOf(toolBlock),
                 delta: toolCallDelta.function.arguments,
-                message: { ...output, timestamp: Date.now() },
+                message: output,
               });
             }
           }
@@ -331,14 +331,14 @@ export function createChatCompletionStream<
             type: 'text_end',
             contentIndex: blockIndex(),
             content: currentBlock.content,
-            message: { ...output, timestamp: Date.now() },
+            message: output,
           });
         } else if (currentBlock.type === 'thinking') {
           stream.push({
             type: 'thinking_end',
             contentIndex: blockIndex(),
             content: currentBlock.thinkingText,
-            message: { ...output, timestamp: Date.now() },
+            message: output,
           });
         }
       }
@@ -371,7 +371,7 @@ export function createChatCompletionStream<
           type: 'toolcall_end',
           contentIndex: blocks.indexOf(toolBlock),
           toolCall: cleanToolCall,
-          message: { ...output, timestamp: Date.now() },
+          message: output,
         });
       }
 

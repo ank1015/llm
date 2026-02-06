@@ -95,7 +95,7 @@ export const streamOpenAI: StreamFunction<'openai'> = (
             stream.push({
               type: 'thinking_start',
               contentIndex: blockIndex(),
-              message: { ...output, timestamp: Date.now() },
+              message: output,
             });
           } else if (item.type === 'message') {
             currentItem = item;
@@ -104,7 +104,7 @@ export const streamOpenAI: StreamFunction<'openai'> = (
             stream.push({
               type: 'text_start',
               contentIndex: blockIndex(),
-              message: { ...output, timestamp: Date.now() },
+              message: output,
             });
           } else if (item.type === 'function_call') {
             currentItem = item;
@@ -119,7 +119,7 @@ export const streamOpenAI: StreamFunction<'openai'> = (
             stream.push({
               type: 'toolcall_start',
               contentIndex: blockIndex(),
-              message: { ...output, timestamp: Date.now() },
+              message: output,
             });
           }
         }
@@ -145,7 +145,7 @@ export const streamOpenAI: StreamFunction<'openai'> = (
                 type: 'thinking_delta',
                 contentIndex: blockIndex(),
                 delta: event.delta,
-                message: { ...output, timestamp: Date.now() },
+                message: output,
               });
             }
           }
@@ -167,7 +167,7 @@ export const streamOpenAI: StreamFunction<'openai'> = (
                 type: 'thinking_delta',
                 contentIndex: blockIndex(),
                 delta: '\n\n',
-                message: { ...output, timestamp: Date.now() },
+                message: output,
               });
             }
           }
@@ -196,7 +196,7 @@ export const streamOpenAI: StreamFunction<'openai'> = (
                 type: 'text_delta',
                 contentIndex: blockIndex(),
                 delta: event.delta,
-                message: { ...output, timestamp: Date.now() },
+                message: output,
               });
             }
           }
@@ -218,7 +218,7 @@ export const streamOpenAI: StreamFunction<'openai'> = (
                 type: 'text_delta',
                 contentIndex: blockIndex(),
                 delta: event.delta,
-                message: { ...output, timestamp: Date.now() },
+                message: output,
               });
             }
           }
@@ -237,7 +237,7 @@ export const streamOpenAI: StreamFunction<'openai'> = (
               type: 'toolcall_delta',
               contentIndex: blockIndex(),
               delta: event.delta,
-              message: { ...output, timestamp: Date.now() },
+              message: output,
             });
           }
         }
@@ -251,7 +251,7 @@ export const streamOpenAI: StreamFunction<'openai'> = (
               type: 'thinking_end',
               contentIndex: blockIndex(),
               content: currentBlock.thinkingText,
-              message: { ...output, timestamp: Date.now() },
+              message: output,
             });
             currentBlock = null;
           } else if (item.type === 'message' && currentBlock && currentBlock.type === 'response') {
@@ -265,7 +265,7 @@ export const streamOpenAI: StreamFunction<'openai'> = (
               type: 'text_end',
               contentIndex: blockIndex(),
               content: currentBlock.content,
-              message: { ...output, timestamp: Date.now() },
+              message: output,
             });
             currentBlock = null;
           } else if (item.type === 'function_call') {
@@ -296,7 +296,7 @@ export const streamOpenAI: StreamFunction<'openai'> = (
               type: 'toolcall_end',
               contentIndex: blockIndex(),
               toolCall,
-              message: { ...output, timestamp: Date.now() },
+              message: output,
             });
           }
         }

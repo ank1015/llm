@@ -117,14 +117,14 @@ export const streamGoogle: StreamFunction<'google'> = (
                       type: 'text_end',
                       contentIndex: blocks.length - 1,
                       content: currentBlock.content,
-                      message: { ...output, timestamp: Date.now() },
+                      message: output,
                     });
                   } else {
                     stream.push({
                       type: 'thinking_end',
                       contentIndex: blockIndex(),
                       content: currentBlock.thinkingText,
-                      message: { ...output, timestamp: Date.now() },
+                      message: output,
                     });
                   }
                 }
@@ -134,7 +134,7 @@ export const streamGoogle: StreamFunction<'google'> = (
                   stream.push({
                     type: 'thinking_start',
                     contentIndex: blockIndex(),
-                    message: { ...output, timestamp: Date.now() },
+                    message: output,
                   });
                 } else {
                   currentBlock = { type: 'response', content: [{ type: 'text', content: '' }] };
@@ -142,7 +142,7 @@ export const streamGoogle: StreamFunction<'google'> = (
                   stream.push({
                     type: 'text_start',
                     contentIndex: blockIndex(),
-                    message: { ...output, timestamp: Date.now() },
+                    message: output,
                   });
                 }
               }
@@ -152,7 +152,7 @@ export const streamGoogle: StreamFunction<'google'> = (
                   type: 'thinking_delta',
                   contentIndex: blockIndex(),
                   delta: part.text,
-                  message: { ...output, timestamp: Date.now() },
+                  message: output,
                 });
               } else {
                 const index = currentBlock.content.findIndex((c) => c.type === 'text');
@@ -163,7 +163,7 @@ export const streamGoogle: StreamFunction<'google'> = (
                   type: 'text_delta',
                   contentIndex: blockIndex(),
                   delta: part.text,
-                  message: { ...output, timestamp: Date.now() },
+                  message: output,
                 });
               }
             }
@@ -175,14 +175,14 @@ export const streamGoogle: StreamFunction<'google'> = (
                     type: 'text_end',
                     contentIndex: blockIndex(),
                     content: currentBlock.content,
-                    message: { ...output, timestamp: Date.now() },
+                    message: output,
                   });
                 } else {
                   stream.push({
                     type: 'thinking_end',
                     contentIndex: blockIndex(),
                     content: currentBlock.thinkingText,
-                    message: { ...output, timestamp: Date.now() },
+                    message: output,
                   });
                 }
                 currentBlock = null;
@@ -225,19 +225,19 @@ export const streamGoogle: StreamFunction<'google'> = (
               stream.push({
                 type: 'toolcall_start',
                 contentIndex: blockIndex(),
-                message: { ...output, timestamp: Date.now() },
+                message: output,
               });
               stream.push({
                 type: 'toolcall_delta',
                 contentIndex: blockIndex(),
                 delta: JSON.stringify(toolCall.arguments),
-                message: { ...output, timestamp: Date.now() },
+                message: output,
               });
               stream.push({
                 type: 'toolcall_end',
                 contentIndex: blockIndex(),
                 toolCall,
-                message: { ...output, timestamp: Date.now() },
+                message: output,
               });
             }
           }
@@ -279,14 +279,14 @@ export const streamGoogle: StreamFunction<'google'> = (
             type: 'text_end',
             contentIndex: blockIndex(),
             content: currentBlock.content,
-            message: { ...output, timestamp: Date.now() },
+            message: output,
           });
         } else {
           stream.push({
             type: 'thinking_end',
             contentIndex: blockIndex(),
             content: currentBlock.thinkingText,
-            message: { ...output, timestamp: Date.now() },
+            message: output,
           });
         }
       }
