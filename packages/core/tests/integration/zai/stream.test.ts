@@ -643,15 +643,47 @@ describe('Zai Stream Integration', () => {
         systemPrompt: 'You are a helpful assistant.',
       };
 
-      const stream = streamZai(model, context, { apiKey }, 'test-msg-21');
+      console.log('[zai/stream] system prompt test started at', new Date().toISOString());
+      console.log('[zai/stream] model:', model.id, 'baseUrl:', model.baseUrl);
+      const startTime = Date.now();
 
-      for await (const _ of stream) {
-        // Consume
+      try {
+        const stream = streamZai(model, context, { apiKey }, 'test-msg-21');
+        console.log('[zai/stream] stream created in', Date.now() - startTime, 'ms');
+
+        let eventCount = 0;
+        for await (const event of stream) {
+          eventCount++;
+          if (eventCount <= 3 || event.type === 'done' || event.type === 'error') {
+            console.log(
+              '[zai/stream] event #' + eventCount + ':',
+              event.type,
+              'at',
+              Date.now() - startTime,
+              'ms'
+            );
+          }
+        }
+        console.log(
+          '[zai/stream] stream consumed:',
+          eventCount,
+          'events in',
+          Date.now() - startTime,
+          'ms'
+        );
+
+        const result = await stream.result();
+        console.log('[zai/stream] stopReason:', result.stopReason);
+        console.log('[zai/stream] errorMessage:', result.errorMessage);
+        console.log('[zai/stream] content blocks:', result.content.length);
+
+        expect(result.stopReason).toBe('stop');
+      } catch (error) {
+        console.log('[zai/stream] FAILED after', Date.now() - startTime, 'ms');
+        console.log('[zai/stream] error:', error);
+        throw error;
       }
-
-      const result = await stream.result();
-      expect(result.stopReason).toBe('stop');
-    }, 30000);
+    }, 60000);
   });
 
   describe('native message format', () => {

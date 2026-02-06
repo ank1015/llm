@@ -35,6 +35,9 @@ export * from './providers/kimi/index.js';
 // LLM - Central entry point (dispatches to providers)
 export { complete, stream } from './llm/index.js';
 
+// Provider registry - for custom providers
+export { registerProvider } from './providers/registry.js';
+
 // Agent - Stateless agent loop and utilities
 export {
   runAgentLoop,

@@ -1,15 +1,10 @@
 /**
  * Central stream function
  *
- * Dispatches to the appropriate provider based on the API type.
+ * Dispatches to the appropriate provider via the provider registry.
  */
 
-import { streamAnthropic } from '../providers/anthropic/stream.js';
-import { streamDeepSeek } from '../providers/deepseek/stream.js';
-import { streamGoogle } from '../providers/google/stream.js';
-import { streamKimi } from '../providers/kimi/stream.js';
-import { streamOpenAI } from '../providers/openai/stream.js';
-import { streamZai } from '../providers/zai/stream.js';
+import { getProviderStream } from '../providers/registry.js';
 
 import type { AssistantMessageEventStream } from '../utils/event-stream.js';
 import type { Api, Context, Model, OptionsForApi } from '@ank1015/llm-types';
@@ -29,58 +24,11 @@ export function stream<TApi extends Api>(
   options: OptionsForApi<TApi>,
   id: string
 ): AssistantMessageEventStream<TApi> {
-  switch (model.api) {
-    case 'anthropic':
-      return streamAnthropic(
-        model as Model<'anthropic'>,
-        context,
-        options as OptionsForApi<'anthropic'>,
-        id
-      ) as unknown as AssistantMessageEventStream<TApi>;
-
-    case 'openai':
-      return streamOpenAI(
-        model as Model<'openai'>,
-        context,
-        options as OptionsForApi<'openai'>,
-        id
-      ) as unknown as AssistantMessageEventStream<TApi>;
-
-    case 'google':
-      return streamGoogle(
-        model as Model<'google'>,
-        context,
-        options as OptionsForApi<'google'>,
-        id
-      ) as unknown as AssistantMessageEventStream<TApi>;
-
-    case 'deepseek':
-      return streamDeepSeek(
-        model as Model<'deepseek'>,
-        context,
-        options as OptionsForApi<'deepseek'>,
-        id
-      ) as unknown as AssistantMessageEventStream<TApi>;
-
-    case 'zai':
-      return streamZai(
-        model as Model<'zai'>,
-        context,
-        options as OptionsForApi<'zai'>,
-        id
-      ) as unknown as AssistantMessageEventStream<TApi>;
-
-    case 'kimi':
-      return streamKimi(
-        model as Model<'kimi'>,
-        context,
-        options as OptionsForApi<'kimi'>,
-        id
-      ) as unknown as AssistantMessageEventStream<TApi>;
-
-    default: {
-      const _exhaustive: never = model.api;
-      throw new Error(`Unsupported API: ${_exhaustive}`);
-    }
+  const providerStream = getProviderStream(model.api);
+  if (!providerStream) {
+    throw new Error(
+      `Unsupported API: ${model.api}. Use registerProvider() to add custom providers.`
+    );
   }
+  return providerStream(model, context, options, id) as AssistantMessageEventStream<TApi>;
 }

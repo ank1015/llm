@@ -113,11 +113,26 @@ describe('Zai Complete Integration', () => {
         systemPrompt: 'You are a helpful math tutor.',
       };
 
-      const result = await complete(model, context, { apiKey }, 'test-msg-5');
+      console.log('[zai/complete] system prompt test started at', new Date().toISOString());
+      console.log('[zai/complete] model:', model.id, 'baseUrl:', model.baseUrl);
+      const startTime = Date.now();
 
-      expect(result.stopReason).toBe('stop');
-      expect(result.content.length).toBeGreaterThan(0);
-    }, 30000);
+      try {
+        const result = await complete(model, context, { apiKey }, 'test-msg-5');
+        console.log('[zai/complete] completed in', Date.now() - startTime, 'ms');
+        console.log('[zai/complete] stopReason:', result.stopReason);
+        console.log('[zai/complete] errorMessage:', result.errorMessage);
+        console.log('[zai/complete] content blocks:', result.content.length);
+        console.log('[zai/complete] usage:', JSON.stringify(result.usage));
+
+        expect(result.stopReason).toBe('stop');
+        expect(result.content.length).toBeGreaterThan(0);
+      } catch (error) {
+        console.log('[zai/complete] FAILED after', Date.now() - startTime, 'ms');
+        console.log('[zai/complete] error:', error);
+        throw error;
+      }
+    }, 60000);
   });
 
   describe('usage tracking', () => {

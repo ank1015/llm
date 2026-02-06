@@ -252,12 +252,29 @@ describe('OpenAI Stream Integration', () => {
         ],
       };
 
+      console.log('[openai/stream] tool call test started at', new Date().toISOString());
+      const startTime = Date.now();
+
       const stream = streamOpenAI(model, context, { apiKey }, 'test-msg-9');
 
       const events: BaseAssistantEvent<'openai'>[] = [];
       for await (const event of stream) {
         events.push(event);
       }
+
+      console.log(
+        '[openai/stream] stream consumed:',
+        events.length,
+        'events in',
+        Date.now() - startTime,
+        'ms'
+      );
+      console.log('[openai/stream] event types:', events.map((e) => e.type).join(', '));
+
+      const result = await stream.result();
+      console.log('[openai/stream] stopReason:', result.stopReason);
+      console.log('[openai/stream] content types:', result.content.map((c) => c.type).join(', '));
+      console.log('[openai/stream] errorMessage:', result.errorMessage);
 
       const toolcallStart = events.find((e) => e.type === 'toolcall_start');
       const toolcallEnd = events.find((e) => e.type === 'toolcall_end');
