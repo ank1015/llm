@@ -37,7 +37,11 @@ export { resolveApiKey } from './utils/resolve-key.js';
 
 // Agent
 export { Conversation } from './agent/index.js';
-export type { ConversationExternalCallback, ConversationOptions } from './agent/index.js';
+export type {
+  ConversationExternalCallback,
+  ConversationOptions,
+  ConversationSessionConfig,
+} from './agent/index.js';
 
 // Session Manager
 export { SessionManager, createSessionManager } from './session/index.js';

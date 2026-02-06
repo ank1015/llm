@@ -12,11 +12,16 @@ import {
   complete as coreComplete,
   stream as coreStream,
 } from '@ank1015/llm-core';
-import { ConversationBusyError, CostLimitError, ModelNotConfiguredError } from '@ank1015/llm-types';
+import {
+  ConversationBusyError,
+  CostLimitError,
+  ModelNotConfiguredError,
+  SessionNotFoundError,
+} from '@ank1015/llm-types';
 
 import { resolveApiKey } from '../utils/resolve-key.js';
 
-import type { KeysAdapter, UsageAdapter } from '../adapters/types.js';
+import type { KeysAdapter, UsageAdapter, SessionsAdapter } from '../adapters/types.js';
 import type { AgentRunnerCallbacks, AgentRunnerConfig } from '@ank1015/llm-core';
 import type {
   Api,
@@ -31,6 +36,22 @@ import type {
   AgentTool,
 } from '@ank1015/llm-types';
 
+/**
+ * Configuration for optional session persistence.
+ */
+export interface ConversationSessionConfig {
+  /** Project name for the session */
+  projectName: string;
+  /** Path within the project (default: '') */
+  path?: string;
+  /** Session ID to resume — omit to auto-create on first message */
+  sessionId?: string;
+  /** Session name used when auto-creating (ignored if sessionId is provided) */
+  sessionName?: string;
+  /** Branch name (default: 'main') */
+  branch?: string;
+}
+
 export interface ConversationOptions {
   /** Initial state for the conversation */
   initialState?: Partial<AgentState>;
@@ -42,6 +63,10 @@ export interface ConversationOptions {
   keysAdapter?: KeysAdapter;
   /** Adapter for tracking usage */
   usageAdapter?: UsageAdapter;
+  /** Adapter for session persistence */
+  sessionsAdapter?: SessionsAdapter;
+  /** Optional session configuration (requires sessionsAdapter) */
+  session?: ConversationSessionConfig;
   /** Optional cost limit */
   costLimit?: number;
   /** Optional context limit */
@@ -84,6 +109,16 @@ export class Conversation {
   private runningPrompt?: Promise<void>;
   private resolveRunningPrompt?: () => void;
   private streamAssistantMessage: boolean = true;
+  private sessionConfig?: ConversationSessionConfig;
+  private persistence?: {
+    adapter: SessionsAdapter;
+    projectName: string;
+    path: string;
+    sessionId?: string;
+    branch: string;
+    lastNodeId?: string;
+  };
+  private persistenceChain: Promise<void> = Promise.resolve();
 
   constructor(opts: ConversationOptions = {}) {
     const initialState = opts.initialState ?? {};
@@ -94,6 +129,21 @@ export class Conversation {
       this.usageAdapter = opts.usageAdapter;
     }
     this.streamAssistantMessage = opts.streamAssistantMessage ?? true;
+
+    // Set up persistence if session config and adapter are provided
+    if (opts.session && opts.sessionsAdapter) {
+      this.sessionConfig = opts.session;
+      const p: typeof this.persistence = {
+        adapter: opts.sessionsAdapter,
+        projectName: opts.session.projectName,
+        path: opts.session.path ?? '',
+        branch: opts.session.branch ?? 'main',
+      };
+      if (opts.session.sessionId) {
+        p.sessionId = opts.session.sessionId;
+      }
+      this.persistence = p;
+    }
 
     // Create fresh copies of reference types
     const state: AgentState = {
@@ -339,6 +389,69 @@ export class Conversation {
     return resolveApiKey(this._state.provider.model.api, providerOptions, this.keysAdapter);
   }
 
+  /**
+   * Initialize persistence on first use: validate existing session or prepare for auto-creation.
+   */
+  private async initializePersistence(): Promise<void> {
+    if (!this.persistence || this.persistence.lastNodeId) return;
+
+    const { adapter, projectName, path, sessionId, branch } = this.persistence;
+
+    if (sessionId) {
+      const session = await adapter.getSession({ projectName, path, sessionId });
+      if (!session) throw new SessionNotFoundError(sessionId);
+
+      this.persistence.sessionId = sessionId;
+      // Find the latest node on the current branch
+      const branchNodes = session.nodes.filter((n) => n.branch === branch);
+      const latest = branchNodes[branchNodes.length - 1];
+      this.persistence.lastNodeId = latest?.id ?? session.header.id;
+    }
+  }
+
+  /**
+   * Persist a message to the session store.
+   */
+  private async persistMessage(message: Message): Promise<void> {
+    if (!this.persistence) return;
+
+    const { adapter, projectName, path, branch } = this.persistence;
+
+    // Auto-create session on first message if no sessionId
+    if (!this.persistence.sessionId) {
+      const createInput: { projectName: string; path?: string; sessionName?: string } = {
+        projectName,
+      };
+      if (path) createInput.path = path;
+      if (this.sessionConfig?.sessionName) createInput.sessionName = this.sessionConfig.sessionName;
+      const { sessionId, header } = await adapter.createSession(createInput);
+      this.persistence.sessionId = sessionId;
+      this.persistence.lastNodeId = header.id;
+    }
+
+    const parentId = this.persistence.lastNodeId!;
+
+    const { node } = await adapter.appendMessage({
+      projectName,
+      path,
+      sessionId: this.persistence.sessionId,
+      parentId,
+      branch,
+      message,
+      api: this._state.provider.model.api,
+      modelId: this._state.provider.model.id,
+    });
+
+    this.persistence.lastNodeId = node.id;
+  }
+
+  /**
+   * Queue a persistence operation. Errors are caught and stored for later inspection.
+   */
+  private queuePersistence(message: Message): void {
+    this.persistenceChain = this.persistenceChain.then(() => this.persistMessage(message));
+  }
+
   private async _prepareRun(): Promise<{
     llmMessages: Message[];
     cfg: AgentRunnerConfig;
@@ -351,6 +464,9 @@ export class Conversation {
     if (this._state.costLimit && this._state.usage.totalCost >= this._state.costLimit) {
       throw new CostLimitError(this._state.usage.totalCost, this._state.costLimit);
     }
+
+    // Initialize persistence (validate session, load latest node)
+    await this.initializePersistence();
 
     // Resolve API key before starting
     const apiKey = await this._resolveApiKey();
@@ -502,6 +618,7 @@ export class Conversation {
         message: userMessage,
       });
       this.appendMessage(userMessage);
+      this.queuePersistence(userMessage);
       callbackQueue.enqueue(userMessage);
 
       const callbacks = this._createRunnerCallbacks(callbackQueue.enqueue);
@@ -519,6 +636,7 @@ export class Conversation {
       }
 
       await callbackQueue.flush();
+      await this.persistenceChain;
       return result.messages;
     } catch (e) {
       this._state.error = e instanceof Error ? e.message : String(e);
@@ -561,6 +679,7 @@ export class Conversation {
       }
 
       await callbackQueue.flush();
+      await this.persistenceChain;
       return result.messages;
     } catch (e) {
       this._state.error = e instanceof Error ? e.message : String(e);
@@ -577,6 +696,7 @@ export class Conversation {
       appendMessage: (m) => {
         this.appendMessage(m);
         onMessageAppended?.(m);
+        this.queuePersistence(m);
       },
       appendMessages: (ms) => {
         this.appendMessages(ms);
@@ -584,6 +704,9 @@ export class Conversation {
           for (const message of ms) {
             onMessageAppended(message);
           }
+        }
+        for (const m of ms) {
+          this.queuePersistence(m);
         }
       },
       addPendingToolCall: (id) => this._state.pendingToolCalls.add(id),

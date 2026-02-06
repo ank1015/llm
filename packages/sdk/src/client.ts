@@ -95,16 +95,19 @@ export class LLMClient {
    * Create a Conversation with adapters auto-wired from this client.
    */
   createConversation(
-    opts: Omit<ConversationOptions, 'keysAdapter' | 'usageAdapter'> & {
+    opts: Omit<ConversationOptions, 'keysAdapter' | 'usageAdapter' | 'sessionsAdapter'> & {
       keysAdapter?: KeysAdapter;
       usageAdapter?: UsageAdapter;
+      sessionsAdapter?: SessionsAdapter;
     } = {}
   ): Conversation {
     const convOpts: ConversationOptions = { ...opts };
     const keys = opts.keysAdapter ?? this.keys;
     const usage = opts.usageAdapter ?? this.usage;
+    const sessions = opts.sessionsAdapter ?? this.sessions;
     if (keys) convOpts.keysAdapter = keys;
     if (usage) convOpts.usageAdapter = usage;
+    if (sessions) convOpts.sessionsAdapter = sessions;
     return new Conversation(convOpts);
   }
 
