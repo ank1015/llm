@@ -74,18 +74,12 @@ export {
   buildToolResultMessage,
   getMockMessage,
   // Provider-specific functions
-  completeAnthropic,
   streamAnthropic,
-  completeOpenAI,
   streamOpenAI,
-  completeGoogle,
   streamGoogle,
   GoogleThinkingLevel,
-  completeDeepSeek,
   streamDeepSeek,
-  completeZai,
   streamZai,
-  completeKimi,
   streamKimi,
 } from '@ank1015/llm-core';
 

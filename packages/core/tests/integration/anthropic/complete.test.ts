@@ -1,8 +1,8 @@
 import { Type } from '@sinclair/typebox';
 import { beforeAll, describe, expect, it } from 'vitest';
 
+import { complete } from '../../../src/llm/complete.js';
 import { getModel } from '../../../src/models.js';
-import { completeAnthropic } from '../../../src/providers/anthropic/complete.js';
 
 import type { Context, Model } from '@ank1015/llm-types';
 
@@ -34,12 +34,7 @@ describe('Anthropic Complete Integration', () => {
         ],
       };
 
-      const result = await completeAnthropic(
-        model,
-        context,
-        { apiKey, max_tokens: 2000 },
-        'test-msg-1'
-      );
+      const result = await complete(model, context, { apiKey, max_tokens: 2000 }, 'test-msg-1');
       expect(result.role).toBe('assistant');
       expect(result.id).toBe('test-msg-1');
       expect(result.api).toBe('anthropic');
@@ -61,12 +56,7 @@ describe('Anthropic Complete Integration', () => {
         ],
       };
 
-      const result = await completeAnthropic(
-        model,
-        context,
-        { apiKey, max_tokens: 2000 },
-        'test-msg-2'
-      );
+      const result = await complete(model, context, { apiKey, max_tokens: 2000 }, 'test-msg-2');
 
       expect(result.message).toBeDefined();
       expect(result.message).toHaveProperty('id');
@@ -88,12 +78,7 @@ describe('Anthropic Complete Integration', () => {
         ],
       };
 
-      const result = await completeAnthropic(
-        model,
-        context,
-        { apiKey, max_tokens: 2000 },
-        'test-msg-3'
-      );
+      const result = await complete(model, context, { apiKey, max_tokens: 2000 }, 'test-msg-3');
 
       expect(result.duration).toBeGreaterThan(0);
       expect(typeof result.duration).toBe('number');
@@ -110,12 +95,7 @@ describe('Anthropic Complete Integration', () => {
         ],
       };
 
-      const result = await completeAnthropic(
-        model,
-        context,
-        { apiKey, max_tokens: 2000 },
-        'test-msg-4'
-      );
+      const result = await complete(model, context, { apiKey, max_tokens: 2000 }, 'test-msg-4');
 
       expect(result.content.length).toBeGreaterThan(0);
       const textContent = result.content.find((c) => c.type === 'response');
@@ -134,12 +114,7 @@ describe('Anthropic Complete Integration', () => {
         systemPrompt: 'You are a helpful math tutor.',
       };
 
-      const result = await completeAnthropic(
-        model,
-        context,
-        { apiKey, max_tokens: 2000 },
-        'test-msg-5'
-      );
+      const result = await complete(model, context, { apiKey, max_tokens: 2000 }, 'test-msg-5');
 
       expect(result.stopReason).toBe('stop');
       expect(result.content.length).toBeGreaterThan(0);
@@ -158,12 +133,7 @@ describe('Anthropic Complete Integration', () => {
         ],
       };
 
-      const result = await completeAnthropic(
-        model,
-        context,
-        { apiKey, max_tokens: 2000 },
-        'test-msg-6'
-      );
+      const result = await complete(model, context, { apiKey, max_tokens: 2000 }, 'test-msg-6');
       console.log('result0');
       console.log(result);
 
@@ -187,12 +157,7 @@ describe('Anthropic Complete Integration', () => {
         ],
       };
 
-      const result = await completeAnthropic(
-        model,
-        context,
-        { apiKey, max_tokens: 2000 },
-        'test-msg-7'
-      );
+      const result = await complete(model, context, { apiKey, max_tokens: 2000 }, 'test-msg-7');
       console.log('result1');
       console.log(result);
 
@@ -227,12 +192,7 @@ describe('Anthropic Complete Integration', () => {
         ],
       };
 
-      const result = await completeAnthropic(
-        model,
-        context,
-        { apiKey, max_tokens: 2000 },
-        'test-msg-9'
-      );
+      const result = await complete(model, context, { apiKey, max_tokens: 2000 }, 'test-msg-9');
 
       // Should return a tool call
       expect(result.stopReason).toBe('toolUse');
@@ -266,12 +226,7 @@ describe('Anthropic Complete Integration', () => {
         ],
       };
 
-      const result = await completeAnthropic(
-        model,
-        context,
-        { apiKey, max_tokens: 2000 },
-        'test-msg-10'
-      );
+      const result = await complete(model, context, { apiKey, max_tokens: 2000 }, 'test-msg-10');
 
       const toolCall = result.content.find((c) => c.type === 'toolCall');
       if (toolCall && toolCall.type === 'toolCall') {
@@ -301,12 +256,7 @@ describe('Anthropic Complete Integration', () => {
         ],
       };
 
-      const result1 = await completeAnthropic(
-        model,
-        context1,
-        { apiKey, max_tokens: 2000 },
-        'test-msg-11a'
-      );
+      const result1 = await complete(model, context1, { apiKey, max_tokens: 2000 }, 'test-msg-11a');
 
       const toolCall = result1.content.find((c) => c.type === 'toolCall');
       expect(toolCall).toBeDefined();
@@ -342,7 +292,7 @@ describe('Anthropic Complete Integration', () => {
           ],
         };
 
-        const result2 = await completeAnthropic(
+        const result2 = await complete(
           model,
           context2,
           { apiKey, max_tokens: 2000 },
@@ -367,7 +317,7 @@ describe('Anthropic Complete Integration', () => {
         ],
       };
 
-      const result = await completeAnthropic(
+      const result = await complete(
         model,
         context,
         { apiKey: 'invalid-key-12345', max_tokens: 2000 },
@@ -397,7 +347,7 @@ describe('Anthropic Complete Integration', () => {
       // Abort immediately
       setTimeout(() => controller.abort(), 10);
 
-      const result = await completeAnthropic(
+      const result = await complete(
         model,
         context,
         { apiKey, signal: controller.signal, max_tokens: 2000 },
@@ -464,12 +414,7 @@ describe('Anthropic Complete Integration', () => {
         ],
       };
 
-      const result = await completeAnthropic(
-        model,
-        context,
-        { apiKey, max_tokens: 2000 },
-        'test-msg-14'
-      );
+      const result = await complete(model, context, { apiKey, max_tokens: 2000 }, 'test-msg-14');
 
       expect(result.stopReason).toBe('stop');
       // Response should reference the name Alice
@@ -522,12 +467,7 @@ describe('Anthropic Complete Integration', () => {
         ],
       };
 
-      const result = await completeAnthropic(
-        model,
-        context,
-        { apiKey, max_tokens: 2000 },
-        'test-handoff-1'
-      );
+      const result = await complete(model, context, { apiKey, max_tokens: 2000 }, 'test-handoff-1');
 
       expect(result.stopReason).toBe('stop');
       expect(result.content.length).toBeGreaterThan(0);
@@ -583,7 +523,7 @@ describe('Anthropic Complete Integration', () => {
         ],
       };
 
-      const result = await completeAnthropic(
+      const result = await complete(
         model,
         context,
         { apiKey, max_tokens: 2000 },
@@ -654,7 +594,7 @@ describe('Anthropic Complete Integration', () => {
         ],
       };
 
-      const result = await completeAnthropic(
+      const result = await complete(
         model,
         context,
         { apiKey, max_tokens: 2000 },
@@ -683,12 +623,7 @@ describe('Anthropic Complete Integration', () => {
         ],
       };
 
-      const result = await completeAnthropic(
-        model,
-        context,
-        { apiKey, max_tokens: 4000 },
-        'test-msg-15'
-      );
+      const result = await complete(model, context, { apiKey, max_tokens: 4000 }, 'test-msg-15');
 
       expect(result.stopReason).toBe('stop');
       expect(result.content.length).toBeGreaterThan(0);

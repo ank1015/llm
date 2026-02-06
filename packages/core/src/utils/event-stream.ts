@@ -57,6 +57,19 @@ export class EventStream<T, R = T> implements AsyncIterable<T> {
   result(): Promise<R> {
     return this.finalResultPromise;
   }
+
+  /**
+   * Drains all stream events (preventing queue buildup) and returns the final result.
+   * Use this when you need the final result but don't care about intermediate events.
+   */
+  async drain(): Promise<R> {
+    // Consume all events to prevent unbounded queue growth
+     
+    for await (const _ of this) {
+      // discard
+    }
+    return this.finalResultPromise;
+  }
 }
 
 export class AssistantMessageEventStream<TApi extends Api> extends EventStream<

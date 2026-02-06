@@ -1,10 +1,8 @@
 import OpenAI from 'openai';
 
-import { calculateCost } from '../../models.js';
 import { sanitizeSurrogates } from '../../utils/sanitize-unicode.js';
 
 import type {
-  AssistantResponse,
   BaseAssistantMessage,
   Context,
   Model,
@@ -12,7 +10,6 @@ import type {
   StopReason,
   TextContent,
   Tool,
-  Usage,
 } from '@ank1015/llm-types';
 import type {
   Tool as OpenAITool,
@@ -36,87 +33,6 @@ export function createClient(model: Model<'openai'>, apiKey: string) {
     dangerouslyAllowBrowser: true,
     defaultHeaders: model.headers,
   });
-}
-
-export function getResponseAssistantResponse(response: Response): AssistantResponse {
-  const assistantResponse: AssistantResponse = [];
-
-  if (response.output) {
-    for (const item of response.output) {
-      if (item.type === 'reasoning' && item.summary) {
-        // Convert reasoning to thinking content
-        const thinkingText = item.summary.map((s) => s.text).join('\n\n');
-        assistantResponse.push({
-          type: 'thinking',
-          thinkingText: thinkingText,
-        });
-      } else if (item.type === 'message' && item.content) {
-        // Convert message to text content
-        const textContent = item.content
-          .map((c) => {
-            if (c.type === 'output_text') return c.text;
-            if (c.type === 'refusal') return c.refusal;
-            return '';
-          })
-          .join('');
-
-        if (textContent) {
-          assistantResponse.push({
-            type: 'response',
-            content: [
-              {
-                type: 'text',
-                content: textContent,
-              },
-            ],
-          });
-        }
-      } else if (item.type === 'image_generation_call' && item.result) {
-        assistantResponse.push({
-          type: 'response',
-          content: [
-            {
-              type: 'image',
-              data: item.result,
-              mimeType: 'image/png',
-            },
-          ],
-        });
-      } else if (item.type === 'function_call') {
-        // Convert function call to tool call
-        assistantResponse.push({
-          type: 'toolCall',
-          toolCallId: item.call_id,
-          name: item.name,
-          arguments: JSON.parse(item.arguments || '{}'),
-        });
-      }
-    }
-  }
-
-  return assistantResponse;
-}
-
-export function getResponseUsage(response: Response, model: Model<'openai'>): Usage {
-  const cachedTokens = response.usage?.input_tokens_details?.cached_tokens || 0;
-  const input = (response.usage?.input_tokens || 0) - cachedTokens;
-  const output = response.usage?.output_tokens || 0;
-  const usage: Usage = {
-    input,
-    output,
-    cacheRead: cachedTokens,
-    cacheWrite: 0,
-    totalTokens: response.usage?.total_tokens || 0,
-    cost: calculateCost(model, {
-      input,
-      output,
-      cacheRead: cachedTokens,
-      cacheWrite: 0,
-      totalTokens: 0,
-      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-    }),
-  };
-  return usage;
 }
 
 export function buildParams(

@@ -9,11 +9,9 @@ import {
   type ToolListUnion,
 } from '@google/genai';
 
-import { calculateCost } from '../../models.js';
 import { sanitizeSurrogates } from '../../utils/sanitize-unicode.js';
 
 import type {
-  AssistantResponse,
   BaseAssistantMessage,
   Context,
   GoogleProviderOptions,
@@ -21,7 +19,6 @@ import type {
   StopReason,
   TextContent,
   Tool,
-  Usage,
 } from '@ank1015/llm-types';
 import type { TSchema } from '@sinclair/typebox';
 
@@ -36,112 +33,6 @@ export function createClient(model: Model<'google'>, apiKey: string): GoogleGenA
     });
   }
   return new GoogleGenAI({ apiKey });
-}
-
-export function getResponseAssistantResponse(response: GenerateContentResponse): AssistantResponse {
-  const assistantResponse: AssistantResponse = [];
-
-  // Process candidates
-  if (response.candidates) {
-    for (const candidate of response.candidates) {
-      if (candidate.content?.parts) {
-        for (const part of candidate.content.parts) {
-          // Handle text parts (thinking or regular text)
-          if (part.text !== undefined) {
-            const isThinking = part.thought === true;
-
-            if (isThinking) {
-              assistantResponse.push({
-                type: 'thinking',
-                thinkingText: part.text,
-              });
-            } else {
-              assistantResponse.push({
-                type: 'response',
-                content: [{ type: 'text', content: part.text }],
-              });
-            }
-          }
-
-          if (part.inlineData) {
-            const imageData = part.inlineData.data;
-            if (imageData) {
-              assistantResponse.push({
-                type: 'response',
-                content: [
-                  {
-                    type: 'image',
-                    data: imageData,
-                    mimeType: part.inlineData.mimeType || 'image/png',
-                  },
-                ],
-              });
-            }
-          }
-
-          // Handle function calls
-          if (part.functionCall) {
-            const toolCallId =
-              part.functionCall.id || `${part.functionCall.name}_${Date.now()}_${Math.random()}`;
-
-            assistantResponse.push({
-              type: 'toolCall',
-              toolCallId: toolCallId,
-              name: part.functionCall.name || '',
-              arguments: (part.functionCall.args as Record<string, unknown>) || {},
-            });
-          }
-        }
-      }
-    }
-  }
-  return assistantResponse;
-}
-
-export function getAssistantStopReason(response: GenerateContentResponse): StopReason {
-  let finishReason: FinishReason | undefined;
-
-  if (response.candidates) {
-    for (const candidate of response.candidates) {
-      // Capture finish reason from first candidate
-      if (candidate.finishReason && !finishReason) {
-        finishReason = candidate.finishReason;
-      }
-    }
-  }
-  // Map stop reason
-  let stopReason: StopReason = 'stop';
-  if (finishReason) {
-    stopReason = mapStopReason(finishReason);
-  }
-  return stopReason;
-}
-
-export function getResponseUsage(response: GenerateContentResponse, model: Model<'google'>): Usage {
-  // Extract usage information
-  const input =
-    (response.usageMetadata?.promptTokenCount || 0) -
-    (response.usageMetadata?.cachedContentTokenCount || 0);
-  const output =
-    (response.usageMetadata?.candidatesTokenCount || 0) +
-    (response.usageMetadata?.thoughtsTokenCount || 0);
-  const cacheRead = response.usageMetadata?.cachedContentTokenCount || 0;
-  const usage: Usage = {
-    input,
-    output,
-    cacheRead,
-    cacheWrite: 0,
-    totalTokens: response.usageMetadata?.totalTokenCount || 0,
-    cost: calculateCost(model, {
-      input,
-      output,
-      cacheRead,
-      cacheWrite: 0,
-      totalTokens: 0,
-      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-    }),
-  };
-  return usage;
 }
 
 export function buildParams(

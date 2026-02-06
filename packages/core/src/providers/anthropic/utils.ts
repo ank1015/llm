@@ -1,30 +1,24 @@
 import Anthropic from '@anthropic-ai/sdk';
 
-import { calculateCost } from '../../models.js';
 import { sanitizeSurrogates } from '../../utils/sanitize-unicode.js';
 
 import type {
   AnthropicProviderOptions,
-  AssistantResponse,
   BaseAssistantMessage,
   Context,
   Model,
   StopReason,
   TextContent,
   Tool,
-  Usage,
 } from '@ank1015/llm-types';
-import type { RedactedThinkingBlock, ThinkingBlock } from '@anthropic-ai/sdk/resources';
 import type {
   Message as AnthropicMessage,
   ContentBlock,
   ImageBlockParam,
   MessageCreateParamsBase,
   MessageParam,
-  TextBlock,
   TextBlockParam,
   ToolResultBlockParam,
-  ToolUseBlock,
   ToolUseBlockParam,
 } from '@anthropic-ai/sdk/resources/messages.js';
 
@@ -75,79 +69,6 @@ export function createClient(
 
     return { client, isOAuthToken: false };
   }
-}
-
-export function getResponseAssistantResponse(response: AnthropicMessage): AssistantResponse {
-  const assistantResponse: AssistantResponse = [];
-
-  if (response.content) {
-    for (const block of response.content) {
-      // Handle thinking blocks (extended thinking)
-      if (block.type === 'thinking') {
-        const thinkingBlock = block as ThinkingBlock;
-        assistantResponse.push({
-          type: 'thinking',
-          thinkingText: thinkingBlock.thinking,
-        });
-      }
-      // Handle redacted thinking blocks
-      else if (block.type === 'redacted_thinking') {
-        const redactedBlock = block as RedactedThinkingBlock;
-        assistantResponse.push({
-          type: 'thinking',
-          thinkingText: `[Redacted: ${redactedBlock.data}]`,
-        });
-      }
-      // Handle text content
-      else if (block.type === 'text') {
-        const textBlock = block as TextBlock;
-        assistantResponse.push({
-          type: 'response',
-          content: [
-            {
-              type: 'text',
-              content: textBlock.text,
-            },
-          ],
-        });
-      }
-      // Handle tool use
-      else if (block.type === 'tool_use') {
-        const toolBlock = block as ToolUseBlock;
-        assistantResponse.push({
-          type: 'toolCall',
-          toolCallId: toolBlock.id,
-          name: toolBlock.name,
-          arguments: toolBlock.input as Record<string, unknown>,
-        });
-      }
-    }
-  }
-
-  return assistantResponse;
-}
-
-export function getResponseUsage(response: AnthropicMessage, model: Model<'anthropic'>): Usage {
-  const usage: Usage = {
-    input: response.usage.input_tokens,
-    output: response.usage.output_tokens,
-    cacheRead: response.usage.cache_read_input_tokens || 0,
-    cacheWrite: response.usage.cache_creation_input_tokens || 0,
-    totalTokens:
-      response.usage.input_tokens +
-      response.usage.output_tokens +
-      (response.usage.cache_read_input_tokens || 0) +
-      (response.usage.cache_creation_input_tokens || 0),
-    cost: calculateCost(model, {
-      input: response.usage.input_tokens,
-      output: response.usage.output_tokens,
-      cacheRead: response.usage.cache_read_input_tokens || 0,
-      cacheWrite: response.usage.cache_creation_input_tokens || 0,
-      totalTokens: 0,
-      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-    }),
-  };
-  return usage;
 }
 
 export function buildParams(

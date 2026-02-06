@@ -1,8 +1,8 @@
 import { Type } from '@sinclair/typebox';
 import { beforeAll, describe, expect, it } from 'vitest';
 
+import { complete } from '../../../src/llm/complete.js';
 import { getModel } from '../../../src/models.js';
-import { completeOpenAI } from '../../../src/providers/openai/complete.js';
 
 import type { Context, Model } from '@ank1015/llm-types';
 
@@ -35,7 +35,7 @@ describe('OpenAI Complete Integration', () => {
         ],
       };
 
-      const result = await completeOpenAI(model, context, { apiKey }, 'test-msg-1');
+      const result = await complete(model, context, { apiKey }, 'test-msg-1');
 
       expect(result.role).toBe('assistant');
       expect(result.id).toBe('test-msg-1');
@@ -58,7 +58,7 @@ describe('OpenAI Complete Integration', () => {
         ],
       };
 
-      const result = await completeOpenAI(model, context, { apiKey }, 'test-msg-2');
+      const result = await complete(model, context, { apiKey }, 'test-msg-2');
 
       expect(result.message).toBeDefined();
       expect(result.message).toHaveProperty('id');
@@ -77,7 +77,7 @@ describe('OpenAI Complete Integration', () => {
         ],
       };
 
-      const result = await completeOpenAI(model, context, { apiKey }, 'test-msg-3');
+      const result = await complete(model, context, { apiKey }, 'test-msg-3');
 
       expect(result.duration).toBeGreaterThan(0);
       expect(typeof result.duration).toBe('number');
@@ -94,7 +94,7 @@ describe('OpenAI Complete Integration', () => {
         ],
       };
 
-      const result = await completeOpenAI(model, context, { apiKey }, 'test-msg-4');
+      const result = await complete(model, context, { apiKey }, 'test-msg-4');
 
       expect(result.content.length).toBeGreaterThan(0);
       const textContent = result.content.find((c) => c.type === 'response');
@@ -113,7 +113,7 @@ describe('OpenAI Complete Integration', () => {
         systemPrompt: 'You are a helpful math tutor.',
       };
 
-      const result = await completeOpenAI(model, context, { apiKey }, 'test-msg-5');
+      const result = await complete(model, context, { apiKey }, 'test-msg-5');
 
       expect(result.stopReason).toBe('stop');
       expect(result.content.length).toBeGreaterThan(0);
@@ -132,7 +132,7 @@ describe('OpenAI Complete Integration', () => {
         ],
       };
 
-      const result = await completeOpenAI(model, context, { apiKey }, 'test-msg-6');
+      const result = await complete(model, context, { apiKey }, 'test-msg-6');
 
       expect(result.usage).toBeDefined();
       expect(result.usage.input).toBeGreaterThan(0);
@@ -154,7 +154,7 @@ describe('OpenAI Complete Integration', () => {
         ],
       };
 
-      const result = await completeOpenAI(model, context, { apiKey }, 'test-msg-7');
+      const result = await complete(model, context, { apiKey }, 'test-msg-7');
 
       expect(result.usage.cost).toBeDefined();
       expect(result.usage.cost.total).toBeGreaterThan(0);
@@ -187,7 +187,7 @@ describe('OpenAI Complete Integration', () => {
         ],
       };
 
-      const result = await completeOpenAI(model, context, { apiKey }, 'test-msg-8');
+      const result = await complete(model, context, { apiKey }, 'test-msg-8');
 
       // Should return a tool call
       expect(result.stopReason).toBe('toolUse');
@@ -221,7 +221,7 @@ describe('OpenAI Complete Integration', () => {
         ],
       };
 
-      const result = await completeOpenAI(model, context, { apiKey }, 'test-msg-9');
+      const result = await complete(model, context, { apiKey }, 'test-msg-9');
 
       const toolCall = result.content.find((c) => c.type === 'toolCall');
       if (toolCall && toolCall.type === 'toolCall') {
@@ -243,12 +243,7 @@ describe('OpenAI Complete Integration', () => {
         ],
       };
 
-      const result = await completeOpenAI(
-        model,
-        context,
-        { apiKey: 'invalid-key-12345' },
-        'test-msg-10'
-      );
+      const result = await complete(model, context, { apiKey: 'invalid-key-12345' }, 'test-msg-10');
 
       expect(result.stopReason).toBe('error');
       expect(result.errorMessage).toBeDefined();
@@ -273,7 +268,7 @@ describe('OpenAI Complete Integration', () => {
       // Abort immediately
       setTimeout(() => controller.abort(), 10);
 
-      const result = await completeOpenAI(
+      const result = await complete(
         model,
         context,
         { apiKey, signal: controller.signal },
@@ -326,7 +321,7 @@ describe('OpenAI Complete Integration', () => {
         ],
       };
 
-      const result = await completeOpenAI(model, context, { apiKey }, 'test-msg-12');
+      const result = await complete(model, context, { apiKey }, 'test-msg-12');
 
       expect(result.stopReason).toBe('stop');
       // Response should reference the name Alice
@@ -381,7 +376,7 @@ describe('OpenAI Complete Integration', () => {
         ],
       };
 
-      const result = await completeOpenAI(model, context, { apiKey }, 'test-handoff-1');
+      const result = await complete(model, context, { apiKey }, 'test-handoff-1');
 
       expect(result.stopReason).toBe('stop');
       expect(result.content.length).toBeGreaterThan(0);
@@ -437,7 +432,7 @@ describe('OpenAI Complete Integration', () => {
         ],
       };
 
-      const result = await completeOpenAI(model, context, { apiKey }, 'test-handoff-think-1');
+      const result = await complete(model, context, { apiKey }, 'test-handoff-think-1');
 
       expect(result.stopReason).toBe('stop');
       expect(result.content.length).toBeGreaterThan(0);
@@ -503,7 +498,7 @@ describe('OpenAI Complete Integration', () => {
         ],
       };
 
-      const result = await completeOpenAI(model, context, { apiKey }, 'test-handoff-tool-1');
+      const result = await complete(model, context, { apiKey }, 'test-handoff-tool-1');
 
       expect(result.stopReason).toBe('stop');
       expect(result.content.length).toBeGreaterThan(0);

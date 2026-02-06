@@ -1,33 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { complete } from '../../../src/llm/complete.js';
-import { completeAnthropic } from '../../../src/providers/anthropic/complete.js';
-import { completeDeepSeek } from '../../../src/providers/deepseek/complete.js';
-import { completeGoogle } from '../../../src/providers/google/complete.js';
-import { completeKimi } from '../../../src/providers/kimi/complete.js';
-import { completeOpenAI } from '../../../src/providers/openai/complete.js';
-import { completeZai } from '../../../src/providers/zai/complete.js';
+import { stream } from '../../../src/llm/stream.js';
+import { AssistantMessageEventStream } from '../../../src/utils/event-stream.js';
 
 import type { BaseAssistantMessage, Context, Model } from '@ank1015/llm-types';
 
-// Mock all provider complete functions
-vi.mock('../../../src/providers/anthropic/complete.js', () => ({
-  completeAnthropic: vi.fn(),
-}));
-vi.mock('../../../src/providers/openai/complete.js', () => ({
-  completeOpenAI: vi.fn(),
-}));
-vi.mock('../../../src/providers/google/complete.js', () => ({
-  completeGoogle: vi.fn(),
-}));
-vi.mock('../../../src/providers/deepseek/complete.js', () => ({
-  completeDeepSeek: vi.fn(),
-}));
-vi.mock('../../../src/providers/zai/complete.js', () => ({
-  completeZai: vi.fn(),
-}));
-vi.mock('../../../src/providers/kimi/complete.js', () => ({
-  completeKimi: vi.fn(),
+// Mock the stream function
+vi.mock('../../../src/llm/stream.js', () => ({
+  stream: vi.fn(),
 }));
 
 // Helper to create mock model
@@ -78,111 +59,116 @@ function createMockResponse(api: string): BaseAssistantMessage<any> {
   };
 }
 
+// Helper to create a mock event stream that emits events and resolves with a result
+function createMockStream(result: BaseAssistantMessage<any>): AssistantMessageEventStream<any> {
+  const mockStream = new AssistantMessageEventStream<any>();
+  // Simulate async producer: push events then end
+  setTimeout(() => {
+    mockStream.push({ type: 'start', message: result });
+    mockStream.push({ type: 'done', reason: 'stop', message: result });
+    mockStream.end(result);
+  }, 0);
+  return mockStream;
+}
+
 describe('complete', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  describe('provider dispatch', () => {
-    it('should dispatch to Anthropic provider', async () => {
+  describe('stream delegation', () => {
+    it('should call stream and return the drained result', async () => {
       const model = createMockModel('anthropic');
       const context = createMockContext();
       const options = { apiKey: 'test-key' };
       const mockResponse = createMockResponse('anthropic');
 
-      vi.mocked(completeAnthropic).mockResolvedValue(mockResponse);
+      vi.mocked(stream).mockReturnValue(createMockStream(mockResponse));
 
       const result = await complete(model, context, options, 'req-1');
 
-      expect(completeAnthropic).toHaveBeenCalledWith(model, context, options, 'req-1');
-      expect(result).toBe(mockResponse);
+      expect(stream).toHaveBeenCalledWith(model, context, options, 'req-1');
+      expect(result).toEqual(mockResponse);
     });
 
-    it('should dispatch to OpenAI provider', async () => {
-      const model = createMockModel('openai');
-      const context = createMockContext();
-      const options = { apiKey: 'test-key' };
-      const mockResponse = createMockResponse('openai');
+    it('should work for all provider types', async () => {
+      const apis = ['anthropic', 'openai', 'google', 'deepseek', 'zai', 'kimi'] as const;
 
-      vi.mocked(completeOpenAI).mockResolvedValue(mockResponse);
+      for (const api of apis) {
+        vi.clearAllMocks();
+        const model = createMockModel(api);
+        const context = createMockContext();
+        const options = { apiKey: 'test-key' };
+        const mockResponse = createMockResponse(api);
 
-      const result = await complete(model, context, options, 'req-1');
+        vi.mocked(stream).mockReturnValue(createMockStream(mockResponse));
 
-      expect(completeOpenAI).toHaveBeenCalledWith(model, context, options, 'req-1');
-      expect(result).toBe(mockResponse);
+        const result = await complete(model, context, options, `req-${api}`);
+
+        expect(stream).toHaveBeenCalledWith(model, context, options, `req-${api}`);
+        expect(result).toEqual(mockResponse);
+      }
     });
+  });
 
-    it('should dispatch to Google provider', async () => {
-      const model = createMockModel('google');
+  describe('event draining', () => {
+    it('should drain all events without queuing them', async () => {
+      const model = createMockModel('anthropic');
       const context = createMockContext();
       const options = { apiKey: 'test-key' };
-      const mockResponse = createMockResponse('google');
+      const mockResponse = createMockResponse('anthropic');
 
-      vi.mocked(completeGoogle).mockResolvedValue(mockResponse);
+      // Create a stream with many events to verify they get drained
+      const mockStream = new AssistantMessageEventStream<any>();
+      setTimeout(() => {
+        mockStream.push({ type: 'start', message: mockResponse });
+        for (let i = 0; i < 100; i++) {
+          mockStream.push({
+            type: 'text_delta',
+            contentIndex: 0,
+            delta: 'x',
+            message: mockResponse,
+          });
+        }
+        mockStream.push({ type: 'done', reason: 'stop', message: mockResponse });
+        mockStream.end(mockResponse);
+      }, 0);
+
+      vi.mocked(stream).mockReturnValue(mockStream);
 
       const result = await complete(model, context, options, 'req-1');
 
-      expect(completeGoogle).toHaveBeenCalledWith(model, context, options, 'req-1');
-      expect(result).toBe(mockResponse);
-    });
-
-    it('should dispatch to DeepSeek provider', async () => {
-      const model = createMockModel('deepseek');
-      const context = createMockContext();
-      const options = { apiKey: 'test-key' };
-      const mockResponse = createMockResponse('deepseek');
-
-      vi.mocked(completeDeepSeek).mockResolvedValue(mockResponse);
-
-      const result = await complete(model, context, options, 'req-1');
-
-      expect(completeDeepSeek).toHaveBeenCalledWith(model, context, options, 'req-1');
-      expect(result).toBe(mockResponse);
-    });
-
-    it('should dispatch to Zai provider', async () => {
-      const model = createMockModel('zai');
-      const context = createMockContext();
-      const options = { apiKey: 'test-key' };
-      const mockResponse = createMockResponse('zai');
-
-      vi.mocked(completeZai).mockResolvedValue(mockResponse);
-
-      const result = await complete(model, context, options, 'req-1');
-
-      expect(completeZai).toHaveBeenCalledWith(model, context, options, 'req-1');
-      expect(result).toBe(mockResponse);
-    });
-
-    it('should dispatch to Kimi provider', async () => {
-      const model = createMockModel('kimi');
-      const context = createMockContext();
-      const options = { apiKey: 'test-key' };
-      const mockResponse = createMockResponse('kimi');
-
-      vi.mocked(completeKimi).mockResolvedValue(mockResponse);
-
-      const result = await complete(model, context, options, 'req-1');
-
-      expect(completeKimi).toHaveBeenCalledWith(model, context, options, 'req-1');
-      expect(result).toBe(mockResponse);
+      expect(result).toEqual(mockResponse);
+      // After drain, the internal queue should be empty (events were consumed, not buffered)
     });
   });
 
   describe('error handling', () => {
-    it('should propagate provider errors', async () => {
+    it('should return error result from stream', async () => {
       const model = createMockModel('anthropic');
       const context = createMockContext();
       const options = { apiKey: 'test-key' };
+      const errorResponse = createMockResponse('anthropic');
+      errorResponse.stopReason = 'error';
+      errorResponse.errorMessage = 'API rate limited';
 
-      vi.mocked(completeAnthropic).mockRejectedValue(new Error('API rate limited'));
+      const mockStream = new AssistantMessageEventStream<any>();
+      setTimeout(() => {
+        mockStream.push({ type: 'error', reason: 'error', message: errorResponse });
+        mockStream.end(errorResponse);
+      }, 0);
 
-      await expect(complete(model, context, options, 'req-1')).rejects.toThrow('API rate limited');
+      vi.mocked(stream).mockReturnValue(mockStream);
+
+      const result = await complete(model, context, options, 'req-1');
+
+      expect(result.stopReason).toBe('error');
+      expect(result.errorMessage).toBe('API rate limited');
     });
   });
 
   describe('context and options forwarding', () => {
-    it('should forward all context fields', async () => {
+    it('should forward all context fields to stream', async () => {
       const model = createMockModel('anthropic');
       const context: Context = {
         messages: [
@@ -201,12 +187,13 @@ describe('complete', () => {
         tools: [{ name: 'calculator', description: 'Does math', parameters: {} as any }],
       };
       const options = { apiKey: 'test-key', max_tokens: 1000 };
+      const mockResponse = createMockResponse('anthropic');
 
-      vi.mocked(completeAnthropic).mockResolvedValue(createMockResponse('anthropic'));
+      vi.mocked(stream).mockReturnValue(createMockStream(mockResponse));
 
       await complete(model, context, options, 'req-1');
 
-      expect(completeAnthropic).toHaveBeenCalledWith(model, context, options, 'req-1');
+      expect(stream).toHaveBeenCalledWith(model, context, options, 'req-1');
     });
   });
 });

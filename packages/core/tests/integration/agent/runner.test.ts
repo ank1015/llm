@@ -2,8 +2,8 @@ import { Type } from '@sinclair/typebox';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { runAgentLoop } from '../../../src/agent/runner.js';
+import { complete } from '../../../src/llm/complete.js';
 import { getModel } from '../../../src/models.js';
-import { completeAnthropic } from '../../../src/providers/anthropic/complete.js';
 import { streamAnthropic } from '../../../src/providers/anthropic/stream.js';
 
 import type {
@@ -67,7 +67,7 @@ describe('Agent Runner Integration', () => {
         providerOptions: { apiKey, max_tokens: 500 },
       },
       complete: (m, ctx, opts, id) =>
-        completeAnthropic(
+        complete(
           m as Model<'anthropic'>,
           ctx,
           { ...opts, apiKey } as AnthropicProviderOptions,

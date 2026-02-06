@@ -1,10 +1,8 @@
 import OpenAI from 'openai';
 
-import { calculateCost } from '../../models.js';
 import { sanitizeSurrogates } from '../../utils/sanitize-unicode.js';
 
 import type {
-  AssistantResponse,
   BaseAssistantMessage,
   Context,
   DeepSeekProviderOptions,
@@ -12,7 +10,6 @@ import type {
   StopReason,
   TextContent,
   Tool,
-  Usage,
 } from '@ank1015/llm-types';
 import type {
   ChatCompletion,
@@ -22,16 +19,6 @@ import type {
   ChatCompletionTool,
   ChatCompletionToolMessageParam,
 } from 'openai/resources/chat/completions.js';
-
-// Extended types for DeepSeek-specific fields
-interface DeepSeekMessage {
-  reasoning_content?: string | null;
-}
-
-interface DeepSeekUsage {
-  prompt_cache_hit_tokens?: number;
-  prompt_cache_miss_tokens?: number;
-}
 
 export function createClient(model: Model<'deepseek'>, apiKey: string) {
   if (!apiKey) {
@@ -43,86 +30,6 @@ export function createClient(model: Model<'deepseek'>, apiKey: string) {
     dangerouslyAllowBrowser: true,
     defaultHeaders: model.headers,
   });
-}
-
-export function getResponseAssistantResponse(response: ChatCompletion): AssistantResponse {
-  const assistantResponse: AssistantResponse = [];
-  const choice = response.choices[0];
-
-  if (!choice?.message) {
-    return assistantResponse;
-  }
-
-  const message = choice.message as typeof choice.message & DeepSeekMessage;
-
-  // Handle reasoning/thinking content (DeepSeek-specific)
-  if (message.reasoning_content) {
-    assistantResponse.push({
-      type: 'thinking',
-      thinkingText: message.reasoning_content,
-    });
-  }
-
-  // Handle text content
-  if (message.content) {
-    assistantResponse.push({
-      type: 'response',
-      content: [
-        {
-          type: 'text',
-          content: message.content,
-        },
-      ],
-    });
-  }
-
-  // Handle tool calls
-  if (message.tool_calls) {
-    for (const toolCall of message.tool_calls) {
-      // Only handle function tool calls
-      if (toolCall.type === 'function') {
-        assistantResponse.push({
-          type: 'toolCall',
-          toolCallId: toolCall.id,
-          name: toolCall.function.name,
-          arguments: JSON.parse(toolCall.function.arguments || '{}'),
-        });
-      }
-    }
-  }
-
-  return assistantResponse;
-}
-
-export function getAssistantStopReason(response: ChatCompletion): StopReason {
-  const finishReason = response.choices[0]?.finish_reason;
-  return mapStopReason(finishReason);
-}
-
-export function getResponseUsage(response: ChatCompletion, model: Model<'deepseek'>): Usage {
-  const responseUsage = response.usage as (typeof response.usage & DeepSeekUsage) | undefined;
-
-  // DeepSeek reports cache hits via prompt_cache_hit_tokens
-  const cacheHitTokens = responseUsage?.prompt_cache_hit_tokens || 0;
-  const input = (responseUsage?.prompt_tokens || 0) - cacheHitTokens;
-  const output = responseUsage?.completion_tokens || 0;
-
-  const usage: Usage = {
-    input,
-    output,
-    cacheRead: cacheHitTokens,
-    cacheWrite: 0,
-    totalTokens: responseUsage?.total_tokens || 0,
-    cost: calculateCost(model, {
-      input,
-      output,
-      cacheRead: cacheHitTokens,
-      cacheWrite: 0,
-      totalTokens: 0,
-      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-    }),
-  };
-  return usage;
 }
 
 export function buildParams(
