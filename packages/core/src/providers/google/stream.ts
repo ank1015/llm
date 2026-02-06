@@ -296,7 +296,8 @@ export const streamGoogle: StreamFunction<'google'> = (
       }
 
       if (output.stopReason === 'aborted' || output.stopReason === 'error') {
-        throw new Error('An unkown error ocurred');
+        const finishReason = finalResponse.candidates?.[0]?.finishReason ?? 'unknown';
+        throw new Error(`Google stream ended with finish reason: ${finishReason}`);
       }
 
       // Build the complete Content from accumulated parts
