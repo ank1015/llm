@@ -235,6 +235,15 @@ describe('Conversation Execution', () => {
       const conversation = new Conversation({ keysAdapter: mockKeysAdapter });
       conversation.setProvider({ model: mockModel, providerOptions: {} });
 
+      // Mock runAgentLoop to emit lifecycle events like the real runner does
+      vi.mocked(core.runAgentLoop).mockImplementation(async (_cfg, _msgs, emit) => {
+        emit({ type: 'agent_start' });
+        emit({ type: 'turn_start' });
+        emit({ type: 'turn_end' });
+        emit({ type: 'agent_end', totalCost: 0.000105 });
+        return { messages: [mockAssistantMessage], totalCost: 0.000105, aborted: false };
+      });
+
       const events: AgentEvent[] = [];
       conversation.subscribe((e) => events.push(e));
 
@@ -245,6 +254,10 @@ describe('Conversation Execution', () => {
       expect(events.some((e) => e.type === 'turn_start')).toBe(true);
       expect(events.some((e) => e.type === 'message_start')).toBe(true);
       expect(events.some((e) => e.type === 'message_end')).toBe(true);
+
+      // Each lifecycle event should appear exactly once (no duplicates)
+      expect(events.filter((e) => e.type === 'agent_start')).toHaveLength(1);
+      expect(events.filter((e) => e.type === 'turn_start')).toHaveLength(1);
     });
 
     it('should call external callback for messages appended during the run', async () => {

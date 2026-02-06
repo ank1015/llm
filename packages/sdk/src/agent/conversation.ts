@@ -524,8 +524,6 @@ export class Conversation {
     try {
       const { llmMessages, cfg, signal } = await this._prepareRun();
       const updatedMessages = [...llmMessages, userMessage];
-      this.emit({ type: 'agent_start' });
-      this.emit({ type: 'turn_start' });
       this.emit({
         type: 'message_start',
         messageId: userMessage.id,
@@ -582,9 +580,6 @@ export class Conversation {
           `Cannot continue from message role: ${lastMessage.role}. Expected 'user' or 'toolResult'.`
         );
       }
-
-      this.emit({ type: 'agent_start' });
-      this.emit({ type: 'turn_start' });
 
       const callbacks = this._createRunnerCallbacks(callbackQueue.enqueue);
       const result = await runAgentLoop(
