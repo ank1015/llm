@@ -292,12 +292,16 @@ export const streamOpenAI: StreamFunction<'openai'> = (
               }
             }
 
+            // Sync finalized tool call back into output.content
+            output.content[blockIndex()] = toolCall;
+
             stream.push({
               type: 'toolcall_end',
               contentIndex: blockIndex(),
               toolCall,
               message: output,
             });
+            currentBlock = null;
           }
         }
         // Handle completion
