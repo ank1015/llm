@@ -37,6 +37,7 @@ export { complete, stream } from './llm/index.js';
 
 // Provider registry - for custom providers
 export { registerProvider } from './providers/registry.js';
+export type { ProviderRegistration, MockMessageFactory } from './providers/registry.js';
 
 // Agent - Stateless agent loop and utilities
 export {

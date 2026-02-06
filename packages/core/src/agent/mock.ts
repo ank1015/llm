@@ -1,9 +1,4 @@
-import { getMockAnthropicMessage } from '../providers/anthropic/utils.js';
-import { getMockDeepSeekMessage } from '../providers/deepseek/utils.js';
-import { getMockGoogleMessage } from '../providers/google/utils.js';
-import { getMockKimiMessage } from '../providers/kimi/utils.js';
-import { getMockOpenaiMessage } from '../providers/openai/utils.js';
-import { getMockZaiMessage } from '../providers/zai/utils.js';
+import { getProviderMockMessage } from '../providers/registry.js';
 import { generateUUID } from '../utils/uuid.js';
 
 import type { Api, BaseAssistantMessage, Model } from '@ank1015/llm-types';
@@ -18,31 +13,11 @@ export function getMockMessage<TApi extends Api>(
 ): BaseAssistantMessage<TApi> {
   const id = messageId ?? generateUUID();
 
-  let nativeMessage: unknown;
-  switch (model.api) {
-    case 'anthropic':
-      nativeMessage = getMockAnthropicMessage(model.id, id);
-      break;
-    case 'openai':
-      nativeMessage = getMockOpenaiMessage(model.id, id);
-      break;
-    case 'google':
-      nativeMessage = getMockGoogleMessage();
-      break;
-    case 'deepseek':
-      nativeMessage = getMockDeepSeekMessage(model.id, id);
-      break;
-    case 'zai':
-      nativeMessage = getMockZaiMessage(model.id, id);
-      break;
-    case 'kimi':
-      nativeMessage = getMockKimiMessage(model.id, id);
-      break;
-    default: {
-      const _exhaustive: never = model.api;
-      throw new Error(`Unsupported API: ${_exhaustive}`);
-    }
+  const mockFn = getProviderMockMessage(model.api);
+  if (!mockFn) {
+    throw new Error(`Unsupported API: ${model.api}`);
   }
+  const nativeMessage = mockFn(model.id, id);
 
   const baseMessage: BaseAssistantMessage<TApi> = {
     role: 'assistant',

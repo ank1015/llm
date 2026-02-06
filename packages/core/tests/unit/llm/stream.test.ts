@@ -1,36 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { stream } from '../../../src/llm/stream.js';
-import { streamAnthropic } from '../../../src/providers/anthropic/stream.js';
-import { streamDeepSeek } from '../../../src/providers/deepseek/stream.js';
-import { streamGoogle } from '../../../src/providers/google/stream.js';
-import { streamKimi } from '../../../src/providers/kimi/stream.js';
-import { streamOpenAI } from '../../../src/providers/openai/stream.js';
-import { streamZai } from '../../../src/providers/zai/stream.js';
+import { registerProvider } from '../../../src/providers/registry.js';
 import { EventStream } from '../../../src/utils/event-stream.js';
 
 import type { AssistantMessageEventStream } from '../../../src/utils/event-stream.js';
 import type { Context, Model } from '@ank1015/llm-types';
-
-// Mock all provider stream functions
-vi.mock('../../../src/providers/anthropic/stream.js', () => ({
-  streamAnthropic: vi.fn(),
-}));
-vi.mock('../../../src/providers/openai/stream.js', () => ({
-  streamOpenAI: vi.fn(),
-}));
-vi.mock('../../../src/providers/google/stream.js', () => ({
-  streamGoogle: vi.fn(),
-}));
-vi.mock('../../../src/providers/deepseek/stream.js', () => ({
-  streamDeepSeek: vi.fn(),
-}));
-vi.mock('../../../src/providers/zai/stream.js', () => ({
-  streamZai: vi.fn(),
-}));
-vi.mock('../../../src/providers/kimi/stream.js', () => ({
-  streamKimi: vi.fn(),
-}));
 
 // Helper to create mock model
 function createMockModel<T extends string>(api: T): Model<any> {
@@ -62,6 +37,21 @@ function createMockEventStream(): AssistantMessageEventStream<any> {
   return new EventStream() as AssistantMessageEventStream<any>;
 }
 
+// Create mock stream functions and register them via the registry
+const mockStreamAnthropic = vi.fn();
+const mockStreamOpenAI = vi.fn();
+const mockStreamGoogle = vi.fn();
+const mockStreamDeepSeek = vi.fn();
+const mockStreamZai = vi.fn();
+const mockStreamKimi = vi.fn();
+
+registerProvider('anthropic', { stream: mockStreamAnthropic, getMockNativeMessage: () => ({}) });
+registerProvider('openai', { stream: mockStreamOpenAI, getMockNativeMessage: () => ({}) });
+registerProvider('google', { stream: mockStreamGoogle, getMockNativeMessage: () => ({}) });
+registerProvider('deepseek', { stream: mockStreamDeepSeek, getMockNativeMessage: () => ({}) });
+registerProvider('zai', { stream: mockStreamZai, getMockNativeMessage: () => ({}) });
+registerProvider('kimi', { stream: mockStreamKimi, getMockNativeMessage: () => ({}) });
+
 describe('stream', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -74,11 +64,11 @@ describe('stream', () => {
       const options = { apiKey: 'test-key' };
       const mockStream = createMockEventStream();
 
-      vi.mocked(streamAnthropic).mockReturnValue(mockStream);
+      mockStreamAnthropic.mockReturnValue(mockStream);
 
       const result = stream(model, context, options, 'req-1');
 
-      expect(streamAnthropic).toHaveBeenCalledWith(model, context, options, 'req-1');
+      expect(mockStreamAnthropic).toHaveBeenCalledWith(model, context, options, 'req-1');
       expect(result).toBe(mockStream);
     });
 
@@ -88,11 +78,11 @@ describe('stream', () => {
       const options = { apiKey: 'test-key' };
       const mockStream = createMockEventStream();
 
-      vi.mocked(streamOpenAI).mockReturnValue(mockStream);
+      mockStreamOpenAI.mockReturnValue(mockStream);
 
       const result = stream(model, context, options, 'req-1');
 
-      expect(streamOpenAI).toHaveBeenCalledWith(model, context, options, 'req-1');
+      expect(mockStreamOpenAI).toHaveBeenCalledWith(model, context, options, 'req-1');
       expect(result).toBe(mockStream);
     });
 
@@ -102,11 +92,11 @@ describe('stream', () => {
       const options = { apiKey: 'test-key' };
       const mockStream = createMockEventStream();
 
-      vi.mocked(streamGoogle).mockReturnValue(mockStream);
+      mockStreamGoogle.mockReturnValue(mockStream);
 
       const result = stream(model, context, options, 'req-1');
 
-      expect(streamGoogle).toHaveBeenCalledWith(model, context, options, 'req-1');
+      expect(mockStreamGoogle).toHaveBeenCalledWith(model, context, options, 'req-1');
       expect(result).toBe(mockStream);
     });
 
@@ -116,11 +106,11 @@ describe('stream', () => {
       const options = { apiKey: 'test-key' };
       const mockStream = createMockEventStream();
 
-      vi.mocked(streamDeepSeek).mockReturnValue(mockStream);
+      mockStreamDeepSeek.mockReturnValue(mockStream);
 
       const result = stream(model, context, options, 'req-1');
 
-      expect(streamDeepSeek).toHaveBeenCalledWith(model, context, options, 'req-1');
+      expect(mockStreamDeepSeek).toHaveBeenCalledWith(model, context, options, 'req-1');
       expect(result).toBe(mockStream);
     });
 
@@ -130,11 +120,11 @@ describe('stream', () => {
       const options = { apiKey: 'test-key' };
       const mockStream = createMockEventStream();
 
-      vi.mocked(streamZai).mockReturnValue(mockStream);
+      mockStreamZai.mockReturnValue(mockStream);
 
       const result = stream(model, context, options, 'req-1');
 
-      expect(streamZai).toHaveBeenCalledWith(model, context, options, 'req-1');
+      expect(mockStreamZai).toHaveBeenCalledWith(model, context, options, 'req-1');
       expect(result).toBe(mockStream);
     });
 
@@ -144,11 +134,11 @@ describe('stream', () => {
       const options = { apiKey: 'test-key' };
       const mockStream = createMockEventStream();
 
-      vi.mocked(streamKimi).mockReturnValue(mockStream);
+      mockStreamKimi.mockReturnValue(mockStream);
 
       const result = stream(model, context, options, 'req-1');
 
-      expect(streamKimi).toHaveBeenCalledWith(model, context, options, 'req-1');
+      expect(mockStreamKimi).toHaveBeenCalledWith(model, context, options, 'req-1');
       expect(result).toBe(mockStream);
     });
   });
@@ -160,7 +150,7 @@ describe('stream', () => {
       const options = { apiKey: 'test-key' };
       const mockStream = createMockEventStream();
 
-      vi.mocked(streamAnthropic).mockReturnValue(mockStream);
+      mockStreamAnthropic.mockReturnValue(mockStream);
 
       const result = stream(model, context, options, 'req-1');
 
