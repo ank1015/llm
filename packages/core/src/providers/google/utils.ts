@@ -119,10 +119,10 @@ export function buildGoogleMessages(model: Model<'google'>, context: Context): C
 
     if (message.role === 'toolResult') {
       const parts: Part[] = [];
-      let textRes = '(see attached:)';
+      const textParts: string[] = [];
       for (const messageContent of message.content) {
         if (messageContent.type === 'text') {
-          textRes = messageContent.content;
+          textParts.push(messageContent.content);
         } else if (messageContent.type === 'image' && model.input.includes('image')) {
           parts.push({
             inlineData: {
@@ -148,7 +148,9 @@ export function buildGoogleMessages(model: Model<'google'>, context: Context): C
               name: message.toolName,
               parts,
               response: {
-                result: sanitizeSurrogates(textRes),
+                result: sanitizeSurrogates(
+                  textParts.length > 0 ? textParts.join('\n') : '(see attached:)'
+                ),
                 isError: message.isError,
               },
             },
