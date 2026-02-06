@@ -34,6 +34,7 @@ export interface CompleteOptions<TApi extends Api> {
  *
  * After completion, if usageAdapter is provided, tracks the usage.
  *
+ * @deprecated Use {@link LLMClient.complete} instead for auto-wired adapter support.
  * @param model - The model configuration
  * @param context - The conversation context (messages, system prompt, tools)
  * @param options - Complete options including adapters

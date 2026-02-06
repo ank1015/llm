@@ -28,6 +28,10 @@ export type {
 export { complete, stream } from './llm/index.js';
 export type { CompleteOptions, StreamOptions } from './llm/index.js';
 
+// Client
+export { LLMClient } from './client.js';
+export type { LLMClientConfig } from './client.js';
+
 // Utilities
 export { resolveApiKey } from './utils/resolve-key.js';
 
