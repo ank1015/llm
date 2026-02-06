@@ -566,6 +566,9 @@ refactor/user-service/extract-validation
 
 ## When Committing
 
+- Commit message should be one-liner messages
+- Never include Co-authored by Claude
+
 Before every commit:
 
 1. Run pnpm typecheck — Ensure no type errors
