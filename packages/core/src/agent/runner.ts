@@ -51,15 +51,18 @@ export async function runAgentLoop(
   const streamAssistantMessage = config.streamAssistantMessage ?? true;
 
   let hasMoreToolCalls = true;
-  let firstTurn = true;
+  let inTurn = false;
   let queuedMessages: QueuedMessage<unknown>[] = (await config.getQueuedMessages()) || [];
 
   // Track accumulated cost within this run execution if budget is provided
   let currentRunCost = 0;
 
   try {
+    emit({ type: 'agent_start' });
+
     while (hasMoreToolCalls || queuedMessages.length > 0) {
       if (signal.aborted) {
+        emit({ type: 'agent_end', agentMessages: newMessages });
         return {
           messages: newMessages,
           totalCost: currentRunCost,
@@ -67,11 +70,8 @@ export async function runAgentLoop(
         };
       }
 
-      if (!firstTurn) {
-        emit({ type: 'turn_start' });
-      } else {
-        firstTurn = false;
-      }
+      emit({ type: 'turn_start' });
+      inTurn = true;
 
       // Process queued messages first (inject before next assistant response)
       if (queuedMessages.length > 0) {
@@ -162,6 +162,7 @@ export async function runAgentLoop(
       }
 
       emit({ type: 'turn_end' });
+      inTurn = false;
 
       // Get queued messages after turn completes
       queuedMessages = (await config.getQueuedMessages()) || [];
@@ -174,6 +175,10 @@ export async function runAgentLoop(
       aborted: false,
     };
   } catch (error) {
+    if (inTurn) {
+      emit({ type: 'turn_end' });
+    }
+    emit({ type: 'agent_end', agentMessages: newMessages });
     const errorMessage = error instanceof Error ? error.message : String(error);
     return {
       messages: newMessages,
