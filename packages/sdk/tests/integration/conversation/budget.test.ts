@@ -1,4 +1,5 @@
 import { MODELS } from '@ank1015/llm-core';
+import { CostLimitError } from '@ank1015/llm-types';
 import { describe, it, expect } from 'vitest';
 
 import { Conversation } from '../../../src/agent/conversation.js';
@@ -56,6 +57,6 @@ describe('Budget Integration', () => {
     expect(conversation.state.usage.totalCost).toBeGreaterThan(conversation.getCostLimit()!);
 
     // BUT, next prompt should fail immediately because of pre-flight check
-    await expect(conversation.prompt('Hi again')).rejects.toThrow('Cost limit exceeded');
+    await expect(conversation.prompt('Hi again')).rejects.toThrow(CostLimitError);
   }, 60000);
 });

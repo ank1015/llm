@@ -12,6 +12,7 @@ import {
   complete as coreComplete,
   stream as coreStream,
 } from '@ank1015/llm-core';
+import { ConversationBusyError, CostLimitError, ModelNotConfiguredError } from '@ank1015/llm-types';
 
 import { resolveApiKey } from '../utils/resolve-key.js';
 
@@ -303,13 +304,11 @@ export class Conversation {
     externalCallback?: ConversationExternalCallback
   ): Promise<Message[]> {
     if (this._state.isStreaming) {
-      throw new Error(
-        'Cannot start a new prompt while another is running. Use waitForIdle() to wait for completion.'
-      );
+      throw new ConversationBusyError();
     }
 
     if (!this._state.provider || !this._state.provider.model) {
-      throw new Error('No provider configured. Call setProvider() before prompt().');
+      throw new ModelNotConfiguredError();
     }
 
     const userMessage = buildUserMessage(input, attachments);
@@ -319,9 +318,7 @@ export class Conversation {
 
   async continue(externalCallback?: ConversationExternalCallback): Promise<Message[]> {
     if (this._state.isStreaming) {
-      throw new Error(
-        'Cannot continue while another prompt is running. Use waitForIdle() to wait for completion.'
-      );
+      throw new ConversationBusyError();
     }
 
     if (this._state.messages.length === 0) {
@@ -348,11 +345,11 @@ export class Conversation {
     signal: AbortSignal;
   }> {
     if (!this._state.provider || !this._state.provider.model) {
-      throw new Error('No provider configured. Call setProvider() before prompt().');
+      throw new ModelNotConfiguredError();
     }
 
     if (this._state.costLimit && this._state.usage.totalCost >= this._state.costLimit) {
-      throw new Error('Cost limit exceeded');
+      throw new CostLimitError(this._state.usage.totalCost, this._state.costLimit);
     }
 
     // Resolve API key before starting

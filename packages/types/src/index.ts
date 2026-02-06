@@ -60,6 +60,10 @@ export type { LLMErrorCode } from './errors.js';
 export {
   LLMError,
   ApiKeyNotFoundError,
+  CostLimitError,
+  ContextLimitError,
+  ConversationBusyError,
+  ModelNotConfiguredError,
   SessionNotFoundError,
   InvalidParentError,
   PathTraversalError,

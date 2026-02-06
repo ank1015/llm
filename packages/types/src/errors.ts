@@ -7,6 +7,10 @@
  */
 export type LLMErrorCode =
   | 'API_KEY_NOT_FOUND'
+  | 'COST_LIMIT'
+  | 'CONTEXT_LIMIT'
+  | 'CONVERSATION_BUSY'
+  | 'MODEL_NOT_CONFIGURED'
   | 'SESSION_NOT_FOUND'
   | 'INVALID_PARENT'
   | 'PATH_TRAVERSAL';
@@ -31,6 +35,34 @@ export class ApiKeyNotFoundError extends LLMError {
   constructor(provider: string) {
     super('API_KEY_NOT_FOUND', `API key not found for provider: ${provider}`);
     this.name = 'ApiKeyNotFoundError';
+  }
+}
+
+export class CostLimitError extends LLMError {
+  constructor(currentCost: number, limit: number) {
+    super('COST_LIMIT', `Cost limit exceeded: ${currentCost} >= ${limit}`);
+    this.name = 'CostLimitError';
+  }
+}
+
+export class ContextLimitError extends LLMError {
+  constructor(inputTokens: number, limit: number) {
+    super('CONTEXT_LIMIT', `Context limit exceeded: ${inputTokens} >= ${limit}`);
+    this.name = 'ContextLimitError';
+  }
+}
+
+export class ConversationBusyError extends LLMError {
+  constructor() {
+    super('CONVERSATION_BUSY', 'Cannot start a new prompt while another is running');
+    this.name = 'ConversationBusyError';
+  }
+}
+
+export class ModelNotConfiguredError extends LLMError {
+  constructor() {
+    super('MODEL_NOT_CONFIGURED', 'No provider configured. Call setProvider() before prompt().');
+    this.name = 'ModelNotConfiguredError';
   }
 }
 

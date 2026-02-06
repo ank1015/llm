@@ -155,4 +155,11 @@ export type {
 
 // Re-export runtime values from types
 export { KnownApis, isValidApi } from '@ank1015/llm-types';
-export { LLMError, ApiKeyNotFoundError } from '@ank1015/llm-types';
+export {
+  LLMError,
+  ApiKeyNotFoundError,
+  CostLimitError,
+  ContextLimitError,
+  ConversationBusyError,
+  ModelNotConfiguredError,
+} from '@ank1015/llm-types';

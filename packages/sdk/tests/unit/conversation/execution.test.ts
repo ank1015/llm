@@ -4,6 +4,7 @@
 
 import * as core from '@ank1015/llm-core';
 import { AssistantMessageEventStream } from '@ank1015/llm-core';
+import { ConversationBusyError, CostLimitError, ModelNotConfiguredError } from '@ank1015/llm-types';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 import { Conversation } from '../../../src/agent/conversation.js';
@@ -117,9 +118,7 @@ describe('Conversation Execution', () => {
     it('should throw when no provider is configured', async () => {
       const conversation = new Conversation();
 
-      await expect(conversation.prompt('Hello')).rejects.toThrow(
-        'No provider configured. Call setProvider() before prompt().'
-      );
+      await expect(conversation.prompt('Hello')).rejects.toThrow(ModelNotConfiguredError);
     });
 
     it('should throw ApiKeyNotFoundError when no key available', async () => {
@@ -229,9 +228,7 @@ describe('Conversation Execution', () => {
       await new Promise((r) => setImmediate(r));
 
       // Second prompt should fail immediately
-      await expect(conversation.prompt('Second')).rejects.toThrow(
-        'Cannot start a new prompt while another is running'
-      );
+      await expect(conversation.prompt('Second')).rejects.toThrow(ConversationBusyError);
 
       // Cleanup
       resolveLoop();
@@ -401,9 +398,7 @@ describe('Conversation Execution', () => {
       await new Promise((r) => setImmediate(r));
 
       // Second continue should fail immediately
-      await expect(conversation.continue()).rejects.toThrow(
-        'Cannot continue while another prompt is running'
-      );
+      await expect(conversation.continue()).rejects.toThrow(ConversationBusyError);
 
       // Cleanup
       resolveLoop();
