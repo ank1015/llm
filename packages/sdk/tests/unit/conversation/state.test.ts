@@ -20,8 +20,8 @@ describe('Conversation State Management', () => {
       expect(state.isStreaming).toBe(false);
       expect(state.pendingToolCalls.size).toBe(0);
       expect(state.error).toBeUndefined();
-      expect(state.provider).toBeDefined();
-      expect(state.provider.model.id).toBe('gemini-3-flash-preview');
+      // No default provider — must be set via setProvider() before use
+      expect(state.provider).toBeNull();
     });
 
     it('should accept initial state', () => {

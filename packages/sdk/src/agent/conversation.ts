@@ -6,7 +6,6 @@
  */
 
 import {
-  getModel,
   generateUUID,
   runAgentLoop,
   buildUserMessage,
@@ -51,18 +50,11 @@ export interface ConversationOptions {
 
 export type ConversationExternalCallback = (message: Message) => void | Promise<void>;
 
-const defaultModel = getModel('google', 'gemini-3-flash-preview');
-if (!defaultModel) {
-  throw new Error("Default model 'gemini-3-flash-preview' not found in models configuration");
-}
-
-const defaultProvider: Provider<'google'> = {
-  model: defaultModel,
-  providerOptions: {},
-};
+/** Sentinel value indicating no provider has been configured yet. */
+const NO_PROVIDER = null as unknown as Provider<Api>;
 
 const defaultConversationState: AgentState = {
-  provider: defaultProvider,
+  provider: NO_PROVIDER,
   messages: [],
   tools: [],
   isStreaming: false,
@@ -315,9 +307,8 @@ export class Conversation {
       );
     }
 
-    const model = this._state.provider.model;
-    if (!model) {
-      throw new Error('No model configured');
+    if (!this._state.provider || !this._state.provider.model) {
+      throw new Error('No provider configured. Call setProvider() before prompt().');
     }
 
     const userMessage = buildUserMessage(input, attachments);
@@ -378,9 +369,8 @@ export class Conversation {
     cfg: AgentRunnerConfig;
     signal: AbortSignal;
   }> {
-    const model = this._state.provider.model;
-    if (!model) {
-      throw new Error('No model configured');
+    if (!this._state.provider || !this._state.provider.model) {
+      throw new Error('No provider configured. Call setProvider() before prompt().');
     }
 
     if (this._state.costLimit && this._state.usage.totalCost >= this._state.costLimit) {

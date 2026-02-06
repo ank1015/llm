@@ -114,6 +114,14 @@ describe('Conversation Execution', () => {
       expect(mockKeysAdapter.get).not.toHaveBeenCalled();
     });
 
+    it('should throw when no provider is configured', async () => {
+      const conversation = new Conversation();
+
+      await expect(conversation.prompt('Hello')).rejects.toThrow(
+        'No provider configured. Call setProvider() before prompt().'
+      );
+    });
+
     it('should throw ApiKeyNotFoundError when no key available', async () => {
       const conversation = new Conversation();
       conversation.setProvider({ model: mockModel, providerOptions: {} });
