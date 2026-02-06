@@ -10,6 +10,8 @@ import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from '
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
+import { PathTraversalError } from '@ank1015/llm-types';
+
 import type { KeysAdapter } from './types.js';
 import type { Api } from '@ank1015/llm-types';
 
@@ -108,7 +110,11 @@ export class FileKeysAdapter implements KeysAdapter {
    * Get the file path for a provider's key.
    */
   private getKeyPath(api: Api): string {
-    return join(this.keysDir, `${api}.key`);
+    const apiStr = String(api);
+    if (apiStr.includes('..') || apiStr.includes('/') || apiStr.includes('\\')) {
+      throw new PathTraversalError(apiStr);
+    }
+    return join(this.keysDir, `${apiStr}.key`);
   }
 
   async get(api: Api): Promise<string | undefined> {

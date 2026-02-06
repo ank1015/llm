@@ -57,7 +57,13 @@ export type { Tool, Context } from './tool.js';
 
 // Error types
 export type { LLMErrorCode } from './errors.js';
-export { LLMError, ApiKeyNotFoundError } from './errors.js';
+export {
+  LLMError,
+  ApiKeyNotFoundError,
+  SessionNotFoundError,
+  InvalidParentError,
+  PathTraversalError,
+} from './errors.js';
 
 export type {
   ToolExecutionContext,

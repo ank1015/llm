@@ -19,6 +19,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 import { generateUUID } from '@ank1015/llm-core';
+import { InvalidParentError, PathTraversalError, SessionNotFoundError } from '@ank1015/llm-types';
 
 import type {
   AppendCustomInput,
@@ -39,6 +40,16 @@ import type {
 
 /** Default base directory for all sessions */
 const DEFAULT_SESSIONS_BASE_DIR = join(homedir(), '.llm', 'sessions');
+
+/**
+ * Validate a path component against directory traversal attacks.
+ */
+function sanitizePath(component: string): string {
+  if (component.includes('..') || component.startsWith('/') || component.startsWith('\\')) {
+    throw new PathTraversalError(component);
+  }
+  return component.trim().replace(/\\/g, '/');
+}
 
 /**
  * Generate an ISO 8601 timestamp.
@@ -95,6 +106,8 @@ export class FileSessionsAdapter implements SessionsAdapter {
    * Get the full directory path for a project/path combination.
    */
   private getSessionDir(projectName: string, path: string = ''): string {
+    sanitizePath(projectName);
+    if (path) sanitizePath(path);
     return join(this.baseDir, projectName, path);
   }
 
@@ -102,6 +115,7 @@ export class FileSessionsAdapter implements SessionsAdapter {
    * Get the full file path for a session.
    */
   private getSessionFilePath(projectName: string, path: string = '', sessionId: string): string {
+    sanitizePath(sessionId);
     return join(this.getSessionDir(projectName, path), `${sessionId}.jsonl`);
   }
 
@@ -283,8 +297,8 @@ export class FileSessionsAdapter implements SessionsAdapter {
     let actualSessionId = sessionId;
     let filePath: string;
 
-    // Create session if it doesn't exist
     if (!actualSessionId) {
+      // No sessionId provided — auto-create
       const { sessionId: newId } = await this.createSession({ projectName, path });
       actualSessionId = newId;
       filePath = this.getSessionFilePath(projectName, path, actualSessionId);
@@ -292,11 +306,14 @@ export class FileSessionsAdapter implements SessionsAdapter {
       filePath = this.getSessionFilePath(projectName, path, actualSessionId);
 
       if (!existsSync(filePath)) {
-        // Session ID provided but file doesn't exist - create it
-        const { sessionId: newId } = await this.createSession({ projectName, path });
-        actualSessionId = newId;
-        filePath = this.getSessionFilePath(projectName, path, actualSessionId);
+        throw new SessionNotFoundError(actualSessionId);
       }
+    }
+
+    // Validate parentId exists in the session
+    const nodes = parseJsonl(filePath);
+    if (!nodes.some((n) => n.id === parentId)) {
+      throw new InvalidParentError(parentId, actualSessionId);
     }
 
     const node: MessageNode = {
@@ -322,6 +339,12 @@ export class FileSessionsAdapter implements SessionsAdapter {
 
     if (!existsSync(filePath)) {
       return undefined;
+    }
+
+    // Validate parentId exists in the session
+    const nodes = parseJsonl(filePath);
+    if (!nodes.some((n) => n.id === parentId)) {
+      throw new InvalidParentError(parentId, sessionId);
     }
 
     const node: CustomNode = {

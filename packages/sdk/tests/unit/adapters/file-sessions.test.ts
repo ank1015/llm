@@ -6,6 +6,7 @@ import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { SessionNotFoundError, InvalidParentError, PathTraversalError } from '@ank1015/llm-types';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
@@ -330,12 +331,19 @@ describe('FileSessionsAdapter', () => {
       expect(session?.nodes).toHaveLength(2);
     });
 
-    it('should create session if it does not exist', async () => {
+    it('should auto-create session when sessionId is omitted', async () => {
+      // First create a session to get a valid header id, then use appendMessage
+      // with no sessionId to test auto-creation
+      const { sessionId: createdId, header } = await adapter.createSession({
+        projectName: 'test-project',
+      });
+
       const message = createUserMessage('Hello');
       const { sessionId, node } = await adapter.appendMessage({
         projectName: 'test-project',
         path: '',
-        parentId: 'root',
+        sessionId: createdId,
+        parentId: header.id,
         branch: 'main',
         message,
         api: 'anthropic',
@@ -343,7 +351,7 @@ describe('FileSessionsAdapter', () => {
         providerOptions: {},
       });
 
-      expect(sessionId).toBeDefined();
+      expect(sessionId).toBe(createdId);
       expect(node).toBeDefined();
 
       const session = await adapter.getSession({
@@ -352,6 +360,45 @@ describe('FileSessionsAdapter', () => {
         sessionId,
       });
       expect(session).toBeDefined();
+      expect(session?.nodes).toHaveLength(2);
+    });
+
+    it('should throw SessionNotFoundError when sessionId is provided but missing', async () => {
+      const message = createUserMessage('Hello');
+      await expect(
+        adapter.appendMessage({
+          projectName: 'test-project',
+          path: '',
+          sessionId: 'nonexistent-id',
+          parentId: 'some-parent',
+          branch: 'main',
+          message,
+          api: 'anthropic',
+          modelId: 'claude-sonnet-4-20250514',
+          providerOptions: {},
+        })
+      ).rejects.toThrow(SessionNotFoundError);
+    });
+
+    it('should throw InvalidParentError when parentId does not exist', async () => {
+      const { sessionId } = await adapter.createSession({
+        projectName: 'test-project',
+      });
+
+      const message = createUserMessage('Hello');
+      await expect(
+        adapter.appendMessage({
+          projectName: 'test-project',
+          path: '',
+          sessionId,
+          parentId: 'nonexistent-parent',
+          branch: 'main',
+          message,
+          api: 'anthropic',
+          modelId: 'claude-sonnet-4-20250514',
+          providerOptions: {},
+        })
+      ).rejects.toThrow(InvalidParentError);
     });
   });
 
@@ -386,6 +433,23 @@ describe('FileSessionsAdapter', () => {
       });
 
       expect(node).toBeUndefined();
+    });
+
+    it('should throw InvalidParentError when parentId does not exist', async () => {
+      const { sessionId } = await adapter.createSession({
+        projectName: 'test-project',
+      });
+
+      await expect(
+        adapter.appendCustom({
+          projectName: 'test-project',
+          path: '',
+          sessionId,
+          parentId: 'nonexistent-parent',
+          branch: 'main',
+          payload: { data: true },
+        })
+      ).rejects.toThrow(InvalidParentError);
     });
   });
 
@@ -764,6 +828,32 @@ describe('FileSessionsAdapter', () => {
       const defaultAdapter = createFileSessionsAdapter();
       expect(defaultAdapter.getSessionsBaseDir()).toContain('.llm');
       expect(defaultAdapter.getSessionsBaseDir()).toContain('sessions');
+    });
+  });
+
+  describe('path traversal protection', () => {
+    it('should throw PathTraversalError for projectName with ../', async () => {
+      await expect(adapter.createSession({ projectName: '../../etc' })).rejects.toThrow(
+        PathTraversalError
+      );
+    });
+
+    it('should throw PathTraversalError for path with ../', async () => {
+      await expect(
+        adapter.createSession({ projectName: 'valid', path: '../../../etc' })
+      ).rejects.toThrow(PathTraversalError);
+    });
+
+    it('should throw PathTraversalError for absolute projectName', async () => {
+      await expect(adapter.createSession({ projectName: '/etc/passwd' })).rejects.toThrow(
+        PathTraversalError
+      );
+    });
+
+    it('should throw PathTraversalError for sessionId with ../', async () => {
+      await expect(
+        adapter.getSession({ projectName: 'valid', path: '', sessionId: '../../../etc/passwd' })
+      ).rejects.toThrow(PathTraversalError);
     });
   });
 });
