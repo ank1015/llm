@@ -1,5 +1,5 @@
 import { sanitizeSurrogates } from '../../utils/sanitize-unicode.js';
-import { convertChatTools , createMockChatCompletion } from '../utils/index.js';
+import { convertChatTools, createMockChatCompletion } from '../utils/index.js';
 
 import type {
   BaseAssistantMessage,
@@ -14,9 +14,8 @@ import type {
   ChatCompletionMessageParam,
   ChatCompletionTool,
   ChatCompletionToolMessageParam,
- ChatCompletion } from 'openai/resources/chat/completions.js';
-
-
+  ChatCompletion,
+} from 'openai/resources/chat/completions.js';
 
 // Re-export shared utils under provider-specific names for backwards compatibility
 export {
@@ -25,8 +24,8 @@ export {
   convertChatTools as convertTools,
 } from '../utils/index.js';
 
-export function getMockDeepSeekMessage(): ChatCompletion {
-  return createMockChatCompletion('deepseek-chat');
+export function getMockDeepSeekMessage(modelId: string, requestId: string): ChatCompletion {
+  return createMockChatCompletion(modelId, requestId);
 }
 
 export function buildParams(

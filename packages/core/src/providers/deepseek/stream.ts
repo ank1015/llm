@@ -1,7 +1,6 @@
 import {
   createChatCompletionClient,
   createChatCompletionStream,
-  createMockChatCompletion,
   mapChatStopReason,
 } from '../utils/index.js';
 
@@ -12,7 +11,6 @@ import type { ChatStreamConfig } from '../utils/index.js';
 import type { Context, DeepSeekProviderOptions, Model } from '@ank1015/llm-types';
 
 const config: ChatStreamConfig<'deepseek'> = {
-  getMockMessage: () => createMockChatCompletion('deepseek-chat'),
   mapStopReason: mapChatStopReason,
   extractCacheTokens: (usage) =>
     (usage as { prompt_cache_hit_tokens?: number }).prompt_cache_hit_tokens || 0,

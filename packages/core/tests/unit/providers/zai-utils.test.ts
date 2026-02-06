@@ -800,8 +800,8 @@ describe('Z.AI Utils', () => {
 
   describe('getMockZaiMessage', () => {
     it('should return a valid ChatCompletion structure', () => {
-      const mock = getMockZaiMessage();
-      expect(mock.id).toBeDefined();
+      const mock = getMockZaiMessage('glm-4.7', 'test-req-123');
+      expect(mock.id).toBe('chatcmpl-test-req-123');
       expect(mock.object).toBe('chat.completion');
       expect(mock.model).toBe('glm-4.7');
       expect(mock.choices).toBeDefined();
@@ -810,12 +810,12 @@ describe('Z.AI Utils', () => {
     });
 
     it('should have empty content', () => {
-      const mock = getMockZaiMessage();
+      const mock = getMockZaiMessage('glm-4.7', 'test-req-123');
       expect(mock.choices[0].message.content).toBe('');
     });
 
     it('should have zero usage', () => {
-      const mock = getMockZaiMessage();
+      const mock = getMockZaiMessage('glm-4.7', 'test-req-123');
       expect(mock.usage?.prompt_tokens).toBe(0);
       expect(mock.usage?.completion_tokens).toBe(0);
       expect(mock.usage?.total_tokens).toBe(0);

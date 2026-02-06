@@ -894,8 +894,8 @@ describe('Kimi Utils', () => {
 
   describe('getMockKimiMessage', () => {
     it('should return a valid ChatCompletion structure', () => {
-      const mock = getMockKimiMessage();
-      expect(mock.id).toBeDefined();
+      const mock = getMockKimiMessage('kimi-k2.5', 'test-req-123');
+      expect(mock.id).toBe('chatcmpl-test-req-123');
       expect(mock.object).toBe('chat.completion');
       expect(mock.model).toBe('kimi-k2.5');
       expect(mock.choices).toBeDefined();
@@ -904,12 +904,12 @@ describe('Kimi Utils', () => {
     });
 
     it('should have empty content', () => {
-      const mock = getMockKimiMessage();
+      const mock = getMockKimiMessage('kimi-k2.5', 'test-req-123');
       expect(mock.choices[0].message.content).toBe('');
     });
 
     it('should have zero usage', () => {
-      const mock = getMockKimiMessage();
+      const mock = getMockKimiMessage('kimi-k2.5', 'test-req-123');
       expect(mock.usage?.prompt_tokens).toBe(0);
       expect(mock.usage?.completion_tokens).toBe(0);
       expect(mock.usage?.total_tokens).toBe(0);

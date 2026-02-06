@@ -708,8 +708,8 @@ describe('DeepSeek Utils', () => {
 
   describe('getMockDeepSeekMessage', () => {
     it('should return a valid ChatCompletion structure', () => {
-      const mock = getMockDeepSeekMessage();
-      expect(mock.id).toBeDefined();
+      const mock = getMockDeepSeekMessage('deepseek-chat', 'test-req-123');
+      expect(mock.id).toBe('chatcmpl-test-req-123');
       expect(mock.object).toBe('chat.completion');
       expect(mock.model).toBe('deepseek-chat');
       expect(mock.choices).toBeDefined();
@@ -718,12 +718,12 @@ describe('DeepSeek Utils', () => {
     });
 
     it('should have empty content', () => {
-      const mock = getMockDeepSeekMessage();
+      const mock = getMockDeepSeekMessage('deepseek-chat', 'test-req-123');
       expect(mock.choices[0].message.content).toBe('');
     });
 
     it('should have zero usage', () => {
-      const mock = getMockDeepSeekMessage();
+      const mock = getMockDeepSeekMessage('deepseek-chat', 'test-req-123');
       expect(mock.usage?.prompt_tokens).toBe(0);
       expect(mock.usage?.completion_tokens).toBe(0);
       expect(mock.usage?.total_tokens).toBe(0);

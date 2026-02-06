@@ -293,13 +293,13 @@ export function mapStopReason(reason: Anthropic.Messages.StopReason): StopReason
   }
 }
 
-export function getMockAnthropicMessage(): AnthropicMessage {
+export function getMockAnthropicMessage(modelId: string, requestId: string): AnthropicMessage {
   return {
-    id: 'msg_01XFDUDYJgAACzvnptvVoYEL',
+    id: `msg_${requestId}`,
     type: 'message',
     role: 'assistant',
     content: [],
-    model: 'claude-sonnet-4-5',
+    model: modelId,
     stop_reason: 'end_turn',
     stop_sequence: null,
     usage: {

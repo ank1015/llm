@@ -2,7 +2,7 @@ import { calculateCost } from '../../models.js';
 import { AssistantMessageEventStream } from '../../utils/event-stream.js';
 import { parseStreamingJson } from '../../utils/json-parse.js';
 
-import { buildParams, createClient, mapStopReason } from './utils.js';
+import { buildParams, createClient, getMockAnthropicMessage, mapStopReason } from './utils.js';
 
 import type { StreamFunction } from '../../utils/types.js';
 import type {
@@ -33,24 +33,7 @@ export const streamAnthropic: StreamFunction<'anthropic'> = (
 
   (async () => {
     const startTimestamp = Date.now();
-    const finalResponse: AnthropicMessage = {
-      id: 'msg_01XFDUDYJgAACzvnptvVoYEL',
-      type: 'message',
-      role: 'assistant',
-      content: [],
-      model: 'claude-sonnet-4-5',
-      stop_reason: 'end_turn',
-      stop_sequence: null,
-      usage: {
-        input_tokens: 0,
-        output_tokens: 0,
-        cache_creation_input_tokens: 0,
-        cache_read_input_tokens: 0,
-        cache_creation: null,
-        server_tool_use: null,
-        service_tier: null,
-      },
-    };
+    const finalResponse: AnthropicMessage = getMockAnthropicMessage(model.id, id);
 
     const output: BaseAssistantMessage<'anthropic'> = {
       role: 'assistant',

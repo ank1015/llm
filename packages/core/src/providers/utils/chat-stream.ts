@@ -7,11 +7,12 @@
  * Used by: DeepSeek, Kimi, Z.AI
  */
 
-
 import { calculateCost } from '../../models.js';
 import { AssistantMessageEventStream } from '../../utils/event-stream.js';
 import { parseStreamingJson } from '../../utils/json-parse.js';
 import { validateToolArguments } from '../../utils/validation.js';
+
+import { createMockChatCompletion } from './chat-completion-utils.js';
 
 import type {
   Api,
@@ -41,8 +42,6 @@ interface ReasoningChunkDelta {
  * Provider-specific configuration for the shared chat stream.
  */
 export interface ChatStreamConfig<_TApi extends Api> {
-  /** Creates a mock ChatCompletion for stream initialization */
-  getMockMessage: () => ChatCompletion;
   /** Maps provider's finish_reason to unified StopReason */
   mapStopReason: (finishReason: string | null | undefined) => StopReason;
   /**
@@ -93,7 +92,7 @@ export function createChatCompletionStream<
 
   (async () => {
     const startTimestamp = Date.now();
-    let finalResponse: ChatCompletion = config.getMockMessage();
+    let finalResponse: ChatCompletion = createMockChatCompletion(model.id, id);
 
     const output: BaseAssistantMessage<TApi> = {
       role: 'assistant',

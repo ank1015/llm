@@ -1,7 +1,6 @@
 import {
   createChatCompletionClient,
   createChatCompletionStream,
-  createMockChatCompletion,
   mapChatStopReason,
 } from '../utils/index.js';
 
@@ -12,7 +11,6 @@ import type { ChatStreamConfig } from '../utils/index.js';
 import type { Context, KimiProviderOptions, Model } from '@ank1015/llm-types';
 
 const config: ChatStreamConfig<'kimi'> = {
-  getMockMessage: () => createMockChatCompletion('kimi-k2.5'),
   mapStopReason: mapChatStopReason,
   extractCacheTokens: (usage) => (usage as { cached_tokens?: number }).cached_tokens || 0,
   // Kimi requires stream_options to include usage in stream

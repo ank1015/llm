@@ -250,11 +250,11 @@ export function mapStopReason(status: OpenAI.Responses.ResponseStatus | undefine
   }
 }
 
-export function getMockOpenaiMessage(): Response {
+export function getMockOpenaiMessage(modelId: string, requestId: string): Response {
   return {
-    id: 'resp_123',
+    id: `resp_${requestId}`,
     object: 'response',
-    created_at: 1740855869,
+    created_at: Math.floor(Date.now() / 1000),
     output_text: '',
     status: 'completed',
     incomplete_details: null,
@@ -262,7 +262,7 @@ export function getMockOpenaiMessage(): Response {
     error: null,
     instructions: null,
     max_output_tokens: null,
-    model: 'gpt-4o-mini-2024-07-18',
+    model: modelId,
     output: [],
     previous_response_id: null,
     temperature: 1,

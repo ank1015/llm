@@ -1,7 +1,6 @@
 import {
   createChatCompletionClient,
   createChatCompletionStream,
-  createMockChatCompletion,
   mapChatStopReason,
 } from '../utils/index.js';
 
@@ -12,7 +11,6 @@ import type { ChatStreamConfig } from '../utils/index.js';
 import type { Context, Model, ZaiProviderOptions } from '@ank1015/llm-types';
 
 const config: ChatStreamConfig<'zai'> = {
-  getMockMessage: () => createMockChatCompletion('glm-4.7'),
   mapStopReason: mapChatStopReason,
   extractCacheTokens: (usage) =>
     (usage as { prompt_tokens_details?: { cached_tokens?: number } }).prompt_tokens_details

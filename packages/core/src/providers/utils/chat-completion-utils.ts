@@ -67,13 +67,14 @@ export function mapChatStopReason(finishReason: string | null | undefined): Stop
 
 /**
  * Creates a mock ChatCompletion response for stream initialization.
+ * Uses actual model ID and request ID to avoid misleading data on error paths.
  */
-export function createMockChatCompletion(modelName: string): ChatCompletion {
+export function createMockChatCompletion(modelId: string, requestId: string): ChatCompletion {
   return {
-    id: 'chatcmpl-123',
+    id: `chatcmpl-${requestId}`,
     object: 'chat.completion',
     created: Math.floor(Date.now() / 1000),
-    model: modelName,
+    model: modelId,
     choices: [
       {
         index: 0,

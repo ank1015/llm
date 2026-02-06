@@ -18,22 +18,22 @@ export function getMockMessage<TApi extends Api>(model: Model<TApi>): BaseAssist
   let nativeMessage: unknown;
   switch (model.api) {
     case 'anthropic':
-      nativeMessage = getMockAnthropicMessage();
+      nativeMessage = getMockAnthropicMessage(model.id, messageId);
       break;
     case 'openai':
-      nativeMessage = getMockOpenaiMessage();
+      nativeMessage = getMockOpenaiMessage(model.id, messageId);
       break;
     case 'google':
       nativeMessage = getMockGoogleMessage();
       break;
     case 'deepseek':
-      nativeMessage = getMockDeepSeekMessage();
+      nativeMessage = getMockDeepSeekMessage(model.id, messageId);
       break;
     case 'zai':
-      nativeMessage = getMockZaiMessage();
+      nativeMessage = getMockZaiMessage(model.id, messageId);
       break;
     case 'kimi':
-      nativeMessage = getMockKimiMessage();
+      nativeMessage = getMockKimiMessage(model.id, messageId);
       break;
     default: {
       const _exhaustive: never = model.api;

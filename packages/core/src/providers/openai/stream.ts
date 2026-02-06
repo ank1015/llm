@@ -3,7 +3,7 @@ import { AssistantMessageEventStream } from '../../utils/event-stream.js';
 import { parseStreamingJson } from '../../utils/json-parse.js';
 import { validateToolArguments } from '../../utils/validation.js';
 
-import { buildParams, createClient, mapStopReason } from './utils.js';
+import { buildParams, createClient, getMockOpenaiMessage, mapStopReason } from './utils.js';
 
 import type { StreamFunction } from '../../utils/types.js';
 import type {
@@ -34,39 +34,7 @@ export const streamOpenAI: StreamFunction<'openai'> = (
 
   (async () => {
     const startTimestamp = Date.now();
-    let finalResponse: Response = {
-      id: 'resp_123',
-      object: 'response',
-      created_at: 1740855869,
-      output_text: '',
-      status: 'completed',
-      incomplete_details: null,
-      parallel_tool_calls: false,
-      error: null,
-      instructions: null,
-      max_output_tokens: null,
-      model: 'gpt-4o-mini-2024-07-18',
-      output: [],
-      previous_response_id: null,
-      temperature: 1,
-      text: {},
-      tool_choice: 'auto',
-      tools: [],
-      top_p: 1,
-      truncation: 'disabled',
-      usage: {
-        input_tokens: 0,
-        output_tokens: 0,
-        output_tokens_details: {
-          reasoning_tokens: 0,
-        },
-        input_tokens_details: {
-          cached_tokens: 0,
-        },
-        total_tokens: 0,
-      },
-      metadata: {},
-    };
+    let finalResponse: Response = getMockOpenaiMessage(model.id, id);
 
     const output: BaseAssistantMessage<'openai'> = {
       role: 'assistant',
