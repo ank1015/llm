@@ -201,7 +201,7 @@ async function callAssistant<TApi extends Api>(
   streamAssistantMessage: boolean
 ): Promise<BaseAssistantMessage<TApi>> {
   const assistantMessageId = generateUUID();
-  const initialMessage = getMockMessage(config.provider.model);
+  const initialMessage = getMockMessage(config.provider.model, assistantMessageId);
 
   emit({
     type: 'message_start',

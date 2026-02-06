@@ -12,28 +12,31 @@ import type { Api, BaseAssistantMessage, Model } from '@ank1015/llm-types';
  * Creates a mock BaseAssistantMessage for the given model.
  * Used for emitting initial message_start events before the actual response.
  */
-export function getMockMessage<TApi extends Api>(model: Model<TApi>): BaseAssistantMessage<TApi> {
-  const messageId = generateUUID();
+export function getMockMessage<TApi extends Api>(
+  model: Model<TApi>,
+  messageId?: string
+): BaseAssistantMessage<TApi> {
+  const id = messageId ?? generateUUID();
 
   let nativeMessage: unknown;
   switch (model.api) {
     case 'anthropic':
-      nativeMessage = getMockAnthropicMessage(model.id, messageId);
+      nativeMessage = getMockAnthropicMessage(model.id, id);
       break;
     case 'openai':
-      nativeMessage = getMockOpenaiMessage(model.id, messageId);
+      nativeMessage = getMockOpenaiMessage(model.id, id);
       break;
     case 'google':
       nativeMessage = getMockGoogleMessage();
       break;
     case 'deepseek':
-      nativeMessage = getMockDeepSeekMessage(model.id, messageId);
+      nativeMessage = getMockDeepSeekMessage(model.id, id);
       break;
     case 'zai':
-      nativeMessage = getMockZaiMessage(model.id, messageId);
+      nativeMessage = getMockZaiMessage(model.id, id);
       break;
     case 'kimi':
-      nativeMessage = getMockKimiMessage(model.id, messageId);
+      nativeMessage = getMockKimiMessage(model.id, id);
       break;
     default: {
       const _exhaustive: never = model.api;
@@ -45,7 +48,7 @@ export function getMockMessage<TApi extends Api>(model: Model<TApi>): BaseAssist
     role: 'assistant',
     message: nativeMessage as BaseAssistantMessage<TApi>['message'],
     api: model.api,
-    id: messageId,
+    id: id,
     model: model,
     timestamp: Date.now(),
     duration: 0,
