@@ -1,35 +1,32 @@
-import OpenAI from 'openai';
-
 import { sanitizeSurrogates } from '../../utils/sanitize-unicode.js';
+import { convertChatTools , createMockChatCompletion } from '../utils/index.js';
 
 import type {
   BaseAssistantMessage,
   Context,
   DeepSeekProviderOptions,
   Model,
-  StopReason,
   TextContent,
-  Tool,
 } from '@ank1015/llm-types';
 import type {
-  ChatCompletion,
   ChatCompletionAssistantMessageParam,
   ChatCompletionCreateParamsNonStreaming,
   ChatCompletionMessageParam,
   ChatCompletionTool,
   ChatCompletionToolMessageParam,
-} from 'openai/resources/chat/completions.js';
+ ChatCompletion } from 'openai/resources/chat/completions.js';
 
-export function createClient(model: Model<'deepseek'>, apiKey: string) {
-  if (!apiKey) {
-    throw new Error('DeepSeek API key is required.');
-  }
-  return new OpenAI({
-    apiKey,
-    baseURL: model.baseUrl,
-    dangerouslyAllowBrowser: true,
-    defaultHeaders: model.headers,
-  });
+
+
+// Re-export shared utils under provider-specific names for backwards compatibility
+export {
+  createChatCompletionClient as createClient,
+  mapChatStopReason as mapStopReason,
+  convertChatTools as convertTools,
+} from '../utils/index.js';
+
+export function getMockDeepSeekMessage(): ChatCompletion {
+  return createMockChatCompletion('deepseek-chat');
 }
 
 export function buildParams(
@@ -50,7 +47,7 @@ export function buildParams(
   // Add tools if available and supported
   if (context.tools && context.tools.length > 0 && model.tools.includes('function_calling')) {
     const tools: ChatCompletionTool[] = [];
-    const convertedTools = convertTools(context.tools);
+    const convertedTools = convertChatTools(context.tools);
     for (const convertedTool of convertedTools) {
       tools.push(convertedTool);
     }
@@ -84,8 +81,6 @@ export function buildDeepSeekMessages(
   for (const message of context.messages) {
     // Handle user messages
     if (message.role === 'user') {
-      // DeepSeek chat completions API supports text content
-      // For images, we'd need to check if the model supports vision
       const textContents = message.content
         .filter((c) => c.type === 'text')
         .map((c) => sanitizeSurrogates((c as TextContent).content))
@@ -175,58 +170,4 @@ export function buildDeepSeekMessages(
   }
 
   return messages;
-}
-
-export function convertTools(tools: readonly Tool[]): ChatCompletionTool[] {
-  return tools.map((tool) => ({
-    type: 'function' as const,
-    function: {
-      name: tool.name,
-      description: tool.description,
-      parameters: tool.parameters as Record<string, unknown>,
-    },
-  }));
-}
-
-export function mapStopReason(finishReason: string | null | undefined): StopReason {
-  if (!finishReason) return 'stop';
-
-  switch (finishReason) {
-    case 'stop':
-      return 'stop';
-    case 'length':
-      return 'length';
-    case 'tool_calls':
-      return 'toolUse';
-    case 'content_filter':
-      return 'error';
-    default:
-      return 'stop';
-  }
-}
-
-export function getMockDeepSeekMessage(): ChatCompletion {
-  return {
-    id: 'chatcmpl-123',
-    object: 'chat.completion',
-    created: Math.floor(Date.now() / 1000),
-    model: 'deepseek-chat',
-    choices: [
-      {
-        index: 0,
-        message: {
-          role: 'assistant',
-          content: '',
-          refusal: null,
-        },
-        finish_reason: 'stop',
-        logprobs: null,
-      },
-    ],
-    usage: {
-      prompt_tokens: 0,
-      completion_tokens: 0,
-      total_tokens: 0,
-    },
-  };
 }

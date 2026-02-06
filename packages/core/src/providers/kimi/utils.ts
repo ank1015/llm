@@ -1,6 +1,5 @@
-import OpenAI from 'openai';
-
 import { sanitizeSurrogates } from '../../utils/sanitize-unicode.js';
+import { convertChatTools , createMockChatCompletion } from '../utils/index.js';
 
 import type {
   BaseAssistantMessage,
@@ -8,30 +7,28 @@ import type {
   ImageContent,
   KimiProviderOptions,
   Model,
-  StopReason,
   TextContent,
-  Tool,
 } from '@ank1015/llm-types';
 import type {
-  ChatCompletion,
   ChatCompletionAssistantMessageParam,
   ChatCompletionContentPart,
   ChatCompletionCreateParamsNonStreaming,
   ChatCompletionMessageParam,
   ChatCompletionTool,
   ChatCompletionToolMessageParam,
-} from 'openai/resources/chat/completions.js';
+ ChatCompletion } from 'openai/resources/chat/completions.js';
 
-export function createClient(model: Model<'kimi'>, apiKey: string) {
-  if (!apiKey) {
-    throw new Error('Kimi API key is required.');
-  }
-  return new OpenAI({
-    apiKey,
-    baseURL: model.baseUrl,
-    dangerouslyAllowBrowser: true,
-    defaultHeaders: model.headers,
-  });
+
+
+// Re-export shared utils under provider-specific names for backwards compatibility
+export {
+  createChatCompletionClient as createClient,
+  mapChatStopReason as mapStopReason,
+  convertChatTools as convertTools,
+} from '../utils/index.js';
+
+export function getMockKimiMessage(): ChatCompletion {
+  return createMockChatCompletion('kimi-k2.5');
 }
 
 export function buildParams(model: Model<'kimi'>, context: Context, options: KimiProviderOptions) {
@@ -77,7 +74,7 @@ export function buildParams(model: Model<'kimi'>, context: Context, options: Kim
   // Add tools if available and supported
   if (context.tools && context.tools.length > 0 && model.tools.includes('function_calling')) {
     const tools: ChatCompletionTool[] = [];
-    const convertedTools = convertTools(context.tools);
+    const convertedTools = convertChatTools(context.tools);
     for (const convertedTool of convertedTools) {
       tools.push(convertedTool);
     }
@@ -234,58 +231,4 @@ export function buildKimiMessages(
   }
 
   return messages;
-}
-
-export function convertTools(tools: readonly Tool[]): ChatCompletionTool[] {
-  return tools.map((tool) => ({
-    type: 'function' as const,
-    function: {
-      name: tool.name,
-      description: tool.description,
-      parameters: tool.parameters as Record<string, unknown>,
-    },
-  }));
-}
-
-export function mapStopReason(finishReason: string | null | undefined): StopReason {
-  if (!finishReason) return 'stop';
-
-  switch (finishReason) {
-    case 'stop':
-      return 'stop';
-    case 'length':
-      return 'length';
-    case 'tool_calls':
-      return 'toolUse';
-    case 'content_filter':
-      return 'error';
-    default:
-      return 'stop';
-  }
-}
-
-export function getMockKimiMessage(): ChatCompletion {
-  return {
-    id: 'chatcmpl-123',
-    object: 'chat.completion',
-    created: Math.floor(Date.now() / 1000),
-    model: 'kimi-k2.5',
-    choices: [
-      {
-        index: 0,
-        message: {
-          role: 'assistant',
-          content: '',
-          refusal: null,
-        },
-        finish_reason: 'stop',
-        logprobs: null,
-      },
-    ],
-    usage: {
-      prompt_tokens: 0,
-      completion_tokens: 0,
-      total_tokens: 0,
-    },
-  };
 }
