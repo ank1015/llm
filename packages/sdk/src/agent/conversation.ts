@@ -425,7 +425,21 @@ export class Conversation {
     };
 
     const boundStream: AgentRunnerConfig['stream'] = (m, ctx, opts, id) => {
-      return coreStream(m, ctx, { ...opts, apiKey } as OptionsForApi<typeof m.api>, id);
+      const eventStream = coreStream(
+        m,
+        ctx,
+        { ...opts, apiKey } as OptionsForApi<typeof m.api>,
+        id
+      );
+      if (usageAdapter) {
+        const originalResult = eventStream.result.bind(eventStream);
+        eventStream.result = async () => {
+          const message = await originalResult();
+          await usageAdapter.track(message);
+          return message;
+        };
+      }
+      return eventStream;
     };
 
     const cfg: AgentRunnerConfig = {

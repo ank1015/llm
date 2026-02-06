@@ -3,6 +3,7 @@
  */
 
 import * as core from '@ank1015/llm-core';
+import { AssistantMessageEventStream } from '@ank1015/llm-core';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 import { Conversation } from '../../../src/agent/conversation.js';
@@ -589,6 +590,75 @@ describe('Conversation Execution', () => {
       expect(conversation.state.messages).toEqual([]);
       expect(conversation.state.isStreaming).toBe(false);
       expect(conversation.state.error).toBeUndefined();
+    });
+  });
+
+  describe('streaming usage tracking', () => {
+    it('should call usageAdapter.track() when streaming completes', async () => {
+      const mockKeysAdapter = createMockKeysAdapter();
+      const mockUsageAdapter = createMockUsageAdapter();
+      const conversation = new Conversation({
+        keysAdapter: mockKeysAdapter,
+        usageAdapter: mockUsageAdapter,
+        streamAssistantMessage: true,
+      });
+      conversation.setProvider({ model: mockModel, providerOptions: {} });
+
+      // Create a fake event stream that coreStream will return
+      const fakeEventStream = new AssistantMessageEventStream<'anthropic'>();
+
+      // Make coreStream return our fake event stream
+      vi.mocked(core.stream).mockReturnValue(fakeEventStream);
+
+      // Mock runAgentLoop to exercise the boundStream function
+      vi.mocked(core.runAgentLoop).mockImplementation(async (cfg) => {
+        // Call the stream function that Conversation created (boundStream)
+        const stream = cfg.stream(mockModel, { messages: [], systemPrompt: '' }, {}, 'test-id');
+
+        // Simulate what the runner does: end the stream then call result()
+        fakeEventStream.end(mockAssistantMessage);
+        const result = await stream.result();
+
+        return {
+          messages: [result],
+          totalCost: result.usage.cost.total,
+          aborted: false,
+        };
+      });
+
+      await conversation.prompt('Hello');
+
+      // Verify usageAdapter.track() was called with the assistant message
+      expect(mockUsageAdapter.track).toHaveBeenCalledTimes(1);
+      expect(mockUsageAdapter.track).toHaveBeenCalledWith(mockAssistantMessage);
+    });
+
+    it('should not call usageAdapter.track() when no usageAdapter is configured', async () => {
+      const mockKeysAdapter = createMockKeysAdapter();
+      const conversation = new Conversation({
+        keysAdapter: mockKeysAdapter,
+        streamAssistantMessage: true,
+      });
+      conversation.setProvider({ model: mockModel, providerOptions: {} });
+
+      const fakeEventStream = new AssistantMessageEventStream<'anthropic'>();
+      vi.mocked(core.stream).mockReturnValue(fakeEventStream);
+
+      vi.mocked(core.runAgentLoop).mockImplementation(async (cfg) => {
+        const stream = cfg.stream(mockModel, { messages: [], systemPrompt: '' }, {}, 'test-id');
+
+        fakeEventStream.end(mockAssistantMessage);
+        const result = await stream.result();
+
+        return {
+          messages: [result],
+          totalCost: result.usage.cost.total,
+          aborted: false,
+        };
+      });
+
+      // Should not throw - just works without tracking
+      await conversation.prompt('Hello');
     });
   });
 });
