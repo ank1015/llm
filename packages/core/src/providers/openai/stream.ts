@@ -305,7 +305,7 @@ export const streamOpenAI: StreamFunction<'openai'> = (
               type: 'toolCall',
               toolCallId: item.call_id,
               name: item.name,
-              arguments: JSON.parse(item.arguments),
+              arguments: parseStreamingJson(item.arguments),
             };
 
             // Validate tool arguments if tool definition is available
