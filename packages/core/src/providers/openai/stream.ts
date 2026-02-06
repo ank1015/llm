@@ -89,7 +89,7 @@ export const streamOpenAI: StreamFunction<'openai'> = (
     };
 
     try {
-      const client = createClient(model, options.apiKey!);
+      const client = createClient(model, options.apiKey);
       const params = buildParams(model, context, options);
 
       const paramsStreaming: ResponseCreateParamsStreaming = {

@@ -10,6 +10,7 @@ import type {
   OptionsForApi,
   Provider,
   QueuedMessage,
+  WithOptionalKey,
 } from '@ank1015/llm-types';
 
 /**
@@ -18,7 +19,7 @@ import type {
 export type AgentCompleteFunction = <TApi extends Api>(
   model: Model<TApi>,
   context: Context,
-  options: OptionsForApi<TApi>,
+  options: WithOptionalKey<OptionsForApi<TApi>>,
   id: string
 ) => Promise<BaseAssistantMessage<TApi>>;
 
@@ -28,7 +29,7 @@ export type AgentCompleteFunction = <TApi extends Api>(
 export type AgentStreamFunction = <TApi extends Api>(
   model: Model<TApi>,
   context: Context,
-  options: OptionsForApi<TApi>,
+  options: WithOptionalKey<OptionsForApi<TApi>>,
   id: string
 ) => AssistantMessageEventStream<TApi>;
 

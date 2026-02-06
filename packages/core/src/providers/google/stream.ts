@@ -59,7 +59,7 @@ export const streamGoogle: StreamFunction<'google'> = (
     let toolCallCounter = 0;
 
     try {
-      const client = createClient(model, options.apiKey!);
+      const client = createClient(model, options.apiKey);
       const params = buildParams(model, context, options);
 
       const googleStream = await client.models.generateContentStream(params);

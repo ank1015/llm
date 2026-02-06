@@ -24,7 +24,7 @@ export const streamDeepSeek: StreamFunction<'deepseek'> = (
   options: DeepSeekProviderOptions,
   id: string
 ) => {
-  const client = createChatCompletionClient(model, options.apiKey!, 'DeepSeek');
+  const client = createChatCompletionClient(model, options.apiKey, 'DeepSeek');
   const params = buildParams(model, context, options);
   return createChatCompletionStream(config, client, params, model, context, options?.signal, id);
 };

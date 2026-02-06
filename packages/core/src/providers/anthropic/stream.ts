@@ -83,7 +83,7 @@ export const streamAnthropic: StreamFunction<'anthropic'> = (
     })[];
 
     try {
-      const { client, isOAuthToken } = createClient(model, options.apiKey!, true);
+      const { client, isOAuthToken } = createClient(model, options.apiKey, true);
       const params = buildParams(model, context, options, isOAuthToken);
       const paramsStreaming: MessageCreateParamsStreaming = { ...params, stream: true };
 

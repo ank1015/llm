@@ -28,7 +28,7 @@ export const streamKimi: StreamFunction<'kimi'> = (
   options: KimiProviderOptions,
   id: string
 ) => {
-  const client = createChatCompletionClient(model, options.apiKey!, 'Kimi');
+  const client = createChatCompletionClient(model, options.apiKey, 'Kimi');
   const params = buildParams(model, context, options);
   return createChatCompletionStream(config, client, params, model, context, options?.signal, id);
 };

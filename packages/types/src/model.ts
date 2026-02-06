@@ -5,7 +5,7 @@
  */
 
 import type { Api } from './api.js';
-import type { OptionsForApi } from './providers/index.js';
+import type { OptionsForApi, WithOptionalKey } from './providers/index.js';
 
 /**
  * Model definition with provider-specific configuration.
@@ -51,5 +51,5 @@ export interface Model<TApi extends Api> {
  */
 export interface Provider<TApi extends Api> {
   model: Model<TApi>;
-  providerOptions?: OptionsForApi<TApi>;
+  providerOptions?: WithOptionalKey<OptionsForApi<TApi>>;
 }

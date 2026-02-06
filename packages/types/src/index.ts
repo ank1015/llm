@@ -30,6 +30,7 @@ export type {
   NativeResponseForApi,
   ApiOptionsMap,
   OptionsForApi,
+  WithOptionalKey,
 } from './providers/index.js';
 
 // Model types

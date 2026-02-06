@@ -59,3 +59,11 @@ export interface ApiOptionsMap {
  * Get the options type for a specific API.
  */
 export type OptionsForApi<TApi extends Api> = ApiOptionsMap[TApi];
+
+/**
+ * Makes apiKey optional in provider options.
+ *
+ * Use this at boundaries where apiKey is injected externally
+ * (e.g., SDK services, agent runner) rather than provided directly.
+ */
+export type WithOptionalKey<T> = Omit<T, 'apiKey'> & { apiKey?: string };

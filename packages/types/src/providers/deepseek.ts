@@ -18,7 +18,7 @@ export type DeepSeekNativeResponse = ChatCompletion;
  * Additional properties for DeepSeek provider
  */
 interface DeepSeekProps {
-  apiKey?: string;
+  apiKey: string;
   signal?: AbortSignal;
 }
 

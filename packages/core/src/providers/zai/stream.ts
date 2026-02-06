@@ -25,7 +25,7 @@ export const streamZai: StreamFunction<'zai'> = (
   options: ZaiProviderOptions,
   id: string
 ) => {
-  const client = createChatCompletionClient(model, options.apiKey!, 'Z.AI');
+  const client = createChatCompletionClient(model, options.apiKey, 'Z.AI');
   const params = buildParams(model, context, options);
   return createChatCompletionStream(config, client, params, model, context, options?.signal, id);
 };

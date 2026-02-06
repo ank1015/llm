@@ -27,7 +27,7 @@ export interface ZaiThinkingConfig {
  * Additional properties for Z.AI provider
  */
 interface ZaiProps {
-  apiKey?: string;
+  apiKey: string;
   signal?: AbortSignal;
   /** Thinking/reasoning configuration */
   thinking?: ZaiThinkingConfig;

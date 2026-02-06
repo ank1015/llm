@@ -24,6 +24,7 @@ import type {
   AgentEvent,
   AgentState,
   Attachment,
+  OptionsForApi,
   Provider,
   QueuedMessage,
   AgentTool,
@@ -411,7 +412,12 @@ export class Conversation {
     // Create bound complete/stream functions with API key
     const usageAdapter = this.usageAdapter;
     const boundComplete: AgentRunnerConfig['complete'] = async (m, ctx, opts, id) => {
-      const result = await coreComplete(m, ctx, { ...opts, apiKey } as typeof opts, id);
+      const result = await coreComplete(
+        m,
+        ctx,
+        { ...opts, apiKey } as OptionsForApi<typeof m.api>,
+        id
+      );
       if (usageAdapter) {
         await usageAdapter.track(result);
       }
@@ -419,7 +425,7 @@ export class Conversation {
     };
 
     const boundStream: AgentRunnerConfig['stream'] = (m, ctx, opts, id) => {
-      return coreStream(m, ctx, { ...opts, apiKey } as typeof opts, id);
+      return coreStream(m, ctx, { ...opts, apiKey } as OptionsForApi<typeof m.api>, id);
     };
 
     const cfg: AgentRunnerConfig = {

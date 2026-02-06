@@ -13,7 +13,7 @@ export type GoogleNativeResponse = GenerateContentResponse;
  * Additional properties for Google provider
  */
 interface GoogleProps {
-  apiKey?: string;
+  apiKey: string;
   signal?: AbortSignal;
 }
 

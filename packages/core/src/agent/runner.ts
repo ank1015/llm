@@ -23,6 +23,7 @@ import type {
   QueuedMessage,
   ToolExecutionContext,
   ToolResultMessage,
+  WithOptionalKey,
 } from '@ank1015/llm-types';
 
 /**
@@ -189,7 +190,7 @@ export async function runAgentLoop(
 async function callAssistant<TApi extends Api>(
   config: AgentRunnerConfig,
   messages: Message[],
-  providerOptions: OptionsForApi<TApi>,
+  providerOptions: WithOptionalKey<OptionsForApi<TApi>>,
   signal: AbortSignal,
   emit: AgentEventEmitter,
   streamAssistantMessage: boolean
@@ -209,13 +210,12 @@ async function callAssistant<TApi extends Api>(
     context.systemPrompt = config.systemPrompt;
   }
 
+  // Type assertion is safe: the bound functions (AgentStreamFunction/AgentCompleteFunction)
+  // handle apiKey injection, and exactOptionalPropertyTypes prevents direct generic assignment.
+  const opts = providerOptions as WithOptionalKey<OptionsForApi<Api>>;
+
   if (streamAssistantMessage) {
-    const assistantStream = config.stream(
-      config.provider.model,
-      context,
-      providerOptions,
-      assistantMessageId
-    );
+    const assistantStream = config.stream(config.provider.model, context, opts, assistantMessageId);
 
     for await (const ev of assistantStream) {
       emit({
@@ -239,7 +239,7 @@ async function callAssistant<TApi extends Api>(
     const assistantMessage = await config.complete(
       config.provider.model,
       context,
-      providerOptions,
+      opts,
       assistantMessageId
     );
     emit({

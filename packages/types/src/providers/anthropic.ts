@@ -16,7 +16,7 @@ export type AnthropicNativeResponse = Message;
  * Additional properties for Anthropic provider
  */
 interface AnthropicProps {
-  apiKey?: string;
+  apiKey: string;
   signal?: AbortSignal;
   max_tokens?: number;
 }

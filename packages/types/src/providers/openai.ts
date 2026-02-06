@@ -13,7 +13,7 @@ export type OpenAINativeResponse = Response;
  * Additional properties for OpenAI provider
  */
 interface OpenAIProps {
-  apiKey?: string;
+  apiKey: string;
   signal?: AbortSignal;
 }
 

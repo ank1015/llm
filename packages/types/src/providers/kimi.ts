@@ -25,7 +25,7 @@ export interface KimiThinkingConfig {
  * Additional properties for Kimi provider
  */
 interface KimiProps {
-  apiKey?: string;
+  apiKey: string;
   signal?: AbortSignal;
   /** Thinking/reasoning configuration */
   thinking?: KimiThinkingConfig;
