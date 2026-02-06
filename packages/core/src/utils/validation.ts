@@ -30,6 +30,19 @@ if (!isBrowserExtension) {
   }
 }
 
+// Cache compiled validators keyed on the schema object reference.
+// Tool schemas are created once and reused, so this avoids repeated ajv.compile() calls.
+const validatorCache = new WeakMap<object, ReturnType<typeof ajv.compile>>();
+
+function getValidator(schema: object) {
+  let validate = validatorCache.get(schema);
+  if (!validate) {
+    validate = ajv.compile(schema);
+    validatorCache.set(schema, validate);
+  }
+  return validate;
+}
+
 /**
  * Finds a tool by name and validates the tool call arguments against its TypeBox schema
  * @param tools Array of tool definitions
@@ -66,8 +79,8 @@ export function validateToolArguments(
     return toolCall.arguments;
   }
 
-  // Compile the schema
-  const validate = ajv.compile(tool.parameters);
+  // Get or compile the schema validator (cached)
+  const validate = getValidator(tool.parameters);
 
   // Validate the arguments
   if (validate(toolCall.arguments)) {
