@@ -8,9 +8,9 @@ import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { createFileSessionsAdapter } from '@ank1015/llm-sdk-adapters';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
-import { createFileSessionsAdapter } from '../../../src/adapters/file-sessions.js';
 import { createSessionManager, SessionManager } from '../../../src/session/session-manager.js';
 
 import type { UserMessage } from '@ank1015/llm-types';

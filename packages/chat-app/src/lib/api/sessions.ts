@@ -1,6 +1,7 @@
-import { createFileSessionsAdapter } from '@ank1015/llm-sdk';
+import { createFileSessionsAdapter } from '@ank1015/llm-sdk-adapters';
 
-import type { FileSessionsAdapter, SessionLocation } from '@ank1015/llm-sdk';
+import type { SessionLocation } from '@ank1015/llm-sdk';
+import type { FileSessionsAdapter } from '@ank1015/llm-sdk-adapters';
 
 export type SessionScope = {
   projectName: string;

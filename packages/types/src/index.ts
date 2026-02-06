@@ -77,6 +77,17 @@ export type {
   AgentEvent,
 } from './agent-types.js';
 
+// Adapter interfaces
+export type {
+  KeysAdapter,
+  UsageAdapter,
+  SessionsAdapter,
+  UsageFilters,
+  UsageStats,
+  TokenBreakdown,
+  CostBreakdown,
+} from './adapters.js';
+
 // Session types
 export type {
   BaseNode,

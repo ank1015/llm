@@ -1,5 +1,9 @@
 /**
  * Adapters for SDK storage operations.
+ *
+ * This module exports adapter interfaces and types only.
+ * For concrete implementations (FileKeysAdapter, SqliteUsageAdapter, FileSessionsAdapter),
+ * use @ank1015/llm-sdk-adapters.
  */
 
 // Types
@@ -16,12 +20,3 @@ export type {
   AppendCustomInput,
   SessionLocation,
 } from './types.js';
-
-// File-based Keys Adapter
-export { FileKeysAdapter, createFileKeysAdapter } from './file-keys.js';
-
-// SQLite Usage Adapter
-export { SqliteUsageAdapter, createSqliteUsageAdapter } from './sqlite-usage.js';
-
-// File-based Sessions Adapter
-export { FileSessionsAdapter, createFileSessionsAdapter } from './file-sessions.js';

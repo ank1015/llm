@@ -1,7 +1,7 @@
 {
-  "name": "@ank1015/llm-sdk",
+  "name": "@ank1015/llm-sdk-adapters",
   "version": "0.0.1",
-  "description": "Unified SDK for LLM interactions with multiple providers",
+  "description": "Node.js adapter implementations for @ank1015/llm-sdk (file-based keys, SQLite usage, JSONL sessions)",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -28,20 +28,19 @@
   "keywords": [
     "llm",
     "sdk",
-    "ai",
-    "anthropic",
-    "openai",
-    "google",
-    "gemini"
+    "adapters",
+    "sqlite",
+    "keys",
+    "sessions"
   ],
   "license": "MIT",
   "dependencies": {
     "@ank1015/llm-core": "workspace:^",
-    "@ank1015/llm-types": "workspace:^"
+    "@ank1015/llm-types": "workspace:^",
+    "better-sqlite3": "^11.0.0"
   },
   "devDependencies": {
-    "@ank1015/llm-sdk-adapters": "workspace:^",
-    "@sinclair/typebox": "^0.34.48",
+    "@types/better-sqlite3": "^7.6.11",
     "vitest": "^2.1.0"
   }
 }

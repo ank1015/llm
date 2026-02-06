@@ -9,18 +9,7 @@
  * - Session management for conversation persistence
  */
 
-// Adapters
-export {
-  // Keys adapter
-  FileKeysAdapter,
-  createFileKeysAdapter,
-  // Usage adapter
-  SqliteUsageAdapter,
-  createSqliteUsageAdapter,
-  // Sessions adapter
-  FileSessionsAdapter,
-  createFileSessionsAdapter,
-} from './adapters/index.js';
+// Adapter interfaces and types (implementations in @ank1015/llm-sdk-adapters)
 export type {
   KeysAdapter,
   UsageAdapter,

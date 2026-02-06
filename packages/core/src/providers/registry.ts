@@ -19,7 +19,6 @@ export interface ProviderRegistration {
   getMockNativeMessage: MockMessageFactory;
 }
 
- 
 const registry = new Map<string, ProviderRegistration>();
 
 /**

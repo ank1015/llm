@@ -6,13 +6,13 @@ import type {
   Api,
   Attachment,
   ConversationExternalCallback,
-  FileSessionsAdapter,
   Message,
   MessageNode,
   Model,
   Session,
   SessionLocation,
 } from '@ank1015/llm-sdk';
+import type { FileSessionsAdapter } from '@ank1015/llm-sdk-adapters';
 
 import { createKeysAdapter, parseApi } from '@/lib/api/keys';
 import { createSessionsAdapter, parseSessionScope, toSessionLocation } from '@/lib/api/sessions';

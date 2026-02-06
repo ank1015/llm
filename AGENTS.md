@@ -33,7 +33,8 @@ pnpm start:dashboard  # Start dashboard
 packages/
   types/              # @ank1015/llm-types - Shared type definitions
   core/               # @ank1015/llm-core - Core SDK (stateless, portable)
-  sdk/                # @ank1015/llm-sdk - Unified SDK with adapters for storage
+  sdk/                # @ank1015/llm-sdk - Unified SDK (portable, adapter interfaces)
+  sdk-adapters/       # @ank1015/llm-sdk-adapters - Node.js adapter implementations
   chat-app/           # @ank1015/llm-chat-app - Next.js chat application
   usage-dashboard/    # @ank1015/llm-usage-dashboard - Next.js usage dashboard
 ```
@@ -59,7 +60,8 @@ packages/
 
 - [packages/types/AGENTS.md](packages/types/AGENTS.md) — Type definitions
 - [packages/core/AGENTS.md](packages/core/AGENTS.md) — Core SDK (stateless)
-- [packages/sdk/AGENTS.md](packages/sdk/AGENTS.md) — Unified SDK with adapters
+- [packages/sdk/AGENTS.md](packages/sdk/AGENTS.md) — Unified SDK (portable)
+- [packages/sdk-adapters/AGENTS.md](packages/sdk-adapters/AGENTS.md) — Node.js adapter implementations
 - [packages/chat-app/AGENTS.md](packages/chat-app/AGENTS.md) — Chat application
 - [packages/usage-dashboard/AGENTS.md](packages/usage-dashboard/AGENTS.md) — Usage dashboard
 

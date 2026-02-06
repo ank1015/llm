@@ -6,9 +6,8 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { FileKeysAdapter, createFileKeysAdapter } from '@ank1015/llm-sdk-adapters';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-
-import { FileKeysAdapter, createFileKeysAdapter } from '../../../src/adapters/file-keys.js';
 
 describe('FileKeysAdapter', () => {
   let testDir: string;

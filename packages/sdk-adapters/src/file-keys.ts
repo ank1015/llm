@@ -12,8 +12,7 @@ import { join } from 'node:path';
 
 import { PathTraversalError } from '@ank1015/llm-types';
 
-import type { KeysAdapter } from './types.js';
-import type { Api } from '@ank1015/llm-types';
+import type { KeysAdapter, Api } from '@ank1015/llm-types';
 
 /** Directory for storing encrypted keys */
 const DEFAULT_KEYS_DIR = join(homedir(), '.llm', 'global', 'keys');

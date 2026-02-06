@@ -8,12 +8,9 @@ import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { createSqliteUsageAdapter, SqliteUsageAdapter } from '@ank1015/llm-sdk-adapters';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
-import {
-  createSqliteUsageAdapter,
-  SqliteUsageAdapter,
-} from '../../../src/adapters/sqlite-usage.js';
 import { complete, stream, getModel } from '../../../src/index.js';
 
 import type { Context } from '@ank1015/llm-types';

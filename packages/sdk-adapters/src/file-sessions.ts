@@ -27,8 +27,6 @@ import type {
   CreateSessionInput,
   SessionLocation,
   SessionsAdapter,
-} from './types.js';
-import type {
   BranchInfo,
   CustomNode,
   MessageNode,

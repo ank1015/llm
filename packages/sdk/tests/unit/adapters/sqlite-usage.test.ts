@@ -6,12 +6,8 @@ import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { SqliteUsageAdapter, createSqliteUsageAdapter } from '@ank1015/llm-sdk-adapters';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-
-import {
-  SqliteUsageAdapter,
-  createSqliteUsageAdapter,
-} from '../../../src/adapters/sqlite-usage.js';
 
 import type { BaseAssistantMessage } from '@ank1015/llm-types';
 

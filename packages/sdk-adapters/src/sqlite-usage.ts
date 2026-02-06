@@ -10,8 +10,13 @@ import { join } from 'node:path';
 
 import Database from 'better-sqlite3';
 
-import type { UsageAdapter, UsageFilters, UsageStats } from './types.js';
-import type { Api, BaseAssistantMessage } from '@ank1015/llm-types';
+import type {
+  UsageAdapter,
+  UsageFilters,
+  UsageStats,
+  Api,
+  BaseAssistantMessage,
+} from '@ank1015/llm-types';
 
 /** Default directory for storing database */
 const DEFAULT_USAGES_DIR = join(homedir(), '.llm', 'global', 'usages');

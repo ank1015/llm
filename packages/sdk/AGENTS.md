@@ -17,11 +17,11 @@ Unified SDK for LLM interactions with multiple providers. Uses adapter pattern f
 src/
   index.ts              — Public exports
   adapters/
-    index.ts            — Adapter exports
+    index.ts            — Adapter exports (interfaces and types only)
     types.ts            — Adapter interfaces (KeysAdapter, UsageAdapter, SessionsAdapter)
-    file-keys.ts        — File-based encrypted keys adapter
-    sqlite-usage.ts     — SQLite-based usage tracking adapter
-    file-sessions.ts    — JSONL file-based sessions adapter
+    file-keys.ts        — [MOVED to @ank1015/llm-sdk-adapters]
+    sqlite-usage.ts     — [MOVED to @ank1015/llm-sdk-adapters]
+    file-sessions.ts    — [MOVED to @ank1015/llm-sdk-adapters]
   llm/
     index.ts            — LLM module exports
     complete.ts         — Complete function with adapter support
@@ -46,11 +46,14 @@ Adapters provide pluggable storage for keys, usage tracking, and sessions.
 - `UsageAdapter` — Track LLM usage and costs
 - `SessionsAdapter` — Manage conversation sessions
 
-**Built-in Implementations:**
+**Implementations (in @ank1015/llm-sdk-adapters):**
 
 - `FileKeysAdapter` — Encrypted file storage (~/.llm/global/keys/)
 - `SqliteUsageAdapter` — SQLite database (~/.llm/global/usages/messages.db)
 - `FileSessionsAdapter` — JSONL files (~/.llm/sessions/)
+- `InMemoryKeysAdapter` — In-memory for testing
+- `InMemoryUsageAdapter` — In-memory for testing
+- `InMemorySessionsAdapter` — In-memory for testing
 
 ### LLM Functions
 
@@ -88,12 +91,8 @@ API key resolution: `providerOptions.apiKey` → `keysAdapter.get()` → error
 ### Basic LLM with Adapters
 
 ```typescript
-import {
-  complete,
-  getModel,
-  createFileKeysAdapter,
-  createSqliteUsageAdapter,
-} from '@ank1015/llm-sdk';
+import { complete, getModel } from '@ank1015/llm-sdk';
+import { createFileKeysAdapter, createSqliteUsageAdapter } from '@ank1015/llm-sdk-adapters';
 
 const keysAdapter = createFileKeysAdapter();
 const usageAdapter = createSqliteUsageAdapter();
@@ -124,7 +123,8 @@ const response = await complete(
 ### Conversation with Adapters
 
 ```typescript
-import { Conversation, getModel, createFileKeysAdapter } from '@ank1015/llm-sdk';
+import { Conversation, getModel } from '@ank1015/llm-sdk';
+import { createFileKeysAdapter } from '@ank1015/llm-sdk-adapters';
 
 const keysAdapter = createFileKeysAdapter();
 const conversation = new Conversation({ keysAdapter });
@@ -138,7 +138,8 @@ const messages = await conversation.prompt('Hello!');
 ### Session Management
 
 ```typescript
-import { createSessionManager, createFileSessionsAdapter } from '@ank1015/llm-sdk';
+import { createSessionManager } from '@ank1015/llm-sdk';
+import { createFileSessionsAdapter } from '@ank1015/llm-sdk-adapters';
 
 const sessionsAdapter = createFileSessionsAdapter();
 const sessionManager = createSessionManager(sessionsAdapter);
@@ -227,5 +228,5 @@ Environment variables for integration tests:
 
 ## Dependencies
 
-- Depends on: @ank1015/llm-types, @ank1015/llm-core, better-sqlite3
-- Depended on by: (consumer applications)
+- Depends on: @ank1015/llm-types, @ank1015/llm-core
+- Depended on by: @ank1015/llm-sdk-adapters, (consumer applications)
