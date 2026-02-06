@@ -64,7 +64,7 @@ export class EventStream<T, R = T> implements AsyncIterable<T> {
    */
   async drain(): Promise<R> {
     // Consume all events to prevent unbounded queue growth
-     
+
     for await (const _ of this) {
       // discard
     }
@@ -75,4 +75,23 @@ export class EventStream<T, R = T> implements AsyncIterable<T> {
 export class AssistantMessageEventStream<TApi extends Api> extends EventStream<
   BaseAssistantEvent<TApi>,
   BaseAssistantMessage<TApi>
-> {}
+> {
+  /**
+   * Drains all stream events and returns the final result.
+   * Unlike `result()`, this throws if the stream ended with an error or was aborted.
+   * Use this as the non-streaming / "complete" path where callers expect errors to throw.
+   */
+  override async drain(): Promise<BaseAssistantMessage<TApi>> {
+    for await (const _ of this) {
+      // discard
+    }
+    const message = await this.result();
+    if (message.stopReason === 'error') {
+      throw new Error(message.errorMessage || 'Stream ended with error');
+    }
+    if (message.stopReason === 'aborted') {
+      throw new Error(message.errorMessage || 'Stream was aborted');
+    }
+    return message;
+  }
+}

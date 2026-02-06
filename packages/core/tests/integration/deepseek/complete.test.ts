@@ -240,13 +240,9 @@ describe('DeepSeek Complete Integration', () => {
         ],
       };
 
-      const result = await complete(model, context, { apiKey: 'invalid-key-12345' }, 'test-msg-10');
-
-      expect(result.stopReason).toBe('error');
-      expect(result.errorMessage).toBeDefined();
-      expect(result.usage.input).toBe(0);
-      expect(result.usage.output).toBe(0);
-      expect(result.usage.totalTokens).toBe(0);
+      await expect(
+        complete(model, context, { apiKey: 'invalid-key-12345' }, 'test-msg-10')
+      ).rejects.toThrow();
     }, 30000);
 
     it('should handle abort signal', async () => {
@@ -265,15 +261,9 @@ describe('DeepSeek Complete Integration', () => {
       // Abort immediately
       setTimeout(() => controller.abort(), 10);
 
-      const result = await complete(
-        model,
-        context,
-        { apiKey, signal: controller.signal },
-        'test-msg-11'
-      );
-
-      expect(result.stopReason).toBe('aborted');
-      expect(result.usage.totalTokens).toBe(0);
+      await expect(
+        complete(model, context, { apiKey, signal: controller.signal }, 'test-msg-11')
+      ).rejects.toThrow();
     }, 30000);
   });
 

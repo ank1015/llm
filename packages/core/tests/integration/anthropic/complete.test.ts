@@ -317,18 +317,9 @@ describe('Anthropic Complete Integration', () => {
         ],
       };
 
-      const result = await complete(
-        model,
-        context,
-        { apiKey: 'invalid-key-12345', max_tokens: 2000 },
-        'test-msg-12'
-      );
-
-      expect(result.stopReason).toBe('error');
-      expect(result.errorMessage).toBeDefined();
-      expect(result.usage.input).toBe(0);
-      expect(result.usage.output).toBe(0);
-      expect(result.usage.totalTokens).toBe(0);
+      await expect(
+        complete(model, context, { apiKey: 'invalid-key-12345', max_tokens: 2000 }, 'test-msg-12')
+      ).rejects.toThrow();
     }, 30000);
 
     it('should handle abort signal', async () => {
@@ -347,15 +338,14 @@ describe('Anthropic Complete Integration', () => {
       // Abort immediately
       setTimeout(() => controller.abort(), 10);
 
-      const result = await complete(
-        model,
-        context,
-        { apiKey, signal: controller.signal, max_tokens: 2000 },
-        'test-msg-13'
-      );
-
-      expect(result.stopReason).toBe('aborted');
-      expect(result.usage.totalTokens).toBe(0);
+      await expect(
+        complete(
+          model,
+          context,
+          { apiKey, signal: controller.signal, max_tokens: 2000 },
+          'test-msg-13'
+        )
+      ).rejects.toThrow();
     }, 30000);
   });
 

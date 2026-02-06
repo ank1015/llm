@@ -280,10 +280,15 @@ export const streamOpenAI: StreamFunction<'openai'> = (
             if (context.tools) {
               const tool = context.tools.find((t) => t.name === toolCall.name);
               if (tool) {
-                toolCall.arguments = validateToolArguments(tool, toolCall) as Record<
-                  string,
-                  unknown
-                >;
+                try {
+                  toolCall.arguments = validateToolArguments(tool, toolCall) as Record<
+                    string,
+                    unknown
+                  >;
+                } catch {
+                  // Keep the parsed arguments — validation errors are handled
+                  // downstream by the agent runner, which sends them back to the LLM
+                }
               }
             }
 

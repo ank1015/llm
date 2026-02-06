@@ -354,7 +354,15 @@ export function createChatCompletionStream<
         if (context.tools) {
           const tool = (context.tools as readonly Tool[]).find((t) => t.name === toolBlock.name);
           if (tool) {
-            toolBlock.arguments = validateToolArguments(tool, toolBlock) as Record<string, unknown>;
+            try {
+              toolBlock.arguments = validateToolArguments(tool, toolBlock) as Record<
+                string,
+                unknown
+              >;
+            } catch {
+              // Keep the parsed arguments — validation errors are handled
+              // downstream by the agent runner, which sends them back to the LLM
+            }
           }
         }
 

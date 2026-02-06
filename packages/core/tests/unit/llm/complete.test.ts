@@ -144,7 +144,7 @@ describe('complete', () => {
   });
 
   describe('error handling', () => {
-    it('should return error result from stream', async () => {
+    it('should throw on error result from stream', async () => {
       const model = createMockModel('anthropic');
       const context = createMockContext();
       const options = { apiKey: 'test-key' };
@@ -160,10 +160,7 @@ describe('complete', () => {
 
       vi.mocked(stream).mockReturnValue(mockStream);
 
-      const result = await complete(model, context, options, 'req-1');
-
-      expect(result.stopReason).toBe('error');
-      expect(result.errorMessage).toBe('API rate limited');
+      await expect(complete(model, context, options, 'req-1')).rejects.toThrow('API rate limited');
     });
   });
 
