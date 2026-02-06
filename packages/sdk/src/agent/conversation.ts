@@ -12,7 +12,8 @@ import {
   complete as coreComplete,
   stream as coreStream,
 } from '@ank1015/llm-core';
-import { ApiKeyNotFoundError } from '@ank1015/llm-types';
+
+import { resolveApiKey } from '../utils/resolve-key.js';
 
 import type { KeysAdapter, UsageAdapter } from '../adapters/types.js';
 import type { AgentRunnerCallbacks, AgentRunnerConfig } from '@ank1015/llm-core';
@@ -338,30 +339,7 @@ export class Conversation {
     const providerOptions = this._state.provider.providerOptions as
       | Record<string, unknown>
       | undefined;
-
-    // Check if apiKey is in provider options
-    if (providerOptions && 'apiKey' in providerOptions && providerOptions.apiKey) {
-      return providerOptions.apiKey as string;
-    }
-
-    // Try to get from adapter
-    if (this.keysAdapter) {
-      const key = await this.keysAdapter.get(this._state.provider.model.api);
-      if (key) {
-        return key;
-      }
-    }
-
-    throw new ApiKeyNotFoundError(this._state.provider.model.api);
-  }
-
-  /**
-   * Track usage via adapter if available.
-   */
-  private async _trackUsage(message: Message): Promise<void> {
-    if (this.usageAdapter && message.role === 'assistant') {
-      await this.usageAdapter.track(message);
-    }
+    return resolveApiKey(this._state.provider.model.api, providerOptions, this.keysAdapter);
   }
 
   private async _prepareRun(): Promise<{

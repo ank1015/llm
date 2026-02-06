@@ -28,6 +28,9 @@ export type {
 export { complete, stream } from './llm/index.js';
 export type { CompleteOptions, StreamOptions } from './llm/index.js';
 
+// Utilities
+export { resolveApiKey } from './utils/resolve-key.js';
+
 // Agent
 export { Conversation } from './agent/index.js';
 export type { ConversationExternalCallback, ConversationOptions } from './agent/index.js';

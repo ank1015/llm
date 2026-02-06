@@ -6,7 +6,8 @@
  */
 
 import { stream as coreStream } from '@ank1015/llm-core';
-import { ApiKeyNotFoundError } from '@ank1015/llm-types';
+
+import { resolveApiKey } from '../utils/resolve-key.js';
 
 import type { KeysAdapter, UsageAdapter } from '../adapters/types.js';
 import type { AssistantMessageEventStream } from '@ank1015/llm-core';
@@ -51,16 +52,11 @@ export async function stream<TApi extends Api>(
   const { providerOptions = {}, keysAdapter, usageAdapter } = options;
 
   // Resolve API key
-  let apiKey: string | undefined;
-  if ('apiKey' in providerOptions && providerOptions.apiKey) {
-    apiKey = providerOptions.apiKey as string;
-  } else if (keysAdapter) {
-    apiKey = await keysAdapter.get(model.api);
-  }
-
-  if (!apiKey) {
-    throw new ApiKeyNotFoundError(model.api);
-  }
+  const apiKey = await resolveApiKey(
+    model.api,
+    providerOptions as Record<string, unknown>,
+    keysAdapter
+  );
 
   // Build final options with resolved API key
   const finalOptions = {
