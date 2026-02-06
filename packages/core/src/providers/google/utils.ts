@@ -109,10 +109,12 @@ export function buildGoogleMessages(model: Model<'google'>, context: Context): C
           });
         }
       }
-      contents.push({
-        role: 'user',
-        parts,
-      });
+      if (parts.length > 0) {
+        contents.push({
+          role: 'user',
+          parts,
+        });
+      }
     }
 
     if (message.role === 'toolResult') {
