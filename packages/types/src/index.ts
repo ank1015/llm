@@ -16,6 +16,8 @@ export type {
   AnthropicProviderOptions,
   ClaudeCodeNativeResponse,
   ClaudeCodeProviderOptions,
+  CodexNativeResponse,
+  CodexProviderOptions,
   DeepSeekNativeResponse,
   DeepSeekProviderOptions,
   GoogleNativeResponse,

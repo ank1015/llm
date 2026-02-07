@@ -89,7 +89,7 @@ function stripBold(text: string): string {
 }
 
 /** APIs that use structured bold-heading format (split into title/body pairs) */
-const STRUCTURED_THINKING_APIS: Set<string> = new Set(['google', 'openai', 'deepseek']);
+const STRUCTURED_THINKING_APIS: Set<string> = new Set(['google', 'openai', 'codex', 'deepseek']);
 
 /**
  * Splits thinking text into grouped items.

@@ -6,6 +6,7 @@
  */
 import './src/providers/anthropic/index.js';
 import './src/providers/claude-code/index.js';
+import './src/providers/codex/index.js';
 import './src/providers/openai/index.js';
 import './src/providers/google/index.js';
 import './src/providers/deepseek/index.js';

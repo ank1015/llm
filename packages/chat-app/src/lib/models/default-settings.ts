@@ -47,6 +47,7 @@ export function getDefaultProviderSettingsForApi(api: Api): Record<string, unkno
       return defaultGoogleProviderOptions;
     case 'kimi':
       return defaultKimiProviderOptions;
+    case 'codex':
     case 'openai':
       return defaultOpenaiProviderOptions;
     case 'zai':

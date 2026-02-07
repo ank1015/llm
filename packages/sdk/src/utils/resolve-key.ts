@@ -11,6 +11,7 @@ import type { Api } from '@ank1015/llm-types';
 
 const REQUIRED_CREDENTIAL_FIELDS: Record<Api, readonly string[]> = {
   openai: ['apiKey'],
+  codex: ['apiKey', 'chatgpt-account-id'],
   google: ['apiKey'],
   deepseek: ['apiKey'],
   anthropic: ['apiKey'],
