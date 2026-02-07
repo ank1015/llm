@@ -9,7 +9,7 @@
 import { complete as coreComplete, stream as coreStream } from '@ank1015/llm-core';
 
 import { Conversation } from './agent/conversation.js';
-import { resolveApiKey } from './utils/resolve-key.js';
+import { resolveProviderCredentials } from './utils/resolve-key.js';
 
 import type { KeysAdapter, UsageAdapter, SessionsAdapter } from './adapters/index.js';
 import type { ConversationOptions } from './agent/conversation.js';
@@ -26,7 +26,7 @@ import type {
 } from '@ank1015/llm-types';
 
 export interface LLMClientConfig {
-  /** Adapter for retrieving API keys */
+  /** Adapter for retrieving provider credentials */
   keys?: KeysAdapter;
   /** Adapter for tracking usage */
   usage?: UsageAdapter;
@@ -61,12 +61,12 @@ export class LLMClient {
     context: Context,
     providerOptions?: Partial<OptionsForApi<TApi>>
   ): Promise<BaseAssistantMessage<TApi>> {
-    const apiKey = await resolveApiKey(
+    const credentialOptions = await resolveProviderCredentials(
       model.api,
       providerOptions as Record<string, unknown> | undefined,
       this.keys
     );
-    const finalOptions = { ...providerOptions, apiKey } as OptionsForApi<TApi>;
+    const finalOptions = { ...providerOptions, ...credentialOptions } as OptionsForApi<TApi>;
     const requestId = `sdk-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
     const message = await coreComplete(model, context, finalOptions, requestId);
     await this.trackUsage(message);
@@ -81,12 +81,12 @@ export class LLMClient {
     context: Context,
     providerOptions?: Partial<OptionsForApi<TApi>>
   ): Promise<AssistantMessageEventStream<TApi>> {
-    const apiKey = await resolveApiKey(
+    const credentialOptions = await resolveProviderCredentials(
       model.api,
       providerOptions as Record<string, unknown> | undefined,
       this.keys
     );
-    const finalOptions = { ...providerOptions, apiKey } as OptionsForApi<TApi>;
+    const finalOptions = { ...providerOptions, ...credentialOptions } as OptionsForApi<TApi>;
     const requestId = `sdk-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
     const eventStream = coreStream(model, context, finalOptions, requestId);
     return this.wrapStreamWithTracking(eventStream);

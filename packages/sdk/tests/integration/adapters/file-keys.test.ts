@@ -77,6 +77,23 @@ describe('FileKeysAdapter Integration', () => {
     });
   });
 
+  describe('credential bundles', () => {
+    it('should store and retrieve claude-code credentials', async () => {
+      await adapter.setCredentials?.('claude-code', {
+        oauthToken: 'oauth-token',
+        betaFlag: 'flag-a,flag-b',
+        billingHeader: 'x-anthropic-billing-header: cc_version=test;',
+      });
+
+      const credentials = await adapter.getCredentials?.('claude-code');
+      expect(credentials).toEqual({
+        oauthToken: 'oauth-token',
+        betaFlag: 'flag-a,flag-b',
+        billingHeader: 'x-anthropic-billing-header: cc_version=test;',
+      });
+    });
+  });
+
   describe('delete', () => {
     it('should delete an existing key', async () => {
       await adapter.set('anthropic', 'test-key');
@@ -120,6 +137,17 @@ describe('FileKeysAdapter Integration', () => {
       const providers = await adapter.list();
       expect(providers).not.toContain('anthropic');
       expect(providers).toContain('openai');
+    });
+
+    it('should list provider when only credential bundle exists', async () => {
+      await adapter.setCredentials?.('claude-code', {
+        oauthToken: 'oauth-token',
+        betaFlag: 'flag-a,flag-b',
+        billingHeader: 'x-anthropic-billing-header: cc_version=test;',
+      });
+
+      const providers = await adapter.list();
+      expect(providers).toContain('claude-code');
     });
   });
 

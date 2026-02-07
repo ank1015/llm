@@ -35,6 +35,19 @@ const mockModel: Model<'anthropic'> = {
   tools: ['function_calling'],
 };
 
+const mockClaudeCodeModel: Model<'claude-code'> = {
+  id: 'claude-haiku-4-5',
+  api: 'claude-code',
+  name: 'Claude Haiku 4.5',
+  baseUrl: 'https://api.anthropic.com',
+  reasoning: false,
+  input: ['text'],
+  cost: { input: 0.001, output: 0.005 },
+  contextWindow: 200000,
+  maxTokens: 8192,
+  tools: ['function_calling'],
+};
+
 const mockAssistantMessage: BaseAssistantMessage<'anthropic'> = {
   role: 'assistant',
   id: 'msg-1',
@@ -199,6 +212,38 @@ describe('LLMClient', () => {
 
       await expect(client.complete(mockModel, { messages: [] })).rejects.toThrow('DB write failed');
     });
+
+    it('should resolve claude-code credentials via getCredentials()', async () => {
+      const keys: KeysAdapter = {
+        get: vi.fn().mockResolvedValue(undefined),
+        getCredentials: vi.fn().mockResolvedValue({
+          oauthToken: 'oauth-token',
+          betaFlag: 'flag-a,flag-b',
+          billingHeader: 'x-anthropic-billing-header: cc_version=test;',
+        }),
+        set: vi.fn(),
+        setCredentials: vi.fn(),
+        delete: vi.fn(),
+        deleteCredentials: vi.fn(),
+        list: vi.fn(),
+      };
+      const client = new LLMClient({ keys });
+      vi.mocked(core.complete).mockResolvedValue(mockAssistantMessage as any);
+
+      await client.complete(mockClaudeCodeModel, { messages: [] });
+
+      expect(keys.getCredentials).toHaveBeenCalledWith('claude-code');
+      expect(core.complete).toHaveBeenCalledWith(
+        mockClaudeCodeModel,
+        { messages: [] },
+        expect.objectContaining({
+          oauthToken: 'oauth-token',
+          betaFlag: 'flag-a,flag-b',
+          billingHeader: 'x-anthropic-billing-header: cc_version=test;',
+        }),
+        expect.any(String)
+      );
+    });
   });
 
   describe('stream()', () => {
@@ -255,6 +300,39 @@ describe('LLMClient', () => {
 
       // Should be the same object (not wrapped)
       expect(stream).toBe(mockStream);
+    });
+
+    it('should resolve claude-code credentials via getCredentials()', async () => {
+      const keys: KeysAdapter = {
+        get: vi.fn().mockResolvedValue(undefined),
+        getCredentials: vi.fn().mockResolvedValue({
+          oauthToken: 'oauth-token',
+          betaFlag: 'flag-a,flag-b',
+          billingHeader: 'x-anthropic-billing-header: cc_version=test;',
+        }),
+        set: vi.fn(),
+        setCredentials: vi.fn(),
+        delete: vi.fn(),
+        deleteCredentials: vi.fn(),
+        list: vi.fn(),
+      };
+      const client = new LLMClient({ keys });
+      const mockStream = createMockEventStream();
+      vi.mocked(core.stream).mockReturnValue(mockStream as any);
+
+      await client.stream(mockClaudeCodeModel, { messages: [] });
+
+      expect(keys.getCredentials).toHaveBeenCalledWith('claude-code');
+      expect(core.stream).toHaveBeenCalledWith(
+        mockClaudeCodeModel,
+        { messages: [] },
+        expect.objectContaining({
+          oauthToken: 'oauth-token',
+          betaFlag: 'flag-a,flag-b',
+          billingHeader: 'x-anthropic-billing-header: cc_version=test;',
+        }),
+        expect.any(String)
+      );
     });
   });
 

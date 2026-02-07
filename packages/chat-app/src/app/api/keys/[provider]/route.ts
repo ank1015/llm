@@ -1,3 +1,5 @@
+import type { Api } from '@ank1015/llm-sdk';
+
 import { parseApi, createKeysAdapter } from '@/lib/api/keys';
 import { apiError } from '@/lib/api/response';
 
@@ -7,23 +9,73 @@ type KeysRouteContext = {
   }>;
 };
 
-type PutBody = {
-  key: string;
-};
+type PutBody =
+  | {
+      kind: 'key';
+      key: string;
+    }
+  | {
+      kind: 'credentials';
+      credentials: Record<string, string>;
+    };
 
 export const runtime = 'nodejs';
 
-function parsePutBody(value: unknown): PutBody | undefined {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function getNonEmptyString(source: Record<string, unknown>, key: string): string | undefined {
+  const value = source[key];
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function parsePutBody(provider: Api, value: unknown): PutBody | undefined {
   if (typeof value !== 'object' || value === null) {
     return undefined;
   }
 
-  const key = (value as { key?: unknown }).key;
-  if (typeof key !== 'string' || key.trim().length === 0) {
+  const body = value as Record<string, unknown>;
+  const credentialsSource = isRecord(body.credentials) ? body.credentials : undefined;
+
+  if (provider === 'claude-code') {
+    const oauthToken =
+      getNonEmptyString(body, 'oauthToken') ??
+      getNonEmptyString(credentialsSource ?? {}, 'oauthToken');
+    const betaFlag =
+      getNonEmptyString(body, 'betaFlag') ?? getNonEmptyString(credentialsSource ?? {}, 'betaFlag');
+    const billingHeader =
+      getNonEmptyString(body, 'billingHeader') ??
+      getNonEmptyString(credentialsSource ?? {}, 'billingHeader');
+
+    if (!oauthToken || !betaFlag || !billingHeader) {
+      return undefined;
+    }
+
+    return {
+      kind: 'credentials',
+      credentials: {
+        oauthToken,
+        betaFlag,
+        billingHeader,
+      },
+    };
+  }
+
+  const key =
+    getNonEmptyString(body, 'key') ??
+    getNonEmptyString(body, 'apiKey') ??
+    getNonEmptyString(credentialsSource ?? {}, 'apiKey');
+
+  if (!key) {
     return undefined;
   }
 
-  return { key: key.trim() };
+  return { kind: 'key', key };
 }
 
 export async function PUT(request: Request, context: KeysRouteContext): Promise<Response> {
@@ -38,18 +90,33 @@ export async function PUT(request: Request, context: KeysRouteContext): Promise<
   }
 
   const requestBody = await request.json().catch(() => undefined);
-  const body = parsePutBody(requestBody);
+  const body = parsePutBody(provider, requestBody);
 
   if (!body) {
+    const message =
+      provider === 'claude-code'
+        ? 'Request body must include non-empty "oauthToken", "betaFlag", and "billingHeader" strings.'
+        : 'Request body must be valid JSON with a non-empty "key" string.';
     return apiError(400, {
       code: 'INVALID_BODY',
-      message: 'Request body must be valid JSON with a non-empty "key" string.',
+      message,
     });
   }
 
   try {
     const keysAdapter = createKeysAdapter();
-    await keysAdapter.set(provider, body.key);
+    if (body.kind === 'credentials') {
+      if (typeof keysAdapter.setCredentials === 'function') {
+        await keysAdapter.setCredentials(provider, body.credentials);
+      } else {
+        return apiError(500, {
+          code: 'KEY_SAVE_FAILED',
+          message: 'Credentials storage is not supported by the configured keys adapter.',
+        });
+      }
+    } else {
+      await keysAdapter.set(provider, body.key);
+    }
 
     return Response.json({
       ok: true,

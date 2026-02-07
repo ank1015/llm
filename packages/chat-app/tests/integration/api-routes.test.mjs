@@ -180,6 +180,57 @@ describe('chat-app API integration', () => {
     assert.equal(afterDeleteProvider.hasKey, false);
   });
 
+  it('stores and deletes claude-code credential bundles through the keys routes', async () => {
+    const initialList = await apiRequest('/api/keys', { method: 'GET' });
+    assert.equal(initialList.response.status, 200);
+    assert.equal(initialList.body.ok, true);
+
+    const initialProvider = initialList.body.providers.find(
+      (provider) => provider.api === 'claude-code'
+    );
+    assert.ok(initialProvider);
+    assert.equal(initialProvider.hasKey, false);
+
+    const putResult = await apiRequest('/api/keys/claude-code', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        oauthToken: 'sk-ant-oat01-test-token',
+        betaFlag: 'claude-code-20250219,oauth-2025-04-20',
+        billingHeader: 'x-anthropic-billing-header: cc_version=test; cc_entrypoint=sdk-ts;',
+      }),
+    });
+
+    assert.equal(putResult.response.status, 200);
+    assert.equal(putResult.body.ok, true);
+    assert.equal(putResult.body.provider, 'claude-code');
+
+    const afterSetList = await apiRequest('/api/keys', { method: 'GET' });
+    const afterSetProvider = afterSetList.body.providers.find(
+      (provider) => provider.api === 'claude-code'
+    );
+    assert.ok(afterSetProvider);
+    assert.equal(afterSetProvider.hasKey, true);
+
+    const deleteResult = await apiRequest('/api/keys/claude-code', {
+      method: 'DELETE',
+    });
+
+    assert.equal(deleteResult.response.status, 200);
+    assert.equal(deleteResult.body.ok, true);
+    assert.equal(deleteResult.body.provider, 'claude-code');
+
+    const afterDeleteList = await apiRequest('/api/keys', { method: 'GET' });
+    const afterDeleteProvider = afterDeleteList.body.providers.find(
+      (provider) => provider.api === 'claude-code'
+    );
+
+    assert.ok(afterDeleteProvider);
+    assert.equal(afterDeleteProvider.hasKey, false);
+  });
+
   it('creates a session and updates its name through the dedicated endpoint', async () => {
     const projectName = 'integration-tests';
 

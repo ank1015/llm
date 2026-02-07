@@ -33,7 +33,7 @@ export { LLMClient } from './client.js';
 export type { LLMClientConfig } from './client.js';
 
 // Utilities
-export { resolveApiKey } from './utils/resolve-key.js';
+export { resolveApiKey, resolveProviderCredentials } from './utils/resolve-key.js';
 
 // Agent
 export { Conversation } from './agent/index.js';

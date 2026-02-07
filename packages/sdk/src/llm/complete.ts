@@ -1,13 +1,13 @@
 /**
  * SDK complete function
  *
- * Calls core's complete function with API key from options or adapter.
+ * Calls core's complete function with provider credentials from options or adapter.
  * Optionally tracks usage via UsageAdapter.
  */
 
 import { complete as coreComplete } from '@ank1015/llm-core';
 
-import { resolveApiKey } from '../utils/resolve-key.js';
+import { resolveProviderCredentials } from '../utils/resolve-key.js';
 
 import type { KeysAdapter, UsageAdapter } from '../adapters/index.js';
 import type { Api, BaseAssistantMessage, Context, Model, OptionsForApi } from '@ank1015/llm-types';
@@ -16,9 +16,9 @@ import type { Api, BaseAssistantMessage, Context, Model, OptionsForApi } from '@
  * Options for the complete function.
  */
 export interface CompleteOptions<TApi extends Api> {
-  /** Provider-specific options (apiKey optional if keysAdapter provided) */
+  /** Provider-specific options (credential fields optional if keysAdapter provided) */
   providerOptions?: Partial<OptionsForApi<TApi>>;
-  /** Adapter for retrieving API keys */
+  /** Adapter for retrieving provider credentials */
   keysAdapter?: KeysAdapter;
   /** Adapter for tracking usage */
   usageAdapter?: UsageAdapter;
@@ -27,10 +27,10 @@ export interface CompleteOptions<TApi extends Api> {
 /**
  * Complete a chat request.
  *
- * API key resolution:
- * 1. If providerOptions.apiKey is provided, use it
- * 2. Else if keysAdapter is provided, get key from adapter
- * 3. Else throw ApiKeyNotFoundError
+ * Credential resolution:
+ * 1. Use explicit credential fields from providerOptions
+ * 2. Fill missing fields from keysAdapter
+ * 3. Throw if required fields are still missing
  *
  * After completion, if usageAdapter is provided, tracks the usage.
  *
@@ -49,17 +49,17 @@ export async function complete<TApi extends Api>(
 ): Promise<BaseAssistantMessage<TApi>> {
   const { providerOptions = {}, keysAdapter, usageAdapter } = options;
 
-  // Resolve API key
-  const apiKey = await resolveApiKey(
+  // Resolve provider credential fields
+  const credentialOptions = await resolveProviderCredentials(
     model.api,
     providerOptions as Record<string, unknown>,
     keysAdapter
   );
 
-  // Build final options with resolved API key
+  // Build final options with resolved credentials
   const finalOptions = {
     ...providerOptions,
-    apiKey,
+    ...credentialOptions,
   } as OptionsForApi<TApi>;
 
   // Generate request ID

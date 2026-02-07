@@ -39,6 +39,17 @@ export interface KeysAdapter {
   get(api: Api): Promise<string | undefined>;
 
   /**
+   * Get all stored credentials for a provider.
+   *
+   * Optional method for providers that require multiple credential fields
+   * (e.g. claude-code needs oauthToken, betaFlag, billingHeader).
+   *
+   * @param api - The API provider
+   * @returns Credential map, or undefined if not found
+   */
+  getCredentials?(api: Api): Promise<Record<string, string> | undefined>;
+
+  /**
    * Set the API key for a provider.
    * @param api - The API provider
    * @param key - The API key to store
@@ -46,11 +57,31 @@ export interface KeysAdapter {
   set(api: Api, key: string): Promise<void>;
 
   /**
+   * Set all credentials for a provider.
+   *
+   * Optional method for providers that require multiple credential fields.
+   *
+   * @param api - The API provider
+   * @param credentials - Credential map to store
+   */
+  setCredentials?(api: Api, credentials: Record<string, string>): Promise<void>;
+
+  /**
    * Delete the API key for a provider.
    * @param api - The API provider
    * @returns true if deleted, false if not found
    */
   delete(api: Api): Promise<boolean>;
+
+  /**
+   * Delete all credentials for a provider.
+   *
+   * Optional method for providers that store multiple credential fields.
+   *
+   * @param api - The API provider
+   * @returns true if deleted, false if not found
+   */
+  deleteCredentials?(api: Api): Promise<boolean>;
 
   /**
    * List all providers with stored keys.

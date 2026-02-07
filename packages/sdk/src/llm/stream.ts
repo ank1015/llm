@@ -1,13 +1,13 @@
 /**
  * SDK stream function
  *
- * Calls core's stream function with API key from options or adapter.
+ * Calls core's stream function with provider credentials from options or adapter.
  * Optionally tracks usage via UsageAdapter.
  */
 
 import { stream as coreStream } from '@ank1015/llm-core';
 
-import { resolveApiKey } from '../utils/resolve-key.js';
+import { resolveProviderCredentials } from '../utils/resolve-key.js';
 
 import type { KeysAdapter, UsageAdapter } from '../adapters/index.js';
 import type { AssistantMessageEventStream } from '@ank1015/llm-core';
@@ -17,9 +17,9 @@ import type { Api, BaseAssistantMessage, Context, Model, OptionsForApi } from '@
  * Options for the stream function.
  */
 export interface StreamOptions<TApi extends Api> {
-  /** Provider-specific options (apiKey optional if keysAdapter provided) */
+  /** Provider-specific options (credential fields optional if keysAdapter provided) */
   providerOptions?: Partial<OptionsForApi<TApi>>;
-  /** Adapter for retrieving API keys */
+  /** Adapter for retrieving provider credentials */
   keysAdapter?: KeysAdapter;
   /** Adapter for tracking usage */
   usageAdapter?: UsageAdapter;
@@ -28,14 +28,14 @@ export interface StreamOptions<TApi extends Api> {
 /**
  * Stream a chat request.
  *
- * API key resolution:
- * 1. If providerOptions.apiKey is provided, use it
- * 2. Else if keysAdapter is provided, get key from adapter
- * 3. Else throw ApiKeyNotFoundError
+ * Credential resolution:
+ * 1. Use explicit credential fields from providerOptions
+ * 2. Fill missing fields from keysAdapter
+ * 3. Throw if required fields are still missing
  *
  * After streaming completes, if usageAdapter is provided, tracks the usage.
  *
- * Note: This function is async because it may need to resolve the API key from an adapter.
+ * Note: This function is async because it may need to resolve credentials from an adapter.
  *
  * @deprecated Use {@link LLMClient.stream} instead for auto-wired adapter support.
  * @param model - The model configuration
@@ -52,17 +52,17 @@ export async function stream<TApi extends Api>(
 ): Promise<AssistantMessageEventStream<TApi>> {
   const { providerOptions = {}, keysAdapter, usageAdapter } = options;
 
-  // Resolve API key
-  const apiKey = await resolveApiKey(
+  // Resolve provider credential fields
+  const credentialOptions = await resolveProviderCredentials(
     model.api,
     providerOptions as Record<string, unknown>,
     keysAdapter
   );
 
-  // Build final options with resolved API key
+  // Build final options with resolved credentials
   const finalOptions = {
     ...providerOptions,
-    apiKey,
+    ...credentialOptions,
   } as OptionsForApi<TApi>;
 
   // Generate request ID

@@ -2,7 +2,7 @@
  * Conversation class for managing stateful agent interactions.
  *
  * Uses core's runAgentLoop for execution with optional adapter support
- * for API key resolution and usage tracking.
+ * for provider credential resolution and usage tracking.
  */
 
 import {
@@ -19,7 +19,7 @@ import {
   SessionNotFoundError,
 } from '@ank1015/llm-types';
 
-import { resolveApiKey } from '../utils/resolve-key.js';
+import { resolveProviderCredentials } from '../utils/resolve-key.js';
 
 import type { KeysAdapter, UsageAdapter, SessionsAdapter } from '../adapters/index.js';
 import type { AgentRunnerCallbacks, AgentRunnerConfig } from '@ank1015/llm-core';
@@ -59,7 +59,7 @@ export interface ConversationOptions {
   messageTransformer?: (messages: Message[]) => Message[] | Promise<Message[]>;
   /** Queue mode: "all" = send all queued messages at once, "one-at-a-time" = send one per turn */
   queueMode?: 'all' | 'one-at-a-time';
-  /** Adapter for retrieving API keys */
+  /** Adapter for retrieving provider credentials */
   keysAdapter?: KeysAdapter;
   /** Adapter for tracking usage */
   usageAdapter?: UsageAdapter;
@@ -380,13 +380,17 @@ export class Conversation {
   }
 
   /**
-   * Resolve API key from provider options or adapter.
+   * Resolve provider credential fields from provider options or adapter.
    */
-  private async _resolveApiKey(): Promise<string> {
+  private async _resolveProviderCredentials(): Promise<Record<string, string>> {
     const providerOptions = this._state.provider.providerOptions as
       | Record<string, unknown>
       | undefined;
-    return resolveApiKey(this._state.provider.model.api, providerOptions, this.keysAdapter);
+    return resolveProviderCredentials(
+      this._state.provider.model.api,
+      providerOptions,
+      this.keysAdapter
+    );
   }
 
   /**
@@ -468,8 +472,8 @@ export class Conversation {
     // Initialize persistence (validate session, load latest node)
     await this.initializePersistence();
 
-    // Resolve API key before starting
-    const apiKey = await this._resolveApiKey();
+    // Resolve provider credentials before starting
+    const resolvedCredentials = await this._resolveProviderCredentials();
 
     this.runningPrompt = new Promise<void>((resolve) => {
       this.resolveRunningPrompt = resolve;
@@ -490,13 +494,13 @@ export class Conversation {
       budget.contextLimit = this._state.contextLimit;
     }
 
-    // Create bound complete/stream functions with API key
+    // Create bound complete/stream functions with resolved credentials
     const usageAdapter = this.usageAdapter;
     const boundComplete: AgentRunnerConfig['complete'] = async (m, ctx, opts, id) => {
       const result = await coreComplete(
         m,
         ctx,
-        { ...opts, apiKey } as OptionsForApi<typeof m.api>,
+        { ...opts, ...resolvedCredentials } as OptionsForApi<typeof m.api>,
         id
       );
       if (usageAdapter) {
@@ -509,7 +513,7 @@ export class Conversation {
       const eventStream = coreStream(
         m,
         ctx,
-        { ...opts, apiKey } as OptionsForApi<typeof m.api>,
+        { ...opts, ...resolvedCredentials } as OptionsForApi<typeof m.api>,
         id
       );
       if (usageAdapter) {

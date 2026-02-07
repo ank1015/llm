@@ -85,6 +85,32 @@ describe('FileKeysAdapter', () => {
     });
   });
 
+  describe('setCredentials() and getCredentials()', () => {
+    it('should store and retrieve multi-field credentials', async () => {
+      await adapter.setCredentials?.('claude-code', {
+        oauthToken: 'oauth-token',
+        betaFlag: 'flag-a,flag-b',
+        billingHeader: 'x-anthropic-billing-header: cc_version=test;',
+      });
+
+      const credentials = await adapter.getCredentials?.('claude-code');
+      expect(credentials).toEqual({
+        oauthToken: 'oauth-token',
+        betaFlag: 'flag-a,flag-b',
+        billingHeader: 'x-anthropic-billing-header: cc_version=test;',
+      });
+    });
+
+    it('should keep legacy get()/set() compatible when credentials bundle exists', async () => {
+      await adapter.setCredentials?.('anthropic', { apiKey: 'bundle-key' });
+      expect(await adapter.get('anthropic')).toBe('bundle-key');
+
+      await adapter.set('anthropic', 'legacy-overwrite');
+      expect(await adapter.get('anthropic')).toBe('legacy-overwrite');
+      expect((await adapter.getCredentials?.('anthropic'))?.apiKey).toBe('legacy-overwrite');
+    });
+  });
+
   describe('delete()', () => {
     it('should delete an existing key', async () => {
       await adapter.set('anthropic', 'test-key');
@@ -140,6 +166,17 @@ describe('FileKeysAdapter', () => {
       expect(providers).toHaveLength(1);
       expect(providers).toContain('openai');
       expect(providers).not.toContain('anthropic');
+    });
+
+    it('should include provider with stored credential bundle', async () => {
+      await adapter.setCredentials?.('claude-code', {
+        oauthToken: 'oauth-token',
+        betaFlag: 'flag-a,flag-b',
+        billingHeader: 'x-anthropic-billing-header: cc_version=test;',
+      });
+
+      const providers = await adapter.list();
+      expect(providers).toContain('claude-code');
     });
   });
 

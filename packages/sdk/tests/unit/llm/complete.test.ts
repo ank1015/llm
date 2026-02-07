@@ -33,6 +33,19 @@ describe('complete', () => {
     tools: ['function'],
   };
 
+  const mockClaudeCodeModel: Model<'claude-code'> = {
+    api: 'claude-code',
+    id: 'claude-haiku-4-5',
+    name: 'Claude Haiku 4.5',
+    baseUrl: 'https://api.anthropic.com',
+    reasoning: false,
+    input: ['text'],
+    contextWindow: 200000,
+    maxTokens: 8192,
+    cost: { input: 1, output: 5, cacheRead: 0.1, cacheWrite: 1.25 },
+    tools: ['function'],
+  };
+
   const mockContext: Context = {
     messages: [
       {
@@ -148,6 +161,63 @@ describe('complete', () => {
       await expect(
         complete(mockModel, mockContext, { keysAdapter: mockKeysAdapter })
       ).rejects.toThrow('API key not found for provider: anthropic');
+    });
+
+    it('should resolve claude-code credentials from providerOptions', async () => {
+      vi.mocked(core.complete).mockResolvedValue(mockResponse as any);
+
+      await complete(mockClaudeCodeModel, mockContext, {
+        providerOptions: {
+          oauthToken: 'oauth-token',
+          betaFlag: 'flag-a,flag-b',
+          billingHeader: 'x-anthropic-billing-header: cc_version=test;',
+        } as any,
+      });
+
+      expect(core.complete).toHaveBeenCalledWith(
+        mockClaudeCodeModel,
+        mockContext,
+        expect.objectContaining({
+          oauthToken: 'oauth-token',
+          betaFlag: 'flag-a,flag-b',
+          billingHeader: 'x-anthropic-billing-header: cc_version=test;',
+        }),
+        expect.any(String)
+      );
+    });
+
+    it('should resolve missing claude-code credentials from keysAdapter.getCredentials', async () => {
+      vi.mocked(core.complete).mockResolvedValue(mockResponse as any);
+
+      const mockKeysAdapter: KeysAdapter = {
+        get: vi.fn().mockResolvedValue(undefined),
+        getCredentials: vi.fn().mockResolvedValue({
+          oauthToken: 'oauth-token',
+          betaFlag: 'flag-a,flag-b',
+          billingHeader: 'x-anthropic-billing-header: cc_version=test;',
+        }),
+        set: vi.fn(),
+        setCredentials: vi.fn(),
+        delete: vi.fn(),
+        deleteCredentials: vi.fn(),
+        list: vi.fn(),
+      };
+
+      await complete(mockClaudeCodeModel, mockContext, {
+        keysAdapter: mockKeysAdapter,
+      });
+
+      expect(mockKeysAdapter.getCredentials).toHaveBeenCalledWith('claude-code');
+      expect(core.complete).toHaveBeenCalledWith(
+        mockClaudeCodeModel,
+        mockContext,
+        expect.objectContaining({
+          oauthToken: 'oauth-token',
+          betaFlag: 'flag-a,flag-b',
+          billingHeader: 'x-anthropic-billing-header: cc_version=test;',
+        }),
+        expect.any(String)
+      );
     });
   });
 

@@ -10,7 +10,7 @@ import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from '
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import { PathTraversalError } from '@ank1015/llm-types';
+import { KnownApis, PathTraversalError } from '@ank1015/llm-types';
 
 import type { KeysAdapter, Api } from '@ank1015/llm-types';
 
@@ -116,42 +116,123 @@ export class FileKeysAdapter implements KeysAdapter {
     return join(this.keysDir, `${apiStr}.key`);
   }
 
-  async get(api: Api): Promise<string | undefined> {
-    const keyPath = this.getKeyPath(api);
-    if (!existsSync(keyPath)) {
-      return undefined;
+  /**
+   * Get the file path for a provider's credential bundle.
+   */
+  private getCredentialsPath(api: Api): string {
+    const apiStr = String(api);
+    if (apiStr.includes('..') || apiStr.includes('/') || apiStr.includes('\\')) {
+      throw new PathTraversalError(apiStr);
     }
+    return join(this.keysDir, `${apiStr}.credentials`);
+  }
+
+  /**
+   * Read an encrypted string file and decrypt it.
+   */
+  private readDecryptedFile(path: string): string | undefined {
+    if (!existsSync(path)) return undefined;
+
     try {
-      const encrypted = readFileSync(keyPath, 'utf8');
+      const encrypted = readFileSync(path, 'utf8');
       return this.decrypt(encrypted);
     } catch {
-      // If decryption fails, key file may be corrupted
       return undefined;
     }
   }
 
-  async set(api: Api, key: string): Promise<void> {
+  /**
+   * Write encrypted string data to disk.
+   */
+  private writeEncryptedFile(path: string, plaintext: string): void {
     this.ensureKeysDir();
-    const encrypted = this.encrypt(key);
-    writeFileSync(this.getKeyPath(api), encrypted, 'utf8');
+    const encrypted = this.encrypt(plaintext);
+    writeFileSync(path, encrypted, 'utf8');
+  }
+
+  async get(api: Api): Promise<string | undefined> {
+    // Prefer apiKey from credentials bundle when present.
+    const credentials = await this.getCredentials(api);
+    const bundledApiKey = credentials?.apiKey;
+    if (bundledApiKey) {
+      return bundledApiKey;
+    }
+
+    // Fallback to legacy single-key storage.
+    return this.readDecryptedFile(this.getKeyPath(api));
+  }
+
+  async getCredentials(api: Api): Promise<Record<string, string> | undefined> {
+    const credentialsRaw = this.readDecryptedFile(this.getCredentialsPath(api));
+    if (credentialsRaw) {
+      try {
+        const parsed = JSON.parse(credentialsRaw);
+        if (!parsed || typeof parsed !== 'object') return undefined;
+        const credentials = {} as Record<string, string>;
+        for (const [key, value] of Object.entries(parsed)) {
+          if (typeof value === 'string' && value) {
+            credentials[key] = value;
+          }
+        }
+        return Object.keys(credentials).length > 0 ? credentials : undefined;
+      } catch {
+        // Corrupted credentials bundle
+        return undefined;
+      }
+    }
+
+    // Backwards-compatible fallback for legacy single-key storage.
+    const apiKey = this.readDecryptedFile(this.getKeyPath(api));
+    if (!apiKey) return undefined;
+    return { apiKey };
+  }
+
+  async set(api: Api, key: string): Promise<void> {
+    // Keep legacy path for compatibility with existing consumers/tools.
+    this.writeEncryptedFile(this.getKeyPath(api), key);
+
+    // Keep credentials bundle in sync when present.
+    const existing = (await this.getCredentials(api)) ?? {};
+    const updated = { ...existing, apiKey: key };
+    this.writeEncryptedFile(this.getCredentialsPath(api), JSON.stringify(updated));
+  }
+
+  async setCredentials(api: Api, credentials: Record<string, string>): Promise<void> {
+    this.writeEncryptedFile(this.getCredentialsPath(api), JSON.stringify(credentials));
+
+    // Keep legacy single-key path in sync when apiKey is provided.
+    if (credentials.apiKey !== undefined) {
+      this.writeEncryptedFile(this.getKeyPath(api), credentials.apiKey);
+    }
   }
 
   async delete(api: Api): Promise<boolean> {
     const keyPath = this.getKeyPath(api);
-    if (!existsSync(keyPath)) {
-      return false;
+    const credentialsPath = this.getCredentialsPath(api);
+    let deleted = false;
+
+    if (existsSync(keyPath)) {
+      unlinkSync(keyPath);
+      deleted = true;
     }
-    unlinkSync(keyPath);
-    return true;
+    if (existsSync(credentialsPath)) {
+      unlinkSync(credentialsPath);
+      deleted = true;
+    }
+
+    return deleted;
+  }
+
+  async deleteCredentials(api: Api): Promise<boolean> {
+    return this.delete(api);
   }
 
   async list(): Promise<Api[]> {
     this.ensureKeysDir();
     const providers: Api[] = [];
-    const knownApis: Api[] = ['openai', 'google', 'deepseek', 'anthropic', 'zai', 'kimi'];
 
-    for (const api of knownApis) {
-      if (existsSync(this.getKeyPath(api))) {
+    for (const api of KnownApis) {
+      if (existsSync(this.getKeyPath(api)) || existsSync(this.getCredentialsPath(api))) {
         providers.push(api);
       }
     }
