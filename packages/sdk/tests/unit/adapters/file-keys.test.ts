@@ -109,6 +109,34 @@ describe('FileKeysAdapter', () => {
       expect(await adapter.get('anthropic')).toBe('legacy-overwrite');
       expect((await adapter.getCredentials?.('anthropic'))?.apiKey).toBe('legacy-overwrite');
     });
+
+    it('should normalize codex account aliases in credentials', async () => {
+      await adapter.setCredentials?.('codex', {
+        apiKey: 'access-token',
+        account_id: 'acc-123',
+      });
+
+      expect(await adapter.get('codex')).toBe('access-token');
+      expect(await adapter.getCredentials?.('codex')).toEqual({
+        apiKey: 'access-token',
+        'chatgpt-account-id': 'acc-123',
+      });
+    });
+
+    it('should preserve codex chatgpt-account-id when apiKey is updated via set()', async () => {
+      await adapter.setCredentials?.('codex', {
+        apiKey: 'old-token',
+        'chatgpt-account-id': 'acc-123',
+      });
+
+      await adapter.set('codex', 'new-token');
+
+      expect(await adapter.get('codex')).toBe('new-token');
+      expect(await adapter.getCredentials?.('codex')).toEqual({
+        apiKey: 'new-token',
+        'chatgpt-account-id': 'acc-123',
+      });
+    });
   });
 
   describe('delete()', () => {

@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 
+import { sanitizeSurrogates } from '../../utils/sanitize-unicode.js';
 import {
   buildOpenAIMessages,
   convertTools,
@@ -16,6 +17,7 @@ import type {
 
 const CODEX_ORIGINATOR = 'codex_cli_rs';
 const CODEX_USER_AGENT = 'codex_cli_rs/0.98.0 (Mac OS 26.3.0; arm64)';
+const DEFAULT_CODEX_INSTRUCTIONS = 'You are a helpful assistant';
 
 interface CodexBackendErrorBody {
   detail?: unknown;
@@ -95,9 +97,12 @@ export function buildParams(
   options: CodexProviderOptions
 ) {
   const messages = buildCodexMessages(model, context);
-  if (!options.instructions?.trim()) {
-    throw new Error('Codex instructions are required.');
-  }
+  const resolvedInstructions =
+    context.systemPrompt?.trim() && context.systemPrompt.trim().length > 0
+      ? context.systemPrompt
+      : options.instructions?.trim() && options.instructions.trim().length > 0
+        ? options.instructions
+        : DEFAULT_CODEX_INSTRUCTIONS;
 
   const {
     apiKey,
@@ -125,6 +130,7 @@ export function buildParams(
   const params: ResponseCreateParamsNonStreaming = {
     ...codexOptions,
     model: model.id,
+    instructions: sanitizeSurrogates(resolvedInstructions),
     input: messages,
     store: false,
     stream: false,
@@ -150,7 +156,9 @@ export function buildParams(
 }
 
 export function buildCodexMessages(model: Model<'codex'>, context: Context) {
-  return buildOpenAIMessages(model as unknown as Model<'openai'>, context);
+  const { systemPrompt, ...contextWithoutSystemPrompt } = context;
+  void systemPrompt;
+  return buildOpenAIMessages(model as unknown as Model<'openai'>, contextWithoutSystemPrompt);
 }
 
 export { convertTools, mapStopReason };

@@ -47,6 +47,19 @@ describe('stream', () => {
     tools: ['function'],
   };
 
+  const mockCodexModel: Model<'codex'> = {
+    api: 'codex',
+    id: 'gpt-5.3-codex',
+    name: 'GPT-5.3 Codex',
+    baseUrl: 'https://chatgpt.com/backend-api/codex',
+    reasoning: true,
+    input: ['text'],
+    contextWindow: 400000,
+    maxTokens: 128000,
+    cost: { input: 1.75, output: 14, cacheRead: 0.175, cacheWrite: 0 },
+    tools: ['function'],
+  };
+
   const mockContext: Context = {
     messages: [
       {
@@ -231,6 +244,41 @@ describe('stream', () => {
           oauthToken: 'oauth-token',
           betaFlag: 'flag-a,flag-b',
           billingHeader: 'x-anthropic-billing-header: cc_version=test;',
+        }),
+        expect.any(String)
+      );
+    });
+
+    it('should resolve codex credentials from keysAdapter.getCredentials with aliases', async () => {
+      const mockEventStream = createMockEventStream();
+      vi.mocked(core.stream).mockReturnValue(mockEventStream as any);
+
+      const mockKeysAdapter: KeysAdapter = {
+        get: vi.fn().mockResolvedValue(undefined),
+        getCredentials: vi.fn().mockResolvedValue({
+          access_token: 'access-token',
+          account_id: 'acc-123',
+        }),
+        set: vi.fn(),
+        setCredentials: vi.fn(),
+        delete: vi.fn(),
+        deleteCredentials: vi.fn(),
+        list: vi.fn(),
+      };
+
+      await stream(mockCodexModel, mockContext, {
+        providerOptions: { instructions: 'You are a coding assistant.' } as any,
+        keysAdapter: mockKeysAdapter,
+      });
+
+      expect(mockKeysAdapter.getCredentials).toHaveBeenCalledWith('codex');
+      expect(core.stream).toHaveBeenCalledWith(
+        mockCodexModel,
+        mockContext,
+        expect.objectContaining({
+          apiKey: 'access-token',
+          'chatgpt-account-id': 'acc-123',
+          instructions: 'You are a coding assistant.',
         }),
         expect.any(String)
       );

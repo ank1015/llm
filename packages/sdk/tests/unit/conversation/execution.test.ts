@@ -37,6 +37,19 @@ describe('Conversation Execution', () => {
     tools: ['function'],
   };
 
+  const mockCodexModel: Model<'codex'> = {
+    api: 'codex',
+    id: 'gpt-5.3-codex',
+    name: 'GPT-5.3 Codex',
+    baseUrl: 'https://chatgpt.com/backend-api/codex',
+    reasoning: true,
+    input: ['text'],
+    contextWindow: 400000,
+    maxTokens: 128000,
+    cost: { input: 1.75, output: 14, cacheRead: 0.175, cacheWrite: 0 },
+    tools: ['function'],
+  };
+
   const mockAssistantMessage: BaseAssistantMessage<'anthropic'> = {
     role: 'assistant',
     message: {} as BaseAssistantMessage<'anthropic'>['message'],
@@ -148,6 +161,31 @@ describe('Conversation Execution', () => {
 
       // Verify the adapter was called
       expect(mockKeysAdapter.get).toHaveBeenCalledWith('anthropic');
+    });
+
+    it('should resolve codex credentials from keysAdapter.getCredentials aliases', async () => {
+      const mockKeysAdapter: KeysAdapter = {
+        get: vi.fn().mockResolvedValue(undefined),
+        getCredentials: vi.fn().mockResolvedValue({
+          access_token: 'access-token',
+          account_id: 'acc-123',
+        }),
+        set: vi.fn(),
+        setCredentials: vi.fn(),
+        delete: vi.fn(),
+        deleteCredentials: vi.fn(),
+        list: vi.fn(),
+      };
+
+      const conversation = new Conversation({ keysAdapter: mockKeysAdapter });
+      conversation.setProvider({
+        model: mockCodexModel,
+        providerOptions: { instructions: 'You are a coding assistant.' } as any,
+      });
+
+      await conversation.prompt('Hello');
+
+      expect(mockKeysAdapter.getCredentials).toHaveBeenCalledWith('codex');
     });
   });
 

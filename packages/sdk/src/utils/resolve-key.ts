@@ -20,8 +20,35 @@ const REQUIRED_CREDENTIAL_FIELDS: Record<Api, readonly string[]> = {
   kimi: ['apiKey'],
 };
 
+const CREDENTIAL_FIELD_ALIASES: Partial<Record<Api, Partial<Record<string, readonly string[]>>>> = {
+  codex: {
+    apiKey: ['access_token', 'accessToken', 'token'],
+    'chatgpt-account-id': ['chatgptAccountId', 'accountId', 'account_id'],
+  },
+};
+
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0;
+}
+
+function getCredentialValue(
+  api: Api,
+  field: string,
+  source?: Record<string, unknown>
+): string | undefined {
+  if (!source) return undefined;
+  const aliasMap = CREDENTIAL_FIELD_ALIASES[api];
+  const aliases = aliasMap?.[field] ?? [];
+  const candidateFields = [field, ...aliases];
+
+  for (const candidate of candidateFields) {
+    const value = source[candidate];
+    if (isNonEmptyString(value)) {
+      return value;
+    }
+  }
+
+  return undefined;
 }
 
 function throwMissingCredentials(api: Api, missing: string[]): never {
@@ -50,8 +77,8 @@ export async function resolveProviderCredentials(
   const resolved = {} as Record<string, string>;
 
   for (const field of requiredFields) {
-    const value = providerOptions?.[field];
-    if (isNonEmptyString(value)) {
+    const value = getCredentialValue(api, field, providerOptions);
+    if (value) {
       resolved[field] = value;
     }
   }
@@ -65,8 +92,8 @@ export async function resolveProviderCredentials(
     const storedCredentials = await keysAdapter.getCredentials(api);
     if (storedCredentials) {
       for (const field of missing) {
-        const value = storedCredentials[field];
-        if (isNonEmptyString(value)) {
+        const value = getCredentialValue(api, field, storedCredentials as Record<string, unknown>);
+        if (value) {
           resolved[field] = value;
         }
       }

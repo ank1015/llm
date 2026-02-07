@@ -37,6 +37,36 @@ describe('InMemoryKeysAdapter', () => {
     expect((await adapter.getCredentials?.('anthropic'))?.apiKey).toBe('legacy-overwrite');
   });
 
+  it('should normalize codex account aliases in credentials', async () => {
+    const adapter = new InMemoryKeysAdapter();
+    await adapter.setCredentials?.('codex', {
+      apiKey: 'access-token',
+      account_id: 'acc-123',
+    });
+
+    expect(await adapter.get('codex')).toBe('access-token');
+    expect(await adapter.getCredentials?.('codex')).toEqual({
+      apiKey: 'access-token',
+      'chatgpt-account-id': 'acc-123',
+    });
+  });
+
+  it('should preserve codex chatgpt-account-id when apiKey is updated via set()', async () => {
+    const adapter = new InMemoryKeysAdapter();
+    await adapter.setCredentials?.('codex', {
+      apiKey: 'old-token',
+      'chatgpt-account-id': 'acc-123',
+    });
+
+    await adapter.set('codex', 'new-token');
+
+    expect(await adapter.get('codex')).toBe('new-token');
+    expect(await adapter.getCredentials?.('codex')).toEqual({
+      apiKey: 'new-token',
+      'chatgpt-account-id': 'acc-123',
+    });
+  });
+
   it('should delete provider credentials', async () => {
     const adapter = new InMemoryKeysAdapter();
     await adapter.setCredentials?.('claude-code', {

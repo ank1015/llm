@@ -15,7 +15,7 @@ export type CodexNativeResponse = Response;
 interface CodexProps {
   apiKey: string;
   'chatgpt-account-id': string;
-  instructions: string;
+  instructions?: string;
   signal?: AbortSignal;
 }
 

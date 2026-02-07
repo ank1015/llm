@@ -20,6 +20,37 @@ const DEFAULT_KEYS_DIR = join(homedir(), '.llm', 'global', 'keys');
 /** Encryption algorithm */
 const ALGORITHM = 'aes-256-gcm';
 
+function normalizeCredentials(
+  api: Api,
+  credentials: Record<string, string>
+): Record<string, string> {
+  const normalized = { ...credentials };
+
+  if (api === 'codex') {
+    const accountId =
+      normalized['chatgpt-account-id'] ??
+      normalized.chatgptAccountId ??
+      normalized.accountId ??
+      normalized.account_id;
+    if (accountId) {
+      normalized['chatgpt-account-id'] = accountId;
+    }
+
+    const apiKey = normalized.apiKey ?? normalized.access_token ?? normalized.accessToken;
+    if (apiKey) {
+      normalized.apiKey = apiKey;
+    }
+
+    delete normalized.chatgptAccountId;
+    delete normalized.accountId;
+    delete normalized.account_id;
+    delete normalized.access_token;
+    delete normalized.accessToken;
+  }
+
+  return normalized;
+}
+
 /**
  * File-based implementation of KeysAdapter.
  * Stores encrypted API keys in the filesystem.
@@ -174,7 +205,8 @@ export class FileKeysAdapter implements KeysAdapter {
             credentials[key] = value;
           }
         }
-        return Object.keys(credentials).length > 0 ? credentials : undefined;
+        const normalized = normalizeCredentials(api, credentials);
+        return Object.keys(normalized).length > 0 ? normalized : undefined;
       } catch {
         // Corrupted credentials bundle
         return undefined;
@@ -198,11 +230,12 @@ export class FileKeysAdapter implements KeysAdapter {
   }
 
   async setCredentials(api: Api, credentials: Record<string, string>): Promise<void> {
-    this.writeEncryptedFile(this.getCredentialsPath(api), JSON.stringify(credentials));
+    const normalized = normalizeCredentials(api, credentials);
+    this.writeEncryptedFile(this.getCredentialsPath(api), JSON.stringify(normalized));
 
     // Keep legacy single-key path in sync when apiKey is provided.
-    if (credentials.apiKey !== undefined) {
-      this.writeEncryptedFile(this.getKeyPath(api), credentials.apiKey);
+    if (normalized.apiKey !== undefined) {
+      this.writeEncryptedFile(this.getKeyPath(api), normalized.apiKey);
     }
   }
 

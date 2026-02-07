@@ -92,6 +92,19 @@ describe('FileKeysAdapter Integration', () => {
         billingHeader: 'x-anthropic-billing-header: cc_version=test;',
       });
     });
+
+    it('should normalize codex account aliases and preserve bundle reads', async () => {
+      await adapter.setCredentials?.('codex', {
+        apiKey: 'access-token',
+        account_id: 'acc-123',
+      });
+
+      expect(await adapter.get('codex')).toBe('access-token');
+      expect(await adapter.getCredentials?.('codex')).toEqual({
+        apiKey: 'access-token',
+        'chatgpt-account-id': 'acc-123',
+      });
+    });
   });
 
   describe('delete', () => {

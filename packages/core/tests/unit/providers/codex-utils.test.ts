@@ -75,6 +75,28 @@ describe('Codex Utils', () => {
         },
       ]);
     });
+
+    it('should not include system prompt in input messages', () => {
+      const context: Context = {
+        systemPrompt: 'You are a strict formatter.',
+        messages: [
+          {
+            role: 'user',
+            id: 'msg-2',
+            content: [{ type: 'text', content: 'format this' }],
+          },
+        ],
+      };
+
+      const messages = buildCodexMessages(mockModel, context);
+
+      expect(messages).toEqual([
+        {
+          role: 'user',
+          content: [{ type: 'input_text', text: 'format this' }],
+        },
+      ]);
+    });
   });
 
   describe('buildParams', () => {
@@ -100,6 +122,28 @@ describe('Codex Utils', () => {
       expect(result.tools?.[0]?.name).toBe('search');
     });
 
+    it('should map context systemPrompt to instructions', () => {
+      const context: Context = {
+        systemPrompt: 'Follow only Python style guidelines.',
+        messages: [
+          {
+            role: 'user',
+            id: 'msg-3',
+            content: [{ type: 'text', content: 'hello' }],
+          },
+        ],
+      };
+      const result = buildParams(mockModel, context, defaultOptions);
+
+      expect(result.instructions).toBe('Follow only Python style guidelines.');
+      expect(result.input).toEqual([
+        {
+          role: 'user',
+          content: [{ type: 'input_text', text: 'hello' }],
+        },
+      ]);
+    });
+
     it('should remove credential and unsupported fields from params', () => {
       const context: Context = { messages: [] };
       const result = buildParams(mockModel, context, {
@@ -122,14 +166,14 @@ describe('Codex Utils', () => {
       expect(result.store).toBe(false);
     });
 
-    it('should throw when instructions are missing', () => {
+    it('should use default instructions when system prompt and instructions are missing', () => {
       const context: Context = { messages: [] };
-      expect(() =>
-        buildParams(mockModel, context, {
-          ...defaultOptions,
-          instructions: '',
-        })
-      ).toThrow('Codex instructions are required.');
+      const result = buildParams(mockModel, context, {
+        apiKey: defaultOptions.apiKey,
+        'chatgpt-account-id': defaultOptions['chatgpt-account-id'],
+      });
+
+      expect(result.instructions).toBe('You are a helpful assistant');
     });
   });
 

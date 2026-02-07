@@ -48,6 +48,19 @@ const mockClaudeCodeModel: Model<'claude-code'> = {
   tools: ['function_calling'],
 };
 
+const mockCodexModel: Model<'codex'> = {
+  id: 'gpt-5.3-codex',
+  api: 'codex',
+  name: 'GPT-5.3 Codex',
+  baseUrl: 'https://chatgpt.com/backend-api/codex',
+  reasoning: true,
+  input: ['text'],
+  cost: { input: 1.75, output: 14, cacheRead: 0.175, cacheWrite: 0 },
+  contextWindow: 400000,
+  maxTokens: 128000,
+  tools: ['function_calling'],
+};
+
 const mockAssistantMessage: BaseAssistantMessage<'anthropic'> = {
   role: 'assistant',
   id: 'msg-1',
@@ -244,6 +257,39 @@ describe('LLMClient', () => {
         expect.any(String)
       );
     });
+
+    it('should resolve codex credentials via getCredentials() aliases', async () => {
+      const keys: KeysAdapter = {
+        get: vi.fn().mockResolvedValue(undefined),
+        getCredentials: vi.fn().mockResolvedValue({
+          access_token: 'access-token',
+          account_id: 'acc-123',
+        }),
+        set: vi.fn(),
+        setCredentials: vi.fn(),
+        delete: vi.fn(),
+        deleteCredentials: vi.fn(),
+        list: vi.fn(),
+      };
+      const client = new LLMClient({ keys });
+      vi.mocked(core.complete).mockResolvedValue(mockAssistantMessage as any);
+
+      await client.complete(mockCodexModel, { messages: [] }, {
+        instructions: 'You are a coding assistant.',
+      } as any);
+
+      expect(keys.getCredentials).toHaveBeenCalledWith('codex');
+      expect(core.complete).toHaveBeenCalledWith(
+        mockCodexModel,
+        { messages: [] },
+        expect.objectContaining({
+          apiKey: 'access-token',
+          'chatgpt-account-id': 'acc-123',
+          instructions: 'You are a coding assistant.',
+        }),
+        expect.any(String)
+      );
+    });
   });
 
   describe('stream()', () => {
@@ -330,6 +376,40 @@ describe('LLMClient', () => {
           oauthToken: 'oauth-token',
           betaFlag: 'flag-a,flag-b',
           billingHeader: 'x-anthropic-billing-header: cc_version=test;',
+        }),
+        expect.any(String)
+      );
+    });
+
+    it('should resolve codex credentials via getCredentials() aliases', async () => {
+      const keys: KeysAdapter = {
+        get: vi.fn().mockResolvedValue(undefined),
+        getCredentials: vi.fn().mockResolvedValue({
+          access_token: 'access-token',
+          account_id: 'acc-123',
+        }),
+        set: vi.fn(),
+        setCredentials: vi.fn(),
+        delete: vi.fn(),
+        deleteCredentials: vi.fn(),
+        list: vi.fn(),
+      };
+      const client = new LLMClient({ keys });
+      const mockStream = createMockEventStream();
+      vi.mocked(core.stream).mockReturnValue(mockStream as any);
+
+      await client.stream(mockCodexModel, { messages: [] }, {
+        instructions: 'You are a coding assistant.',
+      } as any);
+
+      expect(keys.getCredentials).toHaveBeenCalledWith('codex');
+      expect(core.stream).toHaveBeenCalledWith(
+        mockCodexModel,
+        { messages: [] },
+        expect.objectContaining({
+          apiKey: 'access-token',
+          'chatgpt-account-id': 'acc-123',
+          instructions: 'You are a coding assistant.',
         }),
         expect.any(String)
       );

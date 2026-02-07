@@ -6,6 +6,37 @@
 
 import type { KeysAdapter, Api } from '@ank1015/llm-types';
 
+function normalizeCredentials(
+  api: Api,
+  credentials: Record<string, string>
+): Record<string, string> {
+  const normalized = { ...credentials };
+
+  if (api === 'codex') {
+    const accountId =
+      normalized['chatgpt-account-id'] ??
+      normalized.chatgptAccountId ??
+      normalized.accountId ??
+      normalized.account_id;
+    if (accountId) {
+      normalized['chatgpt-account-id'] = accountId;
+    }
+
+    const apiKey = normalized.apiKey ?? normalized.access_token ?? normalized.accessToken;
+    if (apiKey) {
+      normalized.apiKey = apiKey;
+    }
+
+    delete normalized.chatgptAccountId;
+    delete normalized.accountId;
+    delete normalized.account_id;
+    delete normalized.access_token;
+    delete normalized.accessToken;
+  }
+
+  return normalized;
+}
+
 /**
  * In-memory implementation of KeysAdapter for testing.
  */
@@ -18,7 +49,7 @@ export class InMemoryKeysAdapter implements KeysAdapter {
 
   async getCredentials(api: Api): Promise<Record<string, string> | undefined> {
     const credentials = this.credentials.get(api);
-    return credentials ? { ...credentials } : undefined;
+    return credentials ? normalizeCredentials(api, credentials) : undefined;
   }
 
   async set(api: Api, key: string): Promise<void> {
@@ -27,7 +58,7 @@ export class InMemoryKeysAdapter implements KeysAdapter {
   }
 
   async setCredentials(api: Api, credentials: Record<string, string>): Promise<void> {
-    this.credentials.set(api, { ...credentials });
+    this.credentials.set(api, normalizeCredentials(api, credentials));
   }
 
   async delete(api: Api): Promise<boolean> {
