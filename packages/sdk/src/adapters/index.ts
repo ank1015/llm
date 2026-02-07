@@ -19,4 +19,4 @@ export type {
   AppendMessageInput,
   AppendCustomInput,
   SessionLocation,
-} from './types.js';
+} from '@ank1015/llm-types';

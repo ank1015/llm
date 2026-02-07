@@ -34,6 +34,7 @@ if (!isBrowserExtension) {
 // Tool schemas are created once and reused, so this avoids repeated ajv.compile() calls.
 const validatorCache = new WeakMap<object, ReturnType<typeof ajv.compile>>();
 
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 function getValidator(schema: object) {
   let validate = validatorCache.get(schema);
   if (!validate) {

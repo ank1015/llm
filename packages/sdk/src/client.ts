@@ -1,3 +1,4 @@
+/* eslint-disable sonarjs/no-duplicate-string */
 /**
  * LLMClient — central entry point for the SDK.
  *
@@ -10,7 +11,7 @@ import { complete as coreComplete, stream as coreStream } from '@ank1015/llm-cor
 import { Conversation } from './agent/conversation.js';
 import { resolveApiKey } from './utils/resolve-key.js';
 
-import type { KeysAdapter, UsageAdapter, SessionsAdapter } from './adapters/types.js';
+import type { KeysAdapter, UsageAdapter, SessionsAdapter } from './adapters/index.js';
 import type { ConversationOptions } from './agent/conversation.js';
 import type { AssistantMessageEventStream } from '@ank1015/llm-core';
 import type {

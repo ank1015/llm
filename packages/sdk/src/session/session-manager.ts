@@ -5,7 +5,7 @@
  * using a SessionsAdapter.
  */
 
-import type { SessionsAdapter, SessionLocation } from '../adapters/types.js';
+import type { SessionsAdapter, SessionLocation } from '../adapters/index.js';
 import type {
   AppendCustomInput,
   AppendMessageInput,

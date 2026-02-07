@@ -89,7 +89,7 @@ export function createChatCompletionStream<
   id: string
 ): AssistantMessageEventStream<TApi> {
   const stream = new AssistantMessageEventStream<TApi>();
-
+  // eslint-disable-next-line sonarjs/cognitive-complexity
   (async () => {
     const startTimestamp = Date.now();
     let finalResponse: ChatCompletion = createMockChatCompletion(model.id, id);
@@ -137,7 +137,7 @@ export function createChatCompletionStream<
         | (AssistantToolCall & { partialJson: string })
         | null = null;
       const blocks = output.content;
-      const blockIndex = () => blocks.length - 1;
+      const blockIndex = (): number => blocks.length - 1;
 
       const toolCallBlocks: Map<number, AssistantToolCall & { partialJson: string }> = new Map();
 

@@ -21,7 +21,7 @@ import {
 
 import { resolveApiKey } from '../utils/resolve-key.js';
 
-import type { KeysAdapter, UsageAdapter, SessionsAdapter } from '../adapters/types.js';
+import type { KeysAdapter, UsageAdapter, SessionsAdapter } from '../adapters/index.js';
 import type { AgentRunnerCallbacks, AgentRunnerConfig } from '@ank1015/llm-core';
 import type {
   Api,

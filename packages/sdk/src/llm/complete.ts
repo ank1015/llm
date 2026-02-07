@@ -9,7 +9,7 @@ import { complete as coreComplete } from '@ank1015/llm-core';
 
 import { resolveApiKey } from '../utils/resolve-key.js';
 
-import type { KeysAdapter, UsageAdapter } from '../adapters/types.js';
+import type { KeysAdapter, UsageAdapter } from '../adapters/index.js';
 import type { Api, BaseAssistantMessage, Context, Model, OptionsForApi } from '@ank1015/llm-types';
 
 /**

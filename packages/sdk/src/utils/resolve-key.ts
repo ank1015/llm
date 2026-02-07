@@ -6,7 +6,7 @@
 
 import { ApiKeyNotFoundError } from '@ank1015/llm-types';
 
-import type { KeysAdapter } from '../adapters/types.js';
+import type { KeysAdapter } from '../adapters/index.js';
 import type { Api } from '@ank1015/llm-types';
 
 /**
