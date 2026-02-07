@@ -18,8 +18,9 @@ src/
   message.ts        — Messages, assistant response types, streaming events
   model.ts          — Model<TApi>, Provider<TApi>
   tool.ts           — Tool definition (TypeBox), Context
-  errors.ts         — LLMError, ApiKeyNotFoundError
+  errors.ts         — LLMError hierarchy (8 error classes)
   agent-types.ts    — AgentTool, AgentEvent, AgentState, AgentLoopConfig
+  adapters.ts       — KeysAdapter, UsageAdapter, SessionsAdapter interfaces
   session.ts        — Session tree types (JSONL append-only storage)
   providers/
     index.ts        — Type maps (ApiNativeResponseMap, ApiOptionsMap) + re-exports
@@ -29,18 +30,20 @@ src/
     deepseek.ts     — DeepSeekNativeResponse, DeepSeekProviderOptions
     kimi.ts         — KimiNativeResponse, KimiProviderOptions, KimiThinkingConfig
     zai.ts          — ZaiNativeResponse, ZaiProviderOptions, ZaiThinkingConfig
+    claude-code.ts  — ClaudeCodeNativeResponse, ClaudeCodeProviderOptions
+    codex.ts        — CodexNativeResponse, CodexProviderOptions
 ```
 
 ## Key Types
 
 ### Core
 
-- `Api` — Union of known providers: `'openai' | 'google' | 'deepseek' | 'anthropic' | 'zai' | 'kimi'`
+- `Api` — Union of known providers: `'openai' | 'codex' | 'google' | 'deepseek' | 'anthropic' | 'claude-code' | 'zai' | 'kimi'`
 - `Content` — Array of `TextContent | ImageContent | FileContent`
 - `Message` — `UserMessage | ToolResultMessage | BaseAssistantMessage<Api> | CustomMessage`
 - `BaseAssistantMessage<TApi>` — Assistant response with normalized `content` + native `message`
 - `BaseAssistantEvent<TApi>` — Discriminated union of streaming events (start, text_delta, toolcall_end, done, error, etc.)
-- `Model<TApi>` — Model definition (id, api, cost, contextWindow, maxTokens, etc.)
+- `Model<TApi>` — Model definition (id, api, baseUrl, cost, contextWindow, maxTokens, headers, tools, etc.)
 - `Provider<TApi>` — Model + provider options pair
 - `Tool` — Tool definition with TypeBox schema for parameters
 - `Context` — Conversation context (messages, systemPrompt, tools)
@@ -54,6 +57,25 @@ src/
 - `ApiOptionsMap` — Maps each `Api` to its provider options type
 - `OptionsForApi<TApi>` — Lookup helper for options
 - `WithOptionalKey<T>` — Makes `apiKey` optional (for SDK/agent boundaries)
+
+### Adapters
+
+- `KeysAdapter` — API key and multi-credential storage (get/set/delete + getCredentials/setCredentials/deleteCredentials for providers like claude-code)
+- `UsageAdapter` — Usage tracking (track, getStats, getMessage, getMessages, deleteMessage)
+- `SessionsAdapter` — Session CRUD, branching, history, search
+- `UsageFilters`, `UsageStats`, `TokenBreakdown`, `CostBreakdown` — Supporting types for usage queries
+
+### Errors
+
+- `LLMError` — Base error class with `code: LLMErrorCode`
+- `ApiKeyNotFoundError` — API key not found for a provider
+- `CostLimitError` — Cost budget exceeded
+- `ContextLimitError` — Context window exceeded
+- `ConversationBusyError` — Concurrent prompt attempted
+- `ModelNotConfiguredError` — No provider set before prompt
+- `SessionNotFoundError` — Session lookup failed
+- `InvalidParentError` — Invalid parent node in session tree
+- `PathTraversalError` — Path contains traversal characters
 
 ### Agent
 
@@ -79,11 +101,6 @@ src/
 - `SessionSummary` — Metadata for listing sessions
 - `BranchInfo` — Branch metadata (name, branchPointId, nodeCount)
 - `CreateSessionInput`, `AppendMessageInput`, `AppendCustomInput`, `UpdateSessionNameInput` — Service input types
-
-### Errors
-
-- `LLMError` — Base error class with `code: LLMErrorCode` and `message`
-- `ApiKeyNotFoundError` — Thrown when API key is not found for a provider
 
 ## Conventions
 

@@ -25,7 +25,15 @@ pnpm add @ank1015/llm-types
 ### Api
 
 ```typescript
-type Api = 'openai' | 'google' | 'deepseek' | 'anthropic' | 'zai' | 'kimi';
+type Api =
+  | 'openai'
+  | 'codex'
+  | 'google'
+  | 'deepseek'
+  | 'anthropic'
+  | 'claude-code'
+  | 'zai'
+  | 'kimi';
 ```
 
 Derived from the `KnownApis` const array. Adding a new string to the array automatically extends the union, and TypeScript exhaustiveness checks will flag every switch/map that needs updating.
@@ -48,8 +56,8 @@ interface BaseAssistantMessage<TApi extends Api> {
   // Native — the provider's original response object
   message: NativeResponseForApi<TApi>;
   // Resolves to:
-  //   Anthropic.Message        when TApi = 'anthropic'
-  //   OpenAI.Response           when TApi = 'openai'
+  //   Anthropic.Message        when TApi = 'anthropic' | 'claude-code'
+  //   OpenAI.Response           when TApi = 'openai' | 'codex'
   //   GenerateContentResponse   when TApi = 'google'
   //   ChatCompletion            when TApi = 'deepseek' | 'kimi' | 'zai'
 }
@@ -81,6 +89,20 @@ type GoogleProviderOptions = Omit<GenerateContentConfig, 'abortSignal' | 'system
 // DeepSeek, Kimi, Z.AI — extend ChatCompletionCreateParamsBase
 type DeepSeekProviderOptions = Omit<ChatCompletionCreateParamsBase, 'model' | 'messages'> & {
   apiKey: string;
+  signal?: AbortSignal;
+};
+
+// Claude Code — extends Anthropic's MessageCreateParams, uses OAuth + beta headers
+type ClaudeCodeProviderOptions = Omit<
+  MessageCreateParamsNonStreaming,
+  'model' | 'messages' | 'system' | 'max_tokens'
+> & { oauthToken: string; betaFlag: string; billingHeader: string; signal?: AbortSignal };
+
+// Codex — extends OpenAI's ResponseCreateParamsBase, uses chatgpt-account-id
+type CodexProviderOptions = Omit<ResponseCreateParamsBase, 'model' | 'input'> & {
+  apiKey: string;
+  'chatgpt-account-id': string;
+  instructions?: string;
   signal?: AbortSignal;
 };
 ```
@@ -119,6 +141,29 @@ type Content = (TextContent | ImageContent | FileContent)[];
 - `done` / `error` — Stream completion
 
 Every event includes the in-progress `BaseAssistantMessage` for accumulated state access.
+
+### Adapter Interfaces
+
+Contracts for SDK storage operations — implementations live in consumer packages:
+
+- `KeysAdapter` — API key storage with multi-credential support (`getCredentials`/`setCredentials` for providers like claude-code that need multiple fields)
+- `UsageAdapter` — Usage tracking and statistics (`track`, `getStats`, `getMessages`)
+- `SessionsAdapter` — Session CRUD, branching, history, and search
+- `UsageFilters`, `UsageStats`, `TokenBreakdown`, `CostBreakdown` — Supporting types
+
+### Error Classes
+
+Typed error hierarchy with `LLMErrorCode` discriminant:
+
+- `LLMError` — Base class with `code` and `message`
+- `ApiKeyNotFoundError` — Provider key missing
+- `CostLimitError` — Cost budget exceeded
+- `ContextLimitError` — Context window exceeded
+- `ConversationBusyError` — Concurrent prompt attempted
+- `ModelNotConfiguredError` — No provider configured
+- `SessionNotFoundError` — Session not found
+- `InvalidParentError` — Invalid parent node in session tree
+- `PathTraversalError` — Path traversal attack detected
 
 ### Agent Types
 
