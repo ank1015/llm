@@ -39,6 +39,7 @@ function createMockEventStream(): AssistantMessageEventStream<any> {
 
 // Create mock stream functions and register them via the registry
 const mockStreamAnthropic = vi.fn();
+const mockStreamClaudeCode = vi.fn();
 const mockStreamOpenAI = vi.fn();
 const mockStreamGoogle = vi.fn();
 const mockStreamDeepSeek = vi.fn();
@@ -46,6 +47,10 @@ const mockStreamZai = vi.fn();
 const mockStreamKimi = vi.fn();
 
 registerProvider('anthropic', { stream: mockStreamAnthropic, getMockNativeMessage: () => ({}) });
+registerProvider('claude-code', {
+  stream: mockStreamClaudeCode,
+  getMockNativeMessage: () => ({}),
+});
 registerProvider('openai', { stream: mockStreamOpenAI, getMockNativeMessage: () => ({}) });
 registerProvider('google', { stream: mockStreamGoogle, getMockNativeMessage: () => ({}) });
 registerProvider('deepseek', { stream: mockStreamDeepSeek, getMockNativeMessage: () => ({}) });
@@ -83,6 +88,24 @@ describe('stream', () => {
       const result = stream(model, context, options, 'req-1');
 
       expect(mockStreamOpenAI).toHaveBeenCalledWith(model, context, options, 'req-1');
+      expect(result).toBe(mockStream);
+    });
+
+    it('should dispatch to Claude Code provider', () => {
+      const model = createMockModel('claude-code');
+      const context = createMockContext();
+      const options = {
+        oauthToken: 'test-oauth-token',
+        betaFlag: 'oauth-2025-04-20',
+        billingHeader: 'x-billing-account: test',
+      };
+      const mockStream = createMockEventStream();
+
+      mockStreamClaudeCode.mockReturnValue(mockStream);
+
+      const result = stream(model, context, options, 'req-1');
+
+      expect(mockStreamClaudeCode).toHaveBeenCalledWith(model, context, options, 'req-1');
       expect(result).toBe(mockStream);
     });
 

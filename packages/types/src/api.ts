@@ -8,7 +8,15 @@
  * Array of all known API provider identifiers.
  * Used to derive the Api union type and for runtime validation.
  */
-export const KnownApis = ['openai', 'google', 'deepseek', 'anthropic', 'zai', 'kimi'] as const;
+export const KnownApis = [
+  'openai',
+  'google',
+  'deepseek',
+  'anthropic',
+  'claude-code',
+  'zai',
+  'kimi',
+] as const;
 
 /**
  * Union type of all supported API providers.

@@ -10,6 +10,7 @@ describe('getProviders', () => {
     const providers = getProviders();
 
     expect(providers).toContain('anthropic');
+    expect(providers).toContain('claude-code');
     expect(providers).toContain('openai');
     expect(providers).toContain('google');
     expect(providers).toContain('deepseek');
@@ -26,8 +27,8 @@ describe('getProviders', () => {
   it('should return all providers from KnownApis', () => {
     const providers = getProviders();
 
-    // Should have at least the 6 main providers
-    expect(providers.length).toBeGreaterThanOrEqual(6);
+    // Should have at least the 7 main providers
+    expect(providers.length).toBeGreaterThanOrEqual(7);
   });
 });
 
@@ -47,6 +48,14 @@ describe('getModel', () => {
       expect(model).toBeDefined();
       expect(model?.api).toBe('openai');
       expect(model?.id).toBe('gpt-5.2');
+    });
+
+    it('should return Claude Code model', () => {
+      const model = getModel('claude-code', 'claude-haiku-4-5');
+
+      expect(model).toBeDefined();
+      expect(model?.api).toBe('claude-code');
+      expect(model?.id).toBe('claude-haiku-4-5');
     });
 
     it('should return Google model', () => {
@@ -145,6 +154,13 @@ describe('getModels', () => {
 
       expect(models.length).toBeGreaterThan(0);
       expect(models.every((m) => m.api === 'openai')).toBe(true);
+    });
+
+    it('should return all Claude Code models', () => {
+      const models = getModels('claude-code');
+
+      expect(models.length).toBeGreaterThan(0);
+      expect(models.every((m) => m.api === 'claude-code')).toBe(true);
     });
 
     it('should return all Google models', () => {

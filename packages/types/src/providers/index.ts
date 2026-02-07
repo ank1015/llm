@@ -9,6 +9,7 @@ import type { Api } from '../api.js';
 // Import native response types for the map
 // Import provider options for the map
 import type { AnthropicNativeResponse, AnthropicProviderOptions } from './anthropic.js';
+import type { ClaudeCodeNativeResponse, ClaudeCodeProviderOptions } from './claude-code.js';
 import type { DeepSeekNativeResponse, DeepSeekProviderOptions } from './deepseek.js';
 import type { GoogleNativeResponse, GoogleProviderOptions } from './google.js';
 import type { KimiNativeResponse, KimiProviderOptions } from './kimi.js';
@@ -17,6 +18,7 @@ import type { ZaiNativeResponse, ZaiProviderOptions } from './zai.js';
 
 // Re-export all provider types
 export type { AnthropicNativeResponse, AnthropicProviderOptions } from './anthropic.js';
+export type { ClaudeCodeNativeResponse, ClaudeCodeProviderOptions } from './claude-code.js';
 export type { DeepSeekNativeResponse, DeepSeekProviderOptions } from './deepseek.js';
 export type { GoogleNativeResponse, GoogleProviderOptions } from './google.js';
 export type { KimiNativeResponse, KimiProviderOptions, KimiThinkingConfig } from './kimi.js';
@@ -34,6 +36,7 @@ export interface ApiNativeResponseMap {
   google: GoogleNativeResponse;
   deepseek: DeepSeekNativeResponse;
   anthropic: AnthropicNativeResponse;
+  'claude-code': ClaudeCodeNativeResponse;
   zai: ZaiNativeResponse;
   kimi: KimiNativeResponse;
 }
@@ -51,6 +54,7 @@ export interface ApiOptionsMap {
   google: GoogleProviderOptions;
   deepseek: DeepSeekProviderOptions;
   anthropic: AnthropicProviderOptions;
+  'claude-code': ClaudeCodeProviderOptions;
   zai: ZaiProviderOptions;
   kimi: KimiProviderOptions;
 }

@@ -9,6 +9,7 @@ describe('getMockMessage', () => {
   describe('common properties', () => {
     const testCases: Array<{ api: Api; modelId: string }> = [
       { api: 'anthropic', modelId: 'claude-haiku-4-5' },
+      { api: 'claude-code', modelId: 'claude-haiku-4-5' },
       { api: 'openai', modelId: 'gpt-5.2' },
       { api: 'google', modelId: 'gemini-3-flash-preview' },
       { api: 'deepseek', modelId: 'deepseek' },
@@ -63,6 +64,21 @@ describe('getMockMessage', () => {
   describe('provider-specific native messages', () => {
     it('should include Anthropic native message structure', () => {
       const model = getModel('anthropic', 'claude-haiku-4-5')!;
+      const message = getMockMessage(model);
+
+      expect(message.message).toBeDefined();
+      expect(message.message).toHaveProperty('id');
+      expect(message.message).toHaveProperty('type', 'message');
+      expect(message.message).toHaveProperty('role', 'assistant');
+      expect(message.message).toHaveProperty('content');
+      expect(message.message).toHaveProperty('model');
+      expect(message.message).toHaveProperty('stop_reason');
+      expect(message.message).toHaveProperty('stop_sequence');
+      expect(message.message).toHaveProperty('usage');
+    });
+
+    it('should include Claude Code native message structure', () => {
+      const model = getModel('claude-code', 'claude-haiku-4-5')!;
       const message = getMockMessage(model);
 
       expect(message.message).toBeDefined();

@@ -26,6 +26,7 @@ export type { CompleteFunction, StreamFunction } from './utils/index.js';
 
 // Providers
 export * from './providers/anthropic/index.js';
+export * from './providers/claude-code/index.js';
 export * from './providers/openai/index.js';
 export * from './providers/google/index.js';
 export * from './providers/deepseek/index.js';

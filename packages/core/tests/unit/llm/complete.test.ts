@@ -92,13 +92,28 @@ describe('complete', () => {
     });
 
     it('should work for all provider types', async () => {
-      const apis = ['anthropic', 'openai', 'google', 'deepseek', 'zai', 'kimi'] as const;
+      const apis = [
+        'anthropic',
+        'claude-code',
+        'openai',
+        'google',
+        'deepseek',
+        'zai',
+        'kimi',
+      ] as const;
 
       for (const api of apis) {
         vi.clearAllMocks();
         const model = createMockModel(api);
         const context = createMockContext();
-        const options = { apiKey: 'test-key' };
+        const options =
+          api === 'claude-code'
+            ? {
+                oauthToken: 'test-oauth-token',
+                betaFlag: 'oauth-2025-04-20',
+                billingHeader: 'x-billing-account: test',
+              }
+            : { apiKey: 'test-key' };
         const mockResponse = createMockResponse(api);
 
         vi.mocked(stream).mockReturnValue(createMockStream(mockResponse));

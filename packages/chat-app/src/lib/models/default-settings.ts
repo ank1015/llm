@@ -39,6 +39,7 @@ const defaultKimiProviderOptions = {
 export function getDefaultProviderSettingsForApi(api: Api): Record<string, unknown> {
   switch (api) {
     case 'anthropic':
+    case 'claude-code':
       return defaultAnthropicProviderOptions;
     case 'deepseek':
       return defaultDeepseekProviderOptions;
