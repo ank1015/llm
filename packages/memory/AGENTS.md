@@ -25,8 +25,7 @@ src/
   tools/
     save-note.tool.ts       — AgentTool: save_note
     search.tool.ts          — AgentTool: search_memory
-    get-note.tool.ts        — AgentTool: get_note
-    list-notes.tool.ts      — AgentTool: list_notes
+    get-note.tool.ts        — AgentTool: get_notes (supports multiple slugs)
 ```
 
 ## Key Concepts
@@ -57,7 +56,7 @@ tests/
     store/
       memory-store.test.ts    — Full CRUD + semantic search with real API
     tools/
-      e2e.test.ts             — All 4 tools end-to-end with real API
+      e2e.test.ts             — All 3 tools end-to-end with real API
 ```
 
 Environment variables for integration tests:

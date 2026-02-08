@@ -34,5 +34,4 @@ export { OpenAIEmbedder, cosineSimilarity, type Embedder } from './search/embedd
 // Tools
 export { createSaveNoteTool } from './tools/save-note.tool.js';
 export { createSearchTool } from './tools/search.tool.js';
-export { createGetNoteTool } from './tools/get-note.tool.js';
-export { createListNotesTool } from './tools/list-notes.tool.js';
+export { createGetNotesTool } from './tools/get-note.tool.js';

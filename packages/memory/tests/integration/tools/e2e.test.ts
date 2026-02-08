@@ -5,68 +5,37 @@ import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import { MemoryStore } from '../../../src/store/memory-store.js';
-import { createGetNoteTool } from '../../../src/tools/get-note.tool.js';
-import { createListNotesTool } from '../../../src/tools/list-notes.tool.js';
+import { createGetNotesTool } from '../../../src/tools/get-note.tool.js';
 import { createSaveNoteTool } from '../../../src/tools/save-note.tool.js';
 import { createSearchTool } from '../../../src/tools/search.tool.js';
-
-import type { AgentTool } from '@ank1015/llm-types';
 
 const apiKey = process.env['OPENAI_API_KEY'];
 
 describe.skipIf(!apiKey)('AgentTools e2e', () => {
   let tmpDir: string;
   let store: MemoryStore;
-  let saveNote: AgentTool;
-  let searchMemory: AgentTool;
-  let getNote: AgentTool;
-  let listNotes: AgentTool;
+  let saveNote: ReturnType<typeof createSaveNoteTool>;
+  let searchMemory: ReturnType<typeof createSearchTool>;
+  let getNotes: ReturnType<typeof createGetNotesTool>;
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), 'memory-tools-e2e-'));
     store = new MemoryStore({ notesDir: tmpDir, openaiApiKey: apiKey });
     saveNote = createSaveNoteTool(store);
     searchMemory = createSearchTool(store);
-    getNote = createGetNoteTool(store);
-    listNotes = createListNotesTool(store);
+    getNotes = createGetNotesTool(store);
   });
 
   afterEach(async () => {
     await rm(tmpDir, { recursive: true });
   });
 
-  it('should save notes via tool and list them', async () => {
-    const saveResult = await saveNote.execute('call-1', {
+  it('should save notes and search them semantically', async () => {
+    await saveNote.execute('call-1', {
       title: 'Attention Mechanisms',
       content: '## Self-Attention\n\nQueries, keys, and values are projections of the input.',
       tags: ['ml', 'transformers'],
       source: 'https://arxiv.org/abs/1706.03762',
-    });
-
-    expect(saveResult.content[0]).toMatchObject({
-      type: 'text',
-      content: 'Note saved: attention-mechanisms',
-    });
-
-    await saveNote.execute('call-2', {
-      title: 'Rust Lifetimes',
-      content:
-        "## Borrow Checker\n\nLifetimes ensure references don't outlive the data they point to.",
-      tags: ['rust', 'systems'],
-    });
-
-    const listResult = await listNotes.execute('call-3', {});
-    const listText = (listResult.content[0] as { content: string }).content;
-    expect(listText).toContain('attention-mechanisms');
-    expect(listText).toContain('rust-lifetimes');
-    expect((listResult.details as { count: number }).count).toBe(2);
-  });
-
-  it('should search notes via tool and return ranked results', async () => {
-    await saveNote.execute('call-1', {
-      title: 'Neural Network Basics',
-      content: '## Layers\n\nNeural networks consist of layers of interconnected neurons.',
-      tags: ['ml', 'neural-nets'],
     });
 
     await saveNote.execute('call-2', {
@@ -76,32 +45,11 @@ describe.skipIf(!apiKey)('AgentTools e2e', () => {
     });
 
     const searchResult = await searchMemory.execute('call-3', {
-      query: 'how do neural networks learn',
+      query: 'how does attention work in neural networks',
     });
-
-    const searchText = (searchResult.content[0] as { content: string }).content;
-    expect(searchText).toContain('neural-network-basics');
 
     const details = searchResult.details as { results: Array<{ slug: string; score: number }> };
-    // Neural net note should score higher than cooking
-    expect(details.results[0]!.slug).toBe('neural-network-basics');
-  });
-
-  it('should retrieve a note by slug via get_note tool', async () => {
-    await saveNote.execute('call-1', {
-      title: 'Quick Tip',
-      content: '## Tip\n\nAlways commit before refactoring.',
-      tags: ['dev'],
-    });
-
-    const getResult = await getNote.execute('call-2', { slug: 'quick-tip' });
-
-    const noteContent = (getResult.content[0] as { content: string }).content;
-    expect(noteContent).toContain('Always commit before refactoring.');
-
-    const details = getResult.details as { slug: string; frontmatter: { title: string } };
-    expect(details.slug).toBe('quick-tip');
-    expect(details.frontmatter.title).toBe('Quick Tip');
+    expect(details.results[0]!.slug).toBe('attention-mechanisms');
   });
 
   it('should filter by tags via search tool', async () => {
@@ -117,38 +65,74 @@ describe.skipIf(!apiKey)('AgentTools e2e', () => {
       tags: ['rust'],
     });
 
-    const searchResult = await searchMemory.execute('call-3', {
-      tags: ['rust'],
-    });
-
+    const searchResult = await searchMemory.execute('call-3', { tags: ['rust'] });
     const searchText = (searchResult.content[0] as { content: string }).content;
     expect(searchText).toContain('rust-tip');
     expect(searchText).not.toContain('ml-paper');
   });
 
-  it('should filter list_notes by tag and keyword', async () => {
+  it('should retrieve single note via get_notes', async () => {
     await saveNote.execute('call-1', {
-      title: 'Intro to ML',
-      content: '## Basics\n\nML basics.',
+      title: 'Quick Tip',
+      content: '## Tip\n\nAlways commit before refactoring.',
+      tags: ['dev'],
+    });
+
+    const result = await getNotes.execute('call-2', { slugs: ['quick-tip'] });
+    const text = (result.content[0] as { content: string }).content;
+    expect(text).toContain('Always commit before refactoring.');
+
+    const details = result.details as { results: Array<{ slug: string; found: boolean }> };
+    expect(details.results[0]!.slug).toBe('quick-tip');
+    expect(details.results[0]!.found).toBe(true);
+  });
+
+  it('should retrieve multiple notes and handle missing slugs', async () => {
+    await saveNote.execute('call-1', {
+      title: 'Note A',
+      content: '## A\n\nFirst note.',
+      tags: ['test'],
+    });
+
+    await saveNote.execute('call-2', {
+      title: 'Note B',
+      content: '## B\n\nSecond note.',
+      tags: ['test'],
+    });
+
+    const result = await getNotes.execute('call-3', {
+      slugs: ['note-a', 'note-b', 'does-not-exist'],
+    });
+
+    const text = (result.content[0] as { content: string }).content;
+    expect(text).toContain('# Note A');
+    expect(text).toContain('# Note B');
+    expect(text).toContain('Not found: does-not-exist');
+
+    const details = result.details as { results: Array<{ slug: string; found: boolean }> };
+    expect(details.results).toHaveLength(3);
+    expect(details.results[2]!.found).toBe(false);
+  });
+
+  it('should combine semantic search with tag filter', async () => {
+    await saveNote.execute('call-1', {
+      title: 'ML Note',
+      content: '## Topic\n\nMachine learning concepts and optimization.',
       tags: ['ml'],
     });
 
     await saveNote.execute('call-2', {
-      title: 'Advanced ML',
-      content: '## Deep\n\nDeep learning.',
-      tags: ['ml'],
-    });
-
-    await saveNote.execute('call-3', {
-      title: 'Rust Guide',
-      content: '## Ownership\n\nOwnership rules.',
+      title: 'Rust Note',
+      content: '## Topic\n\nSystems programming concepts and optimization.',
       tags: ['rust'],
     });
 
-    const tagResult = await listNotes.execute('call-4', { tags: ['ml'] });
-    expect((tagResult.details as { count: number }).count).toBe(2);
+    const result = await searchMemory.execute('call-3', {
+      query: 'optimization techniques',
+      tags: ['ml'],
+    });
 
-    const keywordResult = await listNotes.execute('call-5', { query: 'advanced' });
-    expect((keywordResult.details as { count: number }).count).toBe(1);
+    const details = result.details as { results: Array<{ slug: string }> };
+    expect(details.results.every((r) => r.slug === 'ml-note')).toBe(true);
   });
 });
