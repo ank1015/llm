@@ -28,6 +28,8 @@
   },
   "dependencies": {
     "@ank1015/llm-memory": "workspace:^",
+    "@ank1015/llm-sdk": "workspace:^",
+    "@ank1015/llm-sdk-adapters": "workspace:^",
     "@ank1015/llm-types": "workspace:^",
     "@sinclair/typebox": "^0.34.48"
   },

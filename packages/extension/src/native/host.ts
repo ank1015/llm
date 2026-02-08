@@ -1,73 +1,78 @@
-import { readMessage, writeMessage } from './stdio.js';
+import { runAgentPrompt } from './agent.js';
+import { MessageDispatcher } from './dispatcher.js';
 
-import type { ExtensionMessage, NativeResponse } from '../shared/message.types.js';
+import type { PromptArgs } from './agent.js';
+import type { ExecuteMessage, ExtensionMessage } from '../shared/message.types.js';
 
-/**
- * Dispatches an incoming message and returns the appropriate response.
- */
-function handleMessage(message: ExtensionMessage): NativeResponse {
-  switch (message.type) {
-    case 'ping':
-      return { type: 'pong', requestId: message.requestId };
-
-    case 'execute':
-      // Placeholder: echo back the command and args
-      return {
-        type: 'success',
-        requestId: message.requestId,
-        data: {
-          command: message.payload.command,
-          args: message.payload.args,
-          echo: true,
-        },
-      };
-
-    default: {
-      const exhaustive: never = message;
-      return {
-        type: 'error',
-        requestId: (exhaustive as ExtensionMessage).requestId,
-        error: `Unknown message type: ${(exhaustive as ExtensionMessage).type}`,
-      };
-    }
-  }
+function log(msg: string): void {
+  process.stderr.write(`[native-host] ${msg}\n`);
 }
 
-/**
- * Main message loop: reads stdin, dispatches, writes stdout.
- * Isolates errors per message so one bad message doesn't crash the host.
- */
-async function main(): Promise<never> {
-  process.stderr.write(`[native-host] started (pid=${process.pid})\n`);
+async function handleExecute(
+  message: ExecuteMessage,
+  dispatcher: MessageDispatcher
+): Promise<void> {
+  try {
+    const { command, args } = message.payload;
 
-   
-  while (true) {
-    const message = await readMessage<ExtensionMessage>().catch((error: unknown) => {
-      process.stderr.write(
-        `[native-host] fatal read error: ${error instanceof Error ? error.message : String(error)}\n`
-      );
-      return process.exit(1) as never;
+    if (command !== 'prompt') {
+      dispatcher.send({
+        type: 'error',
+        requestId: message.requestId,
+        error: `Unknown command: ${command}`,
+      });
+      return;
+    }
+
+    const promptArgs = args as PromptArgs | undefined;
+    if (!promptArgs?.message || !promptArgs.tabId || !promptArgs.api || !promptArgs.modelId) {
+      dispatcher.send({
+        type: 'error',
+        requestId: message.requestId,
+        error: 'Missing required fields: message, tabId, api, modelId',
+      });
+      return;
+    }
+
+    const result = await runAgentPrompt(promptArgs, dispatcher, message.requestId);
+
+    dispatcher.send({
+      type: 'success',
+      requestId: message.requestId,
+      data: result,
     });
-
-    // Clean EOF — Chrome closed the connection
-    if (message === null) {
-      process.stderr.write('[native-host] stdin closed, exiting\n');
-      process.exit(0);
-    }
-
-    try {
-      const response = handleMessage(message);
-      writeMessage(response);
-    } catch (error) {
-      // Per-message error isolation
-      const errorResponse: NativeResponse = {
-        type: 'error',
-        requestId: message.requestId,
-        error: error instanceof Error ? error.message : String(error),
-      };
-      writeMessage(errorResponse);
-    }
+  } catch (error) {
+    log(`execute error: ${error instanceof Error ? error.message : String(error)}`);
+    dispatcher.send({
+      type: 'error',
+      requestId: message.requestId,
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 }
 
-main();
+async function main(): Promise<void> {
+  log(`started (pid=${process.pid})`);
+
+  const dispatcher = new MessageDispatcher();
+
+  await dispatcher.run((message: ExtensionMessage) => {
+    switch (message.type) {
+      case 'ping':
+        dispatcher.send({ type: 'pong', requestId: message.requestId });
+        break;
+
+      case 'execute':
+        // Fire-and-forget — dispatcher keeps reading while agent runs
+        handleExecute(message, dispatcher);
+        break;
+    }
+  });
+
+  log('stdin closed, exiting');
+}
+
+main().catch((error) => {
+  log(`fatal: ${error instanceof Error ? error.message : String(error)}`);
+  process.exit(1);
+});
