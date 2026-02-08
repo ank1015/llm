@@ -143,7 +143,6 @@ function handlePromptResult(data: ResultMsg['data']): void {
         timestamp: Date.now(),
       });
     }
-    saveLastSessionId(newSessionId);
   }
   pendingPromptMeta = null;
   onPromptComplete();
@@ -155,7 +154,6 @@ function handleLoadSessionResult(messages: StoredMessage[]): void {
   waitingForLoadSession = false;
   messagesEl.innerHTML = '';
   renderStoredMessages(messages);
-  saveLastSessionId(sessionId!);
   onPromptComplete();
 }
 
@@ -390,15 +388,6 @@ async function saveSessionMeta(meta: SessionMeta): Promise<void> {
   await chrome.storage.local.set({ sessions });
 }
 
-async function saveLastSessionId(id: string): Promise<void> {
-  await chrome.storage.local.set({ lastSessionId: id });
-}
-
-async function getLastSessionId(): Promise<string | undefined> {
-  const result = await chrome.storage.local.get('lastSessionId');
-  return result.lastSessionId as string | undefined;
-}
-
 // ── History panel ───────────────────────────────────────────────────
 
 function formatRelativeTime(timestamp: number): string {
@@ -562,14 +551,3 @@ inputEl.addEventListener('keydown', (e) => {
 // Session buttons
 newSessionBtn.addEventListener('click', newSession);
 historyBtn.addEventListener('click', toggleHistoryPanel);
-
-// ── Restore last session on load ────────────────────────────────────
-
-async function restoreLastSession(): Promise<void> {
-  const lastId = await getLastSessionId();
-  if (lastId) {
-    loadSession(lastId);
-  }
-}
-
-restoreLastSession();
