@@ -46,6 +46,10 @@ export interface PromptResult {
   messages: Message[];
 }
 
+export interface LoadSessionResult {
+  messages: Message[];
+}
+
 function log(msg: string): void {
   process.stderr.write(`[agent] ${msg}\n`);
 }
@@ -141,4 +145,20 @@ export async function runAgentPrompt(
   log(`prompt complete, ${newMessages.length} new messages`);
 
   return { sessionId, messages: newMessages };
+}
+
+/**
+ * Loads all messages for a given session from disk.
+ */
+export async function loadSessionMessages(sessionId: string): Promise<LoadSessionResult> {
+  log(`loading session ${sessionId}`);
+  const messageNodes = await sessionsAdapter.getMessages(
+    { projectName: PROJECT_NAME, path: SESSION_PATH, sessionId },
+    'main'
+  );
+
+  const messages = messageNodes ? messageNodes.map((n) => n.message) : [];
+  log(`loaded ${messages.length} messages from session ${sessionId}`);
+
+  return { messages };
 }

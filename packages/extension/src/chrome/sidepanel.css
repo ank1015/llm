@@ -26,9 +26,43 @@ header {
   flex-shrink: 0;
 }
 
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 header h1 {
   font-size: 15px;
   font-weight: 600;
+}
+
+#new-session-btn,
+#history-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #d0d0d0;
+  border-radius: 6px;
+  background: #f9f9f9;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #555;
+}
+
+#new-session-btn:hover,
+#history-btn:hover {
+  background: #eee;
+  border-color: #bbb;
+}
+
+#history-btn.active {
+  background: #007aff;
+  color: #fff;
+  border-color: #007aff;
 }
 
 #model-select {
@@ -38,6 +72,68 @@ header h1 {
   border-radius: 4px;
   background: #f9f9f9;
   cursor: pointer;
+}
+
+/* History panel */
+#history-panel {
+  background: #fff;
+  border-bottom: 1px solid #e0e0e0;
+  max-height: 50vh;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+#history-panel.hidden {
+  display: none;
+}
+
+#history-empty {
+  padding: 20px;
+  text-align: center;
+  color: #888;
+  font-size: 13px;
+}
+
+#history-empty.hidden {
+  display: none;
+}
+
+.history-entry {
+  padding: 10px 14px;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+}
+
+.history-entry:hover {
+  background: #f5f7ff;
+}
+
+.history-entry.active {
+  background: #eef2ff;
+  border-left: 3px solid #007aff;
+}
+
+.history-entry-url {
+  font-size: 11px;
+  color: #888;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+
+.history-entry-preview {
+  font-size: 13px;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-entry-time {
+  font-size: 11px;
+  color: #aaa;
+  margin-top: 2px;
 }
 
 /* Messages area */

@@ -130,30 +130,42 @@ interface PanelPromptMessage {
   sessionId?: string;
 }
 
+interface PanelLoadSessionMessage {
+  type: 'loadSession';
+  sessionId: string;
+}
+
+type PanelMessage = PanelPromptMessage | PanelLoadSessionMessage;
+
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name !== 'sidepanel') return;
 
-  console.log('[bg] side panel connected');
   panelPort = port;
 
-  port.onMessage.addListener((msg: PanelPromptMessage) => {
-    if (msg.type === 'prompt') {
-      handlePanelPrompt(msg);
+  port.onMessage.addListener((msg: PanelMessage) => {
+    switch (msg.type) {
+      case 'prompt':
+        handlePanelPrompt(msg);
+        break;
+      case 'loadSession':
+        handlePanelLoadSession(msg);
+        break;
     }
   });
 
   port.onDisconnect.addListener(() => {
-    console.log('[bg] side panel disconnected');
     panelPort = null;
   });
 });
 
-function handlePanelPrompt(msg: PanelPromptMessage): void {
-  const requestId = `prompt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+function generateRequestId(prefix: string): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
 
-  const executeMessage: ExtensionMessage = {
+function handlePanelPrompt(msg: PanelPromptMessage): void {
+  sendToNative({
     type: 'execute',
-    requestId,
+    requestId: generateRequestId('prompt'),
     payload: {
       command: 'prompt',
       args: {
@@ -164,9 +176,18 @@ function handlePanelPrompt(msg: PanelPromptMessage): void {
         sessionId: msg.sessionId,
       },
     },
-  };
+  });
+}
 
-  sendToNative(executeMessage);
+function handlePanelLoadSession(msg: PanelLoadSessionMessage): void {
+  sendToNative({
+    type: 'execute',
+    requestId: generateRequestId('load'),
+    payload: {
+      command: 'loadSession',
+      args: { sessionId: msg.sessionId },
+    },
+  });
 }
 
 // ── Extension action ────────────────────────────────────────────────

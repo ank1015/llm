@@ -2,6 +2,7 @@
  * Side panel UI — connects to background service worker via chrome.runtime.connect.
  *
  * Sends user prompts and receives agent events for display.
+ * Manages session history via chrome.storage.local.
  */
 
 // ── Types for side panel ↔ background messaging ────────────────────
@@ -13,6 +14,11 @@ interface PromptMessage {
   api: string;
   modelId: string;
   sessionId?: string | undefined;
+}
+
+interface LoadSessionMessage {
+  type: 'loadSession';
+  sessionId: string;
 }
 
 interface AgentEventMsg {
@@ -40,7 +46,10 @@ interface AgentEventMsg {
 interface ResultMsg {
   type: 'result';
   requestId: string;
-  data: { sessionId: string };
+  data: {
+    sessionId?: string;
+    messages?: StoredMessage[];
+  };
 }
 
 interface ErrorMsg {
@@ -51,6 +60,25 @@ interface ErrorMsg {
 
 type BackgroundMessage = AgentEventMsg | ResultMsg | ErrorMsg;
 
+// ── Stored message types (from session files) ───────────────────────
+
+interface StoredMessage {
+  role: string;
+  content?: unknown;
+  toolName?: string;
+  toolCallId?: string;
+  isError?: boolean;
+}
+
+// ── Session metadata (chrome.storage.local) ─────────────────────────
+
+interface SessionMeta {
+  sessionId: string;
+  url: string;
+  preview: string;
+  timestamp: number;
+}
+
 // ── DOM elements ────────────────────────────────────────────────────
 
 const messagesEl = document.getElementById('messages')!;
@@ -59,12 +87,19 @@ const sendBtn = document.getElementById('send-btn') as HTMLButtonElement;
 const form = document.getElementById('input-form') as HTMLFormElement;
 const modelSelect = document.getElementById('model-select') as HTMLSelectElement;
 const statusEl = document.getElementById('status')!;
+const newSessionBtn = document.getElementById('new-session-btn')!;
+const historyBtn = document.getElementById('history-btn')!;
+const historyPanel = document.getElementById('history-panel')!;
+const historyList = document.getElementById('history-list')!;
+const historyEmpty = document.getElementById('history-empty')!;
 
 // ── State ───────────────────────────────────────────────────────────
 
 let sessionId: string | undefined;
 let isRunning = false;
 let currentAssistantEl: HTMLElement | null = null;
+let pendingPromptMeta: { url: string; preview: string } | null = null;
+let waitingForLoadSession = false;
 
 // ── Background port ─────────────────────────────────────────────────
 
@@ -76,11 +111,15 @@ port.onMessage.addListener((msg: BackgroundMessage) => {
       handleAgentEvent(msg.event);
       break;
     case 'result':
-      sessionId = msg.data.sessionId;
-      onPromptComplete();
+      if (waitingForLoadSession) {
+        handleLoadSessionResult(msg.data.messages ?? []);
+      } else {
+        handlePromptResult(msg.data);
+      }
       break;
     case 'error':
       showError(msg.error);
+      waitingForLoadSession = false;
       onPromptComplete();
       break;
   }
@@ -89,6 +128,36 @@ port.onMessage.addListener((msg: BackgroundMessage) => {
 port.onDisconnect.addListener(() => {
   showError('Connection to extension lost. Please reload.');
 });
+
+// ── Prompt result handler ───────────────────────────────────────────
+
+function handlePromptResult(data: ResultMsg['data']): void {
+  const newSessionId = data.sessionId;
+  if (newSessionId && newSessionId !== sessionId) {
+    sessionId = newSessionId;
+    if (pendingPromptMeta) {
+      saveSessionMeta({
+        sessionId: newSessionId,
+        url: pendingPromptMeta.url,
+        preview: pendingPromptMeta.preview,
+        timestamp: Date.now(),
+      });
+    }
+    saveLastSessionId(newSessionId);
+  }
+  pendingPromptMeta = null;
+  onPromptComplete();
+}
+
+// ── Load session result handler ─────────────────────────────────────
+
+function handleLoadSessionResult(messages: StoredMessage[]): void {
+  waitingForLoadSession = false;
+  messagesEl.innerHTML = '';
+  renderStoredMessages(messages);
+  saveLastSessionId(sessionId!);
+  onPromptComplete();
+}
 
 // ── Event handlers ──────────────────────────────────────────────────
 
@@ -137,6 +206,68 @@ function handleAgentEvent(event: AgentEventMsg['event']): void {
     case 'agent_end':
       clearStatus();
       break;
+  }
+}
+
+// ── Render stored messages ──────────────────────────────────────────
+
+function renderStoredMessages(messages: StoredMessage[]): void {
+  for (const msg of messages) {
+    switch (msg.role) {
+      case 'user': {
+        const text = extractTextContent(msg.content);
+        if (text) addMessage('user', text);
+        break;
+      }
+      case 'assistant': {
+        renderAssistantMessage(msg.content);
+        break;
+      }
+      case 'toolResult': {
+        const resultText = extractTextContent(msg.content);
+        const preview = resultText
+          ? resultText.length > 200
+            ? resultText.slice(0, 200) + '...'
+            : resultText
+          : '';
+        const label = msg.isError ? 'error' : 'done';
+        addToolMessage(msg.toolName ?? 'tool', label, preview, msg.isError);
+        break;
+      }
+    }
+  }
+  scrollToBottom();
+}
+
+function renderAssistantMessage(content: unknown): void {
+  if (!Array.isArray(content)) {
+    const text = extractTextContent(content);
+    if (text) addMessage('assistant', text);
+    return;
+  }
+
+  // Walk content blocks — render toolCalls and text separately
+  const textParts: string[] = [];
+  for (const block of content) {
+    if (!block || typeof block !== 'object') continue;
+    const b = block as Record<string, unknown>;
+
+    if (b.type === 'toolCall') {
+      // Flush accumulated text first
+      if (textParts.length > 0) {
+        addMessage('assistant', textParts.join('\n'));
+        textParts.length = 0;
+      }
+      addToolMessage((b.name as string) ?? 'tool', 'called');
+    } else if (b.type === 'response' || b.type === 'text' || b.type === 'textContent') {
+      const text = b.type === 'response' ? extractTextContent(b.content) : extractTextContent([b]);
+      if (text) textParts.push(text);
+    }
+  }
+
+  if (textParts.length > 0) {
+    const joined = textParts.join('\n');
+    if (joined) addMessage('assistant', joined);
   }
 }
 
@@ -206,10 +337,6 @@ function extractTextContent(content: unknown): string {
   if (!content) return '';
   if (typeof content === 'string') return content;
 
-  // Content is an array of content blocks with varying structures:
-  //   { type: 'text', content: '...' }            — direct text block
-  //   { type: 'response', content: [{ type: 'text', content: '...' }] }  — wrapped text
-  //   { type: 'toolCall', ... }                    — skip
   if (Array.isArray(content)) {
     const parts: string[] = [];
     for (const block of content) {
@@ -220,7 +347,6 @@ function extractTextContent(content: unknown): string {
         const text = (b.content as string | undefined) ?? (b.text as string | undefined) ?? '';
         if (text) parts.push(text);
       } else if (b.type === 'response' && Array.isArray(b.content)) {
-        // Unwrap nested response content blocks
         const inner = extractTextContent(b.content);
         if (inner) parts.push(inner);
       }
@@ -245,6 +371,128 @@ function onPromptComplete(): void {
   clearStatus();
 }
 
+// ── Session metadata (chrome.storage.local) ─────────────────────────
+
+async function getSessionsMeta(): Promise<SessionMeta[]> {
+  const result = await chrome.storage.local.get('sessions');
+  return (result.sessions as SessionMeta[] | undefined) ?? [];
+}
+
+async function saveSessionMeta(meta: SessionMeta): Promise<void> {
+  const sessions = await getSessionsMeta();
+  // Don't duplicate — update if sessionId exists
+  const idx = sessions.findIndex((s) => s.sessionId === meta.sessionId);
+  if (idx >= 0) {
+    sessions[idx] = meta;
+  } else {
+    sessions.unshift(meta);
+  }
+  await chrome.storage.local.set({ sessions });
+}
+
+async function saveLastSessionId(id: string): Promise<void> {
+  await chrome.storage.local.set({ lastSessionId: id });
+}
+
+async function getLastSessionId(): Promise<string | undefined> {
+  const result = await chrome.storage.local.get('lastSessionId');
+  return result.lastSessionId as string | undefined;
+}
+
+// ── History panel ───────────────────────────────────────────────────
+
+function formatRelativeTime(timestamp: number): string {
+  const diff = Date.now() - timestamp;
+  const minutes = Math.floor(diff / 60_000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+async function renderHistoryPanel(): Promise<void> {
+  const sessions = await getSessionsMeta();
+  historyList.innerHTML = '';
+
+  if (sessions.length === 0) {
+    historyEmpty.classList.remove('hidden');
+    return;
+  }
+
+  historyEmpty.classList.add('hidden');
+
+  // Sort by timestamp descending (most recent first)
+  sessions.sort((a, b) => b.timestamp - a.timestamp);
+
+  for (const meta of sessions) {
+    const entry = document.createElement('div');
+    entry.className = 'history-entry';
+    if (meta.sessionId === sessionId) {
+      entry.classList.add('active');
+    }
+
+    entry.innerHTML = `
+      <div class="history-entry-url">${escapeHtml(meta.url)}</div>
+      <div class="history-entry-preview">${escapeHtml(meta.preview)}</div>
+      <div class="history-entry-time">${escapeHtml(formatRelativeTime(meta.timestamp))}</div>
+    `;
+
+    entry.addEventListener('click', () => {
+      loadSession(meta.sessionId);
+    });
+
+    historyList.appendChild(entry);
+  }
+}
+
+function toggleHistoryPanel(): void {
+  const isHidden = historyPanel.classList.contains('hidden');
+  if (isHidden) {
+    renderHistoryPanel();
+    historyPanel.classList.remove('hidden');
+    historyBtn.classList.add('active');
+  } else {
+    historyPanel.classList.add('hidden');
+    historyBtn.classList.remove('active');
+  }
+}
+
+function closeHistoryPanel(): void {
+  historyPanel.classList.add('hidden');
+  historyBtn.classList.remove('active');
+}
+
+// ── Session actions ─────────────────────────────────────────────────
+
+function newSession(): void {
+  sessionId = undefined;
+  messagesEl.innerHTML = '';
+  currentAssistantEl = null;
+  closeHistoryPanel();
+  clearStatus();
+  inputEl.focus();
+}
+
+function loadSession(targetSessionId: string): void {
+  if (isRunning) return;
+
+  sessionId = targetSessionId;
+  messagesEl.innerHTML = '';
+  currentAssistantEl = null;
+  waitingForLoadSession = true;
+  setRunning(true);
+  setStatus('Loading session...');
+  closeHistoryPanel();
+
+  const msg: LoadSessionMessage = {
+    type: 'loadSession',
+    sessionId: targetSessionId,
+  };
+  port.postMessage(msg);
+}
+
 // ── Send prompt ─────────────────────────────────────────────────────
 
 async function sendPrompt(): Promise<void> {
@@ -264,6 +512,12 @@ async function sendPrompt(): Promise<void> {
     showError('Invalid model selection.');
     return;
   }
+
+  // Save metadata for when we get the sessionId back
+  pendingPromptMeta = {
+    url: tab.url ?? 'unknown',
+    preview: message.slice(0, 80),
+  };
 
   // Show user message and clear input
   addMessage('user', message);
@@ -304,3 +558,18 @@ inputEl.addEventListener('keydown', (e) => {
     sendPrompt();
   }
 });
+
+// Session buttons
+newSessionBtn.addEventListener('click', newSession);
+historyBtn.addEventListener('click', toggleHistoryPanel);
+
+// ── Restore last session on load ────────────────────────────────────
+
+async function restoreLastSession(): Promise<void> {
+  const lastId = await getLastSessionId();
+  if (lastId) {
+    loadSession(lastId);
+  }
+}
+
+restoreLastSession();

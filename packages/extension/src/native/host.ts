@@ -1,4 +1,4 @@
-import { runAgentPrompt } from './agent.js';
+import { runAgentPrompt, loadSessionMessages } from './agent.js';
 import { MessageDispatcher } from './dispatcher.js';
 
 import type { PromptArgs } from './agent.js';
@@ -15,32 +15,54 @@ async function handleExecute(
   try {
     const { command, args } = message.payload;
 
-    if (command !== 'prompt') {
-      dispatcher.send({
-        type: 'error',
-        requestId: message.requestId,
-        error: `Unknown command: ${command}`,
-      });
-      return;
+    switch (command) {
+      case 'prompt': {
+        const promptArgs = args as PromptArgs | undefined;
+        if (!promptArgs?.message || !promptArgs.tabId || !promptArgs.api || !promptArgs.modelId) {
+          dispatcher.send({
+            type: 'error',
+            requestId: message.requestId,
+            error: 'Missing required fields: message, tabId, api, modelId',
+          });
+          return;
+        }
+
+        const result = await runAgentPrompt(promptArgs, dispatcher, message.requestId);
+        dispatcher.send({
+          type: 'success',
+          requestId: message.requestId,
+          data: result,
+        });
+        break;
+      }
+
+      case 'loadSession': {
+        const sessionArgs = args as { sessionId?: string } | undefined;
+        if (!sessionArgs?.sessionId) {
+          dispatcher.send({
+            type: 'error',
+            requestId: message.requestId,
+            error: 'Missing required field: sessionId',
+          });
+          return;
+        }
+
+        const result = await loadSessionMessages(sessionArgs.sessionId);
+        dispatcher.send({
+          type: 'success',
+          requestId: message.requestId,
+          data: result,
+        });
+        break;
+      }
+
+      default:
+        dispatcher.send({
+          type: 'error',
+          requestId: message.requestId,
+          error: `Unknown command: ${command}`,
+        });
     }
-
-    const promptArgs = args as PromptArgs | undefined;
-    if (!promptArgs?.message || !promptArgs.tabId || !promptArgs.api || !promptArgs.modelId) {
-      dispatcher.send({
-        type: 'error',
-        requestId: message.requestId,
-        error: 'Missing required fields: message, tabId, api, modelId',
-      });
-      return;
-    }
-
-    const result = await runAgentPrompt(promptArgs, dispatcher, message.requestId);
-
-    dispatcher.send({
-      type: 'success',
-      requestId: message.requestId,
-      data: result,
-    });
   } catch (error) {
     log(`execute error: ${error instanceof Error ? error.message : String(error)}`);
     dispatcher.send({
