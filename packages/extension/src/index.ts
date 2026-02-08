@@ -9,6 +9,8 @@ export type {
   PongResponse,
   SuccessResponse,
   ErrorResponse,
+  // Native → Extension (streaming events)
+  AgentEventMessage,
   // Native → Extension (requests)
   NativeRequest,
   GetPageHtmlRequest,
@@ -29,6 +31,10 @@ export {
 
 // Native host stdio utilities
 export { readMessage, writeMessage } from './native/stdio.js';
+
+// Message dispatcher
+export { MessageDispatcher } from './native/dispatcher.js';
+export type { DispatcherOptions } from './native/dispatcher.js';
 
 // Agent tools
 export { createAgentTools, createExtractPageMarkdownTool } from './native/tools/index.js';

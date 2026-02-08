@@ -39,6 +39,14 @@ export interface ErrorResponse {
 /** Responses the native host sends back to extension-initiated requests */
 export type NativeResponse = PongResponse | SuccessResponse | ErrorResponse;
 
+// ── Native Host → Extension (streaming events) ─────────────────────
+
+export interface AgentEventMessage {
+  type: 'agentEvent';
+  requestId: string;
+  event: unknown;
+}
+
 // ── Native Host → Extension (requests) ─────────────────────────────
 
 export interface GetPageHtmlRequest {
@@ -73,4 +81,4 @@ export type ExtensionResponse = PageHtmlResponse | PageHtmlErrorResponse;
 export type NativeInbound = ExtensionMessage | ExtensionResponse;
 
 /** Everything the native host can write to stdout */
-export type NativeOutbound = NativeResponse | NativeRequest;
+export type NativeOutbound = NativeResponse | NativeRequest | AgentEventMessage;
