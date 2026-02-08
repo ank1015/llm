@@ -17,7 +17,9 @@ export type {
   NoteSummary,
   NoteChunk,
   EmbeddedChunk,
-  SearchResult,
+  SemanticHit,
+  TagHit,
+  SearchResults,
   NoteFilter,
   MemoryStoreConfig,
 } from './store/note.types.js';

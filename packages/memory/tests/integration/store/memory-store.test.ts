@@ -35,20 +35,22 @@ describe.skipIf(!apiKey)('MemoryStore integration', () => {
     );
 
     // Search for ML-related content
-    const results = await store.search('how does attention work in neural networks');
+    const { semantic } = await store.search('how does attention work in neural networks');
 
-    expect(results.length).toBeGreaterThan(0);
+    expect(semantic.length).toBeGreaterThan(0);
     // Transformer note should rank higher than Rust note
-    expect(results[0]!.slug).toBe('transformer-architecture');
+    expect(semantic[0]!.slug).toBe('transformer-architecture');
   });
 
-  it('should combine semantic search with tag filtering', async () => {
+  it('should return both semantic and tag results when both provided', async () => {
     await store.saveNote('ML Note', '## Topic\n\nMachine learning concepts.', ['ml']);
     await store.saveNote('Rust Note', '## Topic\n\nSystems programming concepts.', ['rust']);
 
-    const results = await store.search('programming concepts', ['rust']);
+    const { semantic, tags } = await store.search('programming concepts', ['rust']);
 
-    expect(results.every((r) => r.slug === 'rust-note')).toBe(true);
+    expect(semantic.length).toBeGreaterThan(0);
+    expect(tags).toHaveLength(1);
+    expect(tags[0]!.slug).toBe('rust-note');
   });
 
   it('should rebuild index from disk and search correctly', async () => {
@@ -62,8 +64,8 @@ describe.skipIf(!apiKey)('MemoryStore integration', () => {
     const freshStore = new MemoryStore({ notesDir: tmpDir, openaiApiKey: apiKey });
     await freshStore.rebuildIndex();
 
-    const results = await freshStore.search('vector representations for text');
-    expect(results.length).toBeGreaterThan(0);
-    expect(results[0]!.slug).toBe('embeddings');
+    const { semantic } = await freshStore.search('vector representations for text');
+    expect(semantic.length).toBeGreaterThan(0);
+    expect(semantic[0]!.slug).toBe('embeddings');
   });
 });

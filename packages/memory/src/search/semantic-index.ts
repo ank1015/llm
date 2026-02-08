@@ -8,7 +8,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { cosineSimilarity } from './embedder.js';
 
 import type { Embedder } from './embedder.js';
-import type { EmbeddedChunk, NoteChunk, SearchResult } from '../store/note.types.js';
+import type { EmbeddedChunk, NoteChunk, SemanticHit } from '../store/note.types.js';
 
 export class SemanticIndex {
   private chunks: EmbeddedChunk[] = [];
@@ -48,7 +48,7 @@ export class SemanticIndex {
   }
 
   /** Search by embedding the query and ranking chunks by cosine similarity */
-  async search(query: string, limit: number): Promise<SearchResult[]> {
+  async search(query: string, limit: number): Promise<SemanticHit[]> {
     if (this.chunks.length === 0) return [];
 
     const [queryVector] = await this.embedder.embed([query]);

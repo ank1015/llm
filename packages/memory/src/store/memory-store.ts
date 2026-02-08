@@ -18,7 +18,7 @@ import type {
   Note,
   NoteFilter,
   NoteSummary,
-  SearchResult,
+  SearchResults,
 } from './note.types.js';
 import type { Embedder } from '../search/embedder.js';
 
@@ -88,31 +88,24 @@ export class MemoryStore {
     return this.metadataIndex.getAll();
   }
 
-  async search(query: string, tags?: string[], limit?: number): Promise<SearchResult[]> {
+  async search(query: string, tags?: string[], limit?: number): Promise<SearchResults> {
     await this.init();
     const maxResults = limit ?? 10;
 
-    // If only tags, do metadata filter
-    if (!query && tags && tags.length > 0) {
-      const summaries = this.metadataIndex.filter({ tags });
-      return summaries.map((s) => ({
-        slug: s.slug,
-        heading: s.title,
-        text: '',
-        score: 1,
-      }));
+    const result: SearchResults = { semantic: [], tags: [] };
+
+    // Semantic search (when query is provided)
+    if (query) {
+      result.semantic = await this.semanticIndex.search(query, maxResults);
     }
 
-    // Semantic search
-    let results = await this.semanticIndex.search(query, maxResults);
-
-    // If tags provided, filter semantic results to only matching slugs
+    // Tag search (when tags are provided)
     if (tags && tags.length > 0) {
-      const matchingSlugs = new Set(this.metadataIndex.filter({ tags }).map((s) => s.slug));
-      results = results.filter((r) => matchingSlugs.has(r.slug));
+      const summaries = this.metadataIndex.filter({ tags });
+      result.tags = summaries.map((s) => ({ slug: s.slug, title: s.title, tags: s.tags }));
     }
 
-    return results.slice(0, maxResults);
+    return result;
   }
 
   async rebuildIndex(): Promise<void> {

@@ -131,26 +131,28 @@ describe('MemoryStore', () => {
       await store.saveNote('Rust Ownership', '## Borrow Checker\n\nRust memory safety.', ['rust']);
     });
 
-    it('should return semantic search results', async () => {
-      const results = await store.search('neural networks');
-      expect(results.length).toBeGreaterThan(0);
-      expect(results[0]!.score).toBeDefined();
+    it('should return semantic results when query provided', async () => {
+      const { semantic } = await store.search('neural networks');
+      expect(semantic.length).toBeGreaterThan(0);
+      expect(semantic[0]!.score).toBeDefined();
     });
 
-    it('should filter by tags only when no query', async () => {
-      const results = await store.search('', ['rust']);
-      expect(results).toHaveLength(1);
-      expect(results[0]!.slug).toBe('rust-ownership');
+    it('should return tag results when tags provided', async () => {
+      const { tags } = await store.search('', ['rust']);
+      expect(tags).toHaveLength(1);
+      expect(tags[0]!.slug).toBe('rust-ownership');
     });
 
-    it('should combine semantic search with tag filter', async () => {
-      const results = await store.search('memory', ['rust']);
-      expect(results.every((r) => r.slug === 'rust-ownership')).toBe(true);
+    it('should return both sections when query and tags provided', async () => {
+      const { semantic, tags } = await store.search('memory', ['rust']);
+      expect(semantic.length).toBeGreaterThan(0);
+      expect(tags).toHaveLength(1);
+      expect(tags[0]!.slug).toBe('rust-ownership');
     });
 
-    it('should respect limit', async () => {
-      const results = await store.search('programming', undefined, 1);
-      expect(results.length).toBeLessThanOrEqual(1);
+    it('should respect limit for semantic results', async () => {
+      const { semantic } = await store.search('programming', undefined, 1);
+      expect(semantic.length).toBeLessThanOrEqual(1);
     });
   });
 

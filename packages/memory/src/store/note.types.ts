@@ -39,12 +39,25 @@ export interface EmbeddedChunk extends NoteChunk {
   vector: number[];
 }
 
-/** Search result from semantic search */
-export interface SearchResult {
+/** A single semantic search hit */
+export interface SemanticHit {
   slug: string;
   heading: string;
   text: string;
   score: number;
+}
+
+/** A tag-matched note */
+export interface TagHit {
+  slug: string;
+  title: string;
+  tags: string[];
+}
+
+/** Combined search results with separate sections */
+export interface SearchResults {
+  semantic: SemanticHit[];
+  tags: TagHit[];
 }
 
 /** Filter options for listing notes */

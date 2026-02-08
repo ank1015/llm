@@ -48,8 +48,12 @@ describe.skipIf(!apiKey)('AgentTools e2e', () => {
       query: 'how does attention work in neural networks',
     });
 
-    const details = searchResult.details as { results: Array<{ slug: string; score: number }> };
-    expect(details.results[0]!.slug).toBe('attention-mechanisms');
+    const text = (searchResult.content[0] as { content: string }).content;
+    expect(text).toContain('Semantic Results:');
+    expect(text).toContain('attention-mechanisms');
+
+    const details = searchResult.details as { semantic: Array<{ slug: string }> };
+    expect(details.semantic[0]!.slug).toBe('attention-mechanisms');
   });
 
   it('should filter by tags via search tool', async () => {
@@ -67,6 +71,7 @@ describe.skipIf(!apiKey)('AgentTools e2e', () => {
 
     const searchResult = await searchMemory.execute('call-3', { tags: ['rust'] });
     const searchText = (searchResult.content[0] as { content: string }).content;
+    expect(searchText).toContain('Tag Results:');
     expect(searchText).toContain('rust-tip');
     expect(searchText).not.toContain('ml-paper');
   });
@@ -132,7 +137,16 @@ describe.skipIf(!apiKey)('AgentTools e2e', () => {
       tags: ['ml'],
     });
 
-    const details = result.details as { results: Array<{ slug: string }> };
-    expect(details.results.every((r) => r.slug === 'ml-note')).toBe(true);
+    const text = (result.content[0] as { content: string }).content;
+    expect(text).toContain('Semantic Results:');
+    expect(text).toContain('Tag Results:');
+
+    const details = result.details as {
+      semantic: Array<{ slug: string }>;
+      tags: Array<{ slug: string }>;
+    };
+    expect(details.semantic.length).toBeGreaterThan(0);
+    expect(details.tags).toHaveLength(1);
+    expect(details.tags[0]!.slug).toBe('ml-note');
   });
 });
