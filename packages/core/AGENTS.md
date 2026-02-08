@@ -67,6 +67,14 @@ src/
       index.ts            — Self-registration + re-exports
       stream.ts           — Uses shared chat-stream engine
       utils.ts            — Message builder, param builder, mock factory
+    claude-code/          — Claude Code (Anthropic SDK via backend gateway)
+      index.ts            — Self-registration + re-exports
+      stream.ts           — StreamFunction<'claude-code'> (Anthropic streaming)
+      utils.ts            — Client factory (OAuth auth), param builder, reuses buildAnthropicMessages
+    codex/                — Codex (OpenAI SDK via backend gateway)
+      index.ts            — Self-registration + re-exports
+      stream.ts           — StreamFunction<'codex'> (OpenAI Responses API streaming)
+      utils.ts            — Client factory (chatgpt-account-id), param builder, error rewriter, reuses buildOpenAIMessages
 tests/
   unit/                   — No API calls, fast, mocked
     agent/                — runner, utils, mock tests
@@ -82,6 +90,8 @@ tests/
     deepseek/             — stream.test.ts, complete.test.ts
     kimi/                 — stream.test.ts, complete.test.ts
     zai/                  — stream.test.ts, complete.test.ts
+    claude-code/          — stream.test.ts, complete.test.ts
+    codex/                — stream.test.ts, complete.test.ts
 ```
 
 ## Key Concepts
@@ -100,10 +110,13 @@ The `export *` triggers the side-effect import, which calls `registerProvider()`
 
 **For tests:** `vitest.setup.ts` imports all provider `index.ts` files directly to ensure registration happens before any test runs.
 
-### Two Provider Categories
+### Three Provider Categories
 
 1. **Native SDK providers** (Anthropic, OpenAI, Google) — Use provider-specific SDKs, implement streaming from scratch
 2. **OpenAI-compatible providers** (DeepSeek, Kimi, Z.AI) — Use `openai` SDK with custom baseURL, share `createChatCompletionStream()` engine from `providers/utils/chat-stream.ts`
+3. **Backend-proxied providers** (Claude Code, Codex) — Use the underlying SDKs (Anthropic SDK for Claude Code, OpenAI SDK for Codex) but connect through authenticated backend gateways instead of direct API endpoints. These reuse message-building utilities from their parent providers but have custom auth:
+   - **Claude Code** — OAuth token + beta flag + billing header via Anthropic SDK
+   - **Codex** — API key + `chatgpt-account-id` header + custom error rewriting via OpenAI SDK
 
 ### Streaming-First Architecture
 
@@ -114,6 +127,11 @@ The `export *` triggers the side-effect import, which calls `registerProvider()`
 ### Cross-Provider Message Building
 
 Each provider's `build<Provider>Messages()` converts unified `Context` messages to provider-native format. When a message originated from a different provider, the normalized `content` field is used for conversion (e.g., Anthropic messages replayed through OpenAI).
+
+Backend-proxied providers reuse their parent's message builder:
+
+- `buildClaudeCodeMessages()` delegates to `buildAnthropicMessages()`
+- `buildCodexMessages()` delegates to `buildOpenAIMessages()`
 
 ## Key Exports
 
@@ -150,6 +168,7 @@ Each provider's `build<Provider>Messages()` converts unified `Context` messages 
 - Use TypeBox for tool parameter schemas
 - Export all public API from `src/index.ts`
 - Tests in `tests/` directory, mirroring `src/` structure
+- Backend-proxied providers reuse their parent's message builder and mock factory
 
 ## Adding a New Provider
 
@@ -171,6 +190,7 @@ See [ADDING_PROVIDER.md](./ADDING_PROVIDER.md) for the full 10-file checklist.
 **Ask first:**
 
 - Modifying the shared chat-stream engine (affects DeepSeek, Kimi, Z.AI)
+- Modifying `buildAnthropicMessages` or `buildOpenAIMessages` (also used by Claude Code and Codex respectively)
 - Changing the `BaseAssistantMessage` or `BaseAssistantEvent` type shapes (in types package)
 - Adding new dependencies
 

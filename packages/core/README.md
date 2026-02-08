@@ -114,10 +114,12 @@ interface BaseAssistantMessage<TApi extends Api> {
 
   // Native response — the provider's original, unmodified response object
   message: NativeResponseForApi<TApi>;
-  //  'anthropic' → Anthropic.Message
-  //  'openai'    → OpenAI.Response
-  //  'google'    → GenerateContentResponse
-  //  'deepseek'  → ChatCompletion
+  //  'anthropic'   → Anthropic.Message
+  //  'claude-code'  → Anthropic.Message
+  //  'openai'      → OpenAI.Response
+  //  'codex'       → OpenAI.Response
+  //  'google'      → GenerateContentResponse
+  //  'deepseek'    → ChatCompletion
   //  ...
 }
 ```
@@ -139,14 +141,16 @@ Every event includes a `message` field with the in-progress `BaseAssistantMessag
 
 ## Supported Providers
 
-| Provider  | API         | SDK                 | Notes                               |
-| --------- | ----------- | ------------------- | ----------------------------------- |
-| Anthropic | `anthropic` | `@anthropic-ai/sdk` | Interleaved thinking, cache control |
-| OpenAI    | `openai`    | `openai`            | Responses API, reasoning summaries  |
-| Google    | `google`    | `@google/genai`     | Configurable thinking levels        |
-| DeepSeek  | `deepseek`  | `openai` (compat)   | Reasoning content, cache tokens     |
-| Kimi      | `kimi`      | `openai` (compat)   | Moonshot, per-choice usage          |
-| Z.AI      | `zai`       | `openai` (compat)   | Silent overflow handling            |
+| Provider    | API           | SDK                 | Category          | Notes                                                   |
+| ----------- | ------------- | ------------------- | ----------------- | ------------------------------------------------------- |
+| Anthropic   | `anthropic`   | `@anthropic-ai/sdk` | Native SDK        | Interleaved thinking, cache control                     |
+| OpenAI      | `openai`      | `openai`            | Native SDK        | Responses API, reasoning summaries                      |
+| Google      | `google`      | `@google/genai`     | Native SDK        | Configurable thinking levels                            |
+| DeepSeek    | `deepseek`    | `openai` (compat)   | OpenAI-compatible | Reasoning content, cache tokens                         |
+| Kimi        | `kimi`        | `openai` (compat)   | OpenAI-compatible | Moonshot, per-choice usage                              |
+| Z.AI        | `zai`         | `openai` (compat)   | OpenAI-compatible | Silent overflow handling                                |
+| Claude Code | `claude-code` | `@anthropic-ai/sdk` | Backend-proxied   | OAuth + beta flag auth, billing header in system prompt |
+| Codex       | `codex`       | `openai`            | Backend-proxied   | chatgpt-account-id auth, custom error rewriting         |
 
 ## Agent Loop
 

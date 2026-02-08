@@ -1,0 +1,43 @@
+{
+  "name": "@ank1015/llm-memory",
+  "version": "0.0.1",
+  "description": "Personal knowledge memory system with semantic search for AI agents",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "lint": "echo 'No linter configured yet'",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "keywords": [
+    "llm",
+    "memory",
+    "ai",
+    "knowledge-base"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@ank1015/llm-sdk": "workspace:^",
+    "@ank1015/llm-types": "workspace:^",
+    "@sinclair/typebox": "^0.34.48",
+    "gray-matter": "^4.0.3",
+    "openai": "^6.17.0"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.0"
+  }
+}
