@@ -5,7 +5,7 @@ import { build, context } from 'esbuild';
 const isWatch = process.argv.includes('--watch');
 
 const buildOptions = {
-  entryPoints: ['src/chrome/background.ts'],
+  entryPoints: ['src/chrome/background.ts', 'src/chrome/sidepanel.ts'],
   bundle: true,
   format: 'esm' as const,
   platform: 'browser' as const,
@@ -17,6 +17,8 @@ const buildOptions = {
 async function main(): Promise<void> {
   mkdirSync('dist/chrome', { recursive: true });
   cpSync('src/chrome/manifest.json', 'dist/chrome/manifest.json');
+  cpSync('src/chrome/sidepanel.html', 'dist/chrome/sidepanel.html');
+  cpSync('src/chrome/sidepanel.css', 'dist/chrome/sidepanel.css');
 
   if (isWatch) {
     const ctx = await context(buildOptions);

@@ -3,9 +3,15 @@
   "name": "LLM Extension",
   "version": "0.0.1",
   "description": "Chrome extension for local LLM interactions via native messaging",
-  "permissions": ["nativeMessaging"],
+  "permissions": ["nativeMessaging", "sidePanel", "scripting", "activeTab", "tabs"],
   "background": {
     "service_worker": "background.js",
     "type": "module"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "action": {
+    "default_title": "Open LLM Assistant"
   }
 }

@@ -22,26 +22,24 @@ if [ ! -f "$DIST_DIR/native/host.js" ]; then
   exit 1
 fi
 
-# Install host files outside Desktop to avoid Chrome sandbox restrictions
+# Chrome's sandbox on macOS blocks executing scripts from certain directories
+# (e.g. ~/Desktop). We create a thin wrapper in ~/.local/share/ which Chrome
+# can execute, but the wrapper runs node against the project's dist/ directly.
+# This way Node resolves workspace packages from the monorepo's node_modules.
 INSTALL_DIR="$HOME/.local/share/llm-native-host"
 rm -rf "$INSTALL_DIR"
 mkdir -p "$INSTALL_DIR"
 
-# Copy compiled native + shared files (preserving directory structure)
-cp -R "$DIST_DIR/native/" "$INSTALL_DIR/native/"
-cp -R "$DIST_DIR/shared/" "$INSTALL_DIR/shared/"
-
-# Ensure Node treats .js files as ES modules
-echo '{"type":"module"}' > "$INSTALL_DIR/package.json"
-
 # Get the absolute path to the node binary currently in use
 NODE_PATH="$(which node)"
 
-# Create wrapper script with absolute node path (no PATH lookup needed)
+# Create wrapper script that runs host.js from the project dist/ directory.
+# Node resolves bare specifier imports (workspace packages, dependencies) by
+# walking up from host.js → packages/extension/ → monorepo root node_modules.
 WRAPPER_PATH="$INSTALL_DIR/run-host.sh"
 cat > "$WRAPPER_PATH" <<WRAPPER
 #!/bin/sh
-exec "$NODE_PATH" "$INSTALL_DIR/native/host.js"
+exec "$NODE_PATH" "$DIST_DIR/native/host.js"
 WRAPPER
 chmod 755 "$WRAPPER_PATH"
 
@@ -60,10 +58,11 @@ cat > "$MANIFEST" <<EOF
 }
 EOF
 
-echo "Installed native host to: $INSTALL_DIR"
-echo "  wrapper: $WRAPPER_PATH"
-echo "  node:    $NODE_PATH"
+echo "Installed native host:"
+echo "  wrapper:  $WRAPPER_PATH"
+echo "  host.js:  $DIST_DIR/native/host.js"
+echo "  node:     $NODE_PATH"
 echo "Installed manifest to: $MANIFEST"
 echo "  extension: $EXTENSION_ID"
 echo ""
-echo "Restart Chrome and reload the extension to test."
+echo "Restart Chrome (Cmd+Q) and reload the extension to test."
