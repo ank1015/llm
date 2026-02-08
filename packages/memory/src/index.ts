@@ -29,7 +29,7 @@ export { parseNote, serializeNote, slugify } from './store/markdown.js';
 export { MetadataIndex } from './search/metadata-index.js';
 export { SemanticIndex } from './search/semantic-index.js';
 export { chunkByHeadings } from './search/chunker.js';
-export { OpenAIEmbedder, type Embedder } from './search/embedder.js';
+export { OpenAIEmbedder, cosineSimilarity, type Embedder } from './search/embedder.js';
 
 // Tools
 export { createSaveNoteTool } from './tools/save-note.tool.js';
