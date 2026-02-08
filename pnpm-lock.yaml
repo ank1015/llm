@@ -219,6 +219,16 @@ importers:
         version: 2.1.9(@types/node@25.1.0)(lightningcss@1.30.2)
 
   packages/extension:
+    dependencies:
+      '@ank1015/llm-memory':
+        specifier: workspace:^
+        version: link:../memory
+      '@ank1015/llm-types':
+        specifier: workspace:^
+        version: link:../types
+      '@sinclair/typebox':
+        specifier: ^0.34.48
+        version: 0.34.48
     devDependencies:
       '@types/chrome':
         specifier: ^0.0.287

@@ -26,6 +26,11 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.chrome.json",
     "clean": "rm -rf dist *.tsbuildinfo"
   },
+  "dependencies": {
+    "@ank1015/llm-memory": "workspace:^",
+    "@ank1015/llm-types": "workspace:^",
+    "@sinclair/typebox": "^0.34.48"
+  },
   "devDependencies": {
     "@types/chrome": "^0.0.287",
     "@types/node": "^22.0.0",
