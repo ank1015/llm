@@ -3,39 +3,65 @@
  * Stored as .semantic-index.json alongside notes.
  */
 
+import { readFile, writeFile } from 'node:fs/promises';
+
+import { cosineSimilarity } from './embedder.js';
+
 import type { Embedder } from './embedder.js';
-import type { EmbeddedChunk, SearchResult } from '../store/note.types.js';
+import type { EmbeddedChunk, NoteChunk, SearchResult } from '../store/note.types.js';
 
 export class SemanticIndex {
+  private chunks: EmbeddedChunk[] = [];
+
   constructor(
     private readonly indexPath: string,
     private readonly embedder: Embedder
-  ) {
-    void indexPath;
-    void embedder;
-  }
+  ) {}
 
   async load(): Promise<void> {
-    throw new Error('Not implemented');
+    try {
+      const raw = await readFile(this.indexPath, 'utf-8');
+      this.chunks = JSON.parse(raw) as EmbeddedChunk[];
+    } catch {
+      this.chunks = [];
+    }
   }
 
   async save(): Promise<void> {
-    throw new Error('Not implemented');
+    await writeFile(this.indexPath, JSON.stringify(this.chunks), 'utf-8');
   }
 
-  async addChunks(chunks: EmbeddedChunk[]): Promise<void> {
-    void chunks;
-    throw new Error('Not implemented');
+  /** Embed and add new chunks. Call save() after to persist. */
+  async addChunks(noteChunks: NoteChunk[]): Promise<void> {
+    if (noteChunks.length === 0) return;
+
+    const texts = noteChunks.map((c) => `${c.heading}\n\n${c.text}`);
+    const vectors = await this.embedder.embed(texts);
+
+    for (let i = 0; i < noteChunks.length; i++) {
+      this.chunks.push({ ...noteChunks[i]!, vector: vectors[i]! });
+    }
   }
 
-  async removeBySlug(slug: string): Promise<void> {
-    void slug;
-    throw new Error('Not implemented');
+  removeBySlug(slug: string): void {
+    this.chunks = this.chunks.filter((c) => c.slug !== slug);
   }
 
+  /** Search by embedding the query and ranking chunks by cosine similarity */
   async search(query: string, limit: number): Promise<SearchResult[]> {
-    void query;
-    void limit;
-    throw new Error('Not implemented');
+    if (this.chunks.length === 0) return [];
+
+    const [queryVector] = await this.embedder.embed([query]);
+    if (!queryVector) return [];
+
+    const scored = this.chunks.map((chunk) => ({
+      slug: chunk.slug,
+      heading: chunk.heading,
+      text: chunk.text,
+      score: cosineSimilarity(queryVector, chunk.vector),
+    }));
+
+    scored.sort((a, b) => b.score - a.score);
+    return scored.slice(0, limit);
   }
 }
