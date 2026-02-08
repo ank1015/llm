@@ -6,7 +6,7 @@
 export interface NoteFrontmatter {
   title: string;
   tags: string[];
-  source?: string;
+  source?: string | undefined;
   date: string;
 }
 
@@ -23,7 +23,7 @@ export interface NoteSummary {
   title: string;
   tags: string[];
   date: string;
-  source?: string;
+  source?: string | undefined;
 }
 
 /** A chunk of a note for semantic indexing */
