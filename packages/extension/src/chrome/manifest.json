@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "LLM Extension",
+  "version": "0.0.1",
+  "description": "Chrome extension for local LLM interactions via native messaging",
+  "permissions": ["nativeMessaging"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  }
+}

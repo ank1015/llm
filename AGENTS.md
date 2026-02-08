@@ -35,6 +35,7 @@ packages/
   core/               # @ank1015/llm-core - Core SDK (stateless, portable)
   sdk/                # @ank1015/llm-sdk - Unified SDK (portable, adapter interfaces)
   sdk-adapters/       # @ank1015/llm-sdk-adapters - Node.js adapter implementations
+  extension/          # @ank1015/llm-extension - Chrome extension + native messaging host
   chat-app/           # @ank1015/llm-chat-app - Next.js chat application
   usage-dashboard/    # @ank1015/llm-usage-dashboard - Next.js usage dashboard
 ```
@@ -62,6 +63,7 @@ packages/
 - [packages/core/AGENTS.md](packages/core/AGENTS.md) — Core SDK (stateless)
 - [packages/sdk/AGENTS.md](packages/sdk/AGENTS.md) — Unified SDK (portable)
 - [packages/sdk-adapters/AGENTS.md](packages/sdk-adapters/AGENTS.md) — Node.js adapter implementations
+- [packages/extension/AGENTS.md](packages/extension/AGENTS.md) — Chrome extension + native messaging host
 - [packages/chat-app/AGENTS.md](packages/chat-app/AGENTS.md) — Chat application
 - [packages/usage-dashboard/AGENTS.md](packages/usage-dashboard/AGENTS.md) — Usage dashboard
 
