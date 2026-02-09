@@ -1,7 +1,6 @@
-import { LENGTH_PREFIX_BYTES, MAX_MESSAGE_SIZE_BYTES } from '../shared/protocol.constants.js';
+import { LENGTH_PREFIX_BYTES, MAX_MESSAGE_SIZE_BYTES } from '../protocol/constants.js';
 
 import type { Readable, Writable } from 'node:stream';
-
 
 /**
  * Reads exactly `size` bytes from a readable stream.

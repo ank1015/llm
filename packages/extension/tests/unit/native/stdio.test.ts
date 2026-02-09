@@ -3,10 +3,7 @@ import { Readable, Writable } from 'node:stream';
 import { describe, it, expect } from 'vitest';
 
 import { readMessage, writeMessage } from '../../../src/native/stdio.js';
-import {
-  LENGTH_PREFIX_BYTES,
-  MAX_MESSAGE_SIZE_BYTES,
-} from '../../../src/shared/protocol.constants.js';
+import { LENGTH_PREFIX_BYTES, MAX_MESSAGE_SIZE_BYTES } from '../../../src/protocol/constants.js';
 
 /** Encode a JSON object into a length-prefixed buffer (same format as writeMessage). */
 function encode(obj: unknown): Buffer {
