@@ -9,6 +9,6 @@
     "sourceMap": false,
     "noEmit": true
   },
-  "include": ["src/shared/**/*", "src/chrome/**/*"],
+  "include": ["src/protocol/**/*", "src/chrome/**/*"],
   "exclude": ["node_modules", "dist", "src/native/**/*", "**/*.test.ts"]
 }

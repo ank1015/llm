@@ -1,7 +1,7 @@
 {
   "name": "@ank1015/llm-extension",
   "version": "0.0.1",
-  "description": "Chrome extension and native messaging host for LLM interactions",
+  "description": "Chrome extension with general-purpose native messaging RPC",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -23,15 +23,11 @@
     "dev:chrome": "tsx esbuild.config.ts --watch",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e:install": "bash manifests/install-e2e-host.sh",
+    "test:e2e:results": "cat /tmp/chrome-rpc-e2e-results.json",
+    "test:e2e:restore": "bash manifests/install-host.sh",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.chrome.json",
     "clean": "rm -rf dist *.tsbuildinfo"
-  },
-  "dependencies": {
-    "@ank1015/llm-memory": "workspace:^",
-    "@ank1015/llm-sdk": "workspace:^",
-    "@ank1015/llm-sdk-adapters": "workspace:^",
-    "@ank1015/llm-types": "workspace:^",
-    "@sinclair/typebox": "^0.34.48"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.287",
