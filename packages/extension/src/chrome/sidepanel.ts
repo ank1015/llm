@@ -12,8 +12,6 @@ interface PromptMessage {
   message: string;
   tabId: number;
   tabUrl: string;
-  api: string;
-  modelId: string;
   sessionId?: string | undefined;
 }
 
@@ -86,7 +84,6 @@ const messagesEl = document.getElementById('messages')!;
 const inputEl = document.getElementById('input') as HTMLTextAreaElement;
 const sendBtn = document.getElementById('send-btn') as HTMLButtonElement;
 const form = document.getElementById('input-form') as HTMLFormElement;
-const modelSelect = document.getElementById('model-select') as HTMLSelectElement;
 const statusEl = document.getElementById('status')!;
 const newSessionBtn = document.getElementById('new-session-btn')!;
 const historyBtn = document.getElementById('history-btn')!;
@@ -500,13 +497,6 @@ async function sendPrompt(): Promise<void> {
     return;
   }
 
-  // Parse model selection
-  const [api, modelId] = modelSelect.value.split(':');
-  if (!api || !modelId) {
-    showError('Invalid model selection.');
-    return;
-  }
-
   // Save metadata for when we get the sessionId back
   pendingPromptMeta = {
     url: tab.url ?? 'unknown',
@@ -526,8 +516,6 @@ async function sendPrompt(): Promise<void> {
     message,
     tabId: tab.id,
     tabUrl: tab.url ?? 'unknown',
-    api,
-    modelId,
     sessionId,
   };
 
@@ -542,12 +530,6 @@ async function startSession(): Promise<void> {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) {
     showError('No active tab found.');
-    return;
-  }
-
-  const [api, modelId] = modelSelect.value.split(':');
-  if (!api || !modelId) {
-    showError('Invalid model selection.');
     return;
   }
 
@@ -567,8 +549,6 @@ async function startSession(): Promise<void> {
     message: autoMessage,
     tabId: tab.id,
     tabUrl: tab.url ?? 'unknown',
-    api,
-    modelId,
     sessionId,
   };
 

@@ -8,11 +8,13 @@ import {
   createFileSessionsAdapter,
 } from '@ank1015/llm-sdk-adapters';
 
+import { MODEL_API, MODEL_ID } from '../shared/config.js';
+
 import { createAgentTools } from './tools/index.js';
 
 import type { MessageDispatcher } from './dispatcher.js';
 import type { PageHtmlResponse, HighlightTextResponse } from '../shared/message.types.js';
-import type { Api, AgentEvent, Message } from '@ank1015/llm-types';
+import type { AgentEvent, Message } from '@ank1015/llm-types';
 
 const PROJECT_NAME = 'extension';
 const SESSION_PATH = '';
@@ -65,8 +67,6 @@ export interface PromptArgs {
   message: string;
   tabId: number;
   tabUrl: string;
-  api: Api;
-  modelId: string;
   sessionId?: string;
 }
 
@@ -97,10 +97,9 @@ export async function runAgentPrompt(
   dispatcher: MessageDispatcher,
   requestId: string
 ): Promise<PromptResult> {
-  // modelId comes as a string from the extension — safe to widen since we check for undefined
-  const model = getModel(args.api, args.modelId as Parameters<typeof getModel>[1]);
+  const model = getModel(MODEL_API, MODEL_ID);
   if (!model) {
-    throw new Error(`Unknown model: ${args.api}/${args.modelId}`);
+    throw new Error(`Unknown model: ${MODEL_API}/${MODEL_ID}`);
   }
 
   // Ensure we have a sessionId — create one if this is a new conversation
@@ -182,7 +181,7 @@ export async function runAgentPrompt(
     });
   });
 
-  log(`running prompt (model=${args.modelId}, session=${sessionId})`);
+  log(`running prompt (model=${MODEL_ID}, session=${sessionId})`);
   const newMessages = await conversation.prompt(args.message);
   log(`prompt complete, ${newMessages.length} new messages`);
 

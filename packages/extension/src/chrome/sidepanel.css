@@ -65,15 +65,6 @@ header h1 {
   border-color: #007aff;
 }
 
-#model-select {
-  font-size: 12px;
-  padding: 4px 8px;
-  border: 1px solid #d0d0d0;
-  border-radius: 4px;
-  background: #f9f9f9;
-  cursor: pointer;
-}
-
 /* History panel */
 #history-panel {
   background: #fff;

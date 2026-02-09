@@ -18,11 +18,11 @@ async function handleExecute(
     switch (command) {
       case 'prompt': {
         const promptArgs = args as PromptArgs | undefined;
-        if (!promptArgs?.message || !promptArgs.tabId || !promptArgs.api || !promptArgs.modelId) {
+        if (!promptArgs?.message || !promptArgs.tabId) {
           dispatcher.send({
             type: 'error',
             requestId: message.requestId,
-            error: 'Missing required fields: message, tabId, api, modelId',
+            error: 'Missing required fields: message, tabId',
           });
           return;
         }
