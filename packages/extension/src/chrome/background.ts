@@ -1,328 +1,202 @@
 /**
- * Background service worker — bridges the side panel UI and native messaging host.
+ * Background service worker — thin RPC proxy for native messaging.
  *
- * Handles:
- *  - Side panel connections (chrome.runtime.onConnect)
- *  - Native host communication (chrome.runtime.connectNative)
- *  - getPageHtml requests from native host (chrome.scripting.executeScript)
- *  - Forwarding agent events to the side panel
+ * Receives call/subscribe/unsubscribe messages from the native host,
+ * executes the corresponding Chrome API, and sends back results/errors/events.
  */
 
-import { NATIVE_HOST_NAME } from '../shared/protocol.constants.js';
+import { NATIVE_HOST_NAME } from '../protocol/constants.js';
 
 import type {
-  ExtensionMessage,
-  NativeOutbound,
-  GetPageHtmlRequest,
-  HighlightTextRequest,
-} from '../shared/message.types.js';
+  HostMessage,
+  CallMessage,
+  SubscribeMessage,
+  UnsubscribeMessage,
+  ChromeMessage,
+} from '../protocol/types.js';
 
 // ── State ───────────────────────────────────────────────────────────
 
 let nativePort: chrome.runtime.Port | null = null;
-let panelPort: chrome.runtime.Port | null = null;
+
+interface ActiveSubscription {
+  target: chrome.events.Event<(...args: unknown[]) => void>;
+  listener: (...args: unknown[]) => void;
+}
+
+const subscriptions = new Map<string, ActiveSubscription>();
 
 // ── Native host connection ──────────────────────────────────────────
 
 function connectNative(): chrome.runtime.Port {
   const port = chrome.runtime.connectNative(NATIVE_HOST_NAME);
 
-  port.onMessage.addListener((message: NativeOutbound) => {
-    handleNativeMessage(message);
+  port.onMessage.addListener((message: HostMessage) => {
+    handleHostMessage(message);
   });
 
   port.onDisconnect.addListener(() => {
-    const error = chrome.runtime.lastError;
-    console.warn('[bg] native host disconnected', error?.message ?? '');
+    console.warn('[bg] native host disconnected', chrome.runtime.lastError?.message ?? '');
     nativePort = null;
+    subscriptions.clear();
   });
 
   nativePort = port;
   return port;
 }
 
-function sendToNative(message: ExtensionMessage | Record<string, unknown>): void {
-  const port = nativePort ?? connectNative();
-  port.postMessage(message);
+function sendToHost(message: ChromeMessage): void {
+  nativePort?.postMessage(message);
 }
 
-// ── Handle messages from native host ────────────────────────────────
+// ── Message routing ─────────────────────────────────────────────────
 
-function handleNativeMessage(message: NativeOutbound): void {
+function handleHostMessage(message: HostMessage): void {
   switch (message.type) {
-    case 'pong':
-      console.log(`[bg] pong (requestId=${message.requestId})`);
+    case 'call':
+      handleCall(message);
       break;
-
-    case 'agentEvent':
-      // Forward event to side panel
-      panelPort?.postMessage({
-        type: 'agentEvent',
-        requestId: message.requestId,
-        event: message.event,
-      });
+    case 'subscribe':
+      handleSubscribe(message);
       break;
-
-    case 'success':
-      console.log(`[bg] success (requestId=${message.requestId})`);
-      panelPort?.postMessage({
-        type: 'result',
-        requestId: message.requestId,
-        data: message.data,
-      });
+    case 'unsubscribe':
+      handleUnsubscribe(message);
       break;
-
-    case 'error':
-      console.error(`[bg] error (requestId=${message.requestId}): ${message.error}`);
-      panelPort?.postMessage({
-        type: 'error',
-        requestId: message.requestId,
-        error: message.error,
-      });
-      break;
-
-    case 'getPageHtml':
-      handleGetPageHtml(message);
-      break;
-
-    case 'highlightText':
-      handleHighlightText(message);
-      break;
-
     default:
-      console.warn('[bg] unknown native message type:', (message as { type: string }).type);
+      console.warn('[bg] unknown message type:', (message as { type: string }).type);
   }
 }
 
-// ── getPageHtml handler ─────────────────────────────────────────────
+// ── Call handler ────────────────────────────────────────────────────
 
-async function handleGetPageHtml(request: GetPageHtmlRequest): Promise<void> {
+async function handleCall(message: CallMessage): Promise<void> {
   try {
-    const results = await chrome.scripting.executeScript({
-      target: { tabId: request.tabId },
-      func: () => document.documentElement.outerHTML,
-    });
+    let result: unknown;
 
-    const html = results[0]?.result;
-    if (typeof html !== 'string') {
-      throw new Error('Failed to extract page HTML');
+    if (message.method === 'scripting.executeScript' && hasCodeArg(message.args)) {
+      result = await executeScriptWithCode(message.args);
+    } else {
+      const fn = resolveMethod(message.method);
+      result = await fn(...message.args);
     }
 
-    sendToNative({
-      type: 'pageHtml',
-      requestId: request.requestId,
-      html,
-    });
+    sendToHost({ id: message.id, type: 'result', data: result });
   } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    console.error(`[bg] getPageHtml failed: ${errorMsg}`);
-    sendToNative({
-      type: 'pageHtmlError',
-      requestId: request.requestId,
-      error: errorMsg,
+    sendToHost({
+      id: message.id,
+      type: 'error',
+      error: error instanceof Error ? error.message : String(error),
     });
   }
 }
 
-// ── highlightText handler ──────────────────────────────────────────
+// ── scripting.executeScript special case ────────────────────────────
 
-async function handleHighlightText(request: HighlightTextRequest): Promise<void> {
+/**
+ * Handles executeScript calls where the host passes a `code` string
+ * instead of a function reference (which can't be serialized over JSON).
+ *
+ * The code runs in the page's MAIN world by default, where new Function()
+ * is available on most pages.
+ */
+
+function hasCodeArg(args: unknown[]): boolean {
+  return (
+    args.length > 0 &&
+    typeof args[0] === 'object' &&
+    args[0] !== null &&
+    'code' in (args[0] as Record<string, unknown>)
+  );
+}
+
+async function executeScriptWithCode(args: unknown[]): Promise<unknown> {
+  const { code, target, world, ...rest } = args[0] as {
+    code: string;
+    target: chrome.scripting.InjectionTarget;
+    world?: string;
+    [key: string]: unknown;
+  };
+
+  return chrome.scripting.executeScript({
+    ...rest,
+    target,
+    world: (world as chrome.scripting.ExecutionWorld) ?? 'MAIN',
+    // func is serialized by Chrome and executed in the TAB context (not the service worker).
+    // eval is allowed in MAIN world under the page's CSP.
+     
+    func: (codeStr: string) => eval(codeStr),
+    args: [code],
+  });
+}
+
+// ── Method resolver ─────────────────────────────────────────────────
+
+function resolveMethod(method: string): (...args: unknown[]) => unknown {
+  const parts = method.split('.');
+  let target: unknown = chrome;
+  let parent: unknown = chrome;
+
+  for (const part of parts) {
+    parent = target;
+    target = (target as Record<string, unknown>)[part];
+    if (target === undefined) {
+      throw new Error(`chrome.${method} is not available`);
+    }
+  }
+
+  if (typeof target !== 'function') {
+    throw new Error(`chrome.${method} is not a function`);
+  }
+
+  return (target as (...args: unknown[]) => unknown).bind(parent);
+}
+
+// ── Subscribe handler ───────────────────────────────────────────────
+
+function handleSubscribe(message: SubscribeMessage): void {
   try {
-    const results = await chrome.scripting.executeScript({
-      target: { tabId: request.tabId },
-      args: [request.text],
-      func: (searchText: string) => {
-        // Clear previous highlights from this tool
-        const previousMarks = document.querySelectorAll('mark[data-llm-highlight]');
-        for (const mark of previousMarks) {
-          const parent = mark.parentNode;
-          if (parent) {
-            parent.replaceChild(document.createTextNode(mark.textContent ?? ''), mark);
-            parent.normalize();
-          }
-        }
+    const parts = message.event.split('.');
+    let target: unknown = chrome;
 
-        // Collect all text nodes and their positions in a concatenated string
-        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
-        const textNodes: { node: Text; start: number }[] = [];
-        let fullText = '';
-
-        let current: Text | null;
-        while ((current = walker.nextNode() as Text | null)) {
-          textNodes.push({ node: current, start: fullText.length });
-          fullText += current.textContent ?? '';
-        }
-
-        // Find match — case-sensitive first, then case-insensitive fallback
-        let matchIndex = fullText.indexOf(searchText);
-        if (matchIndex === -1) {
-          matchIndex = fullText.toLowerCase().indexOf(searchText.toLowerCase());
-        }
-        if (matchIndex === -1) {
-          return {
-            success: false as const,
-            error: `Text not found on page: "${searchText.slice(0, 100)}"`,
-          };
-        }
-
-        const matchEnd = matchIndex + searchText.length;
-
-        // Build a Range spanning the matched text (may cross DOM nodes)
-        const range = document.createRange();
-        let rangeStartSet = false;
-
-        for (const tn of textNodes) {
-          const nodeLength = tn.node.textContent?.length ?? 0;
-          const nodeEnd = tn.start + nodeLength;
-
-          if (!rangeStartSet && nodeEnd > matchIndex) {
-            range.setStart(tn.node, matchIndex - tn.start);
-            rangeStartSet = true;
-          }
-          if (rangeStartSet && nodeEnd >= matchEnd) {
-            range.setEnd(tn.node, matchEnd - tn.start);
-            break;
-          }
-        }
-
-        // Wrap in a highlight <mark> element
-        const mark = document.createElement('mark');
-        mark.setAttribute('data-llm-highlight', 'true');
-        mark.style.backgroundColor = '#FFEB3B';
-        mark.style.color = '#000';
-        mark.style.padding = '2px 0';
-        mark.style.borderRadius = '2px';
-        mark.style.boxShadow = '0 0 0 2px rgba(255, 235, 59, 0.4)';
-
-        try {
-          range.surroundContents(mark);
-        } catch {
-          // surroundContents fails if range crosses element boundaries —
-          // fall back to extracting and re-inserting contents.
-          const fragment = range.extractContents();
-          mark.appendChild(fragment);
-          range.insertNode(mark);
-        }
-
-        mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-        return { success: true as const, highlightedText: mark.textContent ?? searchText };
-      },
-    });
-
-    const result = results[0]?.result as
-      | { success: true; highlightedText: string }
-      | { success: false; error: string }
-      | undefined;
-
-    if (!result) {
-      throw new Error('Failed to execute highlight script');
+    for (const part of parts) {
+      target = (target as Record<string, unknown>)[part];
+      if (target === undefined) {
+        throw new Error(`chrome.${message.event} is not available`);
+      }
     }
 
-    if (!result.success) {
-      sendToNative({
-        type: 'highlightTextError',
-        requestId: request.requestId,
-        error: result.error,
-      });
-      return;
+    const eventTarget = target as chrome.events.Event<(...args: unknown[]) => void>;
+
+    if (typeof eventTarget.addListener !== 'function') {
+      throw new Error(`chrome.${message.event} is not an event`);
     }
 
-    sendToNative({
-      type: 'highlightTextResult',
-      requestId: request.requestId,
-      highlightedText: result.highlightedText,
-    });
+    const listener = (...args: unknown[]): void => {
+      sendToHost({ id: message.id, type: 'event', data: args });
+    };
+
+    eventTarget.addListener(listener);
+    subscriptions.set(message.id, { target: eventTarget, listener });
   } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    console.error(`[bg] highlightText failed: ${errorMsg}`);
-    sendToNative({
-      type: 'highlightTextError',
-      requestId: request.requestId,
-      error: errorMsg,
+    sendToHost({
+      id: message.id,
+      type: 'error',
+      error: error instanceof Error ? error.message : String(error),
     });
   }
 }
 
-// ── Side panel connection ───────────────────────────────────────────
+// ── Unsubscribe handler ─────────────────────────────────────────────
 
-interface PanelPromptMessage {
-  type: 'prompt';
-  message: string;
-  tabId: number;
-  tabUrl: string;
-  sessionId?: string;
-}
-
-interface PanelLoadSessionMessage {
-  type: 'loadSession';
-  sessionId: string;
-}
-
-type PanelMessage = PanelPromptMessage | PanelLoadSessionMessage;
-
-chrome.runtime.onConnect.addListener((port) => {
-  if (port.name !== 'sidepanel') return;
-
-  panelPort = port;
-
-  port.onMessage.addListener((msg: PanelMessage) => {
-    switch (msg.type) {
-      case 'prompt':
-        handlePanelPrompt(msg);
-        break;
-      case 'loadSession':
-        handlePanelLoadSession(msg);
-        break;
-    }
-  });
-
-  port.onDisconnect.addListener(() => {
-    panelPort = null;
-  });
-});
-
-function generateRequestId(prefix: string): string {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function handlePanelPrompt(msg: PanelPromptMessage): void {
-  sendToNative({
-    type: 'execute',
-    requestId: generateRequestId('prompt'),
-    payload: {
-      command: 'prompt',
-      args: {
-        message: msg.message,
-        tabId: msg.tabId,
-        tabUrl: msg.tabUrl,
-        sessionId: msg.sessionId,
-      },
-    },
-  });
-}
-
-function handlePanelLoadSession(msg: PanelLoadSessionMessage): void {
-  sendToNative({
-    type: 'execute',
-    requestId: generateRequestId('load'),
-    payload: {
-      command: 'loadSession',
-      args: { sessionId: msg.sessionId },
-    },
-  });
-}
-
-// ── Extension action ────────────────────────────────────────────────
-
-// Open side panel when toolbar icon is clicked
-chrome.action.onClicked.addListener((tab) => {
-  if (tab.id) {
-    chrome.sidePanel.open({ tabId: tab.id });
+function handleUnsubscribe(message: UnsubscribeMessage): void {
+  const sub = subscriptions.get(message.id);
+  if (sub) {
+    sub.target.removeListener(sub.listener);
+    subscriptions.delete(message.id);
   }
-});
+}
 
 // ── Startup ─────────────────────────────────────────────────────────
 
 console.log('[bg] background service worker loaded');
-sendToNative({ type: 'ping', requestId: 'init-ping' });
+connectNative();
