@@ -14,10 +14,13 @@ export type {
   // Native → Extension (requests)
   NativeRequest,
   GetPageHtmlRequest,
+  HighlightTextRequest,
   // Extension → Native (responses to native requests)
   ExtensionResponse,
   PageHtmlResponse,
   PageHtmlErrorResponse,
+  HighlightTextResponse,
+  HighlightTextErrorResponse,
   // Aggregate types
   NativeInbound,
   NativeOutbound,
@@ -37,6 +40,10 @@ export { MessageDispatcher } from './native/dispatcher.js';
 export type { DispatcherOptions } from './native/dispatcher.js';
 
 // Agent tools
-export { createAgentTools, createExtractPageMarkdownTool } from './native/tools/index.js';
+export {
+  createAgentTools,
+  createExtractPageMarkdownTool,
+  createHighlightTextTool,
+} from './native/tools/index.js';
 
-export type { CreateAgentToolsConfig, GetPageHtml } from './native/tools/index.js';
+export type { CreateAgentToolsConfig, GetPageHtml, HighlightText } from './native/tools/index.js';

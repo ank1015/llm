@@ -55,8 +55,15 @@ export interface GetPageHtmlRequest {
   tabId: number;
 }
 
+export interface HighlightTextRequest {
+  type: 'highlightText';
+  requestId: string;
+  tabId: number;
+  text: string;
+}
+
 /** Requests the native host initiates towards the extension */
-export type NativeRequest = GetPageHtmlRequest;
+export type NativeRequest = GetPageHtmlRequest | HighlightTextRequest;
 
 // ── Extension → Native Host (responses to native-initiated requests)
 
@@ -72,8 +79,24 @@ export interface PageHtmlErrorResponse {
   error: string;
 }
 
+export interface HighlightTextResponse {
+  type: 'highlightTextResult';
+  requestId: string;
+  highlightedText: string;
+}
+
+export interface HighlightTextErrorResponse {
+  type: 'highlightTextError';
+  requestId: string;
+  error: string;
+}
+
 /** Responses the extension sends back to native-initiated requests */
-export type ExtensionResponse = PageHtmlResponse | PageHtmlErrorResponse;
+export type ExtensionResponse =
+  | PageHtmlResponse
+  | PageHtmlErrorResponse
+  | HighlightTextResponse
+  | HighlightTextErrorResponse;
 
 // ── Aggregate types (for reading/writing on each side) ─────────────
 

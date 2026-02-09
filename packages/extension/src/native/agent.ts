@@ -11,7 +11,7 @@ import {
 import { createAgentTools } from './tools/index.js';
 
 import type { MessageDispatcher } from './dispatcher.js';
-import type { PageHtmlResponse } from '../shared/message.types.js';
+import type { PageHtmlResponse, HighlightTextResponse } from '../shared/message.types.js';
 import type { Api, AgentEvent, Message } from '@ank1015/llm-types';
 
 const PROJECT_NAME = 'extension';
@@ -20,11 +20,13 @@ const SESSION_PATH = '';
 const SYSTEM_PROMPT = `You are a helpful AI assistant integrated into a Chrome browser extension.
 You have access to tools to:
 - Extract and read the current browser page as markdown
+- Highlight specific text on the current browser page
 - Save notes to personal knowledge memory
 - Retrieve saved notes by slug
 - Search your memory by semantic query or tags
 
 When the user asks about the current page, use extract_page_markdown to read it first.
+Use highlight_text to draw the user's attention to specific text passages on the page.
 Be concise and helpful.`;
 
 // Singleton adapters — created once for the lifetime of the native host process
@@ -106,9 +108,21 @@ export async function runAgentPrompt(
     return (response as PageHtmlResponse).html;
   };
 
+  // Build highlightText callback using the dispatcher
+  const highlightText = async (tabId: number, text: string): Promise<string> => {
+    const response = await dispatcher.request({
+      type: 'highlightText',
+      requestId: randomUUID(),
+      tabId,
+      text,
+    });
+    return (response as HighlightTextResponse).highlightedText;
+  };
+
   const tools = createAgentTools({
     tabId: args.tabId,
     getPageHtml,
+    highlightText,
     memoryStore,
   });
 

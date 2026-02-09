@@ -10,6 +10,7 @@ import type {
   ExtensionMessage,
   NativeOutbound,
   PageHtmlResponse,
+  HighlightTextResponse,
 } from '../../../src/shared/message.types.js';
 
 /** Encode an object as a length-prefixed buffer (native messaging format). */
@@ -189,6 +190,62 @@ describe('MessageDispatcher.request', () => {
     // Resolve the request so we can clean up
     pushMessage(input, { type: 'pageHtml', requestId: 'req-3', html: '' });
     await responsePromise;
+
+    input.end();
+    await runPromise;
+  });
+
+  it('should resolve when a highlightTextResult response arrives', async () => {
+    const { input, output } = createStreams();
+    const dispatcher = new MessageDispatcher({ input, output });
+
+    const runPromise = dispatcher.run(() => {});
+
+    const responsePromise = dispatcher.request({
+      type: 'highlightText',
+      requestId: 'req-hl-1',
+      tabId: 42,
+      text: 'hello world',
+    });
+
+    pushMessage(input, {
+      type: 'highlightTextResult',
+      requestId: 'req-hl-1',
+      highlightedText: 'hello world',
+    });
+
+    const response = await responsePromise;
+    expect(response).toEqual({
+      type: 'highlightTextResult',
+      requestId: 'req-hl-1',
+      highlightedText: 'hello world',
+    });
+    expect((response as HighlightTextResponse).highlightedText).toBe('hello world');
+
+    input.end();
+    await runPromise;
+  });
+
+  it('should reject when a highlightTextError response arrives', async () => {
+    const { input, output } = createStreams();
+    const dispatcher = new MessageDispatcher({ input, output });
+
+    const runPromise = dispatcher.run(() => {});
+
+    const responsePromise = dispatcher.request({
+      type: 'highlightText',
+      requestId: 'req-hl-2',
+      tabId: 99,
+      text: 'nonexistent',
+    });
+
+    pushMessage(input, {
+      type: 'highlightTextError',
+      requestId: 'req-hl-2',
+      error: 'Text not found on page: "nonexistent"',
+    });
+
+    await expect(responsePromise).rejects.toThrow('Text not found');
 
     input.end();
     await runPromise;

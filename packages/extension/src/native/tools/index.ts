@@ -1,24 +1,26 @@
-import {
-  createSaveNoteTool,
-  createGetNotesTool,
-  createSearchTool,
-} from '@ank1015/llm-memory';
+import { createSaveNoteTool, createGetNotesTool, createSearchTool } from '@ank1015/llm-memory';
 
 import { createExtractPageMarkdownTool } from './extract-page-markdown.tool.js';
+import { createHighlightTextTool } from './highlight-text.tool.js';
 
 import type { GetPageHtml } from './extract-page-markdown.tool.js';
-import type {
-  MemoryStore} from '@ank1015/llm-memory';
+import type { HighlightText } from './highlight-text.tool.js';
+import type { MemoryStore } from '@ank1015/llm-memory';
 import type { AgentTool } from '@ank1015/llm-types';
 
 export type { GetPageHtml } from './extract-page-markdown.tool.js';
 export { createExtractPageMarkdownTool } from './extract-page-markdown.tool.js';
+
+export type { HighlightText } from './highlight-text.tool.js';
+export { createHighlightTextTool } from './highlight-text.tool.js';
 
 export interface CreateAgentToolsConfig {
   /** The Chrome tab ID this agent session is bound to */
   tabId: number;
   /** Callback to fetch page HTML from the extension for a given tab */
   getPageHtml: GetPageHtml;
+  /** Callback to highlight text on the page via the extension */
+  highlightText: HighlightText;
   /** Initialized MemoryStore instance for the memory tools */
   memoryStore: MemoryStore;
 }
@@ -26,11 +28,12 @@ export interface CreateAgentToolsConfig {
 /**
  * Creates the full set of agent tools for an extension session.
  *
- * Returns 4 tools:
+ * Returns 5 tools:
  *  - save_note (memory)
  *  - get_notes (memory)
  *  - search_memory (memory)
  *  - extract_page_markdown (extension)
+ *  - highlight_text (extension)
  */
 export function createAgentTools(config: CreateAgentToolsConfig): AgentTool[] {
   // AgentTool is contravariant on TParameters — specific tool types don't assign
@@ -41,5 +44,6 @@ export function createAgentTools(config: CreateAgentToolsConfig): AgentTool[] {
     createGetNotesTool(config.memoryStore),
     createSearchTool(config.memoryStore),
     createExtractPageMarkdownTool(config.tabId, config.getPageHtml),
+    createHighlightTextTool(config.tabId, config.highlightText),
   ] as unknown as AgentTool[];
 }

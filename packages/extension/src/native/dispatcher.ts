@@ -83,7 +83,7 @@ export class MessageDispatcher {
         const pending = this.pendingRequests.get(message.requestId);
         if (pending) {
           this.pendingRequests.delete(message.requestId);
-          if (message.type === 'pageHtmlError') {
+          if (message.type === 'pageHtmlError' || message.type === 'highlightTextError') {
             pending.reject(new Error(message.error));
           } else {
             pending.resolve(message);
@@ -98,7 +98,12 @@ export class MessageDispatcher {
   }
 
   private isResponse(message: NativeInbound): message is ExtensionResponse {
-    return message.type === 'pageHtml' || message.type === 'pageHtmlError';
+    return (
+      message.type === 'pageHtml' ||
+      message.type === 'pageHtmlError' ||
+      message.type === 'highlightTextResult' ||
+      message.type === 'highlightTextError'
+    );
   }
 
   private rejectAllPending(error: Error): void {
