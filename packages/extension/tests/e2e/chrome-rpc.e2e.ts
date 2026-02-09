@@ -1,24 +1,20 @@
 /**
  * E2E test for Chrome RPC over native messaging.
  *
- * This script runs AS the native host — Chrome launches it when the
- * extension connects. It makes real Chrome API calls and verifies the results.
+ * Connects to the native host's TCP server and makes real Chrome API
+ * calls against a running Chrome instance with the extension installed.
  *
- * Usage:
+ * Prerequisites:
  *   1. pnpm build
- *   2. pnpm test:e2e:install <extension-id>
- *   3. Reload the extension in Chrome (chrome://extensions → refresh icon)
- *   4. pnpm test:e2e:results
+ *   2. ./manifests/install-host.sh <extension-id>
+ *   3. Restart Chrome (first time only)
+ *   4. Extension loaded and native host running
  *
- * Or run directly (if the install already points to this script):
+ * Run:
  *   pnpm test:e2e
  */
 
-import { writeFileSync } from 'node:fs';
-
-import { ChromeClient } from '../../src/sdk/client.js';
-
-const RESULTS_PATH = '/tmp/chrome-rpc-e2e-results.json';
+import { connect } from '../../src/sdk/connect.js';
 
 interface TestResult {
   name: string;
@@ -44,19 +40,19 @@ async function test(
 }
 
 async function main(): Promise<void> {
-  log('starting e2e tests');
+  log('connecting to Chrome RPC server...');
 
-  const client = new ChromeClient();
-  client.run().catch((e) => {
-    log(`read loop error: ${e instanceof Error ? e.message : String(e)}`);
-  });
+  const port = process.env.CHROME_RPC_PORT ? parseInt(process.env.CHROME_RPC_PORT, 10) : undefined;
+
+  const chrome = await connect({ port });
+  log('connected');
 
   const results: TestResult[] = [];
 
   // ── Test: tabs.query returns an array ───────────────────────────
   results.push(
     await test('tabs.query returns an array', async () => {
-      const tabs = await client.call('tabs.query', {});
+      const tabs = await chrome.call('tabs.query', {});
       return { pass: Array.isArray(tabs), data: `${(tabs as unknown[]).length} tabs` };
     })
   );
@@ -64,7 +60,7 @@ async function main(): Promise<void> {
   // ── Test: tabs.query with filter returns active tab ─────────────
   results.push(
     await test('tabs.query with filter returns active tab', async () => {
-      const tabs = (await client.call('tabs.query', {
+      const tabs = (await chrome.call('tabs.query', {
         active: true,
         currentWindow: true,
       })) as { id: number; url?: string }[];
@@ -78,14 +74,14 @@ async function main(): Promise<void> {
   // ── Test: tabs.get with valid tab ID ────────────────────────────
   results.push(
     await test('tabs.get with valid tab ID', async () => {
-      const tabs = (await client.call('tabs.query', {
+      const tabs = (await chrome.call('tabs.query', {
         active: true,
         currentWindow: true,
       })) as { id: number }[];
       const tabId = tabs[0]?.id;
       if (!tabId) return { pass: false, data: 'No active tab found' };
 
-      const tab = (await client.call('tabs.get', tabId)) as { id: number; url?: string };
+      const tab = (await chrome.call('tabs.get', tabId)) as { id: number; url?: string };
       return { pass: tab.id === tabId, data: { id: tab.id, url: tab.url } };
     })
   );
@@ -93,14 +89,14 @@ async function main(): Promise<void> {
   // ── Test: scripting.executeScript with code string ──────────────
   results.push(
     await test('scripting.executeScript returns page title', async () => {
-      const tabs = (await client.call('tabs.query', {
+      const tabs = (await chrome.call('tabs.query', {
         active: true,
         currentWindow: true,
       })) as { id: number }[];
       const tabId = tabs[0]?.id;
       if (!tabId) return { pass: false, data: 'No active tab found' };
 
-      const result = (await client.call('scripting.executeScript', {
+      const result = (await chrome.call('scripting.executeScript', {
         target: { tabId },
         code: 'document.title',
       })) as { result: unknown }[];
@@ -115,14 +111,14 @@ async function main(): Promise<void> {
   // ── Test: scripting.executeScript complex expression ─────────────
   results.push(
     await test('scripting.executeScript evaluates expressions', async () => {
-      const tabs = (await client.call('tabs.query', {
+      const tabs = (await chrome.call('tabs.query', {
         active: true,
         currentWindow: true,
       })) as { id: number }[];
       const tabId = tabs[0]?.id;
       if (!tabId) return { pass: false, data: 'No active tab found' };
 
-      const result = (await client.call('scripting.executeScript', {
+      const result = (await chrome.call('scripting.executeScript', {
         target: { tabId },
         code: '({ url: location.href, nodeCount: document.querySelectorAll("*").length })',
       })) as { result: unknown }[];
@@ -138,7 +134,7 @@ async function main(): Promise<void> {
   results.push(
     await test('invalid method returns error', async () => {
       try {
-        await client.call('nonexistent.fakeMethod');
+        await chrome.call('nonexistent.fakeMethod');
         return { pass: false, data: 'Should have thrown' };
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -151,11 +147,10 @@ async function main(): Promise<void> {
   results.push(
     await test('storage.local set and get', async () => {
       const testKey = '__e2e_test_' + Date.now();
-      await client.call('storage.local.set', { [testKey]: 'hello' });
-      const data = (await client.call('storage.local.get', testKey)) as Record<string, string>;
+      await chrome.call('storage.local.set', { [testKey]: 'hello' });
+      const data = (await chrome.call('storage.local.get', testKey)) as Record<string, string>;
       const pass = data[testKey] === 'hello';
-      // Clean up
-      await client.call('storage.local.remove', testKey);
+      await chrome.call('storage.local.remove', testKey);
       return { pass, data };
     })
   );
@@ -164,7 +159,7 @@ async function main(): Promise<void> {
   results.push(
     await test('subscribe and unsubscribe without error', async () => {
       const events: unknown[] = [];
-      const unsubscribe = client.subscribe('tabs.onActivated', (data) => events.push(data));
+      const unsubscribe = chrome.subscribe('tabs.onActivated', (data) => events.push(data));
       await new Promise((r) => setTimeout(r, 200));
       unsubscribe();
       return { pass: true, data: `received ${events.length} events during wait` };
@@ -188,9 +183,6 @@ async function main(): Promise<void> {
   }
 
   log('='.repeat(60));
-
-  writeFileSync(RESULTS_PATH, JSON.stringify({ results, summary: { passed, failed } }, null, 2));
-  log(`Results written to ${RESULTS_PATH}`);
 
   process.exit(failed > 0 ? 1 : 0);
 }

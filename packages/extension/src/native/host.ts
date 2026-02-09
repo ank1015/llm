@@ -1,4 +1,7 @@
-import { createChromeClient } from '../sdk/index.js';
+import { DEFAULT_PORT } from '../protocol/constants.js';
+import { ChromeClient } from '../sdk/client.js';
+
+import { ChromeServer } from './server.js';
 
 function log(msg: string): void {
   process.stderr.write(`[host] ${msg}\n`);
@@ -6,6 +9,12 @@ function log(msg: string): void {
 
 log(`started (pid=${process.pid})`);
 
-// Create the client and start the read loop.
-// The process stays alive as long as Chrome keeps the native messaging port open.
-createChromeClient();
+const client = new ChromeClient();
+client.run().catch((e) => {
+  log(`fatal: ${e instanceof Error ? e.message : String(e)}`);
+  process.exit(1);
+});
+
+const port = process.env.CHROME_RPC_PORT ? parseInt(process.env.CHROME_RPC_PORT, 10) : DEFAULT_PORT;
+
+new ChromeServer(client, { port });

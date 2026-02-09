@@ -6,3 +6,6 @@ export const MAX_MESSAGE_SIZE_BYTES = 1024 * 1024;
 
 /** Byte length of the uint32 LE length prefix. */
 export const LENGTH_PREFIX_BYTES = 4;
+
+/** Default TCP port for the Chrome RPC server. */
+export const DEFAULT_PORT = 9222;

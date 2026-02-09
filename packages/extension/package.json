@@ -23,9 +23,7 @@
     "dev:chrome": "tsx esbuild.config.ts --watch",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e:install": "bash manifests/install-e2e-host.sh",
-    "test:e2e:results": "cat /tmp/chrome-rpc-e2e-results.json",
-    "test:e2e:restore": "bash manifests/install-host.sh",
+    "test:e2e": "tsx tests/e2e/chrome-rpc.e2e.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.chrome.json",
     "clean": "rm -rf dist *.tsbuildinfo"
   },

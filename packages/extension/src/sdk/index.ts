@@ -5,6 +5,9 @@ import type { ChromeClientOptions } from './client.js';
 export { ChromeClient } from './client.js';
 export type { ChromeClientOptions } from './client.js';
 
+export { connect } from './connect.js';
+export type { ConnectOptions } from './connect.js';
+
 /**
  * Create a ChromeClient and start the read loop.
  *
