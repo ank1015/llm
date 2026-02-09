@@ -8,4 +8,4 @@ export const MAX_MESSAGE_SIZE_BYTES = 1024 * 1024;
 export const LENGTH_PREFIX_BYTES = 4;
 
 /** Default TCP port for the Chrome RPC server. */
-export const DEFAULT_PORT = 9222;
+export const DEFAULT_PORT = 9224;

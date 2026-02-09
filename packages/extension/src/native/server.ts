@@ -40,6 +40,10 @@ export class ChromeServer {
       this.handleConnection(socket);
     });
 
+    this.server.on('error', (err) => {
+      process.stderr.write(`[server] error: ${err.message}\n`);
+    });
+
     this.server.listen(port, host, () => {
       process.stderr.write(`[server] listening on ${host}:${port}\n`);
     });
