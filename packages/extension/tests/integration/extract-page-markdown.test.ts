@@ -27,15 +27,16 @@ describe.skipIf(!serviceAvailable)('extract_page_markdown (integration)', () => 
       </body></html>
     `;
     const getPageHtml = async () => html;
-    const tool = createExtractPageMarkdownTool(1, getPageHtml);
+    const tool = createExtractPageMarkdownTool(1, 'https://test.com/page', getPageHtml);
 
     const result = await tool.execute('call-1', {});
-    const markdown = (result.content[0] as { type: 'text'; content: string }).content;
+    const content = (result.content[0] as { type: 'text'; content: string }).content;
 
-    expect(markdown).toContain('Hello World');
-    expect(markdown).toContain('test');
-    expect(markdown).toContain('Item one');
-    expect(markdown).toContain('Item two');
+    expect(content).toContain('Source: https://test.com/page');
+    expect(content).toContain('Hello World');
+    expect(content).toContain('test');
+    expect(content).toContain('Item one');
+    expect(content).toContain('Item two');
   });
 
   it('should handle a page with links and images', async () => {
@@ -47,7 +48,7 @@ describe.skipIf(!serviceAvailable)('extract_page_markdown (integration)', () => 
       </body></html>
     `;
     const getPageHtml = async () => html;
-    const tool = createExtractPageMarkdownTool(5, getPageHtml);
+    const tool = createExtractPageMarkdownTool(5, 'https://test.com/links', getPageHtml);
 
     const result = await tool.execute('call-2', {});
     const markdown = (result.content[0] as { type: 'text'; content: string }).content;
@@ -59,10 +60,15 @@ describe.skipIf(!serviceAvailable)('extract_page_markdown (integration)', () => 
   it('should return details with lengths', async () => {
     const html = '<p>Short</p>';
     const getPageHtml = async () => html;
-    const tool = createExtractPageMarkdownTool(10, getPageHtml);
+    const tool = createExtractPageMarkdownTool(10, 'https://test.com/short', getPageHtml);
 
     const result = await tool.execute('call-3', {});
-    const details = result.details as { tabId: number; htmlLength: number; markdownLength: number };
+    const details = result.details as {
+      tabId: number;
+      tabUrl: string;
+      htmlLength: number;
+      markdownLength: number;
+    };
 
     expect(details.tabId).toBe(10);
     expect(details.htmlLength).toBe(html.length);

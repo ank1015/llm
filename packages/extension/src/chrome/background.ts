@@ -250,6 +250,7 @@ interface PanelPromptMessage {
   type: 'prompt';
   message: string;
   tabId: number;
+  tabUrl: string;
   api: string;
   modelId: string;
   sessionId?: string;
@@ -296,6 +297,7 @@ function handlePanelPrompt(msg: PanelPromptMessage): void {
       args: {
         message: msg.message,
         tabId: msg.tabId,
+        tabUrl: msg.tabUrl,
         api: msg.api,
         modelId: msg.modelId,
         sessionId: msg.sessionId,

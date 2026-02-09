@@ -17,6 +17,8 @@ export { createHighlightTextTool } from './highlight-text.tool.js';
 export interface CreateAgentToolsConfig {
   /** The Chrome tab ID this agent session is bound to */
   tabId: number;
+  /** The URL of the tab this session is bound to */
+  tabUrl: string;
   /** Callback to fetch page HTML from the extension for a given tab */
   getPageHtml: GetPageHtml;
   /** Callback to highlight text on the page via the extension */
@@ -43,7 +45,7 @@ export function createAgentTools(config: CreateAgentToolsConfig): AgentTool[] {
     createSaveNoteTool(config.memoryStore),
     createGetNotesTool(config.memoryStore),
     createSearchTool(config.memoryStore),
-    createExtractPageMarkdownTool(config.tabId, config.getPageHtml),
+    createExtractPageMarkdownTool(config.tabId, config.tabUrl, config.getPageHtml),
     createHighlightTextTool(config.tabId, config.highlightText),
   ] as unknown as AgentTool[];
 }

@@ -11,6 +11,7 @@ interface PromptMessage {
   type: 'prompt';
   message: string;
   tabId: number;
+  tabUrl: string;
   api: string;
   modelId: string;
   sessionId?: string | undefined;
@@ -92,6 +93,8 @@ const historyBtn = document.getElementById('history-btn')!;
 const historyPanel = document.getElementById('history-panel')!;
 const historyList = document.getElementById('history-list')!;
 const historyEmpty = document.getElementById('history-empty')!;
+const startView = document.getElementById('start-view')!;
+const startBtn = document.getElementById('start-btn')!;
 
 // ── State ───────────────────────────────────────────────────────────
 
@@ -154,6 +157,7 @@ function handleLoadSessionResult(messages: StoredMessage[]): void {
   waitingForLoadSession = false;
   messagesEl.innerHTML = '';
   renderStoredMessages(messages);
+  hideStartView();
   onPromptComplete();
 }
 
@@ -458,10 +462,11 @@ function closeHistoryPanel(): void {
 function newSession(): void {
   sessionId = undefined;
   messagesEl.innerHTML = '';
+  messagesEl.appendChild(startView);
+  showStartView();
   currentAssistantEl = null;
   closeHistoryPanel();
   clearStatus();
-  inputEl.focus();
 }
 
 function loadSession(targetSessionId: string): void {
@@ -509,6 +514,7 @@ async function sendPrompt(): Promise<void> {
   };
 
   // Show user message and clear input
+  hideStartView();
   addMessage('user', message);
   inputEl.value = '';
   inputEl.style.height = 'auto';
@@ -519,12 +525,62 @@ async function sendPrompt(): Promise<void> {
     type: 'prompt',
     message,
     tabId: tab.id,
+    tabUrl: tab.url ?? 'unknown',
     api,
     modelId,
     sessionId,
   };
 
   port.postMessage(prompt);
+}
+
+// ── Start session (auto-summarize) ──────────────────────────────────
+
+async function startSession(): Promise<void> {
+  if (isRunning) return;
+
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) {
+    showError('No active tab found.');
+    return;
+  }
+
+  const [api, modelId] = modelSelect.value.split(':');
+  if (!api || !modelId) {
+    showError('Invalid model selection.');
+    return;
+  }
+
+  const autoMessage =
+    'Summarize this page with a section-by-section overview so I can decide where to dive deeper.';
+
+  pendingPromptMeta = {
+    url: tab.url ?? 'unknown',
+    preview: autoMessage.slice(0, 80),
+  };
+
+  hideStartView();
+  setRunning(true);
+
+  const prompt: PromptMessage = {
+    type: 'prompt',
+    message: autoMessage,
+    tabId: tab.id,
+    tabUrl: tab.url ?? 'unknown',
+    api,
+    modelId,
+    sessionId,
+  };
+
+  port.postMessage(prompt);
+}
+
+function hideStartView(): void {
+  startView.classList.add('hidden');
+}
+
+function showStartView(): void {
+  startView.classList.remove('hidden');
 }
 
 // ── Input handling ──────────────────────────────────────────────────
@@ -551,3 +607,4 @@ inputEl.addEventListener('keydown', (e) => {
 // Session buttons
 newSessionBtn.addEventListener('click', newSession);
 historyBtn.addEventListener('click', toggleHistoryPanel);
+startBtn.addEventListener('click', startSession);

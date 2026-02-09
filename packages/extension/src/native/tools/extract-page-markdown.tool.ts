@@ -23,12 +23,14 @@ const EmptyParams = Type.Object({});
 /**
  * Creates an extract_page_markdown tool bound to a specific tab.
  *
- * The tool has no LLM-facing parameters — the tab ID is pre-configured.
+ * The tool has no LLM-facing parameters — the tab ID and URL are pre-configured.
  * When invoked it fetches the page HTML from the extension, converts it
- * to markdown via the local converter service, and returns the result.
+ * to markdown via the local converter service, and returns the result
+ * with the source URL prepended.
  */
 export function createExtractPageMarkdownTool(
   tabId: number,
+  tabUrl: string,
   getPageHtml: GetPageHtml
 ): AgentTool<typeof EmptyParams> {
   return {
@@ -61,10 +63,11 @@ export function createExtractPageMarkdownTool(
       }
 
       const { markdown } = (await response.json()) as ConvertResponse;
+      const content = `Source: ${tabUrl}\n\n${markdown}`;
 
       return {
-        content: [{ type: 'text', content: markdown }],
-        details: { tabId, htmlLength: html.length, markdownLength: markdown.length },
+        content: [{ type: 'text', content }],
+        details: { tabId, tabUrl, htmlLength: html.length, markdownLength: markdown.length },
       };
     },
   };

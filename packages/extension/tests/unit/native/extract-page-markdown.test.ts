@@ -16,7 +16,7 @@ describe('extract_page_markdown tool', () => {
       json: () => Promise.resolve({ markdown: 'hello', success: true }),
     });
 
-    const tool = createExtractPageMarkdownTool(42, getPageHtml);
+    const tool = createExtractPageMarkdownTool(42, 'https://example.com', getPageHtml);
     await tool.execute('call-1', {});
 
     expect(getPageHtml).toHaveBeenCalledWith(42);
@@ -32,7 +32,7 @@ describe('extract_page_markdown tool', () => {
       json: () => Promise.resolve({ markdown: expectedMarkdown, success: true }),
     });
 
-    const tool = createExtractPageMarkdownTool(1, getPageHtml);
+    const tool = createExtractPageMarkdownTool(1, 'https://example.com', getPageHtml);
     const result = await tool.execute('call-1', {});
 
     // Verify fetch was called with correct body
@@ -44,10 +44,12 @@ describe('extract_page_markdown tool', () => {
       })
     );
 
-    // Verify result
-    expect(result.content).toEqual([{ type: 'text', content: expectedMarkdown }]);
+    // Verify result — markdown has source URL prepended
+    const expectedContent = `Source: https://example.com\n\n${expectedMarkdown}`;
+    expect(result.content).toEqual([{ type: 'text', content: expectedContent }]);
     expect(result.details).toEqual({
       tabId: 1,
+      tabUrl: 'https://example.com',
       htmlLength: html.length,
       markdownLength: expectedMarkdown.length,
     });
@@ -60,7 +62,7 @@ describe('extract_page_markdown tool', () => {
       json: () => Promise.resolve({ error: 'HTML field is required', success: false }),
     });
 
-    const tool = createExtractPageMarkdownTool(1, getPageHtml);
+    const tool = createExtractPageMarkdownTool(1, 'https://example.com', getPageHtml);
 
     await expect(tool.execute('call-1', {})).rejects.toThrow(/HTML-to-markdown conversion failed/);
   });
@@ -68,13 +70,13 @@ describe('extract_page_markdown tool', () => {
   it('should propagate getPageHtml errors', async () => {
     const getPageHtml = vi.fn().mockRejectedValue(new Error('tab not found'));
 
-    const tool = createExtractPageMarkdownTool(999, getPageHtml);
+    const tool = createExtractPageMarkdownTool(999, 'https://example.com', getPageHtml);
 
     await expect(tool.execute('call-1', {})).rejects.toThrow('tab not found');
   });
 
   it('should have correct tool metadata', () => {
-    const tool = createExtractPageMarkdownTool(1, vi.fn());
+    const tool = createExtractPageMarkdownTool(1, 'https://example.com', vi.fn());
 
     expect(tool.name).toBe('extract_page_markdown');
     expect(tool.label).toBe('Extract Page Markdown');
