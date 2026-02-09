@@ -4,6 +4,6 @@
     "outDir": "./dist",
     "rootDir": "./src"
   },
-  "include": ["src/shared/**/*", "src/native/**/*", "src/index.ts"],
+  "include": ["src/shared/**/*", "src/protocol/**/*", "src/native/**/*", "src/index.ts"],
   "exclude": ["node_modules", "dist", "src/chrome/**/*", "**/*.test.ts"]
 }
