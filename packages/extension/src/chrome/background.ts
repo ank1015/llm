@@ -73,7 +73,9 @@ async function handleCall(message: CallMessage): Promise<void> {
   try {
     let result: unknown;
 
-    if (message.method === 'scripting.executeScript' && hasCodeArg(message.args)) {
+    if (message.method === 'debugger.evaluate') {
+      result = await debuggerEvaluate(message.args);
+    } else if (message.method === 'scripting.executeScript' && hasCodeArg(message.args)) {
       result = await executeScriptWithCode(message.args);
     } else {
       const fn = resolveMethod(message.method);
@@ -123,10 +125,74 @@ async function executeScriptWithCode(args: unknown[]): Promise<unknown> {
     world: (world as chrome.scripting.ExecutionWorld) ?? 'MAIN',
     // func is serialized by Chrome and executed in the TAB context (not the service worker).
     // eval is allowed in MAIN world under the page's CSP.
-     
+
     func: (codeStr: string) => eval(codeStr),
     args: [code],
   });
+}
+
+// ── debugger.evaluate — CSP-bypassing code execution ────────────────
+
+/**
+ * Evaluates arbitrary JS in a tab via Chrome DevTools Protocol.
+ *
+ * Uses chrome.debugger to attach, run Runtime.evaluate, and detach.
+ * This bypasses page CSP because the debugger protocol operates at the
+ * browser level, not within the page's JS context.
+ *
+ * Tradeoff: shows a brief yellow "debugging" banner in the tab.
+ */
+async function debuggerEvaluate(args: unknown[]): Promise<unknown> {
+  const {
+    tabId,
+    code,
+    returnByValue = true,
+  } = args[0] as {
+    tabId: number;
+    code: string;
+    returnByValue?: boolean;
+  };
+
+  if (typeof tabId !== 'number') {
+    throw new Error('debugger.evaluate requires a numeric tabId');
+  }
+  if (typeof code !== 'string' || !code) {
+    throw new Error('debugger.evaluate requires a non-empty code string');
+  }
+
+  try {
+    await chrome.debugger.attach({ tabId }, '1.3');
+  } catch (error) {
+    throw new Error(
+      `Failed to attach debugger to tab ${tabId}: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+
+  try {
+    const response = (await chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
+      expression: code,
+      returnByValue,
+    })) as {
+      result?: { value?: unknown; type?: string };
+      exceptionDetails?: { text?: string; exception?: { description?: string } };
+    };
+
+    if (response.exceptionDetails) {
+      const detail =
+        response.exceptionDetails.exception?.description ??
+        response.exceptionDetails.text ??
+        'Unknown evaluation error';
+      throw new Error(detail);
+    }
+
+    return { result: response.result?.value, type: response.result?.type };
+  } finally {
+    try {
+      await chrome.debugger.detach({ tabId });
+    } catch {
+      // Tab may have closed — safe to ignore
+    }
+  }
 }
 
 // ── Method resolver ─────────────────────────────────────────────────
@@ -198,5 +264,5 @@ function handleUnsubscribe(message: UnsubscribeMessage): void {
 
 // ── Startup ─────────────────────────────────────────────────────────
 
-console.log('[bg] background service worker loaded');
+console.warn('[bg] background service worker loaded');
 connectNative();

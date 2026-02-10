@@ -3,7 +3,16 @@
   "name": "LLM Extension",
   "version": "0.0.1",
   "description": "Chrome extension with general-purpose native messaging RPC",
-  "permissions": ["nativeMessaging", "scripting", "activeTab", "tabs", "storage"],
+  "permissions": [
+    "nativeMessaging",
+    "scripting",
+    "activeTab",
+    "tabs",
+    "storage",
+    "debugger",
+    "accessibilityFeatures.read",
+    "accessibilityFeatures.modify"
+  ],
   "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "background.js",
