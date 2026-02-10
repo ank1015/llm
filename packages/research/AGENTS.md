@@ -1,6 +1,6 @@
 # @ank1015/llm-research
 
-Research utilities for LLM SDK.
+Browser-based research utilities. Combines the extension package (browser control) with LLM capabilities to extract structured data from web sources.
 
 ## Commands
 
@@ -17,20 +17,25 @@ pnpm clean        # Remove build artifacts
 
 ```
 src/
-  index.ts          # Public exports
-tests/
-  unit/             # Unit tests
-  integration/      # Integration tests
+  index.ts              # Public exports
+  sources/
+    index.ts            # Re-exports all sources
+    x/                  # Twitter/X source
+      index.ts          # Exports: createXSource()
+      x.source.ts       # Implementation (uses ChromeClient)
+      x.types.ts        # X-specific types (when defined)
+    <source>/           # Future sources follow same pattern
 ```
 
-## Conventions
+## Adding a New Source
 
-- Follow root AGENTS.md and CLAUDE.md conventions
-- Export all public APIs from `src/index.ts`
-- Colocate unit tests as `*.test.ts` next to source files
-- Place integration tests in `tests/integration/`
+1. Create `src/sources/<name>/` directory
+2. Create `<name>.source.ts` with a `create<Name>Source(opts)` factory
+3. Create `index.ts` barrel exporting the factory and types
+4. Re-export from `src/sources/index.ts`
+5. Each source receives a `ChromeClient` and uses browser automation to extract data
 
 ## Dependencies
 
-- Depends on: (none yet)
+- Depends on: `@ank1015/llm-extension` (browser control)
 - Depended on by: (none yet)

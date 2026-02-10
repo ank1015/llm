@@ -29,8 +29,11 @@
     "ai"
   ],
   "license": "MIT",
-  "dependencies": {},
+  "dependencies": {
+    "@ank1015/llm-extension": "workspace:^"
+  },
   "devDependencies": {
+    "tsx": "^4.19.0",
     "vitest": "^2.1.0"
   }
 }

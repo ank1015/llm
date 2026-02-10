@@ -259,7 +259,14 @@ importers:
         version: 2.1.9(@types/node@25.1.0)(lightningcss@1.30.2)
 
   packages/research:
+    dependencies:
+      '@ank1015/llm-extension':
+        specifier: workspace:^
+        version: link:../extension
     devDependencies:
+      tsx:
+        specifier: ^4.19.0
+        version: 4.21.0
       vitest:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@25.1.0)(lightningcss@1.30.2)
