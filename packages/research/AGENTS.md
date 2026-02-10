@@ -28,9 +28,14 @@ src/
       index.ts          # Exports: createRedditSource()
       reddit.source.ts  # Implementation (3 methods, 2 extraction strategies)
       reddit.types.ts   # RedditPost, RedditComment, RedditPostWithComments
+    substack/           # Substack source
+      index.ts          # Exports: createSubstackSource()
+      substack.source.ts # Implementation (2 methods)
+      substack.types.ts # SubstackPost, SubstackPostDetail
 scripts/
   x/                    # X exploration & test scripts
   reddit/               # Reddit exploration & test scripts
+  substack/             # Substack exploration & test scripts
 ```
 
 ## Sources
@@ -48,6 +53,13 @@ scripts/
 - `getPostComments({ postUrl, count? })` — post detail + threaded comments
 
 **Reddit DOM notes:** Subreddit pages use `shreddit-post` elements (data in attributes). Search pages use a different DOM (`sdui-post-unit` with `post-title-text`, `faceplate-number`, `faceplate-timeago`). Comments use `shreddit-comment` elements. All Reddit pages require `active: true` tabs (lazy rendering via IntersectionObserver).
+
+### Substack — `createSubstackSource({ chrome })`
+
+- `searchPosts({ query, count?, dateRange? })` — search across all of Substack (fixed 20 results, no infinite scroll)
+- `getPost({ url })` — full article content from a post URL, with paywall detection
+
+**Substack DOM notes:** No `data-testid` attributes — uses `reader2-*` class selectors for search, `.post-title` / `.subtitle` / `.body.markup` for post pages. Engagement counts extracted from `aria-label` on `.post-ufi-button` elements. Paywalled posts return partial body text with `isPaywalled: true`. Author links at `a[href*="/@"]` — first match is often an avatar (no text), iterate to find one with text content.
 
 ## Adding a New Source
 
