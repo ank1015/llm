@@ -5,7 +5,7 @@
  */
 import { connect } from '@ank1015/llm-extension';
 
-import { createXSource } from '../src/sources/x/index.js';
+import { createXSource } from '../../src/sources/x/index.js';
 
 async function main(): Promise<void> {
   const chrome = await connect({ launch: true });

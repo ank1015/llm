@@ -267,6 +267,8 @@ async function collectTweets(opts: CollectTweetsOptions): Promise<XTweet[]> {
   // Scroll loop
   let attempts = 0;
   let staleRounds = 0;
+  const maxStaleRecoveries = 2;
+  let recoveryAttempts = 0;
 
   while (collected.length < target && attempts < maxScrollAttempts) {
     attempts++;
@@ -292,12 +294,18 @@ async function collectTweets(opts: CollectTweetsOptions): Promise<XTweet[]> {
     if (newCount === 0) {
       staleRounds++;
       if (staleRounds >= 3) {
+        // Try a bigger scroll to recover
         await evaluate(chrome, tabId, scrollByJs(randInt(1200, 1800)));
         await humanDelay(2000, 3500);
         staleRounds = 0;
+        recoveryAttempts++;
+
+        // If recovery keeps failing, results are exhausted
+        if (recoveryAttempts >= maxStaleRecoveries) break;
       }
     } else {
       staleRounds = 0;
+      recoveryAttempts = 0;
     }
   }
 
