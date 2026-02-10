@@ -321,8 +321,12 @@ export interface GetFeedPostsParams {
 export interface SearchPostsParams {
   /** Search query */
   query: string;
-  /** Number of posts to extract */
+  /** Number of posts to extract (default 20) */
   count?: number;
+  /** Only return results after this date (YYYY-MM-DD) */
+  since?: string;
+  /** Sort order: "top" (default) or "latest" */
+  sort?: 'top' | 'latest';
 }
 
 export interface GetUserProfileParams {
@@ -336,7 +340,7 @@ export interface XSource {
   /** Extract top posts from the logged-in user's feed */
   getFeedPosts: (params?: GetFeedPostsParams) => Promise<XTweet[]>;
   /** Search posts with a query */
-  searchPosts: (params: SearchPostsParams) => Promise<unknown>;
+  searchPosts: (params: SearchPostsParams) => Promise<XTweet[]>;
   /** Get a user's profile info and their recent posts */
   getUserProfile: (params: GetUserProfileParams) => Promise<XUserProfileResult>;
 }
@@ -398,13 +402,38 @@ export function createXSource(options: XSourceOptions): XSource {
     }
   }
 
+  async function searchPosts(params: SearchPostsParams): Promise<XTweet[]> {
+    const { query, count = 20, since, sort = 'top' } = params;
+
+    // Build search query with optional date filter
+    let q = query;
+    if (since) q += ` since:${since}`;
+
+    const sortParam = sort === 'latest' ? '&f=live' : '';
+    const url = `https://x.com/search?q=${encodeURIComponent(q)}&src=typed_query${sortParam}`;
+
+    const tab = (await chrome.call('tabs.create', {
+      url,
+      active: false,
+    })) as { id: number };
+    const tabId = tab.id;
+
+    try {
+      await humanDelay(4000, 6000);
+      return await collectTweets({
+        chrome,
+        tabId,
+        target: count,
+        maxScrollAttempts: Math.max(count * 2, 30),
+      });
+    } finally {
+      await chrome.call('tabs.remove', tabId).catch(() => {});
+    }
+  }
+
   return {
     getFeedPosts,
     getUserProfile,
-
-    async searchPosts(_params: SearchPostsParams) {
-      // TODO: implement
-      throw new Error('Not implemented');
-    },
+    searchPosts,
   };
 }
