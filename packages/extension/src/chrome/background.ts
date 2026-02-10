@@ -75,6 +75,14 @@ async function handleCall(message: CallMessage): Promise<void> {
 
     if (message.method === 'debugger.evaluate') {
       result = await debuggerEvaluate(message.args);
+    } else if (message.method === 'debugger.attach') {
+      result = await debuggerAttach(message.args);
+    } else if (message.method === 'debugger.sendCommand') {
+      result = await debuggerSendCommand(message.args);
+    } else if (message.method === 'debugger.detach') {
+      result = await debuggerDetach(message.args);
+    } else if (message.method === 'debugger.getEvents') {
+      result = debuggerGetEvents(message.args);
     } else if (message.method === 'scripting.executeScript' && hasCodeArg(message.args)) {
       result = await executeScriptWithCode(message.args);
     } else {
@@ -193,6 +201,113 @@ async function debuggerEvaluate(args: unknown[]): Promise<unknown> {
       // Tab may have closed — safe to ignore
     }
   }
+}
+
+// ── General-purpose debugger session methods ────────────────────────
+
+/**
+ * Long-lived debugger sessions for CDP domains like Network, DOM, etc.
+ *
+ * Unlike debugger.evaluate (which attaches/detaches per call), these
+ * methods keep the debugger attached so CDP events can be collected.
+ *
+ *   debugger.attach      — attach to a tab (keeps session open)
+ *   debugger.sendCommand — send any CDP command to an attached tab
+ *   debugger.detach      — detach and clean up
+ *   debugger.getEvents   — return collected CDP events (optionally filtered)
+ */
+
+interface DebuggerSession {
+  events: { method: string; params: unknown }[];
+}
+
+const debuggerSessions = new Map<number, DebuggerSession>();
+
+function handleDebuggerEvent(
+  source: chrome.debugger.Debuggee,
+  method: string,
+  params?: object
+): void {
+  if (source.tabId === undefined) return;
+  const session = debuggerSessions.get(source.tabId);
+  if (session) {
+    session.events.push({ method, params: params ?? {} });
+  }
+}
+
+// Register the global listener once
+chrome.debugger.onEvent.addListener(handleDebuggerEvent);
+
+async function debuggerAttach(args: unknown[]): Promise<unknown> {
+  const { tabId } = args[0] as { tabId: number };
+
+  if (debuggerSessions.has(tabId)) {
+    return { alreadyAttached: true };
+  }
+
+  await chrome.debugger.attach({ tabId }, '1.3');
+  debuggerSessions.set(tabId, { events: [] });
+  return { attached: true };
+}
+
+async function debuggerSendCommand(args: unknown[]): Promise<unknown> {
+  const { tabId, method, params } = args[0] as {
+    tabId: number;
+    method: string;
+    params?: object;
+  };
+
+  if (!debuggerSessions.has(tabId)) {
+    throw new Error(`No debugger session for tab ${tabId} — call debugger.attach first`);
+  }
+
+  return chrome.debugger.sendCommand({ tabId }, method, params);
+}
+
+async function debuggerDetach(args: unknown[]): Promise<unknown> {
+  const { tabId } = args[0] as { tabId: number };
+
+  debuggerSessions.delete(tabId);
+
+  try {
+    await chrome.debugger.detach({ tabId });
+  } catch {
+    // Already detached or tab closed
+  }
+  return { detached: true };
+}
+
+function debuggerGetEvents(args: unknown[]): unknown {
+  const {
+    tabId,
+    filter,
+    clear = false,
+  } = args[0] as {
+    tabId: number;
+    filter?: string;
+    clear?: boolean;
+  };
+
+  const session = debuggerSessions.get(tabId);
+  if (!session) {
+    throw new Error(`No debugger session for tab ${tabId}`);
+  }
+
+  let events = session.events;
+  if (filter) {
+    events = events.filter((e) => e.method.startsWith(filter));
+  }
+
+  const result = [...events];
+  if (clear) {
+    if (filter) {
+      session.events = session.events.filter((e) => !e.method.startsWith(filter));
+    } else {
+      session.events = [];
+    }
+  }
+
+  return result;
 }
 
 // ── Method resolver ─────────────────────────────────────────────────
