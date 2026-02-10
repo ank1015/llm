@@ -26,6 +26,7 @@
     "test:e2e": "tsx tests/e2e/chrome-rpc.e2e.ts",
     "test:e2e:accessibility": "tsx tests/e2e/accessibility.e2e.ts",
     "test:e2e:cookies": "tsx tests/e2e/cookies.e2e.ts",
+    "test:e2e:debugger": "tsx tests/e2e/debugger.e2e.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.chrome.json",
     "clean": "rm -rf dist *.tsbuildinfo"
   },
