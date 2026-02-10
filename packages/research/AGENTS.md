@@ -23,17 +23,41 @@ src/
     x/                  # Twitter/X source
       index.ts          # Exports: createXSource()
       x.source.ts       # Implementation (uses ChromeClient)
-      x.types.ts        # X-specific types (when defined)
-    <source>/           # Future sources follow same pattern
+      x.types.ts        # XTweet, XProfile, XUserProfileResult
+    reddit/             # Reddit source
+      index.ts          # Exports: createRedditSource()
+      reddit.source.ts  # Implementation (3 methods, 2 extraction strategies)
+      reddit.types.ts   # RedditPost, RedditComment, RedditPostWithComments
+scripts/
+  x/                    # X exploration & test scripts
+  reddit/               # Reddit exploration & test scripts
 ```
+
+## Sources
+
+### X (Twitter) — `createXSource({ chrome })`
+
+- `getFeedPosts({ count? })` — logged-in user's feed
+- `searchPosts({ query, count?, since?, sort? })` — search with date/sort filters
+- `getUserProfile({ username, postCount? })` — profile + tweets
+
+### Reddit — `createRedditSource({ chrome })`
+
+- `getSubredditPosts({ subreddit, count?, sort?, time? })` — subreddit feed
+- `searchPosts({ query, subreddit?, count?, sort?, time? })` — global or subreddit-scoped search
+- `getPostComments({ postUrl, count? })` — post detail + threaded comments
+
+**Reddit DOM notes:** Subreddit pages use `shreddit-post` elements (data in attributes). Search pages use a different DOM (`sdui-post-unit` with `post-title-text`, `faceplate-number`, `faceplate-timeago`). Comments use `shreddit-comment` elements. All Reddit pages require `active: true` tabs (lazy rendering via IntersectionObserver).
 
 ## Adding a New Source
 
-1. Create `src/sources/<name>/` directory
-2. Create `<name>.source.ts` with a `create<Name>Source(opts)` factory
-3. Create `index.ts` barrel exporting the factory and types
+See `ADD_NEW_SOURCE_GUIDE.md` for the full walkthrough. Summary:
+
+1. Create `src/sources/<name>/` with types, source, and barrel index
+2. Write exploration scripts in `scripts/<name>/` to inspect DOM
+3. Implement with factory pattern, scroll-dedup loop, and `debugger.evaluate`
 4. Re-export from `src/sources/index.ts`
-5. Each source receives a `ChromeClient` and uses browser automation to extract data
+5. Create test scripts and verify with real browser
 
 ## Dependencies
 
