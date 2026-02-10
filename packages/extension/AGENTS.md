@@ -33,7 +33,7 @@ External Agent ── TCP :9224 ──→ Native Host ── stdin/stdout ──
 
 - **Chrome extension** (`background.ts`): RPC proxy that routes `call`/`subscribe`/`unsubscribe` messages to Chrome APIs. Includes special handlers for `debugger.*` and `scripting.executeScript` with code strings.
 - **Native host** (`host.ts`): Chrome-launched process. Runs a `ChromeClient` (stdin/stdout to Chrome) and a `ChromeServer` (TCP on port 9224).
-- **SDK** (`connect()`): external agents import this to connect via TCP. Returns a `ChromeClient` with `call()` and `subscribe()`.
+- **SDK** (`connect()`): external agents import this to connect via TCP. Returns a `ChromeClient` with `call()` and `subscribe()`. Supports `launch: true` to auto-open Chrome if not running.
 
 ## Structure
 
@@ -45,15 +45,15 @@ src/
     constants.ts            # NATIVE_HOST_NAME, MAX_MESSAGE_SIZE, LENGTH_PREFIX_BYTES, DEFAULT_PORT
   sdk/
     client.ts               # ChromeClient — call(), subscribe(), run() read loop
-    connect.ts              # connect() — TCP client, returns ChromeClient
+    connect.ts              # connect() — TCP client, auto-launch Chrome, returns ChromeClient
     index.ts                # SDK barrel exports + createChromeClient()
   native/
-    host.ts                 # Entry point — creates ChromeClient + ChromeServer
+    host.ts                 # Entry point — creates ChromeClient + ChromeServer, exits on disconnect
     server.ts               # ChromeServer — TCP server proxying through ChromeClient
     stdio.ts                # Read/write length-prefixed JSON (native messaging + TCP)
     host-wrapper.sh         # Shell wrapper Chrome executes
   chrome/
-    background.ts           # Service worker — RPC proxy + debugger session management
+    background.ts           # Service worker — RPC proxy + debugger session management + auto-reconnect
     manifest.json           # Manifest V3
 tests/
   unit/sdk/
@@ -125,7 +125,11 @@ The install script copies a wrapper to `~/.local/share/llm-native-host/` because
 ```ts
 import { connect } from '@ank1015/llm-extension';
 
-const chrome = await connect(); // TCP to localhost:9224
+// Auto-launch Chrome if not running, retry until native host is ready
+const chrome = await connect({ launch: true });
+
+// Or connect without auto-launch (throws ECONNREFUSED if Chrome is not running)
+// const chrome = await connect();
 
 // Generic Chrome API calls
 const tabs = await chrome.call('tabs.query', { active: true });
@@ -161,6 +165,9 @@ unsub(); // stop listening
 - Most `accessibilityFeatures.*` are ChromeOS-only; only `animationPolicy` works cross-platform
 - stdio functions accept injected streams for testability
 - Default TCP port: 9224 (configurable via `CHROME_RPC_PORT` env var)
+- Native host exits cleanly when Chrome disconnects (no zombie processes)
+- Service worker registers `onStartup` listener and auto-reconnects native host if port is lost
+- `connect({ launch: true })` auto-opens Chrome and retries with exponential backoff (macOS + Linux)
 
 ## Known Limitations
 
@@ -169,3 +176,4 @@ unsub(); // stop listening
 - `accessibilityFeatures` other than `animationPolicy` are ChromeOS-only
 - Adding/removing manifest permissions requires reloading the extension and possibly re-enabling it in Chrome
 - Native host manifest changes require a full Chrome restart (Cmd+Q)
+- Auto-launch (`launch: true`) supports macOS and Linux only

@@ -62,7 +62,8 @@ No disconnect error means the native host is running and the TCP server is ready
 ```ts
 import { connect } from '@ank1015/llm-extension';
 
-const chrome = await connect(); // TCP to localhost:9224
+// Auto-launch Chrome if not running, retry until native host is ready
+const chrome = await connect({ launch: true });
 
 // Query tabs
 const tabs = await chrome.call('tabs.query', { active: true, currentWindow: true });
@@ -116,9 +117,18 @@ Receive the result:
 
 Connect to the Chrome RPC server. Returns a `ChromeClient`.
 
+| Option          | Default       | Description                                         |
+| --------------- | ------------- | --------------------------------------------------- |
+| `port`          | `9224`        | TCP port to connect to                              |
+| `host`          | `'127.0.0.1'` | TCP host to connect to                              |
+| `launch`        | `false`       | Launch Chrome automatically if connection fails     |
+| `launchTimeout` | `30000`       | Max ms to wait for Chrome + native host to be ready |
+
 ```ts
 const chrome = await connect();
 const chrome = await connect({ port: 9224, host: '127.0.0.1' });
+const chrome = await connect({ launch: true }); // auto-open Chrome if not running
+const chrome = await connect({ launch: true, launchTimeout: 15000 });
 ```
 
 ### `ChromeClient.call(method, ...args)`
