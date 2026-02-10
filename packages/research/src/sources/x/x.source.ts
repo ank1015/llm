@@ -1,4 +1,4 @@
-import type { XTweet } from './x.types.js';
+import type { XProfile, XTweet, XUserProfileResult } from './x.types.js';
 import type { ChromeClient } from '@ank1015/llm-extension';
 
 // ---------------------------------------------------------------------------
@@ -31,7 +31,7 @@ function humanDelay(minMs: number, maxMs: number): Promise<void> {
 
 /**
  * Extract structured data from every tweet article currently in the DOM.
- * Returns a JSON-serialisable array.
+ * Reused across feed, profile, and search pages — tweet DOM is identical.
  */
 const EXTRACT_TWEETS_JS = `(() => {
   const articles = document.querySelectorAll('article[data-testid="tweet"]');
@@ -63,7 +63,7 @@ const EXTRACT_TWEETS_JS = `(() => {
     const tweetTextEl = article.querySelector('[data-testid="tweetText"]');
     const text = tweetTextEl?.textContent || '';
     const hasShowMore = !!article.querySelector('[data-testid="tweet-text-show-more-link"]');
-    const links2 = tweetTextEl
+    const tweetLinks = tweetTextEl
       ? Array.from(tweetTextEl.querySelectorAll('a')).map(a => ({
           text: a.textContent || '', href: a.getAttribute('href') || '',
         }))
@@ -118,7 +118,7 @@ const EXTRACT_TWEETS_JS = `(() => {
 
     return {
       tweetId, displayName, handle, isVerified, avatarUrl,
-      text, hasShowMore, links: links2, timestamp, relativeTime,
+      text, hasShowMore, links: tweetLinks, timestamp, relativeTime,
       replies: replyBtn?.textContent?.trim() || '0',
       retweets: retweetBtn?.textContent?.trim() || '0',
       likes: (likeBtn || unlikeBtn)?.textContent?.trim() || '0',
@@ -143,13 +143,165 @@ const CLICK_SHOW_MORE_JS = `(() => {
   return n;
 })()`;
 
-/** Scroll by a given pixel amount and return positions. */
+/** Scroll by a given pixel amount using smooth behaviour. */
 function scrollByJs(pixels: number): string {
   return `(() => {
     const before = window.scrollY;
     window.scrollBy({ top: ${pixels}, behavior: 'smooth' });
     return { before, after: window.scrollY, docHeight: document.body.scrollHeight };
   })()`;
+}
+
+/** Extract profile header data from the page. */
+const EXTRACT_PROFILE_JS = `(() => {
+  // --- Display name & handle ---
+  const nameEl = document.querySelector('[data-testid="UserName"]');
+  let displayName = '';
+  let handle = '';
+  if (nameEl) {
+    // Display name: innermost span with text, no child spans/svgs
+    const spans = nameEl.querySelectorAll('span');
+    for (const s of spans) {
+      const t = s.textContent?.trim();
+      if (t && !s.querySelector('span') && !s.querySelector('svg') && !t.startsWith('@')) {
+        displayName = t;
+        break;
+      }
+    }
+    // Handle: span starting with @
+    for (const s of spans) {
+      const t = s.textContent?.trim();
+      if (t && t.startsWith('@')) { handle = t; break; }
+    }
+  }
+
+  const isVerified = !!document.querySelector('[data-testid="UserName"] [data-testid="icon-verified"]');
+
+  // --- Bio ---
+  const bioEl = document.querySelector('[data-testid="UserDescription"]');
+  const bio = bioEl?.textContent || '';
+  const bioLinks = bioEl
+    ? Array.from(bioEl.querySelectorAll('a')).map(a => ({
+        text: a.textContent || '',
+        href: a.getAttribute('href') || '',
+      }))
+    : [];
+
+  // --- Header items ---
+  const locationEl = document.querySelector('[data-testid="UserLocation"]');
+  const location = locationEl?.textContent || '';
+
+  const urlEl = document.querySelector('[data-testid="UserUrl"]');
+  const website = urlEl?.textContent || '';
+  const websiteUrl = urlEl?.querySelector('a')?.getAttribute('href') || '';
+
+  const joinDateEl = document.querySelector('[data-testid="UserJoinDate"]');
+  const joinDate = joinDateEl?.textContent || '';
+
+  const categoryEl = document.querySelector('[data-testid="UserProfessionalCategory"]');
+  const category = categoryEl?.textContent || '';
+
+  // --- Counts ---
+  const followingLink = document.querySelector('a[href$="/following"]');
+  const followingCount = followingLink?.textContent || '';
+
+  const followersLink = document.querySelector('a[href$="/verified_followers"]')
+    || document.querySelector('a[href$="/followers"]');
+  const followersCount = followersLink?.textContent || '';
+
+  // --- Images ---
+  const avatarImg = document.querySelector('a[href$="/photo"] img');
+  const avatarUrl = avatarImg?.getAttribute('src') || '';
+
+  const bannerImg = document.querySelector('a[href$="/header_photo"] img');
+  const bannerUrl = bannerImg?.getAttribute('src') || '';
+
+  return {
+    displayName, handle, isVerified,
+    bio, bioLinks, location, website, websiteUrl,
+    joinDate, category, followingCount, followersCount,
+    avatarUrl, bannerUrl,
+  };
+})()`;
+
+// ---------------------------------------------------------------------------
+// Shared scroll-and-collect loop
+// ---------------------------------------------------------------------------
+
+interface CollectTweetsOptions {
+  chrome: ChromeClient;
+  tabId: number;
+  target: number;
+  maxScrollAttempts: number;
+}
+
+async function collectTweets(opts: CollectTweetsOptions): Promise<XTweet[]> {
+  const { chrome, tabId, target, maxScrollAttempts } = opts;
+
+  // Expand truncated tweets before first extraction
+  const expanded = (await evaluate(chrome, tabId, CLICK_SHOW_MORE_JS)) as number;
+  if (expanded > 0) await humanDelay(400, 800);
+
+  const seenIds = new Set<string>();
+  const collected: XTweet[] = [];
+
+  function addNew(raw: Array<Record<string, unknown>>): number {
+    let added = 0;
+    for (const t of raw) {
+      const id = String(t.tweetId ?? '');
+      if (id && !seenIds.has(id)) {
+        seenIds.add(id);
+        collected.push(t as unknown as XTweet);
+        added++;
+      }
+    }
+    return added;
+  }
+
+  // Initial batch
+  const initial = (await evaluate(chrome, tabId, EXTRACT_TWEETS_JS)) as Array<
+    Record<string, unknown>
+  >;
+  addNew(initial);
+
+  // Scroll loop
+  let attempts = 0;
+  let staleRounds = 0;
+
+  while (collected.length < target && attempts < maxScrollAttempts) {
+    attempts++;
+
+    const scrollPx = randInt(500, 900);
+    await evaluate(chrome, tabId, scrollByJs(scrollPx));
+    await humanDelay(1200, 2500);
+
+    // Occasional longer pause
+    if (Math.random() < 0.15) {
+      await humanDelay(1500, 3500);
+    }
+
+    // Expand truncated tweets
+    const exp = (await evaluate(chrome, tabId, CLICK_SHOW_MORE_JS)) as number;
+    if (exp > 0) await humanDelay(300, 600);
+
+    const batch = (await evaluate(chrome, tabId, EXTRACT_TWEETS_JS)) as Array<
+      Record<string, unknown>
+    >;
+    const newCount = addNew(batch);
+
+    if (newCount === 0) {
+      staleRounds++;
+      if (staleRounds >= 3) {
+        await evaluate(chrome, tabId, scrollByJs(randInt(1200, 1800)));
+        await humanDelay(2000, 3500);
+        staleRounds = 0;
+      }
+    } else {
+      staleRounds = 0;
+    }
+  }
+
+  return collected.slice(0, target);
 }
 
 // ---------------------------------------------------------------------------
@@ -176,7 +328,7 @@ export interface SearchPostsParams {
 export interface GetUserProfileParams {
   /** Twitter/X username (without @) */
   username: string;
-  /** Number of posts to extract from the profile */
+  /** Number of posts to extract from the profile (default 10) */
   postCount?: number;
 }
 
@@ -185,8 +337,8 @@ export interface XSource {
   getFeedPosts: (params?: GetFeedPostsParams) => Promise<XTweet[]>;
   /** Search posts with a query */
   searchPosts: (params: SearchPostsParams) => Promise<unknown>;
-  /** Get a user's profile and their recent posts */
-  getUserProfile: (params: GetUserProfileParams) => Promise<unknown>;
+  /** Get a user's profile info and their recent posts */
+  getUserProfile: (params: GetUserProfileParams) => Promise<XUserProfileResult>;
 }
 
 export function createXSource(options: XSourceOptions): XSource {
@@ -194,9 +346,7 @@ export function createXSource(options: XSourceOptions): XSource {
 
   async function getFeedPosts(params?: GetFeedPostsParams): Promise<XTweet[]> {
     const target = params?.count ?? 20;
-    const maxScrollAttempts = Math.max(target * 2, 30);
 
-    // Open feed in a new tab
     const tab = (await chrome.call('tabs.create', {
       url: 'https://x.com/home',
       active: false,
@@ -204,94 +354,55 @@ export function createXSource(options: XSourceOptions): XSource {
     const tabId = tab.id;
 
     try {
-      // Wait for initial page load
+      await humanDelay(4000, 6000);
+      return await collectTweets({
+        chrome,
+        tabId,
+        target,
+        maxScrollAttempts: Math.max(target * 2, 30),
+      });
+    } finally {
+      await chrome.call('tabs.remove', tabId).catch(() => {});
+    }
+  }
+
+  async function getUserProfile(params: GetUserProfileParams): Promise<XUserProfileResult> {
+    const { username, postCount = 10 } = params;
+
+    const tab = (await chrome.call('tabs.create', {
+      url: `https://x.com/${username}`,
+      active: false,
+    })) as { id: number };
+    const tabId = tab.id;
+
+    try {
       await humanDelay(4000, 6000);
 
-      // Expand any truncated tweets before first extraction
-      const expanded = (await evaluate(chrome, tabId, CLICK_SHOW_MORE_JS)) as number;
-      if (expanded > 0) await humanDelay(400, 800);
+      // Extract profile header
+      const profile = (await evaluate(chrome, tabId, EXTRACT_PROFILE_JS)) as XProfile;
 
-      // Collect tweets with deduplication
-      const seenIds = new Set<string>();
-      const collected: XTweet[] = [];
+      // Small pause before scrolling tweets
+      await humanDelay(500, 1000);
 
-      function addNewTweets(raw: Array<Record<string, unknown>>): number {
-        let added = 0;
-        for (const t of raw) {
-          const id = String(t.tweetId ?? '');
-          if (id && !seenIds.has(id)) {
-            seenIds.add(id);
-            collected.push(t as unknown as XTweet);
-            added++;
-          }
-        }
-        return added;
-      }
+      // Collect tweets from the profile's Posts tab (default tab)
+      const tweets = await collectTweets({
+        chrome,
+        tabId,
+        target: postCount,
+        maxScrollAttempts: Math.max(postCount * 2, 20),
+      });
 
-      // Extract initial batch
-      const initial = (await evaluate(chrome, tabId, EXTRACT_TWEETS_JS)) as Array<
-        Record<string, unknown>
-      >;
-      addNewTweets(initial);
-
-      // Scroll loop
-      let scrollAttempts = 0;
-      let staleRounds = 0;
-
-      while (collected.length < target && scrollAttempts < maxScrollAttempts) {
-        scrollAttempts++;
-
-        // Randomised scroll distance (0.6–1.2 viewport heights)
-        const scrollPx = randInt(500, 900);
-        await evaluate(chrome, tabId, scrollByJs(scrollPx));
-
-        // Human-like wait for content to load
-        await humanDelay(1200, 2500);
-
-        // Small chance of a longer pause (simulates reading)
-        if (Math.random() < 0.15) {
-          await humanDelay(1500, 3500);
-        }
-
-        // Expand truncated tweets
-        const exp = (await evaluate(chrome, tabId, CLICK_SHOW_MORE_JS)) as number;
-        if (exp > 0) await humanDelay(300, 600);
-
-        // Extract and deduplicate
-        const batch = (await evaluate(chrome, tabId, EXTRACT_TWEETS_JS)) as Array<
-          Record<string, unknown>
-        >;
-        const newCount = addNewTweets(batch);
-
-        if (newCount === 0) {
-          staleRounds++;
-          // If we haven't seen new tweets for a while, try a bigger scroll
-          if (staleRounds >= 3) {
-            await evaluate(chrome, tabId, scrollByJs(randInt(1200, 1800)));
-            await humanDelay(2000, 3500);
-            staleRounds = 0;
-          }
-        } else {
-          staleRounds = 0;
-        }
-      }
-
-      return collected.slice(0, target);
+      return { profile, tweets };
     } finally {
-      // Clean up – close the tab we opened
       await chrome.call('tabs.remove', tabId).catch(() => {});
     }
   }
 
   return {
     getFeedPosts,
+    getUserProfile,
 
     async searchPosts(_params: SearchPostsParams) {
-      // TODO: implement
-      throw new Error('Not implemented');
-    },
-
-    async getUserProfile(_params: GetUserProfileParams) {
       // TODO: implement
       throw new Error('Not implemented');
     },

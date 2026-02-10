@@ -6,4 +6,12 @@ export type {
   SearchPostsParams,
   GetUserProfileParams,
 } from './x.source.js';
-export type { XTweet, XTweetLink, XTweetImage, XQuoteTweet } from './x.types.js';
+export type {
+  XTweet,
+  XTweetLink,
+  XTweetImage,
+  XQuoteTweet,
+  XProfile,
+  XProfileLink,
+  XUserProfileResult,
+} from './x.types.js';

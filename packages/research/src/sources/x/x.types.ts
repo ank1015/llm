@@ -80,3 +80,48 @@ export interface XTweet {
   /** Relative permalink (e.g. "/user/status/123") */
   permalink: string;
 }
+
+export interface XProfileLink {
+  /** Displayed text */
+  text: string;
+  /** Link href */
+  href: string;
+}
+
+export interface XProfile {
+  /** Display name */
+  displayName: string;
+  /** Handle including @ (e.g. "@ank1015") */
+  handle: string;
+  /** Whether the account has a verified badge */
+  isVerified: boolean;
+  /** Bio / description text */
+  bio: string;
+  /** Links found in the bio */
+  bioLinks: XProfileLink[];
+  /** Location string (may be empty) */
+  location: string;
+  /** Website display text (e.g. "ank1015.com") */
+  website: string;
+  /** Website full href */
+  websiteUrl: string;
+  /** Join date text (e.g. "Joined July 2025") */
+  joinDate: string;
+  /** Following count text (e.g. "432 Following") */
+  followingCount: string;
+  /** Followers count text (e.g. "75 Followers") */
+  followersCount: string;
+  /** Profile image URL */
+  avatarUrl: string;
+  /** Banner / header image URL */
+  bannerUrl: string;
+  /** Professional category if present */
+  category: string;
+}
+
+export interface XUserProfileResult {
+  /** Profile information */
+  profile: XProfile;
+  /** User's tweets */
+  tweets: XTweet[];
+}
