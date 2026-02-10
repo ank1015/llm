@@ -30,8 +30,8 @@ function humanDelay(minMs: number, maxMs: number): Promise<void> {
 // ---------------------------------------------------------------------------
 
 /**
- * Extract structured data from every shreddit-post element currently in the DOM.
- * Reddit's new design stores almost all data as attributes on the element.
+ * Extract structured data from shreddit-post elements on subreddit pages.
+ * Reddit stores almost all data as attributes on the element.
  * Filters out promoted/ad posts.
  */
 const EXTRACT_POSTS_JS = `(() => {
@@ -75,6 +75,86 @@ const EXTRACT_POSTS_JS = `(() => {
   }).filter(Boolean);
 })()`;
 
+/**
+ * Extract structured data from search result elements (sdui-post-unit).
+ * Search pages use a completely different DOM — no shreddit-post.
+ * Score and comments come from faceplate-number inside search-counter-row.
+ * Author, flair, post type, domain, and flags are not available on search.
+ */
+const EXTRACT_SEARCH_POSTS_JS = `(() => {
+  const units = document.querySelectorAll('[data-testid="sdui-post-unit"]');
+  return Array.from(units).map(unit => {
+    // --- Title & permalink ---
+    // post-title lives outside sdui-post-unit; post-title-text is inside it
+    const titleLink = unit.querySelector('[data-testid="post-title-text"]');
+    const title = titleLink?.textContent?.trim() || '';
+    const permalink = titleLink?.getAttribute('href') || '';
+
+    // Post ID from permalink: /r/sub/comments/<id>/slug/
+    const postId = permalink.match(/\\/comments\\/([a-z0-9]+)/)?.[1] || '';
+    if (!postId) return null;
+
+    // --- Subreddit ---
+    // Match short /r/<name>/ links, not the permalink which also starts with /r/
+    const allLinks = unit.querySelectorAll('a[href*="/r/"]');
+    let subreddit = '';
+    for (const a of allLinks) {
+      const href = a.getAttribute('href') || '';
+      if (href.match(/^\\/r\\/[^/]+\\/$/) && !href.includes('/comments/')) {
+        subreddit = a.textContent?.trim() || '';
+        break;
+      }
+    }
+
+    // --- Score & comment count from search-counter-row ---
+    const counterRow = unit.querySelector('[data-testid="search-counter-row"]');
+    const counterNums = counterRow
+      ? Array.from(counterRow.querySelectorAll('faceplate-number'))
+      : [];
+    const score = counterNums[0]?.getAttribute('number') || '';
+    const commentCount = counterNums[1]?.getAttribute('number') || '';
+
+    // --- Timestamp (may be in parent container, not inside sdui-post-unit) ---
+    const parent = unit.closest('[data-testid="search-post-with-content-preview"], [data-testid="search-post-unit"]');
+    const timeEl = unit.querySelector('faceplate-timeago')
+      || parent?.querySelector('faceplate-timeago');
+    const createdTimestamp = timeEl?.getAttribute('ts') || '';
+
+    // --- Thumbnail (may be in parent container) ---
+    const thumbEl = unit.querySelector('img[src*="preview"], img[src*="thumb"]')
+      || parent?.querySelector('[data-testid="search_post_thumbnail"] img');
+    const thumbnailUrl = thumbEl?.getAttribute('src') || '';
+
+    // --- Body preview (from sibling content preview link) ---
+    const bodyLink = parent?.querySelector('a:not([data-testid])');
+    const bodyText = bodyLink && bodyLink.getAttribute('href')?.includes('/comments/')
+      ? bodyLink.textContent?.trim()?.substring(0, 500) || ''
+      : '';
+
+    return {
+      postId: 't3_' + postId,
+      title,
+      author: '',
+      subreddit,
+      score,
+      commentCount,
+      permalink,
+      contentHref: '',
+      createdTimestamp,
+      postType: '',
+      domain: '',
+      flair: '',
+      bodyText,
+      thumbnailUrl,
+      isNsfw: false,
+      isSpoiler: false,
+      isPromoted: false,
+      isStickied: false,
+      awardCount: '',
+    };
+  }).filter(Boolean);
+})()`;
+
 /** Scroll by a given pixel amount using smooth behaviour. */
 function scrollByJs(pixels: number): string {
   return `(() => {
@@ -93,10 +173,12 @@ interface CollectPostsOptions {
   tabId: number;
   target: number;
   maxScrollAttempts: number;
+  /** Browser JS snippet that returns an array of post objects */
+  extractJs: string;
 }
 
 async function collectPosts(opts: CollectPostsOptions): Promise<RedditPost[]> {
-  const { chrome, tabId, target, maxScrollAttempts } = opts;
+  const { chrome, tabId, target, maxScrollAttempts, extractJs } = opts;
 
   const seenIds = new Set<string>();
   const collected: RedditPost[] = [];
@@ -115,9 +197,7 @@ async function collectPosts(opts: CollectPostsOptions): Promise<RedditPost[]> {
   }
 
   // Initial batch
-  const initial = (await evaluate(chrome, tabId, EXTRACT_POSTS_JS)) as Array<
-    Record<string, unknown>
-  >;
+  const initial = (await evaluate(chrome, tabId, extractJs)) as Array<Record<string, unknown>>;
   addNew(initial);
 
   // Scroll loop
@@ -138,9 +218,7 @@ async function collectPosts(opts: CollectPostsOptions): Promise<RedditPost[]> {
       await humanDelay(1500, 3500);
     }
 
-    const batch = (await evaluate(chrome, tabId, EXTRACT_POSTS_JS)) as Array<
-      Record<string, unknown>
-    >;
+    const batch = (await evaluate(chrome, tabId, extractJs)) as Array<Record<string, unknown>>;
     const newCount = addNew(batch);
 
     if (newCount === 0) {
@@ -239,6 +317,7 @@ export function createRedditSource(options: RedditSourceOptions): RedditSource {
         tabId,
         target: count,
         maxScrollAttempts: Math.max(count * 2, 30),
+        extractJs: EXTRACT_POSTS_JS,
       });
     } finally {
       await chrome.call('tabs.remove', tabId).catch(() => {});
@@ -274,6 +353,7 @@ export function createRedditSource(options: RedditSourceOptions): RedditSource {
         tabId,
         target: count,
         maxScrollAttempts: Math.max(count * 2, 30),
+        extractJs: EXTRACT_SEARCH_POSTS_JS,
       });
     } finally {
       await chrome.call('tabs.remove', tabId).catch(() => {});
