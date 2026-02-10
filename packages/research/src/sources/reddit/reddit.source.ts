@@ -1,4 +1,4 @@
-import type { RedditPost } from './reddit.types.js';
+import type { RedditComment, RedditPost, RedditPostWithComments } from './reddit.types.js';
 import type { ChromeClient } from '@ank1015/llm-extension';
 
 // ---------------------------------------------------------------------------
@@ -155,6 +155,88 @@ const EXTRACT_SEARCH_POSTS_JS = `(() => {
   }).filter(Boolean);
 })()`;
 
+/**
+ * Extract the single shreddit-post on a post detail page.
+ * Returns the full body text (up to 2000 chars) since this is the detail view.
+ */
+const EXTRACT_SINGLE_POST_JS = `(() => {
+  const post = document.querySelector('shreddit-post');
+  if (!post) return null;
+
+  const get = (name) => post.getAttribute(name) || '';
+
+  const flairEl = post.querySelector('shreddit-post-flair, flair-badge');
+  const flair = flairEl?.textContent?.trim() || '';
+
+  const thumbEl = post.querySelector('img[src*="preview"], img[src*="thumb"], img[src*="external-preview"]');
+  const thumbnailUrl = thumbEl?.getAttribute('src') || '';
+
+  const bodyEl = post.querySelector('[slot="text-body"], .md, .RichTextJSON-root');
+  const bodyText = bodyEl?.textContent?.trim()?.substring(0, 2000) || '';
+
+  return {
+    postId: get('id'),
+    title: get('post-title'),
+    author: get('author'),
+    subreddit: get('subreddit-prefixed-name'),
+    score: get('score'),
+    commentCount: get('comment-count'),
+    permalink: get('permalink'),
+    contentHref: get('content-href'),
+    createdTimestamp: get('created-timestamp'),
+    postType: get('post-type'),
+    domain: get('domain'),
+    flair,
+    bodyText,
+    thumbnailUrl,
+    isNsfw: post.hasAttribute('nsfw'),
+    isSpoiler: post.hasAttribute('spoiler'),
+    isPromoted: false,
+    isStickied: post.hasAttribute('stickied'),
+    awardCount: get('award-count'),
+  };
+})()`;
+
+/**
+ * Extract comments from shreddit-comment elements on a post detail page.
+ * All data is in attributes. Body text is in [slot="comment"] child.
+ * Accepts postAuthor to detect OP comments.
+ */
+function extractCommentsJs(postAuthor: string): string {
+  return `(() => {
+    const comments = document.querySelectorAll('shreddit-comment');
+    const postAuthor = ${JSON.stringify(postAuthor)};
+
+    return Array.from(comments).map(comment => {
+      const author = comment.getAttribute('author') || '';
+      const score = comment.getAttribute('score') || '';
+      const depth = parseInt(comment.getAttribute('depth') || '0', 10);
+      const commentId = comment.getAttribute('thingid') || '';
+      const permalink = comment.getAttribute('permalink') || '';
+
+      // Timestamp: try faceplate-timeago inside the comment
+      const timeEl = comment.querySelector('faceplate-timeago');
+      const createdTimestamp = timeEl?.getAttribute('ts') || '';
+
+      // Body text from the comment slot
+      const bodyEl = comment.querySelector('[slot="comment"]');
+      const text = bodyEl?.textContent?.trim() || '';
+
+      if (!commentId || !author) return null;
+
+      return {
+        commentId,
+        author,
+        text,
+        score,
+        createdTimestamp,
+        depth,
+        isOP: author === postAuthor,
+      };
+    }).filter(Boolean);
+  })()`;
+}
+
 /** Scroll by a given pixel amount using smooth behaviour. */
 function scrollByJs(pixels: number): string {
   return `(() => {
@@ -287,6 +369,8 @@ export interface RedditSource {
   getSubredditPosts: (params: GetSubredditPostsParams) => Promise<RedditPost[]>;
   /** Search posts across Reddit or within a subreddit */
   searchPosts: (params: SearchPostsParams) => Promise<RedditPost[]>;
+  /** Get a post and its comments */
+  getPostComments: (params: GetPostCommentsParams) => Promise<RedditPostWithComments>;
 }
 
 export function createRedditSource(options: RedditSourceOptions): RedditSource {
@@ -360,8 +444,47 @@ export function createRedditSource(options: RedditSourceOptions): RedditSource {
     }
   }
 
+  async function getPostComments(params: GetPostCommentsParams): Promise<RedditPostWithComments> {
+    const { postUrl, count = 20 } = params;
+
+    // Accept both relative permalink and full URL
+    const url = postUrl.startsWith('http') ? postUrl : `https://www.reddit.com${postUrl}`;
+
+    const tab = (await chrome.call('tabs.create', {
+      url,
+      active: true,
+    })) as { id: number };
+    const tabId = tab.id;
+
+    try {
+      await humanDelay(4000, 6000);
+
+      // Extract the post
+      const post = (await evaluate(chrome, tabId, EXTRACT_SINGLE_POST_JS)) as RedditPost | null;
+      if (!post) {
+        throw new Error(`Failed to extract post from ${url}`);
+      }
+
+      // Extract comments (pass post author for OP detection)
+      const allComments = (await evaluate(
+        chrome,
+        tabId,
+        extractCommentsJs(post.author)
+      )) as RedditComment[];
+
+      // Return up to count comments (all depths included, in DOM order)
+      return {
+        post,
+        comments: allComments.slice(0, count),
+      };
+    } finally {
+      await chrome.call('tabs.remove', tabId).catch(() => {});
+    }
+  }
+
   return {
     getSubredditPosts,
     searchPosts,
+    getPostComments,
   };
 }
