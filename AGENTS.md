@@ -38,6 +38,7 @@ packages/
   extension/          # @ank1015/llm-extension - Chrome extension + native messaging host
   chat-app/           # @ank1015/llm-chat-app - Next.js chat application
   usage-dashboard/    # @ank1015/llm-usage-dashboard - Next.js usage dashboard
+  research/           # @ank1015/llm-research - Research utilities
 ```
 
 ## Conventions
@@ -66,6 +67,7 @@ packages/
 - [packages/extension/AGENTS.md](packages/extension/AGENTS.md) — Chrome extension + native messaging host
 - [packages/chat-app/AGENTS.md](packages/chat-app/AGENTS.md) — Chat application
 - [packages/usage-dashboard/AGENTS.md](packages/usage-dashboard/AGENTS.md) — Usage dashboard
+- [packages/research/AGENTS.md](packages/research/AGENTS.md) — Research utilities
 
 ## Boundaries
 

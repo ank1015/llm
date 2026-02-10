@@ -219,22 +219,6 @@ importers:
         version: 2.1.9(@types/node@25.1.0)(lightningcss@1.30.2)
 
   packages/extension:
-    dependencies:
-      '@ank1015/llm-memory':
-        specifier: workspace:^
-        version: link:../memory
-      '@ank1015/llm-sdk':
-        specifier: workspace:^
-        version: link:../sdk
-      '@ank1015/llm-sdk-adapters':
-        specifier: workspace:^
-        version: link:../sdk-adapters
-      '@ank1015/llm-types':
-        specifier: workspace:^
-        version: link:../types
-      '@sinclair/typebox':
-        specifier: ^0.34.48
-        version: 0.34.48
     devDependencies:
       '@types/chrome':
         specifier: ^0.0.287
@@ -269,6 +253,12 @@ importers:
       openai:
         specifier: ^6.17.0
         version: 6.17.0(ws@8.19.0)(zod@4.3.6)
+    devDependencies:
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@25.1.0)(lightningcss@1.30.2)
+
+  packages/research:
     devDependencies:
       vitest:
         specifier: ^2.1.0
