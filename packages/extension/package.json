@@ -1,0 +1,48 @@
+{
+  "name": "@ank1015/llm-extension",
+  "version": "0.0.1",
+  "description": "Chrome extension with general-purpose native messaging RPC",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "pnpm build:native && pnpm build:chrome",
+    "build:native": "tsc && cp src/native/host-wrapper.sh dist/native/host-wrapper.sh && chmod +x dist/native/host-wrapper.sh",
+    "build:chrome": "tsx esbuild.config.ts && cp src/chrome/manifest.json dist/chrome/manifest.json",
+    "dev": "pnpm dev:native & pnpm dev:chrome",
+    "dev:native": "tsc --watch",
+    "dev:chrome": "tsx esbuild.config.ts --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "tsx tests/e2e/chrome-rpc.e2e.ts",
+    "test:e2e:accessibility": "tsx tests/e2e/accessibility.e2e.ts",
+    "test:e2e:cookies": "tsx tests/e2e/cookies.e2e.ts",
+    "test:e2e:debugger": "tsx tests/e2e/debugger.e2e.ts",
+    "test:e2e:network": "tsx tests/e2e/network.e2e.ts",
+    "test:e2e:windows": "tsx tests/e2e/windows.e2e.ts",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.chrome.json",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.287",
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.24.0",
+    "tsx": "^4.19.0",
+    "vitest": "^2.1.0"
+  },
+  "keywords": [
+    "llm",
+    "chrome-extension",
+    "native-messaging"
+  ],
+  "license": "MIT"
+}
