@@ -28,6 +28,7 @@
     "test:e2e:cookies": "tsx tests/e2e/cookies.e2e.ts",
     "test:e2e:debugger": "tsx tests/e2e/debugger.e2e.ts",
     "test:e2e:network": "tsx tests/e2e/network.e2e.ts",
+    "test:e2e:windows": "tsx tests/e2e/windows.e2e.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.chrome.json",
     "clean": "rm -rf dist *.tsbuildinfo"
   },
