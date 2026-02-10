@@ -46,7 +46,10 @@ function connectNative(): chrome.runtime.Port {
 }
 
 function sendToHost(message: ChromeMessage): void {
-  nativePort?.postMessage(message);
+  if (!nativePort) {
+    connectNative();
+  }
+  nativePort!.postMessage(message);
 }
 
 // ── Message routing ─────────────────────────────────────────────────
@@ -378,6 +381,11 @@ function handleUnsubscribe(message: UnsubscribeMessage): void {
 }
 
 // ── Startup ─────────────────────────────────────────────────────────
+
+// Ensure the service worker wakes on Chrome launch (MV3 is lazy).
+chrome.runtime.onStartup.addListener(() => {
+  if (!nativePort) connectNative();
+});
 
 console.warn('[bg] background service worker loaded');
 connectNative();
