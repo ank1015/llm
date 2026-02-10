@@ -24,3 +24,33 @@ export interface SubstackPost {
   /** Post thumbnail image URL (may be empty) */
   thumbnailUrl: string;
 }
+
+export interface SubstackPostDetail {
+  /** Post title */
+  title: string;
+  /** Subtitle / description */
+  subtitle: string;
+  /** Canonical post URL */
+  url: string;
+
+  /** Publication name */
+  publicationName: string;
+  /** Author name */
+  author: string;
+  /** Author Substack profile URL (e.g. "https://substack.com/@user") */
+  authorUrl: string;
+
+  /** Date as displayed in the byline (e.g. "Jan 29, 2026") */
+  date: string;
+
+  /** Full article body as plain text (free preview if paywalled) */
+  bodyText: string;
+
+  /** Like count as displayed (e.g. "78") */
+  likes: string;
+  /** Comment count as displayed (e.g. "6") */
+  comments: string;
+
+  /** Whether the post is behind a paywall (body may be truncated) */
+  isPaywalled: boolean;
+}
