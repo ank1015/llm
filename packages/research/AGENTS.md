@@ -32,10 +32,15 @@ src/
       index.ts          # Exports: createSubstackSource()
       substack.source.ts # Implementation (2 methods)
       substack.types.ts # SubstackPost, SubstackPostDetail
+    discord/            # Discord source
+      index.ts          # Exports: createDiscordSource()
+      discord.source.ts # Implementation (1 method, scroll-up collection)
+      discord.types.ts  # DiscordMessage, DiscordReplyInfo, DiscordReaction
 scripts/
   x/                    # X exploration & test scripts
   reddit/               # Reddit exploration & test scripts
   substack/             # Substack exploration & test scripts
+  discord/              # Discord exploration & test scripts
 ```
 
 ## Sources
@@ -60,6 +65,12 @@ scripts/
 - `getPost({ url })` — full article content from a post URL, with paywall detection
 
 **Substack DOM notes:** No `data-testid` attributes — uses `reader2-*` class selectors for search, `.post-title` / `.subtitle` / `.body.markup` for post pages. Engagement counts extracted from `aria-label` on `.post-ufi-button` elements. Paywalled posts return partial body text with `isPaywalled: true`. Author links at `a[href*="/@"]` — first match is often an avatar (no text), iterate to find one with text content.
+
+### Discord — `createDiscordSource({ chrome })`
+
+- `getMessages({ url, count?, sinceHours? })` — channel messages by count or time window
+
+**Discord DOM notes:** Messages use `li[id^="chat-messages-{channelId}-{messageId}"]` with `role="article"` inner divs. Group-start messages have full author headers (`data-text` attribute on username span); continuation messages inherit author from the preceding group start. The scrollable container is a `div[role="group"]` ancestor of `ol[data-list-id="chat-messages"]` — NOT the OL itself. Scrolling UP loads older messages in ~30-message batches. Page may open at the "new messages" divider (mid-history), so scroll to bottom first to normalise. Requires `active: true` tabs.
 
 ## Adding a New Source
 
