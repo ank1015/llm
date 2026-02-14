@@ -37,7 +37,6 @@ export interface StreamOptions<TApi extends Api> {
  *
  * Note: This function is async because it may need to resolve credentials from an adapter.
  *
- * @deprecated Use {@link LLMClient.stream} instead for auto-wired adapter support.
  * @param model - The model configuration
  * @param context - The conversation context (messages, system prompt, tools)
  * @param options - Stream options including adapters
