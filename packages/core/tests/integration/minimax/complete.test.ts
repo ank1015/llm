@@ -205,15 +205,15 @@ describe('MiniMax Complete Integration', () => {
           {
             role: 'user',
             id: 'test-1',
-            content: [{ type: 'text', content: 'What is 5 + 3?' }],
+            content: [{ type: 'text', content: 'What is the weather in London right now?' }],
           },
         ],
         tools: [
           {
-            name: 'calculate',
-            description: 'Perform basic calculations',
+            name: 'get_weather',
+            description: 'Get the current weather for a location',
             parameters: Type.Object({
-              expression: Type.String(),
+              location: Type.String({ description: 'City name' }),
             }),
           },
         ],
@@ -230,7 +230,7 @@ describe('MiniMax Complete Integration', () => {
             {
               role: 'user',
               id: 'test-1',
-              content: [{ type: 'text', content: 'What is 5 + 3?' }],
+              content: [{ type: 'text', content: 'What is the weather in London right now?' }],
             },
             result1,
             {
@@ -238,17 +238,17 @@ describe('MiniMax Complete Integration', () => {
               id: 'result-1',
               toolCallId: toolCall.toolCallId,
               toolName: toolCall.name,
-              content: [{ type: 'text', content: '8' }],
+              content: [{ type: 'text', content: '12°C, cloudy with light rain' }],
               isError: false,
               timestamp: Date.now(),
             },
           ],
           tools: [
             {
-              name: 'calculate',
-              description: 'Perform basic calculations',
+              name: 'get_weather',
+              description: 'Get the current weather for a location',
               parameters: Type.Object({
-                expression: Type.String(),
+                location: Type.String({ description: 'City name' }),
               }),
             },
           ],
