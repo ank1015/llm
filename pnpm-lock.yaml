@@ -311,16 +311,25 @@ importers:
 
   packages/server:
     dependencies:
+      '@ank1015/llm-extension':
+        specifier: workspace:^
+        version: link:../extension
       '@ank1015/llm-research':
         specifier: workspace:^
         version: link:../research
       '@hono/node-server':
         specifier: ^1.14.1
         version: 1.19.9(hono@4.11.9)
+      better-sqlite3:
+        specifier: ^11.0.0
+        version: 11.10.0
       hono:
         specifier: ^4.7.6
         version: 4.11.9
     devDependencies:
+      '@types/better-sqlite3':
+        specifier: ^7.6.11
+        version: 7.6.13
       '@types/node':
         specifier: ^25.2.3
         version: 25.2.3

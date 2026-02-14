@@ -23,11 +23,14 @@
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
+    "@ank1015/llm-extension": "workspace:^",
     "@ank1015/llm-research": "workspace:^",
     "@hono/node-server": "^1.14.1",
+    "better-sqlite3": "^11.0.0",
     "hono": "^4.7.6"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
     "@types/node": "^25.2.3",
     "vitest": "^2.1.0"
   }
