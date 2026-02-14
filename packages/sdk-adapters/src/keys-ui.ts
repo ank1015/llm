@@ -12,9 +12,12 @@
  *   node dist/keys-ui.js
  */
 
-import { existsSync, readFileSync } from 'node:fs';
+import { execSync } from 'node:child_process';
+import { existsSync, readFileSync, writeFileSync, unlinkSync, chmodSync } from 'node:fs';
+import * as http from 'node:http';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { homedir } from 'node:os';
+import * as https from 'node:https';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { KnownApis, isValidApi } from '@ank1015/llm-types';
@@ -28,13 +31,13 @@ import type { Api } from '@ank1015/llm-types';
 // ────────────────────────────────────────────────────────────────────
 
 /** Providers that support auto-reloading credentials from local config files. */
-const RELOADABLE_APIS = new Set<Api>(['codex']);
+const RELOADABLE_APIS = new Set<Api>(['codex', 'claude-code']);
 
 /**
- * Read credentials from the provider's local config file.
- * Returns the credential map or throws with a user-friendly message.
+ * Reload credentials for a provider. Async because claude-code
+ * extraction requires starting a local proxy and an SDK call.
  */
-function reloadCredentials(api: Api): Record<string, string> {
+async function reloadCredentials(api: Api): Promise<Record<string, string>> {
   switch (api) {
     case 'codex': {
       const authPath = join(homedir(), '.codex', 'auth.json');
@@ -55,9 +58,179 @@ function reloadCredentials(api: Api): Record<string, string> {
       }
       return creds;
     }
+    case 'claude-code':
+      return extractClaudeCodeCredentials();
     default:
       throw new Error(`Reload not supported for ${api}`);
   }
+}
+
+// ────────────────────────────────────────────────────────────────────
+//  Claude Code credential extraction
+// ────────────────────────────────────────────────────────────────────
+
+interface ClaudeCodeCredentials {
+  oauthToken: string;
+  billingHeader: string;
+  betaFlag: string;
+}
+
+/**
+ * Extract Claude Code credentials (OAuth token, billing header, beta flags)
+ * by making one throwaway SDK call through a temp local proxy.
+ */
+function extractClaudeCodeCredentials(): Promise<Record<string, string>> {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(
+      () => reject(new Error('Timeout: no credentials captured in 30s')),
+      30_000
+    );
+
+    const server = http.createServer((req, res) => {
+      let body = '';
+      req.on('data', (chunk: Buffer) => (body += chunk.toString()));
+      req.on('end', () => {
+        const isMainCall =
+          req.url?.startsWith('/v1/messages') &&
+          !req.url?.includes('count_tokens') &&
+          req.method === 'POST' &&
+          body.includes('x-anthropic-billing-header');
+
+        if (isMainCall) {
+          const parsed = JSON.parse(body) as {
+            system?: Array<{ text?: string }>;
+          };
+          const billingBlock = parsed.system?.find((b) =>
+            b.text?.includes('x-anthropic-billing-header')
+          );
+
+          const authRaw = (req.headers['authorization'] as string) || '';
+          const token = authRaw.replace('Bearer ', '');
+
+          const creds: ClaudeCodeCredentials = {
+            oauthToken: token,
+            billingHeader: billingBlock?.text ?? '',
+            betaFlag: (req.headers['anthropic-beta'] as string) || '',
+          };
+
+          clearTimeout(timeout);
+
+          // SSE streaming response so CLI exits cleanly
+          const msgId = `msg_fake_${Date.now()}`;
+          const events = [
+            {
+              type: 'message_start',
+              message: {
+                id: msgId,
+                type: 'message',
+                role: 'assistant',
+                content: [],
+                model: 'claude-sonnet-4-5-20250929',
+                stop_reason: null,
+                stop_sequence: null,
+                usage: { input_tokens: 1, output_tokens: 0 },
+              },
+            },
+            { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
+            { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'ok' } },
+            { type: 'content_block_stop', index: 0 },
+            {
+              type: 'message_delta',
+              delta: { stop_reason: 'end_turn', stop_sequence: null },
+              usage: { output_tokens: 1 },
+            },
+            { type: 'message_stop' },
+          ];
+          res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
+          for (const evt of events) {
+            res.write(`event: ${evt.type}\ndata: ${JSON.stringify(evt)}\n\n`);
+          }
+          res.end();
+          server.close();
+          resolve({
+            oauthToken: creds.oauthToken,
+            billingHeader: creds.billingHeader,
+            betaFlag: creds.betaFlag,
+          });
+          return;
+        }
+
+        // Forward non-main requests (quota check etc) to the real API
+        const headers: Record<string, string> = {};
+        for (const [key, val] of Object.entries(req.headers)) {
+          if (key !== 'host' && key !== 'content-length' && val) {
+            headers[key] = Array.isArray(val) ? val[0]! : val;
+          }
+        }
+        headers['host'] = 'api.anthropic.com';
+        headers['content-length'] = Buffer.byteLength(body).toString();
+        const proxyReq = https.request(
+          { hostname: 'api.anthropic.com', port: 443, path: req.url, method: req.method, headers },
+          (proxyRes) => {
+            res.writeHead(proxyRes.statusCode ?? 200, proxyRes.headers);
+            proxyRes.pipe(res);
+          }
+        );
+        proxyReq.on('error', () => {
+          res.writeHead(502);
+          res.end('error');
+        });
+        proxyReq.end(body);
+      });
+    });
+
+    server.listen(0, '127.0.0.1', async () => {
+      const addr = server.address();
+      const port = typeof addr === 'object' && addr ? addr.port : 0;
+
+      // Find claude binary
+      let claudePath: string;
+      try {
+        claudePath = execSync('which claude', { encoding: 'utf8' }).trim();
+      } catch {
+        clearTimeout(timeout);
+        server.close();
+        reject(new Error('Claude CLI not found. Install it first.'));
+        return;
+      }
+
+      const wrapperPath = join(tmpdir(), `claude-cred-extract-${port}.sh`);
+      writeFileSync(
+        wrapperPath,
+        [
+          '#!/bin/bash',
+          `export ANTHROPIC_BASE_URL="http://127.0.0.1:${port}"`,
+          'unset CLAUDECODE',
+          `exec "${claudePath}" "$@"`,
+        ].join('\n')
+      );
+      chmodSync(wrapperPath, 0o755);
+
+      try {
+        const { query } = await import('@anthropic-ai/claude-agent-sdk');
+        for await (const _ of query({
+          prompt: 'hi',
+          options: {
+            systemPrompt: 'Reply ok',
+            allowedTools: [],
+            maxTurns: 1,
+            model: 'sonnet',
+            pathToClaudeCodeExecutable: wrapperPath,
+          },
+        })) {
+          /* drain */
+        }
+      } catch {
+        // Expected — proxy closes before SDK finishes cleanly
+      }
+
+      try {
+        unlinkSync(wrapperPath);
+      } catch {
+        /* ignore */
+      }
+    });
+  });
 }
 
 // ────────────────────────────────────────────────────────────────────
@@ -128,6 +301,7 @@ function getHtml(): string {
       transition: opacity 0.15s;
     }
     button:hover { opacity: 0.85; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
     .btn-save { background: #2563eb; color: #fff; }
     .btn-reload { background: #7c3aed; color: #e9d5ff; }
     .btn-delete { background: #7f1d1d; color: #fca5a5; }
@@ -208,7 +382,7 @@ function getHtml(): string {
           + '</div>'
           + '<div class="actions">'
           + '  <button class="btn-save" onclick="save(\\'' + api + '\\')">Save</button>'
-          + (RELOADABLE.includes(api) ? '  <button class="btn-reload" onclick="reload(\\'' + api + '\\')">Reload</button>' : '')
+          + (RELOADABLE.includes(api) ? '  <button id="reload-' + api + '" class="btn-reload" onclick="reload(\\'' + api + '\\')">Reload</button>' : '')
           + '  <button class="btn-delete" onclick="del(\\'' + api + '\\')">Delete</button>'
           + '</div>'
           + '</div>'
@@ -273,14 +447,20 @@ function getHtml(): string {
     }
 
     async function reload(api) {
-      const res = await fetch('/api/keys/' + api + '/reload', { method: 'POST' });
-      const data = await res.json();
-      if (res.ok && data.ok) {
-        toast('Reloaded ' + api);
-        await loadKeys();
-        document.getElementById('body-' + api).classList.add('open');
-      } else {
-        toast(data.error || 'Reload failed', false);
+      const btn = document.getElementById('reload-' + api);
+      if (btn) { btn.disabled = true; btn.textContent = 'Reloading\u2026'; }
+      try {
+        const res = await fetch('/api/keys/' + api + '/reload', { method: 'POST' });
+        const data = await res.json();
+        if (res.ok && data.ok) {
+          toast('Reloaded ' + api);
+          await loadKeys();
+          document.getElementById('body-' + api).classList.add('open');
+        } else {
+          toast(data.error || 'Reload failed', false);
+        }
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Reload'; }
       }
     }
 
@@ -404,7 +584,7 @@ async function handleRequest(
       json(res, { ok: false, error: `Reload not supported for ${api}` }, 400);
       return;
     }
-    const credentials = reloadCredentials(api as Api);
+    const credentials = await reloadCredentials(api as Api);
     await adapter.setCredentials(api as Api, credentials);
     json(res, { ok: true });
     return;
