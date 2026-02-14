@@ -18,6 +18,7 @@
     "lint:fix": "eslint packages/ --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "keys-ui": "pnpm --filter @ank1015/llm-sdk-adapters keys-ui",
     "clean": "turbo run clean && rm -rf node_modules",
     "prepare": "husky"
   },
