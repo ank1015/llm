@@ -52,6 +52,11 @@ export function getDefaultProviderSettingsForApi(api: Api): Record<string, unkno
       return defaultOpenaiProviderOptions;
     case 'zai':
       return defaultZAIProviderOptions;
+    case 'minimax':
+      return defaultAnthropicProviderOptions;
+    case 'cerebras':
+    case 'openrouter':
+      return {};
   }
 }
 

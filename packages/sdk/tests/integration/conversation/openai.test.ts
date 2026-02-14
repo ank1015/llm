@@ -144,8 +144,8 @@ describe('OpenAI Conversation Integration', () => {
     expect(toolResultStarts.length).toBeGreaterThan(0);
     expect(toolResultEnds.length).toBeGreaterThan(0);
 
-    // Verify event order for first turn: agent_start should come first
-    expect(eventTypes[0]).toBe('agent_start');
+    // Verify event order: user message_start comes first, then agent loop
+    expect(eventTypes[0]).toBe('message_start');
 
     // Verify agent_end is last
     expect(eventTypes[eventTypes.length - 1]).toBe('agent_end');

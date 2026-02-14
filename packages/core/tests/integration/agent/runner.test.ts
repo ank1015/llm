@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { runAgentLoop } from '../../../src/agent/runner.js';
 import { complete } from '../../../src/llm/complete.js';
-import { getModel } from '../../../src/models.js';
+import { getModel } from '../../../src/models/index.js';
 import { streamAnthropic } from '../../../src/providers/anthropic/stream.js';
 
 import type {

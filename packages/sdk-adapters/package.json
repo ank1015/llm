@@ -21,6 +21,7 @@
     "test:watch": "vitest",
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
+    "keys-ui": "node dist/keys-ui.js",
     "typecheck": "tsc --noEmit",
     "lint": "echo 'No linter configured yet'",
     "clean": "rm -rf dist *.tsbuildinfo"
@@ -40,6 +41,7 @@
     "better-sqlite3": "^11.0.0"
   },
   "devDependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.42",
     "@types/better-sqlite3": "^7.6.11",
     "vitest": "^2.1.0"
   }
