@@ -7,8 +7,7 @@
 export const VERSION = '0.0.1';
 
 // Models
-export { MODELS } from './models.generated.js';
-export { getProviders, getModel, getModels, calculateCost } from './models.js';
+export { MODELS, getProviders, getModel, getModels, calculateCost } from './models/index.js';
 
 // Utilities
 export {

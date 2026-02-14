@@ -1,6 +1,6 @@
 import { KnownApis } from '@ank1015/llm-types';
 
-import { MODELS } from './models.generated.js';
+import { MODELS } from './index.js';
 
 import type { Api, Model, Usage } from '@ank1015/llm-types';
 

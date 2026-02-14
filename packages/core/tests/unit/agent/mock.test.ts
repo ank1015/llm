@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { getMockMessage } from '../../../src/agent/mock.js';
-import { getModel } from '../../../src/models.js';
+import { getModel } from '../../../src/models/index.js';
 
 import type { Api, Model } from '@ank1015/llm-types';
 

@@ -1,7 +1,7 @@
 import { Type } from '@sinclair/typebox';
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { getModel } from '../../../src/models.js';
+import { getModel } from '../../../src/models/index.js';
 import { streamMinimax } from '../../../src/providers/minimax/stream.js';
 
 import type { BaseAssistantEvent, Context, Model } from '@ank1015/llm-types';

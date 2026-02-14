@@ -7,7 +7,7 @@
  * Used by: DeepSeek, Kimi, Z.AI
  */
 
-import { calculateCost } from '../../models.js';
+import { calculateCost } from '../../models/index.js';
 import { AssistantMessageEventStream } from '../../utils/event-stream.js';
 import { parseStreamingJson } from '../../utils/json-parse.js';
 import { validateToolArguments } from '../../utils/validation.js';

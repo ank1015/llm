@@ -1,7 +1,7 @@
 import { Type } from '@sinclair/typebox';
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { getModel } from '../../../src/models.js';
+import { getModel } from '../../../src/models/index.js';
 import { streamClaudeCode as coreStreamClaudeCode } from '../../../src/providers/claude-code/stream.js';
 
 import type {
