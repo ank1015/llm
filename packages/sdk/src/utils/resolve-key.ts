@@ -18,6 +18,7 @@ const REQUIRED_CREDENTIAL_FIELDS: Record<Api, readonly string[]> = {
   'claude-code': ['oauthToken', 'betaFlag', 'billingHeader'],
   zai: ['apiKey'],
   kimi: ['apiKey'],
+  minimax: ['apiKey'],
 };
 
 const CREDENTIAL_FIELD_ALIASES: Partial<Record<Api, Partial<Record<string, readonly string[]>>>> = {

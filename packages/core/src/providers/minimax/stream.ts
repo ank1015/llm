@@ -1,0 +1,295 @@
+import { calculateCost } from '../../models.js';
+import { AssistantMessageEventStream } from '../../utils/event-stream.js';
+import { parseStreamingJson } from '../../utils/json-parse.js';
+
+import { buildParams, createClient, getMockMinimaxMessage, mapStopReason } from './utils.js';
+
+import type { StreamFunction } from '../../utils/types.js';
+import type {
+  AssistantResponseContent,
+  AssistantThinkingContent,
+  AssistantToolCall,
+  BaseAssistantMessage,
+  Context,
+  MiniMaxProviderOptions,
+  Model,
+  TextContent,
+} from '@ank1015/llm-types';
+import type { MessageCreateParamsStreaming } from '@anthropic-ai/sdk/resources';
+import type {
+  Message as AnthropicMessage,
+  ContentBlock,
+  TextBlock,
+  ThinkingBlock,
+} from '@anthropic-ai/sdk/resources.js';
+
+export const streamMinimax: StreamFunction<'minimax'> = (
+  model: Model<'minimax'>,
+  context: Context,
+  options: MiniMaxProviderOptions,
+  id: string
+) => {
+  const stream = new AssistantMessageEventStream<'minimax'>();
+
+  (async () => {
+    const startTimestamp = Date.now();
+    const finalResponse: AnthropicMessage = getMockMinimaxMessage(model.id, id);
+
+    const output: BaseAssistantMessage<'minimax'> = {
+      role: 'assistant',
+      api: model.api,
+      model: model,
+      id,
+      message: finalResponse,
+      content: [],
+      usage: {
+        input: 0,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: 0,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+      },
+      stopReason: 'stop',
+      timestamp: startTimestamp,
+      duration: 0,
+    };
+
+    type Block = (
+      | AssistantThinkingContent
+      | AssistantResponseContent
+      | (AssistantToolCall & { partialJson: string })
+    ) & { index: number };
+    const blocks = output.content as Block[];
+    const accumulatedContent = [] as (ContentBlock & { index?: number } & {
+      partialJson?: string;
+    })[];
+
+    try {
+      const client = createClient(model, options.apiKey);
+      const params = buildParams(model, context, options);
+      const paramsStreaming: MessageCreateParamsStreaming = { ...params, stream: true };
+
+      const minimaxStream = client.messages.stream(paramsStreaming, { signal: options?.signal });
+      stream.push({ type: 'start', message: { ...output, timestamp: Date.now() } });
+
+      for await (const event of minimaxStream) {
+        if (event.type === 'message_start') {
+          // Capture message metadata from message_start event
+          finalResponse.id = event.message.id;
+          finalResponse.model = event.message.model;
+          finalResponse.role = event.message.role;
+          finalResponse.type = event.message.type;
+          finalResponse.stop_sequence = event.message.stop_sequence;
+          // Capture initial token usage from message_start event
+          output.usage.input = event.message.usage.input_tokens || 0;
+          output.usage.output = event.message.usage.output_tokens || 0;
+          output.usage.cacheRead = event.message.usage.cache_read_input_tokens || 0;
+          output.usage.cacheWrite = event.message.usage.cache_creation_input_tokens || 0;
+          output.usage.totalTokens =
+            output.usage.input +
+            output.usage.output +
+            output.usage.cacheRead +
+            output.usage.cacheWrite;
+          output.usage.cost = calculateCost(model, output.usage);
+        } else if (event.type === 'content_block_start') {
+          accumulatedContent.push({ index: event.index, ...event.content_block });
+          if (event.content_block.type === 'text') {
+            const block: Block = {
+              type: 'response',
+              content: [{ type: 'text', content: '' }],
+              index: event.index,
+            };
+            output.content.push(block);
+            stream.push({
+              type: 'text_start',
+              contentIndex: output.content.length - 1,
+              message: output,
+            });
+          } else if (event.content_block.type === 'thinking') {
+            const block: Block = {
+              type: 'thinking',
+              thinkingText: '',
+              index: event.index,
+            };
+            output.content.push(block);
+            stream.push({
+              type: 'thinking_start',
+              contentIndex: output.content.length - 1,
+              message: output,
+            });
+          } else if (event.content_block.type === 'tool_use') {
+            const block: Block = {
+              type: 'toolCall',
+              toolCallId: event.content_block.id,
+              name: event.content_block.name,
+              arguments: event.content_block.input as Record<string, unknown>,
+              partialJson: '',
+              index: event.index,
+            };
+            output.content.push(block);
+            stream.push({
+              type: 'toolcall_start',
+              contentIndex: output.content.length - 1,
+              message: output,
+            });
+          }
+        } else if (event.type === 'content_block_delta') {
+          const accumBlockIndex = accumulatedContent.findIndex((a) => a.index === event.index);
+          if (event.delta.type === 'text_delta') {
+            const index = blocks.findIndex((b) => b.index === event.index);
+            const block = blocks[index];
+            if (block && block.type === 'response') {
+              const textContentIndex = block.content.findIndex((b) => b.type === 'text');
+              (block.content[textContentIndex] as TextContent).content += event.delta.text;
+              stream.push({
+                type: 'text_delta',
+                contentIndex: index,
+                delta: event.delta.text,
+                message: output,
+              });
+            }
+            const textAccumBlock = accumulatedContent[accumBlockIndex];
+            if (textAccumBlock) {
+              (textAccumBlock as TextBlock).text += event.delta.text;
+            }
+          } else if (event.delta.type === 'thinking_delta') {
+            const index = blocks.findIndex((b) => b.index === event.index);
+            const block = blocks[index];
+            if (block && block.type === 'thinking') {
+              block.thinkingText += event.delta.thinking;
+              stream.push({
+                type: 'thinking_delta',
+                contentIndex: index,
+                delta: event.delta.thinking,
+                message: output,
+              });
+            }
+            const thinkingAccumBlock = accumulatedContent[accumBlockIndex];
+            if (thinkingAccumBlock) {
+              (thinkingAccumBlock as ThinkingBlock).thinking += event.delta.thinking;
+            }
+          } else if (event.delta.type === 'input_json_delta') {
+            const index = blocks.findIndex((b) => b.index === event.index);
+            const block = blocks[index];
+            if (block && block.type === 'toolCall') {
+              block.partialJson += event.delta.partial_json;
+              block.arguments = parseStreamingJson(block.partialJson);
+              stream.push({
+                type: 'toolcall_delta',
+                contentIndex: index,
+                delta: event.delta.partial_json,
+                message: output,
+              });
+            }
+            const accumBlock = accumulatedContent[accumBlockIndex];
+            if (accumBlock) {
+              accumBlock.partialJson += event.delta.partial_json;
+            }
+          } else if (event.delta.type === 'signature_delta') {
+            const accumBlock = accumulatedContent[accumBlockIndex];
+            if (accumBlock) {
+              (accumBlock as ThinkingBlock).signature += event.delta.signature;
+            }
+          }
+        } else if (event.type === 'content_block_stop') {
+          const index = blocks.findIndex((b) => b.index === event.index);
+          const block = blocks[index];
+          const accumBlockIndex = accumulatedContent.findIndex((a) => a.index === event.index);
+          const accumBlock = accumulatedContent[accumBlockIndex];
+          if (accumBlock) {
+            if (accumBlock.type === 'tool_use') {
+              const partialJson = accumBlock.partialJson;
+              (accumBlock as ContentBlock & { input?: unknown }).input =
+                parseStreamingJson(partialJson);
+            }
+            // Always delete index and partialJson - don't use truthy check as index can be 0
+            if (accumBlock.index !== undefined) delete accumBlock.index;
+            if (accumBlock.partialJson !== undefined) delete accumBlock.partialJson;
+          }
+          if (block) {
+            delete (block as any).index;
+            if (block.type === 'response') {
+              stream.push({
+                type: 'text_end',
+                contentIndex: index,
+                content: block.content,
+                message: output,
+              });
+            } else if (block.type === 'thinking') {
+              stream.push({
+                type: 'thinking_end',
+                contentIndex: index,
+                content: block.thinkingText,
+                message: output,
+              });
+            } else if (block.type === 'toolCall') {
+              block.arguments = parseStreamingJson(block.partialJson);
+              delete (block as any).partialJson;
+              stream.push({
+                type: 'toolcall_end',
+                contentIndex: index,
+                toolCall: block,
+                message: output,
+              });
+            }
+          }
+        } else if (event.type === 'message_delta') {
+          if (event.delta.stop_reason) {
+            output.stopReason = mapStopReason(event.delta.stop_reason);
+            finalResponse.stop_reason = event.delta.stop_reason;
+          }
+          finalResponse.usage = event.usage as any;
+          // message_delta only provides output_tokens, preserve input tokens from message_start
+          output.usage.output = event.usage.output_tokens || 0;
+          output.usage.totalTokens =
+            output.usage.input +
+            output.usage.output +
+            output.usage.cacheRead +
+            output.usage.cacheWrite;
+          output.usage.cost = calculateCost(model, output.usage);
+        }
+      }
+
+      if (options?.signal?.aborted) {
+        throw new Error('Request was aborted');
+      }
+
+      if (output.stopReason === 'aborted' || output.stopReason === 'error') {
+        throw new Error(
+          `Stream ended with status: ${output.stopReason}${output.errorMessage ? ` - ${output.errorMessage}` : ''}`
+        );
+      }
+
+      // Populate finalResponse.content with accumulated content blocks
+      finalResponse.content = accumulatedContent as ContentBlock[];
+
+      output.timestamp = Date.now();
+      output.duration = Date.now() - startTimestamp;
+      stream.push({
+        type: 'done',
+        reason: output.stopReason,
+        message: output,
+      });
+      stream.end(output);
+    } catch (error) {
+      for (const block of output.content) delete (block as any).index;
+      output.stopReason = options?.signal?.aborted ? 'aborted' : 'error';
+      output.errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+
+      // Populate finalResponse.content with accumulated content blocks even on error
+      finalResponse.content = accumulatedContent as ContentBlock[];
+
+      output.timestamp = Date.now();
+      output.duration = Date.now() - startTimestamp;
+      stream.push({
+        type: 'error',
+        reason: output.stopReason,
+        message: output,
+      });
+      stream.end(output);
+    }
+  })();
+
+  return stream;
+};

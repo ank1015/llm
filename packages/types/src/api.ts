@@ -17,6 +17,7 @@ export const KnownApis = [
   'claude-code',
   'zai',
   'kimi',
+  'minimax',
 ] as const;
 
 /**

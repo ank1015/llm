@@ -25,6 +25,8 @@ export type {
   KimiNativeResponse,
   KimiProviderOptions,
   KimiThinkingConfig,
+  MiniMaxNativeResponse,
+  MiniMaxProviderOptions,
   OpenAINativeResponse,
   OpenAIProviderOptions,
   ZaiNativeResponse,

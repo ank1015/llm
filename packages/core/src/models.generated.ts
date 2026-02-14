@@ -5,6 +5,7 @@ const openaiBaseUrl = `https://api.openai.com/v1`;
 const codexBaseUrl = `https://chatgpt.com/backend-api/codex`;
 const googleBaseUrl = `https://generativelanguage.googleapis.com/v1beta`;
 const anthropicBaseUrl = `https://api.anthropic.com`
+const minimaxBaseUrl = `https://api.minimax.io/anthropic`
 
 export const MODELS = {
 	openai: {
@@ -363,5 +364,92 @@ export const MODELS = {
 			maxTokens: 32768,
 			tools: ["function_calling"],
 		} satisfies Model<"kimi">,
+	},
+	minimax: {
+		"MiniMax-M2.5": {
+			id: "MiniMax-M2.5",
+			name: "MiniMax M2.5",
+			api: "minimax",
+			baseUrl: minimaxBaseUrl,
+			reasoning: true,
+			input: ["text"],
+			cost: {
+				input: 0.3,
+				output: 1.2,
+				cacheRead: 0.03,
+				cacheWrite: 0.375,
+			},
+			contextWindow: 204800,
+			maxTokens: 64000,
+			tools: ["function_calling"],
+		} satisfies Model<"minimax">,
+		"MiniMax-M2.5-highspeed": {
+			id: "MiniMax-M2.5-highspeed",
+			name: "MiniMax M2.5 Highspeed",
+			api: "minimax",
+			baseUrl: minimaxBaseUrl,
+			reasoning: true,
+			input: ["text"],
+			cost: {
+				input: 0.3,
+				output: 2.4,
+				cacheRead: 0.03,
+				cacheWrite: 0.375,
+			},
+			contextWindow: 204800,
+			maxTokens: 64000,
+			tools: ["function_calling"],
+		} satisfies Model<"minimax">,
+		"MiniMax-M2.1": {
+			id: "MiniMax-M2.1",
+			name: "MiniMax M2.1",
+			api: "minimax",
+			baseUrl: minimaxBaseUrl,
+			reasoning: true,
+			input: ["text"],
+			cost: {
+				input: 0.3,
+				output: 1.2,
+				cacheRead: 0.03,
+				cacheWrite: 0.375,
+			},
+			contextWindow: 204800,
+			maxTokens: 64000,
+			tools: ["function_calling"],
+		} satisfies Model<"minimax">,
+		"MiniMax-M2.1-highspeed": {
+			id: "MiniMax-M2.1-highspeed",
+			name: "MiniMax M2.1 Highspeed",
+			api: "minimax",
+			baseUrl: minimaxBaseUrl,
+			reasoning: true,
+			input: ["text"],
+			cost: {
+				input: 0.3,
+				output: 2.4,
+				cacheRead: 0.03,
+				cacheWrite: 0.375,
+			},
+			contextWindow: 204800,
+			maxTokens: 64000,
+			tools: ["function_calling"],
+		} satisfies Model<"minimax">,
+		"MiniMax-M2": {
+			id: "MiniMax-M2",
+			name: "MiniMax M2",
+			api: "minimax",
+			baseUrl: minimaxBaseUrl,
+			reasoning: true,
+			input: ["text"],
+			cost: {
+				input: 0.3,
+				output: 1.2,
+				cacheRead: 0.03,
+				cacheWrite: 0.375,
+			},
+			contextWindow: 204800,
+			maxTokens: 64000,
+			tools: ["function_calling"],
+		} satisfies Model<"minimax">,
 	},
 };
