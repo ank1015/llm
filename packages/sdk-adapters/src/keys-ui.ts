@@ -12,13 +12,53 @@
  *   node dist/keys-ui.js
  */
 
+import { existsSync, readFileSync } from 'node:fs';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 
 import { KnownApis, isValidApi } from '@ank1015/llm-types';
 
 import { FileKeysAdapter } from './file-keys.js';
 
 import type { Api } from '@ank1015/llm-types';
+
+// ────────────────────────────────────────────────────────────────────
+//  Credential reload logic per provider
+// ────────────────────────────────────────────────────────────────────
+
+/** Providers that support auto-reloading credentials from local config files. */
+const RELOADABLE_APIS = new Set<Api>(['codex']);
+
+/**
+ * Read credentials from the provider's local config file.
+ * Returns the credential map or throws with a user-friendly message.
+ */
+function reloadCredentials(api: Api): Record<string, string> {
+  switch (api) {
+    case 'codex': {
+      const authPath = join(homedir(), '.codex', 'auth.json');
+      if (!existsSync(authPath)) {
+        throw new Error(`Codex auth file not found: ${authPath}`);
+      }
+      const auth = JSON.parse(readFileSync(authPath, 'utf8')) as {
+        tokens?: { access_token?: string; account_id?: string };
+      };
+      const accessToken = auth.tokens?.access_token;
+      const accountId = auth.tokens?.account_id;
+      if (!accessToken) {
+        throw new Error('No access_token found in codex auth.json');
+      }
+      const creds: Record<string, string> = { apiKey: accessToken };
+      if (accountId) {
+        creds['chatgpt-account-id'] = accountId;
+      }
+      return creds;
+    }
+    default:
+      throw new Error(`Reload not supported for ${api}`);
+  }
+}
 
 // ────────────────────────────────────────────────────────────────────
 //  HTML template
@@ -89,6 +129,7 @@ function getHtml(): string {
     }
     button:hover { opacity: 0.85; }
     .btn-save { background: #2563eb; color: #fff; }
+    .btn-reload { background: #7c3aed; color: #e9d5ff; }
     .btn-delete { background: #7f1d1d; color: #fca5a5; }
     .toast {
       position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
@@ -108,6 +149,7 @@ function getHtml(): string {
 
   <script>
     const PROVIDERS = ${JSON.stringify(KnownApis)};
+    const RELOADABLE = ${JSON.stringify([...RELOADABLE_APIS])};
     let keysStatus = {};
 
     function toast(msg, ok = true) {
@@ -166,6 +208,7 @@ function getHtml(): string {
           + '</div>'
           + '<div class="actions">'
           + '  <button class="btn-save" onclick="save(\\'' + api + '\\')">Save</button>'
+          + (RELOADABLE.includes(api) ? '  <button class="btn-reload" onclick="reload(\\'' + api + '\\')">Reload</button>' : '')
           + '  <button class="btn-delete" onclick="del(\\'' + api + '\\')">Delete</button>'
           + '</div>'
           + '</div>'
@@ -226,6 +269,18 @@ function getHtml(): string {
         await loadKeys();
       } else {
         toast('Failed to delete', false);
+      }
+    }
+
+    async function reload(api) {
+      const res = await fetch('/api/keys/' + api + '/reload', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        toast('Reloaded ' + api);
+        await loadKeys();
+        document.getElementById('body-' + api).classList.add('open');
+      } else {
+        toast(data.error || 'Reload failed', false);
       }
     }
 
@@ -334,6 +389,24 @@ async function handleRequest(
       })
     );
     json(res, { ok: true, providers });
+    return;
+  }
+
+  // POST /api/keys/:api/reload — auto-fetch credentials from local config
+  const reloadMatch = url.match(/^\/api\/keys\/([a-z0-9-]+)\/reload$/);
+  if (reloadMatch && method === 'POST') {
+    const api = reloadMatch[1] as string;
+    if (!isValidApi(api)) {
+      json(res, { ok: false, error: `Unknown provider: ${api}` }, 400);
+      return;
+    }
+    if (!RELOADABLE_APIS.has(api as Api)) {
+      json(res, { ok: false, error: `Reload not supported for ${api}` }, 400);
+      return;
+    }
+    const credentials = reloadCredentials(api as Api);
+    await adapter.setCredentials(api as Api, credentials);
+    json(res, { ok: true });
     return;
   }
 
