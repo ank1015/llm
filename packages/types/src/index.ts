@@ -32,6 +32,8 @@ export type {
   MiniMaxProviderOptions,
   OpenAINativeResponse,
   OpenAIProviderOptions,
+  OpenRouterNativeResponse,
+  OpenRouterProviderOptions,
   ZaiNativeResponse,
   ZaiProviderOptions,
   ZaiThinkingConfig,

@@ -7,6 +7,7 @@ const googleBaseUrl = `https://generativelanguage.googleapis.com/v1beta`;
 const anthropicBaseUrl = `https://api.anthropic.com`
 const minimaxBaseUrl = `https://api.minimax.io/anthropic`
 const cerebrasBaseUrl = `https://api.cerebras.ai/v1`
+const openrouterBaseUrl = `https://openrouter.ai/api/v1`
 
 export const MODELS = {
 	openai: {
@@ -557,5 +558,59 @@ export const MODELS = {
 			maxTokens: 8192,
 			tools: ["function_calling"],
 		} satisfies Model<"cerebras">,
+	},
+
+	openrouter: {
+		"anthropic/claude-sonnet-4": {
+			id: "anthropic/claude-sonnet-4",
+			name: "Claude Sonnet 4 (OpenRouter)",
+			api: "openrouter",
+			baseUrl: openrouterBaseUrl,
+			reasoning: false,
+			input: ["text", "image"],
+			cost: {
+				input: 3.0,
+				output: 15.0,
+				cacheRead: 0.3,
+				cacheWrite: 3.75,
+			},
+			contextWindow: 200000,
+			maxTokens: 8192,
+			tools: ["function_calling"],
+		} satisfies Model<"openrouter">,
+		"openai/gpt-4o": {
+			id: "openai/gpt-4o",
+			name: "GPT-4o (OpenRouter)",
+			api: "openrouter",
+			baseUrl: openrouterBaseUrl,
+			reasoning: false,
+			input: ["text", "image"],
+			cost: {
+				input: 2.5,
+				output: 10.0,
+				cacheRead: 1.25,
+				cacheWrite: 0,
+			},
+			contextWindow: 128000,
+			maxTokens: 16384,
+			tools: ["function_calling"],
+		} satisfies Model<"openrouter">,
+		"google/gemini-2.5-flash-preview": {
+			id: "google/gemini-2.5-flash-preview",
+			name: "Gemini 2.5 Flash Preview (OpenRouter)",
+			api: "openrouter",
+			baseUrl: openrouterBaseUrl,
+			reasoning: true,
+			input: ["text", "image"],
+			cost: {
+				input: 0.075,
+				output: 0.3,
+				cacheRead: 0.01875,
+				cacheWrite: 0,
+			},
+			contextWindow: 1000000,
+			maxTokens: 8192,
+			tools: ["function_calling"],
+		} satisfies Model<"openrouter">,
 	},
 };

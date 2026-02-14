@@ -17,6 +17,7 @@ import type { GoogleNativeResponse, GoogleProviderOptions } from './google.js';
 import type { KimiNativeResponse, KimiProviderOptions } from './kimi.js';
 import type { MiniMaxNativeResponse, MiniMaxProviderOptions } from './minimax.js';
 import type { OpenAINativeResponse, OpenAIProviderOptions } from './openai.js';
+import type { OpenRouterNativeResponse, OpenRouterProviderOptions } from './openrouter.js';
 import type { ZaiNativeResponse, ZaiProviderOptions } from './zai.js';
 
 // Re-export all provider types
@@ -33,6 +34,7 @@ export type { GoogleNativeResponse, GoogleProviderOptions } from './google.js';
 export type { KimiNativeResponse, KimiProviderOptions, KimiThinkingConfig } from './kimi.js';
 export type { MiniMaxNativeResponse, MiniMaxProviderOptions } from './minimax.js';
 export type { OpenAINativeResponse, OpenAIProviderOptions } from './openai.js';
+export type { OpenRouterNativeResponse, OpenRouterProviderOptions } from './openrouter.js';
 export type { ZaiNativeResponse, ZaiProviderOptions, ZaiThinkingConfig } from './zai.js';
 
 /**
@@ -52,6 +54,7 @@ export interface ApiNativeResponseMap {
   kimi: KimiNativeResponse;
   minimax: MiniMaxNativeResponse;
   cerebras: CerebrasNativeResponse;
+  openrouter: OpenRouterNativeResponse;
 }
 
 /**
@@ -73,6 +76,7 @@ export interface ApiOptionsMap {
   kimi: KimiProviderOptions;
   minimax: MiniMaxProviderOptions;
   cerebras: CerebrasProviderOptions;
+  openrouter: OpenRouterProviderOptions;
 }
 
 /**

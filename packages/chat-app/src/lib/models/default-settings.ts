@@ -55,6 +55,7 @@ export function getDefaultProviderSettingsForApi(api: Api): Record<string, unkno
     case 'minimax':
       return defaultAnthropicProviderOptions;
     case 'cerebras':
+    case 'openrouter':
       return {};
   }
 }

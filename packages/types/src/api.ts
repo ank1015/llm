@@ -19,6 +19,7 @@ export const KnownApis = [
   'kimi',
   'minimax',
   'cerebras',
+  'openrouter',
 ] as const;
 
 /**
