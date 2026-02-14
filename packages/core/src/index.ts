@@ -34,6 +34,7 @@ export * from './providers/deepseek/index.js';
 export * from './providers/zai/index.js';
 export * from './providers/kimi/index.js';
 export * from './providers/minimax/index.js';
+export * from './providers/cerebras/index.js';
 
 // LLM - Central entry point (dispatches to providers)
 export { complete, stream } from './llm/index.js';

@@ -19,6 +19,7 @@ const REQUIRED_CREDENTIAL_FIELDS: Record<Api, readonly string[]> = {
   zai: ['apiKey'],
   kimi: ['apiKey'],
   minimax: ['apiKey'],
+  cerebras: ['apiKey'],
 };
 
 const CREDENTIAL_FIELD_ALIASES: Partial<Record<Api, Partial<Record<string, readonly string[]>>>> = {

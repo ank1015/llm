@@ -54,6 +54,8 @@ export function getDefaultProviderSettingsForApi(api: Api): Record<string, unkno
       return defaultZAIProviderOptions;
     case 'minimax':
       return defaultAnthropicProviderOptions;
+    case 'cerebras':
+      return {};
   }
 }
 

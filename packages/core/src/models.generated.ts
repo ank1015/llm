@@ -6,6 +6,7 @@ const codexBaseUrl = `https://chatgpt.com/backend-api/codex`;
 const googleBaseUrl = `https://generativelanguage.googleapis.com/v1beta`;
 const anthropicBaseUrl = `https://api.anthropic.com`
 const minimaxBaseUrl = `https://api.minimax.io/anthropic`
+const cerebrasBaseUrl = `https://api.cerebras.ai/v1`
 
 export const MODELS = {
 	openai: {
@@ -451,5 +452,110 @@ export const MODELS = {
 			maxTokens: 64000,
 			tools: ["function_calling"],
 		} satisfies Model<"minimax">,
+	},
+
+	cerebras: {
+		"llama-3.3-70b": {
+			id: "llama-3.3-70b",
+			name: "Llama 3.3 70B",
+			api: "cerebras",
+			baseUrl: cerebrasBaseUrl,
+			reasoning: false,
+			input: ["text"],
+			cost: {
+				input: 0.06,
+				output: 0.06,
+				cacheRead: 0.06,
+				cacheWrite: 0,
+			},
+			contextWindow: 128000,
+			maxTokens: 8192,
+			tools: ["function_calling"],
+		} satisfies Model<"cerebras">,
+		"llama3.1-8b": {
+			id: "llama3.1-8b",
+			name: "Llama 3.1 8B",
+			api: "cerebras",
+			baseUrl: cerebrasBaseUrl,
+			reasoning: false,
+			input: ["text"],
+			cost: {
+				input: 0.01,
+				output: 0.01,
+				cacheRead: 0.01,
+				cacheWrite: 0,
+			},
+			contextWindow: 128000,
+			maxTokens: 8192,
+			tools: ["function_calling"],
+		} satisfies Model<"cerebras">,
+		"qwen-3-32b": {
+			id: "qwen-3-32b",
+			name: "Qwen 3 32B",
+			api: "cerebras",
+			baseUrl: cerebrasBaseUrl,
+			reasoning: true,
+			input: ["text"],
+			cost: {
+				input: 0.15,
+				output: 0.60,
+				cacheRead: 0.15,
+				cacheWrite: 0,
+			},
+			contextWindow: 32768,
+			maxTokens: 8192,
+			tools: ["function_calling"],
+		} satisfies Model<"cerebras">,
+		"gpt-oss-120b": {
+			id: "gpt-oss-120b",
+			name: "GPT-OSS 120B",
+			api: "cerebras",
+			baseUrl: cerebrasBaseUrl,
+			reasoning: true,
+			input: ["text"],
+			cost: {
+				input: 0.60,
+				output: 2.40,
+				cacheRead: 0.60,
+				cacheWrite: 0,
+			},
+			contextWindow: 128000,
+			maxTokens: 16384,
+			tools: ["function_calling"],
+		} satisfies Model<"cerebras">,
+		"zai-glm-4.7": {
+			id: "zai-glm-4.7",
+			name: "Z.AI GLM 4.7",
+			api: "cerebras",
+			baseUrl: cerebrasBaseUrl,
+			reasoning: true,
+			input: ["text"],
+			cost: {
+				input: 0.10,
+				output: 0.40,
+				cacheRead: 0.10,
+				cacheWrite: 0,
+			},
+			contextWindow: 128000,
+			maxTokens: 16384,
+			tools: ["function_calling"],
+		} satisfies Model<"cerebras">,
+		"qwen-3-235b-a22b-instruct-2507": {
+			id: "qwen-3-235b-a22b-instruct-2507",
+			name: "Qwen 3 235B A22B",
+			api: "cerebras",
+			baseUrl: cerebrasBaseUrl,
+			reasoning: true,
+			input: ["text"],
+			cost: {
+				input: 0.30,
+				output: 0.60,
+				cacheRead: 0.30,
+				cacheWrite: 0,
+			},
+			contextWindow: 128000,
+			maxTokens: 8192,
+			tools: ["function_calling"],
+		} satisfies Model<"cerebras">,
 	},
 };

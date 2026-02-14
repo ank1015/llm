@@ -9,6 +9,7 @@ import type { Api } from '../api.js';
 // Import native response types for the map
 // Import provider options for the map
 import type { AnthropicNativeResponse, AnthropicProviderOptions } from './anthropic.js';
+import type { CerebrasNativeResponse, CerebrasProviderOptions } from './cerebras.js';
 import type { ClaudeCodeNativeResponse, ClaudeCodeProviderOptions } from './claude-code.js';
 import type { CodexNativeResponse, CodexProviderOptions } from './codex.js';
 import type { DeepSeekNativeResponse, DeepSeekProviderOptions } from './deepseek.js';
@@ -20,6 +21,11 @@ import type { ZaiNativeResponse, ZaiProviderOptions } from './zai.js';
 
 // Re-export all provider types
 export type { AnthropicNativeResponse, AnthropicProviderOptions } from './anthropic.js';
+export type {
+  CerebrasNativeResponse,
+  CerebrasProviderOptions,
+  CerebrasReasoningFormat,
+} from './cerebras.js';
 export type { ClaudeCodeNativeResponse, ClaudeCodeProviderOptions } from './claude-code.js';
 export type { CodexNativeResponse, CodexProviderOptions } from './codex.js';
 export type { DeepSeekNativeResponse, DeepSeekProviderOptions } from './deepseek.js';
@@ -45,6 +51,7 @@ export interface ApiNativeResponseMap {
   zai: ZaiNativeResponse;
   kimi: KimiNativeResponse;
   minimax: MiniMaxNativeResponse;
+  cerebras: CerebrasNativeResponse;
 }
 
 /**
@@ -65,6 +72,7 @@ export interface ApiOptionsMap {
   zai: ZaiProviderOptions;
   kimi: KimiProviderOptions;
   minimax: MiniMaxProviderOptions;
+  cerebras: CerebrasProviderOptions;
 }
 
 /**

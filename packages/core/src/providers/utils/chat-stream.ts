@@ -33,9 +33,11 @@ import type {
   ChatCompletionCreateParamsStreaming,
 } from 'openai/resources/chat/completions.js';
 
-/** Delta type extension for providers that include reasoning_content */
+/** Delta type extension for providers that include reasoning content */
 interface ReasoningChunkDelta {
   reasoning_content?: string | null;
+  /** Cerebras uses 'reasoning' instead of 'reasoning_content' */
+  reasoning?: string | null;
 }
 
 /**
@@ -146,10 +148,11 @@ export function createChatCompletionStream<
         if (!choice) continue;
 
         const delta = choice.delta as typeof choice.delta & ReasoningChunkDelta;
+        const reasoningDelta = delta.reasoning_content ?? delta.reasoning;
 
         // Handle reasoning/thinking content
-        if (delta.reasoning_content) {
-          accumulatedReasoningContent += delta.reasoning_content;
+        if (reasoningDelta) {
+          accumulatedReasoningContent += reasoningDelta;
 
           if (!currentBlock || currentBlock.type !== 'thinking') {
             if (currentBlock) {
@@ -172,11 +175,11 @@ export function createChatCompletionStream<
           }
 
           if (currentBlock.type === 'thinking') {
-            currentBlock.thinkingText += delta.reasoning_content;
+            currentBlock.thinkingText += reasoningDelta;
             stream.push({
               type: 'thinking_delta',
               contentIndex: blockIndex(),
-              delta: delta.reasoning_content,
+              delta: reasoningDelta,
               message: output,
             });
           }

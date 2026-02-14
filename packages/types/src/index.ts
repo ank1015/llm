@@ -14,6 +14,9 @@ export type { TextContent, ImageContent, FileContent, Content } from './content.
 export type {
   AnthropicNativeResponse,
   AnthropicProviderOptions,
+  CerebrasNativeResponse,
+  CerebrasProviderOptions,
+  CerebrasReasoningFormat,
   ClaudeCodeNativeResponse,
   ClaudeCodeProviderOptions,
   CodexNativeResponse,
