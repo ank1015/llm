@@ -284,7 +284,7 @@ export class FileSessionsAdapter implements SessionsAdapter {
       projectName,
       path = '',
       sessionId,
-      parentId,
+      parentId: inputParentId,
       branch,
       message,
       api,
@@ -293,12 +293,14 @@ export class FileSessionsAdapter implements SessionsAdapter {
     } = input;
 
     let actualSessionId = sessionId;
+    let parentId = inputParentId;
     let filePath: string;
 
     if (!actualSessionId) {
-      // No sessionId provided — auto-create
-      const { sessionId: newId } = await this.createSession({ projectName, path });
+      // No sessionId provided — auto-create, use header as parent
+      const { sessionId: newId, header } = await this.createSession({ projectName, path });
       actualSessionId = newId;
+      parentId = header.id;
       filePath = this.getSessionFilePath(projectName, path, actualSessionId);
     } else {
       filePath = this.getSessionFilePath(projectName, path, actualSessionId);
