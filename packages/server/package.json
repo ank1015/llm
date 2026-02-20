@@ -25,8 +25,13 @@
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
-    "hono": "^4.7.0",
-    "@hono/node-server": "^1.14.0"
+    "@ank1015/llm-sdk": "workspace:^",
+    "@ank1015/llm-sdk-adapters": "workspace:^",
+    "@hono/node-server": "^1.14.0",
+    "@silvia-odwyer/photon-node": "^0.3.4",
+    "@sinclair/typebox": "^0.34.48",
+    "file-type": "^21.3.0",
+    "hono": "^4.7.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
