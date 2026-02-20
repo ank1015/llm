@@ -30,11 +30,16 @@
     "@hono/node-server": "^1.14.0",
     "@silvia-odwyer/photon-node": "^0.3.4",
     "@sinclair/typebox": "^0.34.48",
+    "chalk": "^5.6.2",
+    "diff": "^8.0.3",
     "file-type": "^21.3.0",
-    "hono": "^4.7.0"
+    "glob": "^13.0.6",
+    "hono": "^4.7.0",
+    "proper-lockfile": "^4.1.2"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "@types/proper-lockfile": "^4.1.4",
     "vitest": "^2.1.0"
   },
   "keywords": [
