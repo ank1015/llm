@@ -1,12 +1,13 @@
- 
 'use client';
 import {
   Archive,
   ChevronDown,
+  ChevronRight,
   Ellipsis,
   FilterIcon,
   Folder,
   FolderPlus,
+  GitBranch,
   PanelLeft,
   Pen,
   Pin,
@@ -32,37 +33,75 @@ import { cn } from '@/lib/utils';
 // Mock data
 // ---------------------------------------------------------------------------
 
-type MockSession = {
-  sessionId: string;
-  sessionName: string;
+type MockThread = {
+  threadId: string;
+  threadName: string;
   age: string;
+};
+
+type MockBranch = {
+  branchId: string;
+  branchName: string;
+  status: 'active' | 'merged';
+  threads: MockThread[];
 };
 
 type MockProject = {
   projectId: string;
   projectName: string;
-  chats: MockSession[];
+  branches: MockBranch[];
 };
 
 const MOCK_PROJECTS: MockProject[] = [
   {
     projectId: 'p1',
     projectName: 'polymarket',
-    chats: [
-      { sessionId: '1', sessionName: 'Review high-level strategy for Q2', age: '3d' },
-      { sessionId: '2', sessionName: 'Review polymarket strategy docs', age: '3d' },
-      { sessionId: '3', sessionName: 'Estimate storage and compute costs', age: '3d' },
+    branches: [
+      {
+        branchId: 'b1',
+        branchName: 'feat/trading-engine',
+        status: 'active',
+        threads: [
+          { threadId: '1', threadName: 'Review high-level strategy for Q2', age: '3d' },
+          { threadId: '2', threadName: 'Review polymarket strategy docs', age: '3d' },
+        ],
+      },
+      {
+        branchId: 'b2',
+        branchName: 'feat/market-analytics',
+        status: 'active',
+        threads: [{ threadId: '3', threadName: 'Estimate storage and compute costs', age: '3d' }],
+      },
+      {
+        branchId: 'b3',
+        branchName: 'fix/order-matching',
+        status: 'merged',
+        threads: [{ threadId: '4', threadName: 'Debug order matching race condition', age: '7d' }],
+      },
+      {
+        branchId: 'b4',
+        branchName: 'feat/onboarding-flow',
+        status: 'merged',
+        threads: [{ threadId: '5', threadName: 'Design onboarding screens', age: '12d' }],
+      },
     ],
   },
   {
     projectId: 'p2',
     projectName: 'web-reader',
-    chats: [],
+    branches: [
+      {
+        branchId: 'b5',
+        branchName: 'feat/pdf-parser',
+        status: 'active',
+        threads: [{ threadId: '6', threadName: 'PDF text extraction pipeline', age: '1d' }],
+      },
+    ],
   },
   {
     projectId: 'p3',
     projectName: 'llm',
-    chats: [],
+    branches: [],
   },
 ];
 
@@ -93,41 +132,88 @@ const SidebarItem: FC<SidebarItemProps> = ({ icon, label, collapsed, onClick }) 
 };
 
 // ---------------------------------------------------------------------------
-// ChatItem
+// ThreadItem
 // ---------------------------------------------------------------------------
 
-type ChatItemProps = {
-  session: MockSession;
+const ThreadItem: FC<{
+  thread: MockThread;
   isActive: boolean;
-  onSelect: (session: MockSession) => void;
-};
-
-const ChatItem: FC<ChatItemProps> = ({ session, isActive, onSelect }) => {
+  onSelect: (thread: MockThread) => void;
+}> = ({ thread, isActive, onSelect }) => {
   return (
     <div
-      onClick={() => onSelect(session)}
+      onClick={() => onSelect(thread)}
       className={cn(
-        'flex h-9 w-full cursor-pointer items-center rounded-lg pr-2 pl-7 text-[13px]',
+        'flex h-8 w-full cursor-pointer items-center rounded-lg pr-2 pl-10 text-[13px]',
         isActive ? 'bg-home-hover' : 'hover:bg-home-hover'
       )}
     >
-      <span className="flex-1 truncate text-foreground text-[13px]">{session.sessionName}</span>
-      <span className="text-muted-foreground ml-2 shrink-0 text-[12px]">{session.age}</span>
+      <span className="flex-1 truncate text-foreground text-[13px]">{thread.threadName}</span>
+      <span className="text-muted-foreground ml-2 shrink-0 text-[12px]">{thread.age}</span>
     </div>
   );
 };
 
 // ---------------------------------------------------------------------------
-// ProjectGroup — a single collapsible project with its chats
+// BranchGroup — a single branch with its threads
+// ---------------------------------------------------------------------------
+
+const BranchGroup: FC<{
+  branch: MockBranch;
+  activeThreadId: string | null;
+  onSelect: (thread: MockThread) => void;
+  defaultCollapsed?: boolean;
+}> = ({ branch, activeThreadId, onSelect, defaultCollapsed = false }) => {
+  const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
+
+  return (
+    <div>
+      <button
+        onClick={() => setIsCollapsed(!isCollapsed)}
+        className="group flex h-8 w-full cursor-pointer items-center gap-1.5 rounded-lg py-1 pl-6 pr-2 hover:bg-home-hover"
+      >
+        <ChevronRight
+          size={12}
+          strokeWidth={2}
+          className={cn(
+            'text-muted-foreground shrink-0 transition-transform duration-200',
+            !isCollapsed && 'rotate-90'
+          )}
+        />
+        <GitBranch size={14} strokeWidth={1.8} className="text-muted-foreground shrink-0" />
+        <span className="text-foreground truncate text-[13px]">{branch.branchName}</span>
+      </button>
+      {!isCollapsed && branch.threads.length > 0 && (
+        <div className="flex flex-col gap-0.5">
+          {branch.threads.map((thread) => (
+            <ThreadItem
+              key={thread.threadId}
+              thread={thread}
+              isActive={activeThreadId === thread.threadId}
+              onSelect={onSelect}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// ProjectGroup — a project folder with active/merged branch sections
 // ---------------------------------------------------------------------------
 
 const ProjectGroup: FC<{
   project: MockProject;
-  activeSessionId: string | null;
-  onSelect: (session: MockSession) => void;
-}> = ({ project, activeSessionId, onSelect }) => {
-  const hasChats = project.chats.length > 0;
-  const [isCollapsed, setIsCollapsed] = useState(!hasChats);
+  activeThreadId: string | null;
+  onSelect: (thread: MockThread) => void;
+}> = ({ project, activeThreadId, onSelect }) => {
+  const hasBranches = project.branches.length > 0;
+  const [isCollapsed, setIsCollapsed] = useState(!hasBranches);
+  const [isMergedExpanded, setIsMergedExpanded] = useState(false);
+
+  const activeBranches = project.branches.filter((b) => b.status === 'active');
+  const mergedBranches = project.branches.filter((b) => b.status === 'merged');
 
   return (
     <div>
@@ -188,16 +274,51 @@ const ProjectGroup: FC<{
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      {hasChats && !isCollapsed && (
+
+      {!isCollapsed && hasBranches && (
         <div className="flex flex-col gap-0.5 mt-0.5">
-          {project.chats.map((session) => (
-            <ChatItem
-              key={session.sessionId}
-              session={session}
-              isActive={activeSessionId === session.sessionId}
+          {/* Active branches */}
+          {activeBranches.map((branch) => (
+            <BranchGroup
+              key={branch.branchId}
+              branch={branch}
+              activeThreadId={activeThreadId}
               onSelect={onSelect}
+              defaultCollapsed
             />
           ))}
+
+          {/* Merged branches section */}
+          {mergedBranches.length > 0 && (
+            <div>
+              <button
+                onClick={() => setIsMergedExpanded(!isMergedExpanded)}
+                className="flex h-7 w-full cursor-pointer items-center gap-1 rounded-lg pl-6 pr-2 hover:bg-home-hover"
+              >
+                <ChevronRight
+                  size={12}
+                  strokeWidth={2}
+                  className={cn(
+                    'text-muted-foreground shrink-0 transition-transform duration-200',
+                    isMergedExpanded && 'rotate-90'
+                  )}
+                />
+                <span className="text-muted-foreground text-[12px]">
+                  Merged ({mergedBranches.length})
+                </span>
+              </button>
+              {isMergedExpanded &&
+                mergedBranches.map((branch) => (
+                  <BranchGroup
+                    key={branch.branchId}
+                    branch={branch}
+                    activeThreadId={activeThreadId}
+                    onSelect={onSelect}
+                    defaultCollapsed
+                  />
+                ))}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -210,10 +331,10 @@ const ProjectGroup: FC<{
 
 const ProjectList: FC<{ collapsed?: boolean }> = ({ collapsed }) => {
   const [projects] = useState(MOCK_PROJECTS);
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
 
-  const handleSelect = (session: MockSession) => {
-    setActiveSessionId(session.sessionId);
+  const handleSelect = (thread: MockThread) => {
+    setActiveThreadId(thread.threadId);
   };
 
   return (
@@ -243,7 +364,7 @@ const ProjectList: FC<{ collapsed?: boolean }> = ({ collapsed }) => {
                 <ProjectGroup
                   key={project.projectId}
                   project={project}
-                  activeSessionId={activeSessionId}
+                  activeThreadId={activeThreadId}
                   onSelect={handleSelect}
                 />
               ))}
