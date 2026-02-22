@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { memo, useState } from 'react';
 
+import type { MockBranch, MockProject, MockThread } from '@/lib/mock-data';
 import type { FC, ReactNode } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -27,83 +28,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { MOCK_PROJECTS } from '@/lib/mock-data';
 import { cn } from '@/lib/utils';
-
-// ---------------------------------------------------------------------------
-// Mock data
-// ---------------------------------------------------------------------------
-
-type MockThread = {
-  threadId: string;
-  threadName: string;
-  age: string;
-};
-
-type MockBranch = {
-  branchId: string;
-  branchName: string;
-  status: 'active' | 'merged';
-  threads: MockThread[];
-};
-
-type MockProject = {
-  projectId: string;
-  projectName: string;
-  branches: MockBranch[];
-};
-
-const MOCK_PROJECTS: MockProject[] = [
-  {
-    projectId: 'p1',
-    projectName: 'polymarket',
-    branches: [
-      {
-        branchId: 'b1',
-        branchName: 'feat/trading-engine',
-        status: 'active',
-        threads: [
-          { threadId: '1', threadName: 'Review high-level strategy for Q2', age: '3d' },
-          { threadId: '2', threadName: 'Review polymarket strategy docs', age: '3d' },
-        ],
-      },
-      {
-        branchId: 'b2',
-        branchName: 'feat/market-analytics',
-        status: 'active',
-        threads: [{ threadId: '3', threadName: 'Estimate storage and compute costs', age: '3d' }],
-      },
-      {
-        branchId: 'b3',
-        branchName: 'fix/order-matching',
-        status: 'merged',
-        threads: [{ threadId: '4', threadName: 'Debug order matching race condition', age: '7d' }],
-      },
-      {
-        branchId: 'b4',
-        branchName: 'feat/onboarding-flow',
-        status: 'merged',
-        threads: [{ threadId: '5', threadName: 'Design onboarding screens', age: '12d' }],
-      },
-    ],
-  },
-  {
-    projectId: 'p2',
-    projectName: 'web-reader',
-    branches: [
-      {
-        branchId: 'b5',
-        branchName: 'feat/pdf-parser',
-        status: 'active',
-        threads: [{ threadId: '6', threadName: 'PDF text extraction pipeline', age: '1d' }],
-      },
-    ],
-  },
-  {
-    projectId: 'p3',
-    projectName: 'llm',
-    branches: [],
-  },
-];
 
 // ---------------------------------------------------------------------------
 // SidebarItem
@@ -212,7 +138,8 @@ const ProjectGroup: FC<{
   project: MockProject;
   activeThreadId: string | null;
   onSelect: (thread: MockThread) => void;
-}> = ({ project, activeThreadId, onSelect }) => {
+  onProjectClick?: (project: MockProject) => void;
+}> = ({ project, activeThreadId, onSelect, onProjectClick }) => {
   const hasBranches = project.branches.length > 0;
   const [isCollapsed, setIsCollapsed] = useState(!hasBranches);
   const [isMergedExpanded, setIsMergedExpanded] = useState(false);
@@ -224,11 +151,11 @@ const ProjectGroup: FC<{
     <div>
       <DropdownMenu>
         <div className="group flex w-full items-center gap-1 whitespace-nowrap rounded-lg py-1.5 pl-2 pr-1 hover:bg-home-hover">
-          <button
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className="flex flex-1 cursor-pointer items-center gap-2 overflow-hidden"
-          >
-            <div className="relative flex h-4 w-4 shrink-0 items-center justify-center">
+          <div className="flex flex-1 cursor-pointer items-center gap-2 overflow-hidden">
+            <button
+              onClick={() => setIsCollapsed(!isCollapsed)}
+              className="relative flex h-4 w-4 shrink-0 items-center justify-center"
+            >
               <Folder
                 size={16}
                 strokeWidth={1.8}
@@ -242,9 +169,14 @@ const ProjectGroup: FC<{
                   isCollapsed && '-rotate-90'
                 )}
               />
-            </div>
-            <span className="text-foreground truncate text-[14px]">{project.projectName}</span>
-          </button>
+            </button>
+            <button
+              onClick={() => onProjectClick?.(project)}
+              className="flex-1 cursor-pointer truncate text-left"
+            >
+              <span className="text-foreground truncate text-[14px]">{project.projectName}</span>
+            </button>
+          </div>
           <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
             <DropdownMenuTrigger asChild>
               <button className="text-muted-foreground hover:text-foreground flex h-6 w-6 cursor-pointer items-center justify-center rounded-md">
@@ -334,7 +266,10 @@ const ProjectGroup: FC<{
 // ProjectList
 // ---------------------------------------------------------------------------
 
-const ProjectList: FC<{ collapsed?: boolean }> = ({ collapsed }) => {
+const ProjectList: FC<{
+  collapsed?: boolean;
+  onProjectSelect?: (project: MockProject) => void;
+}> = ({ collapsed, onProjectSelect }) => {
   const [projects] = useState(MOCK_PROJECTS);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
 
@@ -371,6 +306,7 @@ const ProjectList: FC<{ collapsed?: boolean }> = ({ collapsed }) => {
                   project={project}
                   activeThreadId={activeThreadId}
                   onSelect={handleSelect}
+                  onProjectClick={onProjectSelect}
                 />
               ))}
             </div>
@@ -385,7 +321,11 @@ const ProjectList: FC<{ collapsed?: boolean }> = ({ collapsed }) => {
 // Sidebar
 // ---------------------------------------------------------------------------
 
-function SidebarComponent() {
+function SidebarComponent({
+  onProjectSelect,
+}: {
+  onProjectSelect?: (project: MockProject) => void;
+}) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
 
@@ -451,7 +391,7 @@ function SidebarComponent() {
       </div>
 
       {/* Threads grouped by project */}
-      <ProjectList collapsed={isSidebarCollapsed} />
+      <ProjectList collapsed={isSidebarCollapsed} onProjectSelect={onProjectSelect} />
 
       {/* Settings — pinned to bottom */}
       {!isSidebarCollapsed && <div className="border-home-border mx-2 border-t" />}
