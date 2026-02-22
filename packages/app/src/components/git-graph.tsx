@@ -1,8 +1,9 @@
 'use client';
 
-import type { MockBranch, MockProject } from '@/lib/mock-data';
-import type { FC } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
+import type { MockBranch, MockProject } from '@/lib/mock-data';
+import type { FC, PointerEvent as ReactPointerEvent, WheelEvent } from 'react';
 
 // Layout constants
 const MAIN_X = 80;
@@ -163,8 +164,101 @@ const BranchPath: FC<{ layout: BranchLayout }> = ({ layout }) => {
   );
 };
 
+// ---------------------------------------------------------------------------
+// Canvas constants
+// ---------------------------------------------------------------------------
+
+const SVG_WIDTH = 520;
+const MIN_SCALE = 0.15;
+const MAX_SCALE = 3;
+const ZOOM_SENSITIVITY = 0.002;
+
 export const GitGraph: FC<{ project: MockProject }> = ({ project }) => {
   const { layouts, mainStartY, mainEndY, totalHeight } = computeLayout(project);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStart = useRef({ x: 0, y: 0, tx: 0, ty: 0 });
+  const hasInitialized = useRef(false);
+
+  // Center the graph when the container first mounts or project changes
+  useEffect(() => {
+    hasInitialized.current = false;
+  }, [project.projectId]);
+
+  useEffect(() => {
+    if (hasInitialized.current) return;
+    const el = containerRef.current;
+    if (!el) return;
+
+    const cw = el.clientWidth;
+    const ch = el.clientHeight;
+
+    // Fit the graph in view with some padding
+    const scaleX = cw / (SVG_WIDTH + 80);
+    const scaleY = ch / (totalHeight + 80);
+    const fitScale = Math.min(scaleX, scaleY, 1.2);
+    const clampedScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, fitScale));
+
+    const x = (cw - SVG_WIDTH * clampedScale) / 2;
+    const y = (ch - totalHeight * clampedScale) / 2;
+
+    setTransform({ x, y, scale: clampedScale });
+    hasInitialized.current = true;
+  }, [totalHeight, project.projectId]);
+
+  // Zoom centered on cursor
+  const handleWheel = useCallback((e: WheelEvent) => {
+    e.preventDefault();
+    const el = containerRef.current;
+    if (!el) return;
+
+    const rect = el.getBoundingClientRect();
+    const cursorX = e.clientX - rect.left;
+    const cursorY = e.clientY - rect.top;
+
+    setTransform((prev) => {
+      const delta = -e.deltaY * ZOOM_SENSITIVITY;
+      const nextScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, prev.scale * (1 + delta)));
+      const ratio = nextScale / prev.scale;
+
+      return {
+        x: cursorX - (cursorX - prev.x) * ratio,
+        y: cursorY - (cursorY - prev.y) * ratio,
+        scale: nextScale,
+      };
+    });
+  }, []);
+
+  // Pan via pointer drag
+  const handlePointerDown = useCallback(
+    (e: ReactPointerEvent) => {
+      if (e.button !== 0) return;
+      setIsDragging(true);
+      dragStart.current = { x: e.clientX, y: e.clientY, tx: transform.x, ty: transform.y };
+      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    },
+    [transform.x, transform.y]
+  );
+
+  const handlePointerMove = useCallback(
+    (e: ReactPointerEvent) => {
+      if (!isDragging) return;
+      const dx = e.clientX - dragStart.current.x;
+      const dy = e.clientY - dragStart.current.y;
+      setTransform((prev) => ({
+        ...prev,
+        x: dragStart.current.tx + dx,
+        y: dragStart.current.ty + dy,
+      }));
+    },
+    [isDragging]
+  );
+
+  const handlePointerUp = useCallback(() => {
+    setIsDragging(false);
+  }, []);
 
   if (project.branches.length === 0) {
     return (
@@ -175,43 +269,59 @@ export const GitGraph: FC<{ project: MockProject }> = ({ project }) => {
   }
 
   return (
-    <div className="flex h-full flex-col items-center overflow-auto p-8">
-      <h2 className="text-foreground mb-6 text-lg font-medium">{project.projectName}</h2>
-      <svg width={520} height={totalHeight} viewBox={`0 0 520 ${totalHeight}`} className="shrink-0">
-        {/* Main vertical line */}
-        <line
-          x1={MAIN_X}
-          y1={mainStartY}
-          x2={MAIN_X}
-          y2={mainEndY}
-          stroke={MAIN_COLOR}
-          strokeWidth={2.5}
-        />
+    <div
+      ref={containerRef}
+      onWheel={handleWheel}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+      className="relative h-full w-full overflow-hidden"
+      style={{ cursor: isDragging ? 'grabbing' : 'grab', touchAction: 'none' }}
+    >
+      <div
+        style={{
+          transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`,
+          transformOrigin: '0 0',
+          willChange: 'transform',
+        }}
+      >
+        <svg width={SVG_WIDTH} height={totalHeight} viewBox={`0 0 ${SVG_WIDTH} ${totalHeight}`}>
+          {/* Main vertical line */}
+          <line
+            x1={MAIN_X}
+            y1={mainStartY}
+            x2={MAIN_X}
+            y2={mainEndY}
+            stroke={MAIN_COLOR}
+            strokeWidth={2.5}
+          />
 
-        {/* Initial commit dot (top) */}
-        <circle cx={MAIN_X} cy={mainStartY} r={COMMIT_RADIUS + 1} fill={MAIN_COLOR} />
+          {/* Initial commit dot (top) */}
+          <circle cx={MAIN_X} cy={mainStartY} r={COMMIT_RADIUS + 1} fill={MAIN_COLOR} />
 
-        {/* "main" label at top */}
-        <text
-          x={MAIN_X}
-          y={mainStartY - 18}
-          fill="var(--muted-foreground)"
-          fontSize={13}
-          fontFamily="var(--font-geist-sans), sans-serif"
-          textAnchor="middle"
-          fontWeight={500}
-        >
-          main
-        </text>
+          {/* "main" label at top */}
+          <text
+            x={MAIN_X}
+            y={mainStartY - 18}
+            fill="var(--muted-foreground)"
+            fontSize={13}
+            fontFamily="var(--font-geist-sans), sans-serif"
+            textAnchor="middle"
+            fontWeight={500}
+          >
+            main
+          </text>
 
-        {/* HEAD dot (bottom) */}
-        <circle cx={MAIN_X} cy={mainEndY} r={COMMIT_RADIUS + 1} fill={MAIN_COLOR} />
+          {/* HEAD dot (bottom) */}
+          <circle cx={MAIN_X} cy={mainEndY} r={COMMIT_RADIUS + 1} fill={MAIN_COLOR} />
 
-        {/* Branch paths */}
-        {layouts.map((layout) => (
-          <BranchPath key={layout.branch.branchId} layout={layout} />
-        ))}
-      </svg>
+          {/* Branch paths */}
+          {layouts.map((layout) => (
+            <BranchPath key={layout.branch.branchId} layout={layout} />
+          ))}
+        </svg>
+      </div>
     </div>
   );
 };
