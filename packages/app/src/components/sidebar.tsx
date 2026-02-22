@@ -4,7 +4,6 @@ import {
   Archive,
   ChevronDown,
   Ellipsis,
-  Images,
   LifeBuoy,
   LogOut,
   PanelLeft,
@@ -54,15 +53,39 @@ type MockSession = {
   sessionName: string;
 };
 
-const MOCK_SESSIONS: MockSession[] = [
-  { sessionId: '1', sessionName: 'Building a REST API with Hono' },
-  { sessionId: '2', sessionName: 'React state management patterns' },
-  { sessionId: '3', sessionName: 'TypeScript generics deep dive' },
-  { sessionId: '4', sessionName: 'Deploying to Cloudflare Workers' },
-  { sessionId: '5', sessionName: 'CSS Grid vs Flexbox layout' },
-  { sessionId: '6', sessionName: 'Database schema design tips' },
-  { sessionId: '7', sessionName: 'Authentication with JWT tokens' },
-  { sessionId: '8', sessionName: 'WebSocket real-time features' },
+type MockProject = {
+  projectId: string;
+  projectName: string;
+  chats: MockSession[];
+};
+
+const MOCK_PROJECTS: MockProject[] = [
+  {
+    projectId: 'p1',
+    projectName: 'LLM Platform',
+    chats: [
+      { sessionId: '1', sessionName: 'Building a REST API with Hono' },
+      { sessionId: '2', sessionName: 'React state management patterns' },
+      { sessionId: '3', sessionName: 'TypeScript generics deep dive' },
+    ],
+  },
+  {
+    projectId: 'p2',
+    projectName: 'DevOps Toolkit',
+    chats: [
+      { sessionId: '4', sessionName: 'Deploying to Cloudflare Workers' },
+      { sessionId: '5', sessionName: 'CI/CD pipeline setup' },
+    ],
+  },
+  {
+    projectId: 'p3',
+    projectName: 'Design System',
+    chats: [
+      { sessionId: '6', sessionName: 'CSS Grid vs Flexbox layout' },
+      { sessionId: '7', sessionName: 'Component library architecture' },
+      { sessionId: '8', sessionName: 'Dark mode token strategy' },
+    ],
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -170,12 +193,61 @@ const ChatItem: FC<ChatItemProps> = ({ session, isActive, onSelect, onRename, on
 };
 
 // ---------------------------------------------------------------------------
-// ChatList
+// ProjectGroup — a single collapsible project with its chats
 // ---------------------------------------------------------------------------
 
-const ChatList: FC<{ collapsed?: boolean }> = ({ collapsed }) => {
+const ProjectGroup: FC<{
+  project: MockProject;
+  activeSessionId: string | null;
+  onSelect: (session: MockSession) => void;
+  onRename: (session: MockSession) => void;
+  onDelete: (session: MockSession) => void;
+}> = ({ project, activeSessionId, onSelect, onRename, onDelete }) => {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  return (
+    <div>
+      <button
+        onClick={() => setIsCollapsed(!isCollapsed)}
+        className="flex w-full cursor-pointer items-center gap-1 whitespace-nowrap px-1 pt-1 pb-0.5"
+      >
+        <ChevronDown
+          size={12}
+          strokeWidth={2}
+          className={cn(
+            'text-muted-foreground transition-transform duration-200',
+            isCollapsed && '-rotate-90'
+          )}
+        />
+        <span className="text-muted-foreground truncate text-[12px] font-medium">
+          {project.projectName}
+        </span>
+      </button>
+      {!isCollapsed && (
+        <div className="flex flex-col gap-0.5">
+          {project.chats.map((session) => (
+            <ChatItem
+              key={session.sessionId}
+              session={session}
+              isActive={activeSessionId === session.sessionId}
+              onSelect={onSelect}
+              onRename={onRename}
+              onDelete={onDelete}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// ProjectList
+// ---------------------------------------------------------------------------
+
+const ProjectList: FC<{ collapsed?: boolean }> = ({ collapsed }) => {
   const [isSectionCollapsed, setIsSectionCollapsed] = useState(false);
-  const [sessions, setSessions] = useState(MOCK_SESSIONS);
+  const [projects, setProjects] = useState(MOCK_PROJECTS);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [renamingSession, setRenamingSession] = useState<MockSession | null>(null);
   const [deletingSession, setDeletingSession] = useState<MockSession | null>(null);
@@ -186,17 +258,27 @@ const ChatList: FC<{ collapsed?: boolean }> = ({ collapsed }) => {
 
   const confirmRename = (newName: string) => {
     if (!renamingSession) return;
-    setSessions((prev) =>
-      prev.map((s) =>
-        s.sessionId === renamingSession.sessionId ? { ...s, sessionName: newName } : s
-      )
+    setProjects((prev) =>
+      prev.map((p) => ({
+        ...p,
+        chats: p.chats.map((s) =>
+          s.sessionId === renamingSession.sessionId ? { ...s, sessionName: newName } : s
+        ),
+      }))
     );
     setRenamingSession(null);
   };
 
   const confirmDelete = () => {
     if (!deletingSession) return;
-    setSessions((prev) => prev.filter((s) => s.sessionId !== deletingSession.sessionId));
+    setProjects((prev) =>
+      prev
+        .map((p) => ({
+          ...p,
+          chats: p.chats.filter((s) => s.sessionId !== deletingSession.sessionId),
+        }))
+        .filter((p) => p.chats.length > 0)
+    );
     if (activeSessionId === deletingSession.sessionId) {
       setActiveSessionId(null);
     }
@@ -210,7 +292,7 @@ const ChatList: FC<{ collapsed?: boolean }> = ({ collapsed }) => {
           onClick={() => setIsSectionCollapsed(!isSectionCollapsed)}
           className="flex cursor-pointer items-center gap-1 whitespace-nowrap px-3 pt-4 pb-1 mb-1"
         >
-          <span className="text-muted-foreground text-[14px]">Your chats</span>
+          <span className="text-muted-foreground text-[14px]">Projects</span>
           <ChevronDown
             size={12}
             strokeWidth={2}
@@ -223,17 +305,17 @@ const ChatList: FC<{ collapsed?: boolean }> = ({ collapsed }) => {
       )}
       {!isSectionCollapsed && !collapsed && (
         <div className="no-scrollbar flex-1 overflow-y-auto px-2">
-          {sessions.length === 0 ? (
+          {projects.length === 0 ? (
             <p className="text-muted-foreground flex justify-center whitespace-nowrap py-2 mt-12 text-xs">
-              No chats yet.
+              No projects yet.
             </p>
           ) : (
-            <div className="flex flex-col gap-0.5">
-              {sessions.map((session) => (
-                <ChatItem
-                  key={session.sessionId}
-                  session={session}
-                  isActive={activeSessionId === session.sessionId}
+            <div className="flex flex-col gap-2">
+              {projects.map((project) => (
+                <ProjectGroup
+                  key={project.projectId}
+                  project={project}
+                  activeSessionId={activeSessionId}
                   onSelect={handleSelect}
                   onRename={setRenamingSession}
                   onDelete={setDeletingSession}
@@ -528,15 +610,10 @@ function SidebarComponent() {
           shortcut="⇧⌘K"
           collapsed={isSidebarCollapsed}
         />
-        <SidebarItem
-          icon={<Images size={18} strokeWidth={1.8} />}
-          label="Images"
-          collapsed={isSidebarCollapsed}
-        />
       </div>
 
-      {/* Chat list */}
-      <ChatList collapsed={isSidebarCollapsed} />
+      {/* Project list */}
+      <ProjectList collapsed={isSidebarCollapsed} />
 
       {/* Account menu — pinned to bottom */}
       {!isSidebarCollapsed && <div className="border-home-border mx-2 border-t" />}
