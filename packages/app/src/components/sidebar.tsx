@@ -168,21 +168,26 @@ const BranchGroup: FC<{
 
   return (
     <div>
-      <button
-        onClick={() => setIsCollapsed(!isCollapsed)}
-        className="group flex h-8 w-full cursor-pointer items-center gap-1.5 rounded-lg py-1 pl-6 pr-2 hover:bg-home-hover"
-      >
-        <ChevronRight
-          size={12}
-          strokeWidth={2}
-          className={cn(
-            'text-muted-foreground shrink-0 transition-transform duration-200',
-            !isCollapsed && 'rotate-90'
-          )}
-        />
-        <GitBranch size={14} strokeWidth={1.8} className="text-muted-foreground shrink-0" />
-        <span className="text-foreground truncate text-[13px]">{branch.branchName}</span>
-      </button>
+      <div className="group flex h-8 w-full items-center rounded-lg py-1 pl-6 pr-1 hover:bg-home-hover">
+        <button
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="flex flex-1 cursor-pointer items-center gap-1.5 overflow-hidden"
+        >
+          <ChevronRight
+            size={12}
+            strokeWidth={2}
+            className={cn(
+              'text-muted-foreground shrink-0 transition-transform duration-200',
+              !isCollapsed && 'rotate-90'
+            )}
+          />
+          <GitBranch size={14} strokeWidth={1.8} className="text-muted-foreground shrink-0" />
+          <span className="text-foreground truncate text-[13px]">{branch.branchName}</span>
+        </button>
+        <button className="text-muted-foreground hover:text-foreground flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded-md opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+          <SquarePen size={13} strokeWidth={1.8} />
+        </button>
+      </div>
       {!isCollapsed && branch.threads.length > 0 && (
         <div className="flex flex-col gap-0.5">
           {branch.threads.map((thread) => (
@@ -247,7 +252,7 @@ const ProjectGroup: FC<{
               </button>
             </DropdownMenuTrigger>
             <button className="text-muted-foreground hover:text-foreground flex h-6 w-6 cursor-pointer items-center justify-center rounded-md">
-              <SquarePen size={14} strokeWidth={1.8} />
+              <GitBranch size={14} strokeWidth={1.8} />
             </button>
           </div>
         </div>
