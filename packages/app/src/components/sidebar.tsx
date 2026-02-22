@@ -16,7 +16,8 @@ import {
   SquarePen,
   Trash2,
 } from 'lucide-react';
-import { memo, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { memo, useEffect, useMemo, useState } from 'react';
 
 import type { MockBranch, MockProject, MockThread } from '@/lib/mock-data';
 import type { FC, ReactNode } from 'react';
@@ -28,8 +29,30 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { MOCK_PROJECTS } from '@/lib/mock-data';
+import { branchToSlug, MOCK_PROJECTS } from '@/lib/mock-data';
 import { cn } from '@/lib/utils';
+
+// ---------------------------------------------------------------------------
+// Route context — parsed from the current URL
+// ---------------------------------------------------------------------------
+
+type RouteContext = {
+  projectName: string | null;
+  branchSlug: string | null;
+  threadId: string | null;
+};
+
+function useRouteContext(): RouteContext {
+  const pathname = usePathname();
+  return useMemo(() => {
+    const segments = pathname.split('/').filter(Boolean);
+    return {
+      projectName: segments[0] ?? null,
+      branchSlug: segments[1] ?? null,
+      threadId: segments[2] ?? null,
+    };
+  }, [pathname]);
+}
 
 // ---------------------------------------------------------------------------
 // SidebarItem
@@ -86,11 +109,21 @@ const ThreadItem: FC<{
 
 const BranchGroup: FC<{
   branch: MockBranch;
+  projectName: string;
   activeThreadId: string | null;
-  onSelect: (thread: MockThread) => void;
-  defaultCollapsed?: boolean;
-}> = ({ branch, activeThreadId, onSelect, defaultCollapsed = false }) => {
-  const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
+  defaultExpanded?: boolean;
+}> = ({ branch, projectName, activeThreadId, defaultExpanded = false }) => {
+  const router = useRouter();
+  const [isCollapsed, setIsCollapsed] = useState(!defaultExpanded);
+
+  // Expand when the route points to this branch
+  useEffect(() => {
+    if (defaultExpanded) setIsCollapsed(false);
+  }, [defaultExpanded]);
+
+  const handleThreadSelect = (thread: MockThread) => {
+    router.push(`/${projectName}/${branchToSlug(branch.branchName)}/${thread.threadId}`);
+  };
 
   return (
     <div>
@@ -121,7 +154,7 @@ const BranchGroup: FC<{
               key={thread.threadId}
               thread={thread}
               isActive={activeThreadId === thread.threadId}
-              onSelect={onSelect}
+              onSelect={handleThreadSelect}
             />
           ))}
         </div>
@@ -136,16 +169,35 @@ const BranchGroup: FC<{
 
 const ProjectGroup: FC<{
   project: MockProject;
-  activeThreadId: string | null;
-  onSelect: (thread: MockThread) => void;
-  onProjectClick?: (project: MockProject) => void;
-}> = ({ project, activeThreadId, onSelect, onProjectClick }) => {
+  routeCtx: RouteContext;
+}> = ({ project, routeCtx }) => {
+  const router = useRouter();
   const hasBranches = project.branches.length > 0;
-  const [isCollapsed, setIsCollapsed] = useState(!hasBranches);
-  const [isMergedExpanded, setIsMergedExpanded] = useState(false);
+
+  const isRouteProject = routeCtx.projectName === project.projectName;
+  const activeBranch = routeCtx.branchSlug ?? null;
 
   const activeBranches = project.branches.filter((b) => b.status === 'active');
   const mergedBranches = project.branches.filter((b) => b.status === 'merged');
+
+  // Auto-expand if this project is in the current route
+  const hasActiveMergedBranch =
+    isRouteProject &&
+    activeBranch !== null &&
+    mergedBranches.some((b) => branchToSlug(b.branchName) === activeBranch);
+
+  const [isCollapsed, setIsCollapsed] = useState(!hasBranches && !isRouteProject);
+  const [isMergedExpanded, setIsMergedExpanded] = useState(hasActiveMergedBranch);
+
+  // Expand project folder when route navigates into it
+  useEffect(() => {
+    if (isRouteProject) setIsCollapsed(false);
+  }, [isRouteProject]);
+
+  // Expand merged section when route points to a merged branch
+  useEffect(() => {
+    if (hasActiveMergedBranch) setIsMergedExpanded(true);
+  }, [hasActiveMergedBranch]);
 
   return (
     <div>
@@ -171,7 +223,7 @@ const ProjectGroup: FC<{
               />
             </button>
             <button
-              onClick={() => onProjectClick?.(project)}
+              onClick={() => router.push(`/${project.projectName}`)}
               className="flex-1 cursor-pointer truncate text-left"
             >
               <span className="text-foreground truncate text-[14px]">{project.projectName}</span>
@@ -219,9 +271,9 @@ const ProjectGroup: FC<{
             <BranchGroup
               key={branch.branchId}
               branch={branch}
-              activeThreadId={activeThreadId}
-              onSelect={onSelect}
-              defaultCollapsed
+              projectName={project.projectName}
+              activeThreadId={routeCtx.threadId}
+              defaultExpanded={isRouteProject && branchToSlug(branch.branchName) === activeBranch}
             />
           ))}
 
@@ -249,9 +301,11 @@ const ProjectGroup: FC<{
                   <BranchGroup
                     key={branch.branchId}
                     branch={branch}
-                    activeThreadId={activeThreadId}
-                    onSelect={onSelect}
-                    defaultCollapsed
+                    projectName={project.projectName}
+                    activeThreadId={routeCtx.threadId}
+                    defaultExpanded={
+                      isRouteProject && branchToSlug(branch.branchName) === activeBranch
+                    }
                   />
                 ))}
             </div>
@@ -268,14 +322,9 @@ const ProjectGroup: FC<{
 
 const ProjectList: FC<{
   collapsed?: boolean;
-  onProjectSelect?: (project: MockProject) => void;
-}> = ({ collapsed, onProjectSelect }) => {
+}> = ({ collapsed }) => {
   const [projects] = useState(MOCK_PROJECTS);
-  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
-
-  const handleSelect = (thread: MockThread) => {
-    setActiveThreadId(thread.threadId);
-  };
+  const routeCtx = useRouteContext();
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -301,13 +350,7 @@ const ProjectList: FC<{
           ) : (
             <div className="flex flex-col gap-0.5">
               {projects.map((project) => (
-                <ProjectGroup
-                  key={project.projectId}
-                  project={project}
-                  activeThreadId={activeThreadId}
-                  onSelect={handleSelect}
-                  onProjectClick={onProjectSelect}
-                />
+                <ProjectGroup key={project.projectId} project={project} routeCtx={routeCtx} />
               ))}
             </div>
           )}
@@ -321,11 +364,7 @@ const ProjectList: FC<{
 // Sidebar
 // ---------------------------------------------------------------------------
 
-function SidebarComponent({
-  onProjectSelect,
-}: {
-  onProjectSelect?: (project: MockProject) => void;
-}) {
+function SidebarComponent() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
 
@@ -391,7 +430,7 @@ function SidebarComponent({
       </div>
 
       {/* Threads grouped by project */}
-      <ProjectList collapsed={isSidebarCollapsed} onProjectSelect={onProjectSelect} />
+      <ProjectList collapsed={isSidebarCollapsed} />
 
       {/* Settings — pinned to bottom */}
       {!isSidebarCollapsed && <div className="border-home-border mx-2 border-t" />}

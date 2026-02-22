@@ -1,9 +1,12 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { MockBranch, MockProject } from '@/lib/mock-data';
+import type { MockBranch, MockProject, MockThread } from '@/lib/mock-data';
 import type { FC, PointerEvent as ReactPointerEvent, WheelEvent } from 'react';
+
+import { branchToSlug } from '@/lib/mock-data';
 
 // Layout constants
 const MAIN_X = 80;
@@ -14,6 +17,7 @@ const BRANCH_DOT_RADIUS = 6;
 const TOP_PADDING = 70;
 const CURVE_OFFSET = 28;
 const COMMIT_SPACING = 50;
+const HIT_AREA_RADIUS = 14;
 
 // Colors (CSS variable references for theme support)
 const MAIN_COLOR = 'var(--foreground)';
@@ -26,6 +30,13 @@ type BranchLayout = {
   endY: number;
   mergeY: number | null;
   color: string;
+};
+
+type HoveredCommit = {
+  thread: MockThread;
+  branchName: string;
+  svgX: number;
+  svgY: number;
 };
 
 function computeLayout(project: MockProject) {
@@ -66,7 +77,11 @@ function computeLayout(project: MockProject) {
   return { layouts, mainStartY, mainEndY, totalHeight: mainEndY + TOP_PADDING };
 }
 
-const BranchPath: FC<{ layout: BranchLayout }> = ({ layout }) => {
+const BranchPath: FC<{
+  layout: BranchLayout;
+  onCommitHover: (commit: HoveredCommit | null) => void;
+  onCommitClick: (thread: MockThread, branchName: string) => void;
+}> = ({ layout, onCommitHover, onCommitClick }) => {
   const { branch, forkY, endY, mergeY, color } = layout;
   const isMerged = branch.status === 'merged';
 
@@ -131,10 +146,38 @@ const BranchPath: FC<{ layout: BranchLayout }> = ({ layout }) => {
       {/* Fork dot on main */}
       <circle cx={MAIN_X} cy={forkY} r={COMMIT_RADIUS} fill={MAIN_COLOR} />
 
-      {/* Commit dots on branch */}
-      {commitDots.map((cy, i) => (
-        <circle key={i} cx={BRANCH_X} cy={cy} r={BRANCH_DOT_RADIUS} fill={color} />
-      ))}
+      {/* Commit dots on branch — visible dots + invisible hit areas */}
+      {commitDots.map((cy, i) => {
+        const thread = branch.threads[i];
+        if (!thread) return null;
+        return (
+          <g key={thread.threadId}>
+            {/* Visible dot */}
+            <circle cx={BRANCH_X} cy={cy} r={BRANCH_DOT_RADIUS} fill={color} />
+            {/* Invisible hit area for hover + click */}
+            <circle
+              cx={BRANCH_X}
+              cy={cy}
+              r={HIT_AREA_RADIUS}
+              fill="transparent"
+              style={{ cursor: 'pointer' }}
+              onMouseEnter={() =>
+                onCommitHover({
+                  thread,
+                  branchName: branch.branchName,
+                  svgX: BRANCH_X,
+                  svgY: cy,
+                })
+              }
+              onMouseLeave={() => onCommitHover(null)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onCommitClick(thread, branch.branchName);
+              }}
+            />
+          </g>
+        );
+      })}
 
       {/* Branch name label */}
       <text
@@ -172,14 +215,18 @@ const SVG_WIDTH = 520;
 const MIN_SCALE = 0.15;
 const MAX_SCALE = 3;
 const ZOOM_SENSITIVITY = 0.002;
+const CLICK_THRESHOLD = 5;
 
 export const GitGraph: FC<{ project: MockProject }> = ({ project }) => {
+  const router = useRouter();
   const { layouts, mainStartY, mainEndY, totalHeight } = computeLayout(project);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
   const [isDragging, setIsDragging] = useState(false);
+  const [hoveredCommit, setHoveredCommit] = useState<HoveredCommit | null>(null);
   const dragStart = useRef({ x: 0, y: 0, tx: 0, ty: 0 });
+  const dragDistance = useRef(0);
   const hasInitialized = useRef(false);
 
   // Center the graph when the container first mounts or project changes
@@ -231,11 +278,12 @@ export const GitGraph: FC<{ project: MockProject }> = ({ project }) => {
     });
   }, []);
 
-  // Pan via pointer drag
+  // Pan via pointer drag — track distance to distinguish click from drag
   const handlePointerDown = useCallback(
     (e: ReactPointerEvent) => {
       if (e.button !== 0) return;
       setIsDragging(true);
+      dragDistance.current = 0;
       dragStart.current = { x: e.clientX, y: e.clientY, tx: transform.x, ty: transform.y };
       (e.target as HTMLElement).setPointerCapture(e.pointerId);
     },
@@ -247,6 +295,7 @@ export const GitGraph: FC<{ project: MockProject }> = ({ project }) => {
       if (!isDragging) return;
       const dx = e.clientX - dragStart.current.x;
       const dy = e.clientY - dragStart.current.y;
+      dragDistance.current = Math.sqrt(dx * dx + dy * dy);
       setTransform((prev) => ({
         ...prev,
         x: dragStart.current.tx + dx,
@@ -259,6 +308,23 @@ export const GitGraph: FC<{ project: MockProject }> = ({ project }) => {
   const handlePointerUp = useCallback(() => {
     setIsDragging(false);
   }, []);
+
+  // Click handler for commit dots — only fires if pointer didn't drag
+  const handleCommitClick = useCallback(
+    (thread: MockThread, branchName: string) => {
+      if (dragDistance.current > CLICK_THRESHOLD) return;
+      router.push(`/${project.projectName}/${branchToSlug(branchName)}/${thread.threadId}`);
+    },
+    [router, project.projectName]
+  );
+
+  // Compute tooltip screen position from SVG coords + canvas transform
+  const tooltipStyle = hoveredCommit
+    ? {
+        left: hoveredCommit.svgX * transform.scale + transform.x,
+        top: hoveredCommit.svgY * transform.scale + transform.y - 12,
+      }
+    : null;
 
   if (project.branches.length === 0) {
     return (
@@ -318,10 +384,32 @@ export const GitGraph: FC<{ project: MockProject }> = ({ project }) => {
 
           {/* Branch paths */}
           {layouts.map((layout) => (
-            <BranchPath key={layout.branch.branchId} layout={layout} />
+            <BranchPath
+              key={layout.branch.branchId}
+              layout={layout}
+              onCommitHover={setHoveredCommit}
+              onCommitClick={handleCommitClick}
+            />
           ))}
         </svg>
       </div>
+
+      {/* Hover tooltip */}
+      {hoveredCommit && tooltipStyle && (
+        <div
+          className="bg-popover text-popover-foreground border-border pointer-events-none absolute z-10 rounded-lg border px-3 py-2 shadow-md"
+          style={{
+            left: tooltipStyle.left,
+            top: tooltipStyle.top,
+            transform: 'translate(-50%, -100%)',
+          }}
+        >
+          <p className="text-sm font-medium whitespace-nowrap">{hoveredCommit.thread.threadName}</p>
+          <p className="text-muted-foreground mt-0.5 text-xs">
+            {hoveredCommit.branchName} &middot; {hoveredCommit.thread.age}
+          </p>
+        </div>
+      )}
     </div>
   );
 };

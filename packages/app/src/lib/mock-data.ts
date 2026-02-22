@@ -1,3 +1,13 @@
+/** Convert branch name to URL-safe slug: `feat/trading-engine` → `feat-trading-engine` */
+export function branchToSlug(branchName: string): string {
+  return branchName.replace(/\//g, '-');
+}
+
+/** Find a branch by its URL slug within a project */
+export function findBranchBySlug(project: MockProject, slug: string): MockBranch | undefined {
+  return project.branches.find((b) => branchToSlug(b.branchName) === slug);
+}
+
 export type MockThread = {
   threadId: string;
   threadName: string;
