@@ -36,6 +36,12 @@ export async function createProject(name: string): Promise<MockProject> {
   return project;
 }
 
+export async function deleteProject(projectId: string): Promise<void> {
+  await delay();
+  const index = MOCK_PROJECTS.findIndex((p) => p.projectId === projectId);
+  if (index !== -1) MOCK_PROJECTS.splice(index, 1);
+}
+
 export async function getThreadMessages(
   projectName: string,
   branchSlug: string,

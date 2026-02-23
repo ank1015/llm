@@ -25,6 +25,14 @@ import type { FC, ReactNode } from 'react';
 import { NewProjectDialog } from '@/components/new-project-dialog';
 import { Button } from '@/components/ui/button';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -176,6 +184,8 @@ const ProjectGroup: FC<{
   collapseAllKey: number;
 }> = ({ project, routeCtx, collapseAllKey }) => {
   const router = useRouter();
+  const deleteProject = useProjectsStore((s) => s.deleteProject);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const hasBranches = project.branches.length > 0;
 
   const isRouteProject = routeCtx.projectName === project.projectName;
@@ -272,7 +282,7 @@ const ProjectGroup: FC<{
             <Archive size={16} />
             Archive
           </DropdownMenuItem>
-          <DropdownMenuItem variant="destructive">
+          <DropdownMenuItem variant="destructive" onSelect={() => setIsDeleteOpen(true)}>
             <Trash2 size={16} />
             Delete
           </DropdownMenuItem>
@@ -327,6 +337,36 @@ const ProjectGroup: FC<{
           )}
         </div>
       )}
+
+      <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete project</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete &ldquo;{project.projectName}&rdquo;? This action
+              cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeleteOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                void deleteProject(project.projectId).then(() => {
+                  setIsDeleteOpen(false);
+                  if (routeCtx.projectName === project.projectName) {
+                    router.push('/');
+                  }
+                });
+              }}
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

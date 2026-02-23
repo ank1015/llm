@@ -1,5 +1,6 @@
 export {
   createProject,
+  deleteProject,
   getBranchBySlug,
   getProjectByName,
   getProjects,
