@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronRight, GitBranch } from 'lucide-react';
+import { ChevronRight, FileDiff, GitBranch, GitMerge } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
@@ -9,6 +9,8 @@ import { NewBranchDialog } from '@/components/new-branch-dialog';
 import { Sidebar } from '@/components/sidebar';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
+import { findBranchBySlug } from '@/lib/mock-data';
+import { useProjectsStore } from '@/stores';
 
 function HeaderBreadcrumb() {
   const pathname = usePathname();
@@ -54,26 +56,52 @@ function HeaderBreadcrumb() {
 function HeaderActions() {
   const pathname = usePathname();
   const segments = pathname.split('/').filter(Boolean);
+  const projects = useProjectsStore((s) => s.projects);
   const [isBranchDialogOpen, setIsBranchDialogOpen] = useState(false);
 
-  // Only show on /{project} pages (1 segment = project root, more = sub-pages)
-  if (segments.length !== 1) return null;
+  const projectName = segments[0];
+  const branchSlug = segments[1];
 
-  const projectName = segments[0]!;
+  // /{project} — show Create Branch
+  if (segments.length === 1 && projectName) {
+    return (
+      <>
+        <Button variant="outline" size="sm" onClick={() => setIsBranchDialogOpen(true)}>
+          <GitBranch size={14} />
+          Create Branch
+        </Button>
+        <NewBranchDialog
+          open={isBranchDialogOpen}
+          onOpenChange={setIsBranchDialogOpen}
+          projectName={projectName}
+        />
+      </>
+    );
+  }
 
-  return (
-    <>
-      <Button variant="outline" size="sm" onClick={() => setIsBranchDialogOpen(true)}>
-        <GitBranch size={14} />
-        Create Branch
-      </Button>
-      <NewBranchDialog
-        open={isBranchDialogOpen}
-        onOpenChange={setIsBranchDialogOpen}
-        projectName={projectName}
-      />
-    </>
-  );
+  // /{project}/{branch} — show View Diff + Merge Branch (if active)
+  if (segments.length === 2 && projectName && branchSlug) {
+    const project = projects.find((p) => p.projectName === projectName);
+    const branch = project ? findBranchBySlug(project, branchSlug) : undefined;
+    const isActive = branch?.status === 'active';
+
+    return (
+      <>
+        <Button variant="outline" size="sm">
+          <FileDiff size={14} />
+          View Diff
+        </Button>
+        {isActive && (
+          <Button variant="outline" size="sm">
+            <GitMerge size={14} />
+            Merge Branch
+          </Button>
+        )}
+      </>
+    );
+  }
+
+  return null;
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {

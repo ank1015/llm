@@ -1,9 +1,10 @@
 'use client';
 
-import { GitBranch } from 'lucide-react';
+import { GitBranch, GitCommitHorizontal, SquarePen } from 'lucide-react';
 import Link from 'next/link';
 import { use, useEffect } from 'react';
 
+import { Button } from '@/components/ui/button';
 import { branchToSlug, findBranchBySlug } from '@/lib/mock-data';
 import { useProjectsStore } from '@/stores';
 
@@ -40,6 +41,18 @@ export default function BranchPage({
           <span className="text-muted-foreground bg-muted rounded-full px-2 py-0.5 text-xs">
             {branch.status}
           </span>
+          <div className="flex-1" />
+          <span className="text-muted-foreground flex items-center gap-1 text-xs">
+            <GitCommitHorizontal size={14} />
+            {branch.threads.length}
+          </span>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <SquarePen size={16} />
+          </Button>
         </div>
 
         {branch.threads.length === 0 ? (
