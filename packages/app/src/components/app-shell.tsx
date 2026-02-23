@@ -1,11 +1,14 @@
 'use client';
 
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, GitBranch } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useState } from 'react';
 
+import { NewBranchDialog } from '@/components/new-branch-dialog';
 import { Sidebar } from '@/components/sidebar';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { Button } from '@/components/ui/button';
 
 function HeaderBreadcrumb() {
   const pathname = usePathname();
@@ -13,7 +16,9 @@ function HeaderBreadcrumb() {
 
   if (segments.length === 0) return null;
 
-  const projectName = segments[0];
+  const projectName = segments[0]!;
+  const branchSlug = segments[1];
+  const isLast = (index: number) => index === Math.min(segments.length - 1, 1);
 
   return (
     <div className="flex items-center gap-1.5 text-sm">
@@ -23,11 +28,51 @@ function HeaderBreadcrumb() {
       <ChevronRight size={14} className="text-muted-foreground" />
       <Link
         href={`/${projectName}`}
-        className="text-foreground font-medium hover:text-foreground/80 transition-colors"
+        className={
+          isLast(0)
+            ? 'text-foreground font-medium hover:text-foreground/80 transition-colors'
+            : 'text-muted-foreground hover:text-foreground transition-colors'
+        }
       >
         {projectName}
       </Link>
+      {branchSlug && (
+        <>
+          <ChevronRight size={14} className="text-muted-foreground" />
+          <Link
+            href={`/${projectName}/${branchSlug}`}
+            className="text-foreground font-medium hover:text-foreground/80 transition-colors"
+          >
+            {branchSlug}
+          </Link>
+        </>
+      )}
     </div>
+  );
+}
+
+function HeaderActions() {
+  const pathname = usePathname();
+  const segments = pathname.split('/').filter(Boolean);
+  const [isBranchDialogOpen, setIsBranchDialogOpen] = useState(false);
+
+  // Only show on /{project} pages (1 segment = project root, more = sub-pages)
+  if (segments.length !== 1) return null;
+
+  const projectName = segments[0]!;
+
+  return (
+    <>
+      <Button variant="outline" size="sm" onClick={() => setIsBranchDialogOpen(true)}>
+        <GitBranch size={14} />
+        Create Branch
+      </Button>
+      <NewBranchDialog
+        open={isBranchDialogOpen}
+        onOpenChange={setIsBranchDialogOpen}
+        projectName={projectName}
+      />
+    </>
   );
 }
 
@@ -38,7 +83,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-12 w-full shrink-0 items-center justify-between px-3">
           <HeaderBreadcrumb />
-          <ThemeToggle />
+          <div className="flex items-center gap-4">
+            <HeaderActions />
+            <ThemeToggle />
+          </div>
         </header>
         <main className="relative flex-1 overflow-hidden">{children}</main>
       </div>

@@ -36,6 +36,17 @@ export async function createProject(name: string): Promise<MockProject> {
   return project;
 }
 
+export async function createBranch(projectName: string, branchName: string): Promise<MockBranch> {
+  await delay();
+  const branch: MockBranch = {
+    branchId: `b${Date.now()}`,
+    branchName,
+    status: 'active',
+    threads: [],
+  };
+  return branch;
+}
+
 export async function deleteProject(projectId: string): Promise<void> {
   await delay();
   const index = MOCK_PROJECTS.findIndex((p) => p.projectId === projectId);

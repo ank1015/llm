@@ -22,6 +22,7 @@ import { memo, useEffect, useMemo, useState } from 'react';
 import type { MockBranch, MockProject, MockThread } from '@/lib/mock-data';
 import type { FC, ReactNode } from 'react';
 
+import { NewBranchDialog } from '@/components/new-branch-dialog';
 import { NewProjectDialog } from '@/components/new-project-dialog';
 import { Button } from '@/components/ui/button';
 import {
@@ -141,7 +142,7 @@ const BranchGroup: FC<{
       <div className="group flex h-8 w-full items-center rounded-lg py-1 pl-6 pr-1 hover:bg-home-hover">
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="flex flex-1 cursor-pointer items-center gap-1.5 overflow-hidden"
+          className="flex shrink-0 cursor-pointer items-center justify-center"
         >
           <ChevronRight
             size={12}
@@ -151,6 +152,11 @@ const BranchGroup: FC<{
               !isCollapsed && 'rotate-90'
             )}
           />
+        </button>
+        <button
+          onClick={() => router.push(`/${projectName}/${branchToSlug(branch.branchName)}`)}
+          className="flex flex-1 cursor-pointer items-center gap-1.5 overflow-hidden ml-1.5"
+        >
           <GitBranch size={14} strokeWidth={1.8} className="text-muted-foreground shrink-0" />
           <span className="text-foreground truncate text-[13px]">{branch.branchName}</span>
         </button>
@@ -186,6 +192,7 @@ const ProjectGroup: FC<{
   const router = useRouter();
   const deleteProject = useProjectsStore((s) => s.deleteProject);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isBranchDialogOpen, setIsBranchDialogOpen] = useState(false);
   const hasBranches = project.branches.length > 0;
 
   const isRouteProject = routeCtx.projectName === project.projectName;
@@ -260,7 +267,10 @@ const ProjectGroup: FC<{
                 <Ellipsis size={16} strokeWidth={2} />
               </button>
             </DropdownMenuTrigger>
-            <button className="text-muted-foreground hover:text-foreground flex h-6 w-6 cursor-pointer items-center justify-center rounded-md">
+            <button
+              onClick={() => setIsBranchDialogOpen(true)}
+              className="text-muted-foreground hover:text-foreground flex h-6 w-6 cursor-pointer items-center justify-center rounded-md"
+            >
               <GitBranch size={14} strokeWidth={1.8} />
             </button>
           </div>
@@ -367,6 +377,12 @@ const ProjectGroup: FC<{
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <NewBranchDialog
+        open={isBranchDialogOpen}
+        onOpenChange={setIsBranchDialogOpen}
+        projectName={project.projectName}
+      />
     </div>
   );
 };

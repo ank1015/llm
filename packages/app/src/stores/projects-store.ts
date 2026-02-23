@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import type { MockProject } from '@/lib/mock-data';
 
 import {
+  createBranch as apiCreateBranch,
   createProject as apiCreateProject,
   deleteProject as apiDeleteProject,
   getProjects,
@@ -14,6 +15,7 @@ type ProjectsState = {
   error: string | null;
   fetchProjects: () => Promise<void>;
   createProject: (name: string) => Promise<MockProject>;
+  createBranch: (projectName: string, branchName: string) => Promise<void>;
   deleteProject: (projectId: string) => Promise<void>;
 };
 
@@ -21,6 +23,15 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
   projects: [],
   isLoading: false,
   error: null,
+
+  createBranch: async (projectName: string, branchName: string) => {
+    const branch = await apiCreateBranch(projectName, branchName);
+    set((state) => ({
+      projects: state.projects.map((p) =>
+        p.projectName === projectName ? { ...p, branches: [...p.branches, branch] } : p
+      ),
+    }));
+  },
 
   deleteProject: async (projectId: string) => {
     await apiDeleteProject(projectId);
