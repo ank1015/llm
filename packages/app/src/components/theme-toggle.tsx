@@ -1,33 +1,24 @@
 'use client';
 
 import { Moon, Sun } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect } from 'react';
 
 import { Button } from '@/components/ui/button';
-
-type Theme = 'light' | 'dark';
+import { useUiStore } from '@/stores';
 
 export function ThemeToggle() {
-  const [theme, setThemeState] = useState<Theme>('light');
+  const theme = useUiStore((s) => s.theme);
+  const setTheme = useUiStore((s) => s.setTheme);
+  const toggleTheme = useUiStore((s) => s.toggleTheme);
 
   useEffect(() => {
     const stored = localStorage.getItem('theme');
     if (stored === 'dark' || stored === 'light') {
-      applyTheme(stored);
+      setTheme(stored);
     } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      applyTheme('dark');
+      setTheme('dark');
     }
-  }, []);
-
-  const applyTheme = (next: Theme) => {
-    document.documentElement.classList.toggle('dark', next === 'dark');
-    localStorage.setItem('theme', next);
-    setThemeState(next);
-  };
-
-  const toggleTheme = useCallback(() => {
-    applyTheme(theme === 'light' ? 'dark' : 'light');
-  }, [theme]);
+  }, [setTheme]);
 
   return (
     <Button

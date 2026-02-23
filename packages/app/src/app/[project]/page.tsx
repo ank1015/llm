@@ -1,9 +1,9 @@
 'use client';
 
-import { use } from 'react';
+import { use, useEffect } from 'react';
 
 import { GitGraph } from '@/components/git-graph';
-import { MOCK_PROJECTS } from '@/lib/mock-data';
+import { useProjectsStore } from '@/stores';
 
 export default function ProjectPage({
   params,
@@ -11,7 +11,14 @@ export default function ProjectPage({
   params: Promise<{ project: string }>;
 }): React.ReactElement {
   const { project: projectName } = use(params);
-  const project = MOCK_PROJECTS.find((p) => p.projectName === projectName);
+  const projects = useProjectsStore((s) => s.projects);
+  const fetchProjects = useProjectsStore((s) => s.fetchProjects);
+
+  useEffect(() => {
+    void fetchProjects();
+  }, [fetchProjects]);
+
+  const project = projects.find((p) => p.projectName === projectName);
 
   if (!project) {
     return (

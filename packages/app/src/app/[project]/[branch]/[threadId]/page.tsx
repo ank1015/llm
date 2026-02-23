@@ -4,7 +4,8 @@ import { use, useEffect, useRef } from 'react';
 
 import { ThreadInput } from '@/components/thread-input';
 import { ThreadMessages } from '@/components/thread-messages';
-import { findBranchBySlug, MOCK_PROJECTS } from '@/lib/mock-data';
+import { findBranchBySlug } from '@/lib/mock-data';
+import { useProjectsStore } from '@/stores';
 
 export default function ThreadPage({
   params,
@@ -12,8 +13,14 @@ export default function ThreadPage({
   params: Promise<{ project: string; branch: string; threadId: string }>;
 }): React.ReactElement {
   const { project: projectName, branch: branchSlug, threadId } = use(params);
+  const projects = useProjectsStore((s) => s.projects);
+  const fetchProjects = useProjectsStore((s) => s.fetchProjects);
 
-  const project = MOCK_PROJECTS.find((p) => p.projectName === projectName);
+  useEffect(() => {
+    void fetchProjects();
+  }, [fetchProjects]);
+
+  const project = projects.find((p) => p.projectName === projectName);
   const branch = project ? findBranchBySlug(project, branchSlug) : undefined;
   const thread = branch?.threads.find((t) => t.threadId === threadId);
 

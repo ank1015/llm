@@ -13,22 +13,16 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-
-const MODELS = [
-  'GPT-5.3-Codex',
-  'GPT-5.3',
-  'GPT-4.1',
-  'Claude Opus 4.6',
-  'Claude Sonnet 4.6',
-  'Gemini 2.5 Pro',
-];
-
-const REASONING_LEVELS = ['None', 'Low', 'Medium', 'High', 'Extra High'];
+import { useSettingsStore } from '@/stores';
 
 export function ThreadInput() {
   const [input, setInput] = useState('');
-  const [selectedModel, setSelectedModel] = useState(MODELS[0]);
-  const [selectedReasoning, setSelectedReasoning] = useState('Extra High');
+  const selectedModel = useSettingsStore((s) => s.selectedModel);
+  const setSelectedModel = useSettingsStore((s) => s.setSelectedModel);
+  const selectedReasoning = useSettingsStore((s) => s.selectedReasoning);
+  const setSelectedReasoning = useSettingsStore((s) => s.setSelectedReasoning);
+  const availableModels = useSettingsStore((s) => s.availableModels);
+  const availableReasoningLevels = useSettingsStore((s) => s.availableReasoningLevels);
 
   const handleSubmit = () => {
     const trimmed = input.trim();
@@ -72,7 +66,7 @@ export function ThreadInput() {
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="min-w-[180px]">
-                  {MODELS.map((model) => (
+                  {availableModels.map((model) => (
                     <DropdownMenuItem
                       key={model}
                       onClick={() => setSelectedModel(model)}
@@ -97,7 +91,7 @@ export function ThreadInput() {
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="min-w-[140px]">
-                  {REASONING_LEVELS.map((level) => (
+                  {availableReasoningLevels.map((level) => (
                     <DropdownMenuItem
                       key={level}
                       onClick={() => setSelectedReasoning(level)}

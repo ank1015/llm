@@ -29,8 +29,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { branchToSlug, MOCK_PROJECTS } from '@/lib/mock-data';
+import { branchToSlug } from '@/lib/mock-data';
 import { cn } from '@/lib/utils';
+import { useProjectsStore, useUiStore } from '@/stores';
 
 // ---------------------------------------------------------------------------
 // Route context — parsed from the current URL
@@ -115,11 +116,12 @@ const BranchGroup: FC<{
 }> = ({ branch, projectName, activeThreadId, defaultExpanded = false }) => {
   const router = useRouter();
   const [isCollapsed, setIsCollapsed] = useState(!defaultExpanded);
+  const [prevDefaultExpanded, setPrevDefaultExpanded] = useState(defaultExpanded);
 
-  // Expand when the route points to this branch
-  useEffect(() => {
+  if (prevDefaultExpanded !== defaultExpanded) {
+    setPrevDefaultExpanded(defaultExpanded);
     if (defaultExpanded) setIsCollapsed(false);
-  }, [defaultExpanded]);
+  }
 
   const handleThreadSelect = (thread: MockThread) => {
     router.push(`/${projectName}/${branchToSlug(branch.branchName)}/${thread.threadId}`);
@@ -190,23 +192,26 @@ const ProjectGroup: FC<{
   const [isCollapsed, setIsCollapsed] = useState(!hasBranches && !isRouteProject);
   const [isMergedExpanded, setIsMergedExpanded] = useState(hasActiveMergedBranch);
 
-  // Collapse all when the collapse-all button is pressed
-  useEffect(() => {
+  const [prevCollapseAllKey, setPrevCollapseAllKey] = useState(collapseAllKey);
+  if (prevCollapseAllKey !== collapseAllKey) {
+    setPrevCollapseAllKey(collapseAllKey);
     if (collapseAllKey > 0) {
       setIsCollapsed(true);
       setIsMergedExpanded(false);
     }
-  }, [collapseAllKey]);
+  }
 
-  // Expand project folder when route navigates into it
-  useEffect(() => {
+  const [prevIsRouteProject, setPrevIsRouteProject] = useState(isRouteProject);
+  if (prevIsRouteProject !== isRouteProject) {
+    setPrevIsRouteProject(isRouteProject);
     if (isRouteProject) setIsCollapsed(false);
-  }, [isRouteProject]);
+  }
 
-  // Expand merged section when route points to a merged branch
-  useEffect(() => {
+  const [prevHasActiveMergedBranch, setPrevHasActiveMergedBranch] = useState(hasActiveMergedBranch);
+  if (prevHasActiveMergedBranch !== hasActiveMergedBranch) {
+    setPrevHasActiveMergedBranch(hasActiveMergedBranch);
     if (hasActiveMergedBranch) setIsMergedExpanded(true);
-  }, [hasActiveMergedBranch]);
+  }
 
   return (
     <div>
@@ -332,9 +337,14 @@ const ProjectGroup: FC<{
 const ProjectList: FC<{
   collapsed?: boolean;
 }> = ({ collapsed }) => {
-  const [projects] = useState(MOCK_PROJECTS);
+  const projects = useProjectsStore((s) => s.projects);
+  const fetchProjects = useProjectsStore((s) => s.fetchProjects);
   const routeCtx = useRouteContext();
   const [collapseAllKey, setCollapseAllKey] = useState(0);
+
+  useEffect(() => {
+    void fetchProjects();
+  }, [fetchProjects]);
 
   const handleCollapseAll = () => setCollapseAllKey((k) => k + 1);
 
@@ -380,10 +390,9 @@ const ProjectList: FC<{
 // ---------------------------------------------------------------------------
 
 function SidebarComponent() {
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const isSidebarCollapsed = useUiStore((s) => s.isSidebarCollapsed);
+  const toggleSidebarCollapsed = useUiStore((s) => s.toggleSidebarCollapsed);
   const [isHovered, setIsHovered] = useState(false);
-
-  const toggleSidebarCollapsed = () => setIsSidebarCollapsed((prev) => !prev);
 
   const showToggleIcon = isSidebarCollapsed && isHovered;
 
