@@ -1,6 +1,8 @@
 import type { MockBranch, MockProject, MockThread } from '@/lib/mock-data';
+import type { MockBranchDiff } from '@/lib/mock-diff-data';
 
 import { findBranchBySlug, MOCK_PROJECTS } from '@/lib/mock-data';
+import { getMockBranchDiff } from '@/lib/mock-diff-data';
 
 function delay(ms = 80): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -52,6 +54,14 @@ export async function deleteProject(projectId: string): Promise<void> {
   await delay();
   const index = MOCK_PROJECTS.findIndex((p) => p.projectId === projectId);
   if (index !== -1) MOCK_PROJECTS.splice(index, 1);
+}
+
+export async function getDiffForBranch(
+  _projectName: string,
+  _branchSlug: string
+): Promise<MockBranchDiff> {
+  await delay();
+  return getMockBranchDiff();
 }
 
 export async function getThreadMessages(

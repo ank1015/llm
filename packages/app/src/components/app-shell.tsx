@@ -2,7 +2,7 @@
 
 import { ChevronRight, FileDiff, GitBranch, GitMerge } from 'lucide-react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import { NewBranchDialog } from '@/components/new-branch-dialog';
@@ -20,7 +20,8 @@ function HeaderBreadcrumb() {
 
   const projectName = segments[0]!;
   const branchSlug = segments[1];
-  const isLast = (index: number) => index === Math.min(segments.length - 1, 1);
+  const isDiffPage = segments[2] === 'diff';
+  const lastSegmentIndex = isDiffPage ? 2 : branchSlug ? 1 : 0;
 
   return (
     <div className="flex items-center gap-1.5 text-sm">
@@ -31,7 +32,7 @@ function HeaderBreadcrumb() {
       <Link
         href={`/${projectName}`}
         className={
-          isLast(0)
+          lastSegmentIndex === 0
             ? 'text-foreground font-medium hover:text-foreground/80 transition-colors'
             : 'text-muted-foreground hover:text-foreground transition-colors'
         }
@@ -43,10 +44,20 @@ function HeaderBreadcrumb() {
           <ChevronRight size={14} className="text-muted-foreground" />
           <Link
             href={`/${projectName}/${branchSlug}`}
-            className="text-foreground font-medium hover:text-foreground/80 transition-colors"
+            className={
+              lastSegmentIndex === 1
+                ? 'text-foreground font-medium hover:text-foreground/80 transition-colors'
+                : 'text-muted-foreground hover:text-foreground transition-colors'
+            }
           >
             {branchSlug}
           </Link>
+        </>
+      )}
+      {isDiffPage && (
+        <>
+          <ChevronRight size={14} className="text-muted-foreground" />
+          <span className="text-foreground font-medium">diff</span>
         </>
       )}
     </div>
@@ -55,6 +66,7 @@ function HeaderBreadcrumb() {
 
 function HeaderActions() {
   const pathname = usePathname();
+  const router = useRouter();
   const segments = pathname.split('/').filter(Boolean);
   const projects = useProjectsStore((s) => s.projects);
   const [isBranchDialogOpen, setIsBranchDialogOpen] = useState(false);
@@ -80,14 +92,18 @@ function HeaderActions() {
   }
 
   // /{project}/{branch} — show View Diff + Merge Branch (if active)
-  if (segments.length === 2 && projectName && branchSlug) {
+  if (segments.length >= 2 && projectName && branchSlug) {
     const project = projects.find((p) => p.projectName === projectName);
     const branch = project ? findBranchBySlug(project, branchSlug) : undefined;
     const isActive = branch?.status === 'active';
 
     return (
       <>
-        <Button variant="outline" size="sm">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => router.push(`/${projectName}/${branchSlug}/diff`)}
+        >
           <FileDiff size={14} />
           View Diff
         </Button>
