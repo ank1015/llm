@@ -2,7 +2,7 @@ import type { MockBranch, MockProject, MockThread } from '@/lib/mock-data';
 import type { MockBranchDiff } from '@/lib/mock-diff-data';
 
 import { findBranchBySlug, MOCK_PROJECTS } from '@/lib/mock-data';
-import { getMockBranchDiff } from '@/lib/mock-diff-data';
+import { getMockBranchDiff, getMockThreadDiff } from '@/lib/mock-diff-data';
 
 function delay(ms = 80): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -62,6 +62,15 @@ export async function getDiffForBranch(
 ): Promise<MockBranchDiff> {
   await delay();
   return getMockBranchDiff();
+}
+
+export async function getDiffForThread(
+  _projectName: string,
+  _branchSlug: string,
+  _threadId: string
+): Promise<MockBranchDiff> {
+  await delay();
+  return getMockThreadDiff();
 }
 
 export async function getThreadMessages(

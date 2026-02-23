@@ -45,13 +45,12 @@ function DiffLine({
 
   const prefix = line.type === 'added' ? '+' : line.type === 'removed' ? '-' : ' ';
 
+  const lineNumber = line.newLineNumber ?? line.oldLineNumber ?? '';
+
   return (
     <tr ref={hunkRef} className={bgClass}>
       <td className="text-muted-foreground w-[1px] select-none whitespace-nowrap px-2 text-right align-top font-mono text-xs leading-6">
-        {line.oldLineNumber ?? ''}
-      </td>
-      <td className="text-muted-foreground w-[1px] select-none whitespace-nowrap px-2 text-right align-top font-mono text-xs leading-6">
-        {line.newLineNumber ?? ''}
+        {lineNumber}
       </td>
       <td
         className={`w-[1px] select-none whitespace-nowrap pl-2 pr-1 text-center align-top font-mono text-[13px] leading-6 ${fgClass}`}

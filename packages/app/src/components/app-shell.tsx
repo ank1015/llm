@@ -20,8 +20,25 @@ function HeaderBreadcrumb() {
 
   const projectName = segments[0]!;
   const branchSlug = segments[1];
-  const isDiffPage = segments[2] === 'diff';
-  const lastSegmentIndex = isDiffPage ? 2 : branchSlug ? 1 : 0;
+  const isBranchDiff = segments[2] === 'diff';
+  const threadId = !isBranchDiff ? segments[2] : undefined;
+  const isThreadDiff = threadId !== undefined && segments[3] === 'diff';
+
+  // Determine last segment for styling the "active" breadcrumb
+  const lastSegment = isThreadDiff
+    ? 'threadDiff'
+    : threadId
+      ? 'thread'
+      : isBranchDiff
+        ? 'branchDiff'
+        : branchSlug
+          ? 'branch'
+          : 'project';
+
+  const linkClass = (active: boolean) =>
+    active
+      ? 'text-foreground font-medium hover:text-foreground/80 transition-colors'
+      : 'text-muted-foreground hover:text-foreground transition-colors';
 
   return (
     <div className="flex items-center gap-1.5 text-sm">
@@ -29,14 +46,7 @@ function HeaderBreadcrumb() {
         Projects
       </Link>
       <ChevronRight size={14} className="text-muted-foreground" />
-      <Link
-        href={`/${projectName}`}
-        className={
-          lastSegmentIndex === 0
-            ? 'text-foreground font-medium hover:text-foreground/80 transition-colors'
-            : 'text-muted-foreground hover:text-foreground transition-colors'
-        }
-      >
+      <Link href={`/${projectName}`} className={linkClass(lastSegment === 'project')}>
         {projectName}
       </Link>
       {branchSlug && (
@@ -44,17 +54,24 @@ function HeaderBreadcrumb() {
           <ChevronRight size={14} className="text-muted-foreground" />
           <Link
             href={`/${projectName}/${branchSlug}`}
-            className={
-              lastSegmentIndex === 1
-                ? 'text-foreground font-medium hover:text-foreground/80 transition-colors'
-                : 'text-muted-foreground hover:text-foreground transition-colors'
-            }
+            className={linkClass(lastSegment === 'branch')}
           >
             {branchSlug}
           </Link>
         </>
       )}
-      {isDiffPage && (
+      {threadId && (
+        <>
+          <ChevronRight size={14} className="text-muted-foreground" />
+          <Link
+            href={`/${projectName}/${branchSlug}/${threadId}`}
+            className={linkClass(lastSegment === 'thread')}
+          >
+            {threadId}
+          </Link>
+        </>
+      )}
+      {(isBranchDiff || isThreadDiff) && (
         <>
           <ChevronRight size={14} className="text-muted-foreground" />
           <span className="text-foreground font-medium">diff</span>
@@ -91,21 +108,26 @@ function HeaderActions() {
     );
   }
 
-  // /{project}/{branch} and /{project}/{branch}/diff — show actions
+  // /{project}/{branch}... — show actions
   if (segments.length >= 2 && projectName && branchSlug) {
     const project = projects.find((p) => p.projectName === projectName);
     const branch = project ? findBranchBySlug(project, branchSlug) : undefined;
     const isActive = branch?.status === 'active';
-    const isDiffPage = segments[2] === 'diff';
+
+    const isBranchDiff = segments[2] === 'diff';
+    const threadId = !isBranchDiff ? segments[2] : undefined;
+    const isThreadDiff = threadId !== undefined && segments[3] === 'diff';
+    const isDiffPage = isBranchDiff || isThreadDiff;
+
+    // Determine diff navigation target
+    const diffHref = threadId
+      ? `/${projectName}/${branchSlug}/${threadId}/diff`
+      : `/${projectName}/${branchSlug}/diff`;
 
     return (
       <>
         {!isDiffPage && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => router.push(`/${projectName}/${branchSlug}/diff`)}
-          >
+          <Button variant="outline" size="sm" onClick={() => router.push(diffHref)}>
             <FileDiff size={14} />
             View Diff
           </Button>

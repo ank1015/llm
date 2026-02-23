@@ -340,6 +340,158 @@ export function buildFullFileView(file: MockDiffFile): FullFileView {
   return { lines: result, hunkStartIndices };
 }
 
+export function getMockThreadDiff(): MockBranchDiff {
+  const files: MockDiffFile[] = [
+    {
+      filePath: 'src/trading/order-matching.ts',
+      status: 'modified',
+      additions: 4,
+      deletions: 2,
+      hunks: [
+        {
+          header: '@@ -45,9 +51,13 @@ export class OrderMatcher {',
+          lines: [
+            {
+              type: 'context',
+              content: '    const filled = candidates.slice(0, fillIndex);',
+              oldLineNumber: 45,
+              newLineNumber: 51,
+            },
+            {
+              type: 'context',
+              content: '    const totalPrice = filled.reduce((sum, c) => sum + c.price, 0);',
+              oldLineNumber: 46,
+              newLineNumber: 52,
+            },
+            {
+              type: 'removed',
+              content: '    const avgPrice = totalPrice / filled.length;',
+              oldLineNumber: 47,
+              newLineNumber: null,
+            },
+            {
+              type: 'removed',
+              content: '    return { filled, avgPrice, slippage: 0 };',
+              oldLineNumber: 48,
+              newLineNumber: null,
+            },
+            {
+              type: 'added',
+              content: '    const avgPrice = filled.length > 0 ? totalPrice / filled.length : 0;',
+              oldLineNumber: null,
+              newLineNumber: 53,
+            },
+            {
+              type: 'added',
+              content:
+                '    const slippage = Math.abs(avgPrice - order.limitPrice) / order.limitPrice;',
+              oldLineNumber: null,
+              newLineNumber: 54,
+            },
+            {
+              type: 'added',
+              content: '    return { filled, avgPrice, slippage, rejected: false };',
+              oldLineNumber: null,
+              newLineNumber: 55,
+            },
+            { type: 'added', content: '  }', oldLineNumber: null, newLineNumber: 56 },
+            { type: 'context', content: '}', oldLineNumber: 49, newLineNumber: 57 },
+          ],
+        },
+      ],
+    },
+    {
+      filePath: 'src/trading/utils/validation.ts',
+      status: 'added',
+      additions: 16,
+      deletions: 0,
+      hunks: [
+        {
+          header: '@@ -0,0 +1,16 @@',
+          lines: [
+            {
+              type: 'added',
+              content: 'import { z } from "zod";',
+              oldLineNumber: null,
+              newLineNumber: 1,
+            },
+            { type: 'added', content: '', oldLineNumber: null, newLineNumber: 2 },
+            {
+              type: 'added',
+              content: 'export const OrderSchema = z.object({',
+              oldLineNumber: null,
+              newLineNumber: 3,
+            },
+            {
+              type: 'added',
+              content: '  id: z.string().uuid(),',
+              oldLineNumber: null,
+              newLineNumber: 4,
+            },
+            {
+              type: 'added',
+              content: '  side: z.enum(["buy", "sell"]),',
+              oldLineNumber: null,
+              newLineNumber: 5,
+            },
+            {
+              type: 'added',
+              content: '  quantity: z.number().positive(),',
+              oldLineNumber: null,
+              newLineNumber: 6,
+            },
+            {
+              type: 'added',
+              content: '  limitPrice: z.number().nonnegative(),',
+              oldLineNumber: null,
+              newLineNumber: 7,
+            },
+            {
+              type: 'added',
+              content: '  marketId: z.string(),',
+              oldLineNumber: null,
+              newLineNumber: 8,
+            },
+            {
+              type: 'added',
+              content: '  createdAt: z.string().datetime(),',
+              oldLineNumber: null,
+              newLineNumber: 9,
+            },
+            { type: 'added', content: '});', oldLineNumber: null, newLineNumber: 10 },
+            { type: 'added', content: '', oldLineNumber: null, newLineNumber: 11 },
+            {
+              type: 'added',
+              content: 'export type ValidatedOrder = z.infer<typeof OrderSchema>;',
+              oldLineNumber: null,
+              newLineNumber: 12,
+            },
+            { type: 'added', content: '', oldLineNumber: null, newLineNumber: 13 },
+            {
+              type: 'added',
+              content: 'export function validateOrder(data: unknown): ValidatedOrder {',
+              oldLineNumber: null,
+              newLineNumber: 14,
+            },
+            {
+              type: 'added',
+              content: '  return OrderSchema.parse(data);',
+              oldLineNumber: null,
+              newLineNumber: 15,
+            },
+            { type: 'added', content: '}', oldLineNumber: null, newLineNumber: 16 },
+          ],
+        },
+      ],
+    },
+  ];
+
+  const totalAdditions = files.reduce((sum, f) => sum + f.additions, 0);
+  const totalDeletions = files.reduce((sum, f) => sum + f.deletions, 0);
+
+  return { files, totalAdditions, totalDeletions };
+}
+
 export function getMockBranchDiff(): MockBranchDiff {
   const files: MockDiffFile[] = [
     {

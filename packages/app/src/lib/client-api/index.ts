@@ -4,6 +4,7 @@ export {
   deleteProject,
   getBranchBySlug,
   getDiffForBranch,
+  getDiffForThread,
   getProjectByName,
   getProjects,
   getThreadMessages,
