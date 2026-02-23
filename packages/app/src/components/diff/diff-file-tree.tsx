@@ -128,7 +128,7 @@ export function DiffFileTree({
   const tree = buildFileTree(files);
 
   return (
-    <div className="border-home-border flex h-full w-[20%] min-w-[200px] flex-col border-r">
+    <div className="flex h-full flex-col">
       <div className="border-home-border flex items-center justify-between border-b px-3 py-2">
         <span className="text-sm font-medium">Files</span>
         <span className="text-muted-foreground text-xs">{files.length} changed</span>

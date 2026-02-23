@@ -91,23 +91,25 @@ function HeaderActions() {
     );
   }
 
-  // /{project}/{branch} — show View Diff + Merge Branch (if active)
-  // Hide View Diff on the diff page itself
-  if (segments.length >= 2 && segments[2] !== 'diff' && projectName && branchSlug) {
+  // /{project}/{branch} and /{project}/{branch}/diff — show actions
+  if (segments.length >= 2 && projectName && branchSlug) {
     const project = projects.find((p) => p.projectName === projectName);
     const branch = project ? findBranchBySlug(project, branchSlug) : undefined;
     const isActive = branch?.status === 'active';
+    const isDiffPage = segments[2] === 'diff';
 
     return (
       <>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => router.push(`/${projectName}/${branchSlug}/diff`)}
-        >
-          <FileDiff size={14} />
-          View Diff
-        </Button>
+        {!isDiffPage && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.push(`/${projectName}/${branchSlug}/diff`)}
+          >
+            <FileDiff size={14} />
+            View Diff
+          </Button>
+        )}
         {isActive && (
           <Button variant="outline" size="sm">
             <GitMerge size={14} />
