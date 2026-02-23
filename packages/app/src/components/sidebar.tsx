@@ -3,8 +3,8 @@ import {
   Archive,
   ChevronDown,
   ChevronRight,
+  ChevronsDownUp,
   Ellipsis,
-  FilterIcon,
   Folder,
   FolderPlus,
   GitBranch,
@@ -170,7 +170,8 @@ const BranchGroup: FC<{
 const ProjectGroup: FC<{
   project: MockProject;
   routeCtx: RouteContext;
-}> = ({ project, routeCtx }) => {
+  collapseAllKey: number;
+}> = ({ project, routeCtx, collapseAllKey }) => {
   const router = useRouter();
   const hasBranches = project.branches.length > 0;
 
@@ -188,6 +189,14 @@ const ProjectGroup: FC<{
 
   const [isCollapsed, setIsCollapsed] = useState(!hasBranches && !isRouteProject);
   const [isMergedExpanded, setIsMergedExpanded] = useState(hasActiveMergedBranch);
+
+  // Collapse all when the collapse-all button is pressed
+  useEffect(() => {
+    if (collapseAllKey > 0) {
+      setIsCollapsed(true);
+      setIsMergedExpanded(false);
+    }
+  }, [collapseAllKey]);
 
   // Expand project folder when route navigates into it
   useEffect(() => {
@@ -325,20 +334,21 @@ const ProjectList: FC<{
 }> = ({ collapsed }) => {
   const [projects] = useState(MOCK_PROJECTS);
   const routeCtx = useRouteContext();
+  const [collapseAllKey, setCollapseAllKey] = useState(0);
+
+  const handleCollapseAll = () => setCollapseAllKey((k) => k + 1);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {!collapsed && (
         <div className="flex items-center px-3 pt-4 pb-1 mb-1">
-          <span className="text-muted-foreground flex-1 text-[14px]">Threads</span>
-          <div className="flex items-center gap-0.5">
-            <button className="text-muted-foreground hover:text-foreground flex h-6 w-6 cursor-pointer items-center justify-center rounded-md hover:bg-home-hover">
-              <FolderPlus size={15} strokeWidth={1.8} />
-            </button>
-            <button className="text-muted-foreground hover:text-foreground flex h-6 w-6 cursor-pointer items-center justify-center rounded-md hover:bg-home-hover">
-              <FilterIcon size={15} strokeWidth={1.8} />
-            </button>
-          </div>
+          <span className="text-muted-foreground flex-1 text-[14px]">Projects</span>
+          <button
+            onClick={handleCollapseAll}
+            className="text-muted-foreground hover:text-foreground flex h-6 w-6 cursor-pointer items-center justify-center rounded-md hover:bg-home-hover"
+          >
+            <ChevronsDownUp size={15} strokeWidth={1.8} />
+          </button>
         </div>
       )}
       {!collapsed && (
@@ -350,7 +360,12 @@ const ProjectList: FC<{
           ) : (
             <div className="flex flex-col gap-0.5">
               {projects.map((project) => (
-                <ProjectGroup key={project.projectId} project={project} routeCtx={routeCtx} />
+                <ProjectGroup
+                  key={project.projectId}
+                  project={project}
+                  routeCtx={routeCtx}
+                  collapseAllKey={collapseAllKey}
+                />
               ))}
             </div>
           )}
@@ -423,8 +438,8 @@ function SidebarComponent() {
       {/* Navigation items */}
       <div className="mt-2 flex flex-col gap-0.5 px-2">
         <SidebarItem
-          icon={<SquarePen size={18} strokeWidth={1.8} />}
-          label="New thread"
+          icon={<FolderPlus size={18} strokeWidth={1.8} />}
+          label="New project"
           collapsed={isSidebarCollapsed}
         />
       </div>
