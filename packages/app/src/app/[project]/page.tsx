@@ -28,5 +28,9 @@ export default function ProjectPage({
     );
   }
 
-  return <GitGraph project={project} />;
+  return (
+    <div className="h-full overflow-y-auto px-4">
+      <GitGraph project={project} />
+    </div>
+  );
 }

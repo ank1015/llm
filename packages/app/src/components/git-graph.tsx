@@ -1,16 +1,19 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 
 import type { MockBranch, MockProject, MockThread } from '@/lib/mock-data';
-import type { FC, PointerEvent as ReactPointerEvent, WheelEvent } from 'react';
+import type { FC } from 'react';
 
 import { branchToSlug } from '@/lib/mock-data';
 
+// ---------------------------------------------------------------------------
 // Layout constants
-const MAIN_X = 80;
-const BRANCH_X = 220;
+// ---------------------------------------------------------------------------
+
+const MAIN_X = 200;
+const BRANCH_X = 320;
 const ROW_HEIGHT = 100;
 const COMMIT_RADIUS = 7;
 const BRANCH_DOT_RADIUS = 6;
@@ -18,16 +21,26 @@ const TOP_PADDING = 70;
 const CURVE_OFFSET = 28;
 const COMMIT_SPACING = 50;
 const HIT_AREA_RADIUS = 14;
+const SVG_WIDTH = 520;
 
 // Colors (CSS variable references for theme support)
 const MAIN_COLOR = 'var(--foreground)';
-const ACTIVE_COLOR = '#3b82f6';
+const ACTIVE_COLOR = '#98CEFF';
 const MERGED_COLOR = 'var(--muted-foreground)';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 type BranchLayout = {
   branch: MockBranch;
+  /** Fork point on main line (lower on screen = larger Y) */
   forkY: number;
+  /** Where branch lane starts after the fork curve */
+  branchStartY: number;
+  /** End of branch content (higher on screen = smaller Y) */
   endY: number;
+  /** Merge-back point on main (smaller Y than endY), null for active */
   mergeY: number | null;
   color: string;
 };
@@ -39,28 +52,36 @@ type HoveredCommit = {
   svgY: number;
 };
 
+// ---------------------------------------------------------------------------
+// Layout computation — inverted: initial commit at bottom, HEAD at top
+// ---------------------------------------------------------------------------
+
 function computeLayout(project: MockProject) {
-  // Merged branches first (older), then active (current) — time flows top-to-bottom
+  // Compute in natural order (top-to-bottom), then flip Y
   const mergedBranches = project.branches.filter((b) => b.status === 'merged');
   const activeBranches = project.branches.filter((b) => b.status === 'active');
   const allBranches = [...mergedBranches, ...activeBranches];
 
-  const layouts: BranchLayout[] = [];
-  let currentY = TOP_PADDING;
+  const rawLayouts: Array<{
+    branch: MockBranch;
+    forkY: number;
+    endY: number;
+    mergeY: number | null;
+    color: string;
+  }> = [];
 
+  let currentY = TOP_PADDING;
   const mainStartY = currentY;
 
   for (const branch of allBranches) {
     currentY += ROW_HEIGHT;
     const forkY = currentY;
-
     const branchLength = Math.max(branch.threads.length, 1);
     const endY = forkY + CURVE_OFFSET + branchLength * COMMIT_SPACING;
-
     const isMerged = branch.status === 'merged';
     const mergeY = isMerged ? endY + 40 : null;
 
-    layouts.push({
+    rawLayouts.push({
       branch,
       forkY,
       endY,
@@ -68,46 +89,69 @@ function computeLayout(project: MockProject) {
       color: isMerged ? MERGED_COLOR : ACTIVE_COLOR,
     });
 
-    // Advance past the merge point or branch end
     currentY = mergeY ?? endY;
   }
 
   const mainEndY = currentY + ROW_HEIGHT;
+  const totalHeight = mainEndY + TOP_PADDING;
 
-  return { layouts, mainStartY, mainEndY, totalHeight: mainEndY + TOP_PADDING };
+  // Flip Y so initial commit is at the bottom and HEAD is at the top
+  const flip = (y: number) => totalHeight - y;
+
+  const layouts: BranchLayout[] = rawLayouts.map((l) => {
+    const flippedFork = flip(l.forkY);
+    return {
+      branch: l.branch,
+      forkY: flippedFork,
+      branchStartY: flippedFork - CURVE_OFFSET,
+      endY: flip(l.endY),
+      mergeY: l.mergeY !== null ? flip(l.mergeY) : null,
+      color: l.color,
+    };
+  });
+
+  return {
+    layouts,
+    headY: flip(mainEndY),
+    initialCommitY: flip(mainStartY),
+    totalHeight,
+  };
 }
+
+// ---------------------------------------------------------------------------
+// BranchPath — draws a single branch (inverted: branches extend upward)
+// ---------------------------------------------------------------------------
 
 const BranchPath: FC<{
   layout: BranchLayout;
   onCommitHover: (commit: HoveredCommit | null) => void;
   onCommitClick: (thread: MockThread, branchName: string) => void;
 }> = ({ layout, onCommitHover, onCommitClick }) => {
-  const { branch, forkY, endY, mergeY, color } = layout;
+  const { branch, forkY, branchStartY, endY, mergeY, color } = layout;
   const isMerged = branch.status === 'merged';
 
-  // Fork curve: bezier from main to branch lane
+  // Fork curve: from main upward-right to branch lane
   const forkPath = [
     `M ${MAIN_X} ${forkY}`,
-    `C ${MAIN_X + 50} ${forkY}, ${BRANCH_X - 50} ${forkY + CURVE_OFFSET}, ${BRANCH_X} ${forkY + CURVE_OFFSET}`,
+    `C ${MAIN_X + 50} ${forkY}, ${BRANCH_X - 50} ${branchStartY}, ${BRANCH_X} ${branchStartY}`,
   ].join(' ');
 
-  // Branch vertical segment
-  const branchLine = `M ${BRANCH_X} ${forkY + CURVE_OFFSET} L ${BRANCH_X} ${endY}`;
+  // Branch vertical segment (goes upward from branchStartY to endY)
+  const branchLine = `M ${BRANCH_X} ${branchStartY} L ${BRANCH_X} ${endY}`;
 
-  // Merge curve: bezier from branch end back to main
-  const mergePath = mergeY
-    ? [
-        `M ${BRANCH_X} ${endY}`,
-        `C ${BRANCH_X - 50} ${mergeY}, ${MAIN_X + 50} ${mergeY}, ${MAIN_X} ${mergeY}`,
-      ].join(' ')
-    : '';
+  // Merge curve: from branch end upward-left back to main
+  const mergePath =
+    mergeY !== null
+      ? [
+          `M ${BRANCH_X} ${endY}`,
+          `C ${BRANCH_X - 50} ${mergeY}, ${MAIN_X + 50} ${mergeY}, ${MAIN_X} ${mergeY}`,
+        ].join(' ')
+      : '';
 
-  // Evenly spaced commit dots along the branch segment
-  const branchSegmentStart = forkY + CURVE_OFFSET;
+  // Commit dots evenly spaced between branchStartY and endY (going upward)
+  const span = branchStartY - endY;
   const commitDots = branch.threads.map((_, i) => {
-    return (
-      branchSegmentStart + (i + 1) * ((endY - branchSegmentStart) / (branch.threads.length + 1))
-    );
+    return branchStartY - (i + 1) * (span / (branch.threads.length + 1));
   });
 
   return (
@@ -119,23 +163,22 @@ const BranchPath: FC<{
       <path d={branchLine} fill="none" stroke={color} strokeWidth={2.5} />
 
       {/* Merge curve back to main */}
-      {isMerged && mergeY && (
+      {isMerged && mergeY !== null && (
         <>
           <path d={mergePath} fill="none" stroke={color} strokeWidth={2.5} />
           <circle cx={MAIN_X} cy={mergeY} r={COMMIT_RADIUS} fill={color} />
         </>
       )}
 
-      {/* Active branch: open-ended arrow tip */}
+      {/* Active branch: open-ended tip pointing upward */}
       {!isMerged && (
         <>
           <circle cx={BRANCH_X} cy={endY} r={5} fill="none" stroke={color} strokeWidth={2.5} />
-          {/* Small downward ticks to suggest continuation */}
           <line
             x1={BRANCH_X}
-            y1={endY + 8}
+            y1={endY - 8}
             x2={BRANCH_X}
-            y2={endY + 18}
+            y2={endY - 18}
             stroke={color}
             strokeWidth={2}
             strokeDasharray="3 4"
@@ -152,9 +195,7 @@ const BranchPath: FC<{
         if (!thread) return null;
         return (
           <g key={thread.threadId}>
-            {/* Visible dot */}
             <circle cx={BRANCH_X} cy={cy} r={BRANCH_DOT_RADIUS} fill={color} />
-            {/* Invisible hit area for hover + click */}
             <circle
               cx={BRANCH_X}
               cy={cy}
@@ -179,10 +220,10 @@ const BranchPath: FC<{
         );
       })}
 
-      {/* Branch name label */}
+      {/* Branch name label (next to fork curve endpoint) */}
       <text
         x={BRANCH_X + 18}
-        y={branchSegmentStart + 6}
+        y={branchStartY + 6}
         fill={color}
         fontSize={14}
         fontFamily="var(--font-geist-sans), sans-serif"
@@ -195,7 +236,7 @@ const BranchPath: FC<{
       {branch.threads.length > 0 && (
         <text
           x={BRANCH_X + 18}
-          y={branchSegmentStart + 24}
+          y={branchStartY + 24}
           fill="var(--muted-foreground)"
           fontSize={12}
           fontFamily="var(--font-geist-sans), sans-serif"
@@ -208,123 +249,12 @@ const BranchPath: FC<{
 };
 
 // ---------------------------------------------------------------------------
-// Canvas constants
+// GitGraph — scrollable, no zoom/pan canvas
 // ---------------------------------------------------------------------------
-
-const SVG_WIDTH = 520;
-const MIN_SCALE = 0.15;
-const MAX_SCALE = 3;
-const ZOOM_SENSITIVITY = 0.002;
-const CLICK_THRESHOLD = 5;
 
 export const GitGraph: FC<{ project: MockProject }> = ({ project }) => {
   const router = useRouter();
-  const { layouts, mainStartY, mainEndY, totalHeight } = computeLayout(project);
-
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
-  const [isDragging, setIsDragging] = useState(false);
   const [hoveredCommit, setHoveredCommit] = useState<HoveredCommit | null>(null);
-  const dragStart = useRef({ x: 0, y: 0, tx: 0, ty: 0 });
-  const dragDistance = useRef(0);
-  const hasInitialized = useRef(false);
-
-  // Center the graph when the container first mounts or project changes
-  useEffect(() => {
-    hasInitialized.current = false;
-  }, [project.projectId]);
-
-  useEffect(() => {
-    if (hasInitialized.current) return;
-    const el = containerRef.current;
-    if (!el) return;
-
-    const cw = el.clientWidth;
-    const ch = el.clientHeight;
-
-    // Fit the graph in view with some padding
-    const scaleX = cw / (SVG_WIDTH + 80);
-    const scaleY = ch / (totalHeight + 80);
-    const fitScale = Math.min(scaleX, scaleY, 1.2);
-    const clampedScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, fitScale));
-
-    const x = (cw - SVG_WIDTH * clampedScale) / 2;
-    const y = (ch - totalHeight * clampedScale) / 2;
-
-    setTransform({ x, y, scale: clampedScale });
-    hasInitialized.current = true;
-  }, [totalHeight, project.projectId]);
-
-  // Zoom centered on cursor
-  const handleWheel = useCallback((e: WheelEvent) => {
-    e.preventDefault();
-    const el = containerRef.current;
-    if (!el) return;
-
-    const rect = el.getBoundingClientRect();
-    const cursorX = e.clientX - rect.left;
-    const cursorY = e.clientY - rect.top;
-
-    setTransform((prev) => {
-      const delta = -e.deltaY * ZOOM_SENSITIVITY;
-      const nextScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, prev.scale * (1 + delta)));
-      const ratio = nextScale / prev.scale;
-
-      return {
-        x: cursorX - (cursorX - prev.x) * ratio,
-        y: cursorY - (cursorY - prev.y) * ratio,
-        scale: nextScale,
-      };
-    });
-  }, []);
-
-  // Pan via pointer drag — track distance to distinguish click from drag
-  const handlePointerDown = useCallback(
-    (e: ReactPointerEvent) => {
-      if (e.button !== 0) return;
-      setIsDragging(true);
-      dragDistance.current = 0;
-      dragStart.current = { x: e.clientX, y: e.clientY, tx: transform.x, ty: transform.y };
-      (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    },
-    [transform.x, transform.y]
-  );
-
-  const handlePointerMove = useCallback(
-    (e: ReactPointerEvent) => {
-      if (!isDragging) return;
-      const dx = e.clientX - dragStart.current.x;
-      const dy = e.clientY - dragStart.current.y;
-      dragDistance.current = Math.sqrt(dx * dx + dy * dy);
-      setTransform((prev) => ({
-        ...prev,
-        x: dragStart.current.tx + dx,
-        y: dragStart.current.ty + dy,
-      }));
-    },
-    [isDragging]
-  );
-
-  const handlePointerUp = useCallback(() => {
-    setIsDragging(false);
-  }, []);
-
-  // Click handler for commit dots — only fires if pointer didn't drag
-  const handleCommitClick = useCallback(
-    (thread: MockThread, branchName: string) => {
-      if (dragDistance.current > CLICK_THRESHOLD) return;
-      router.push(`/${project.projectName}/${branchToSlug(branchName)}/${thread.threadId}`);
-    },
-    [router, project.projectName]
-  );
-
-  // Compute tooltip screen position from SVG coords + canvas transform
-  const tooltipStyle = hoveredCommit
-    ? {
-        left: hoveredCommit.svgX * transform.scale + transform.x,
-        top: hoveredCommit.svgY * transform.scale + transform.y - 12,
-      }
-    : null;
 
   if (project.branches.length === 0) {
     return (
@@ -334,73 +264,62 @@ export const GitGraph: FC<{ project: MockProject }> = ({ project }) => {
     );
   }
 
+  const { layouts, headY, initialCommitY, totalHeight } = computeLayout(project);
+
+  const handleCommitClick = (thread: MockThread, branchName: string) => {
+    router.push(`/${project.projectName}/${branchToSlug(branchName)}/${thread.threadId}`);
+  };
+
   return (
-    <div
-      ref={containerRef}
-      onWheel={handleWheel}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerUp}
-      className="relative h-full w-full overflow-hidden"
-      style={{ cursor: isDragging ? 'grabbing' : 'grab', touchAction: 'none' }}
-    >
-      <div
-        style={{
-          transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`,
-          transformOrigin: '0 0',
-          willChange: 'transform',
-        }}
-      >
-        <svg width={SVG_WIDTH} height={totalHeight} viewBox={`0 0 ${SVG_WIDTH} ${totalHeight}`}>
-          {/* Main vertical line */}
-          <line
-            x1={MAIN_X}
-            y1={mainStartY}
-            x2={MAIN_X}
-            y2={mainEndY}
-            stroke={MAIN_COLOR}
-            strokeWidth={2.5}
+    <div className="relative inline-block py-8">
+      <svg width={SVG_WIDTH} height={totalHeight} viewBox={`0 0 ${SVG_WIDTH} ${totalHeight}`}>
+        {/* Main vertical line */}
+        <line
+          x1={MAIN_X}
+          y1={headY}
+          x2={MAIN_X}
+          y2={initialCommitY}
+          stroke={MAIN_COLOR}
+          strokeWidth={2.5}
+        />
+
+        {/* HEAD dot (top) */}
+        <circle cx={MAIN_X} cy={headY} r={COMMIT_RADIUS + 1} fill={MAIN_COLOR} />
+
+        {/* "main" label at top */}
+        <text
+          x={MAIN_X}
+          y={headY - 18}
+          fill="var(--muted-foreground)"
+          fontSize={13}
+          fontFamily="var(--font-geist-sans), sans-serif"
+          textAnchor="middle"
+          fontWeight={500}
+        >
+          main
+        </text>
+
+        {/* Initial commit dot (bottom) */}
+        <circle cx={MAIN_X} cy={initialCommitY} r={COMMIT_RADIUS + 1} fill={MAIN_COLOR} />
+
+        {/* Branch paths */}
+        {layouts.map((layout) => (
+          <BranchPath
+            key={layout.branch.branchId}
+            layout={layout}
+            onCommitHover={setHoveredCommit}
+            onCommitClick={handleCommitClick}
           />
-
-          {/* Initial commit dot (top) */}
-          <circle cx={MAIN_X} cy={mainStartY} r={COMMIT_RADIUS + 1} fill={MAIN_COLOR} />
-
-          {/* "main" label at top */}
-          <text
-            x={MAIN_X}
-            y={mainStartY - 18}
-            fill="var(--muted-foreground)"
-            fontSize={13}
-            fontFamily="var(--font-geist-sans), sans-serif"
-            textAnchor="middle"
-            fontWeight={500}
-          >
-            main
-          </text>
-
-          {/* HEAD dot (bottom) */}
-          <circle cx={MAIN_X} cy={mainEndY} r={COMMIT_RADIUS + 1} fill={MAIN_COLOR} />
-
-          {/* Branch paths */}
-          {layouts.map((layout) => (
-            <BranchPath
-              key={layout.branch.branchId}
-              layout={layout}
-              onCommitHover={setHoveredCommit}
-              onCommitClick={handleCommitClick}
-            />
-          ))}
-        </svg>
-      </div>
+        ))}
+      </svg>
 
       {/* Hover tooltip */}
-      {hoveredCommit && tooltipStyle && (
+      {hoveredCommit && (
         <div
           className="bg-popover text-popover-foreground border-border pointer-events-none absolute z-10 rounded-lg border px-3 py-2 shadow-md"
           style={{
-            left: tooltipStyle.left,
-            top: tooltipStyle.top,
+            left: hoveredCommit.svgX,
+            top: hoveredCommit.svgY - 12,
             transform: 'translate(-50%, -100%)',
           }}
         >
