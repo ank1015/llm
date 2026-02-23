@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronRight, FileDiff, GitBranch, GitMerge } from 'lucide-react';
+import { Check, ChevronRight, FileDiff, GitBranch, GitMerge } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -118,6 +118,7 @@ function HeaderActions() {
     const threadId = !isBranchDiff ? segments[2] : undefined;
     const isThreadDiff = threadId !== undefined && segments[3] === 'diff';
     const isDiffPage = isBranchDiff || isThreadDiff;
+    const isThreadContext = threadId !== undefined;
 
     // Determine diff navigation target
     const diffHref = threadId
@@ -132,7 +133,13 @@ function HeaderActions() {
             View Diff
           </Button>
         )}
-        {isActive && (
+        {isThreadContext && (
+          <Button variant="outline" size="sm">
+            <Check size={14} />
+            Commit
+          </Button>
+        )}
+        {!isThreadContext && isActive && (
           <Button variant="outline" size="sm">
             <GitMerge size={14} />
             Merge Branch
