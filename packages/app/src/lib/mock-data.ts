@@ -26,6 +26,7 @@ export type MockBranch = {
   branchId: string;
   branchName: string;
   status: 'active' | 'merged';
+  description: string;
   threads: MockThread[];
 };
 
@@ -44,6 +45,8 @@ export const MOCK_PROJECTS: MockProject[] = [
         branchId: 'b1',
         branchName: 'feat/trading-engine',
         status: 'active',
+        description:
+          'Implementing the core trading engine for prediction markets. This includes order matching, position management, liquidity pooling, and real-time price feeds. The engine supports both limit and market orders with configurable slippage tolerance.',
         threads: [
           {
             threadId: '1',
@@ -106,6 +109,8 @@ export const MOCK_PROJECTS: MockProject[] = [
         branchId: 'b2',
         branchName: 'feat/market-analytics',
         status: 'active',
+        description:
+          'Building an analytics dashboard for market performance tracking. Includes volume trends, user activity heatmaps, P&L breakdowns by market category, and automated report generation for weekly stakeholder updates.',
         threads: [
           {
             threadId: '3',
@@ -134,6 +139,8 @@ export const MOCK_PROJECTS: MockProject[] = [
         branchId: 'b3',
         branchName: 'fix/order-matching',
         status: 'merged',
+        description:
+          'Fixed a race condition in the order matching engine where concurrent processes could match the same order twice. Added optimistic locking with a version column and idempotency keys on match operations.',
         threads: [
           {
             threadId: '4',
@@ -162,6 +169,8 @@ export const MOCK_PROJECTS: MockProject[] = [
         branchId: 'b4',
         branchName: 'feat/onboarding-flow',
         status: 'merged',
+        description:
+          'Designed and implemented a 3-step onboarding flow for new users covering account setup, wallet funding, and a guided first trade. Includes progress indicators and skip options to keep completion under 2 minutes.',
         threads: [
           {
             threadId: '5',
@@ -196,6 +205,8 @@ export const MOCK_PROJECTS: MockProject[] = [
         branchId: 'b5',
         branchName: 'feat/pdf-parser',
         status: 'active',
+        description:
+          'Building a PDF text extraction pipeline that handles both scanned and native PDFs. Uses pdf-parse for native text extraction and Tesseract.js for OCR on scanned documents, with post-processing for whitespace cleanup and language detection.',
         threads: [
           {
             threadId: '6',

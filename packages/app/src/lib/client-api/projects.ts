@@ -42,6 +42,7 @@ export async function createBranch(projectName: string, branchName: string): Pro
     branchId: `b${Date.now()}`,
     branchName,
     status: 'active',
+    description: '',
     threads: [],
   };
   return branch;
