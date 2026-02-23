@@ -126,7 +126,8 @@ const BranchPath: FC<{
   layout: BranchLayout;
   onCommitHover: (commit: HoveredCommit | null) => void;
   onCommitClick: (thread: MockThread, branchName: string) => void;
-}> = ({ layout, onCommitHover, onCommitClick }) => {
+  onBranchClick: (branchName: string) => void;
+}> = ({ layout, onCommitHover, onCommitClick, onBranchClick }) => {
   const { branch, forkY, branchStartY, endY, mergeY, color } = layout;
   const isMerged = branch.status === 'merged';
 
@@ -228,6 +229,8 @@ const BranchPath: FC<{
         fontSize={14}
         fontFamily="var(--font-geist-sans), sans-serif"
         fontWeight={500}
+        style={{ cursor: 'pointer' }}
+        onClick={() => onBranchClick(branch.branchName)}
       >
         {branch.branchName}
       </text>
@@ -270,6 +273,10 @@ export const GitGraph: FC<{ project: MockProject }> = ({ project }) => {
     router.push(`/${project.projectName}/${branchToSlug(branchName)}/${thread.threadId}`);
   };
 
+  const handleBranchClick = (branchName: string) => {
+    router.push(`/${project.projectName}/${branchToSlug(branchName)}`);
+  };
+
   return (
     <div className="relative inline-block py-8">
       <svg width={SVG_WIDTH} height={totalHeight} viewBox={`0 0 ${SVG_WIDTH} ${totalHeight}`}>
@@ -309,6 +316,7 @@ export const GitGraph: FC<{ project: MockProject }> = ({ project }) => {
             layout={layout}
             onCommitHover={setHoveredCommit}
             onCommitClick={handleCommitClick}
+            onBranchClick={handleBranchClick}
           />
         ))}
       </svg>
