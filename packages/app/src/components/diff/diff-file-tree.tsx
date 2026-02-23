@@ -40,14 +40,6 @@ function buildFileTree(files: MockDiffFile[]): TreeNode {
   return root;
 }
 
-function statusDotColor(status: MockDiffFile['status']): string {
-  return {
-    added: 'bg-diff-added-fg',
-    modified: 'bg-yellow-500',
-    deleted: 'bg-diff-removed-fg',
-  }[status];
-}
-
 function TreeNodeItem({
   node,
   depth,
@@ -105,9 +97,6 @@ function TreeNodeItem({
     >
       <span className="w-[14px] shrink-0" />
       <FileText size={14} className="text-muted-foreground shrink-0" />
-      {node.file && (
-        <span className={`h-2 w-2 shrink-0 rounded-full ${statusDotColor(node.file.status)}`} />
-      )}
       <span
         className={`truncate ${isSelected ? 'text-foreground font-medium' : 'text-foreground'}`}
       >

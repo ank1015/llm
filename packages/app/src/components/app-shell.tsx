@@ -92,7 +92,8 @@ function HeaderActions() {
   }
 
   // /{project}/{branch} — show View Diff + Merge Branch (if active)
-  if (segments.length >= 2 && projectName && branchSlug) {
+  // Hide View Diff on the diff page itself
+  if (segments.length >= 2 && segments[2] !== 'diff' && projectName && branchSlug) {
     const project = projects.find((p) => p.projectName === projectName);
     const branch = project ? findBranchBySlug(project, branchSlug) : undefined;
     const isActive = branch?.status === 'active';

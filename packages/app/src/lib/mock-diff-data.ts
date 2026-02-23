@@ -24,6 +24,322 @@ export type MockBranchDiff = {
   totalDeletions: number;
 };
 
+export type FullFileView = {
+  lines: MockDiffLine[];
+  hunkStartIndices: number[];
+};
+
+/**
+ * Full "new version" content for each modified file.
+ * Lines covered by hunks are placeholders (replaced by hunk data in the builder).
+ */
+const FILE_NEW_CONTENTS: Record<string, string[]> = {
+  'src/trading/order-matching.ts': [
+    /* 1  */ 'import { Order } from "./types";',
+    /* 2  */ 'import { OrderBook, type MatchResult, MatcherOptions } from "./types";',
+    /* 3  */ 'import { Logger } from "../utils/logger";',
+    /* 4  */ 'import { validateOrder } from "./utils/validation";',
+    /* 5  */ '',
+    /* 6  */ 'const logger = new Logger("order-matcher");',
+    /* 7  */ '',
+    /* 8  */ 'type OrderSide = "buy" | "sell";',
+    /* 9  */ '',
+    /* 10 */ 'const DEFAULT_TIMEOUT = 30_000;',
+    /* 11 */ '',
+    // 12–24: hunk 1 (placeholders)
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    /* 25 */ '    const sortedCandidates = candidates.sort((a, b) => a.price - b.price);',
+    /* 26 */ '    if (sortedCandidates.length === 0) {',
+    /* 27 */ '      return { filled: [], avgPrice: 0, slippage: 0, rejected: false };',
+    /* 28 */ '    }',
+    /* 29 */ '',
+    /* 30 */ '    const validCandidates = sortedCandidates.filter(',
+    /* 31 */ '      (c) => this.validateSlippage(c.price, order.limitPrice)',
+    /* 32 */ '    );',
+    /* 33 */ '',
+    /* 34 */ '    logger.debug(`Found ${validCandidates.length} valid candidates`);',
+    /* 35 */ '',
+    /* 36 */ '    let remainingQty = order.quantity;',
+    /* 37 */ '    const matchedOrders: Order[] = [];',
+    /* 38 */ '',
+    /* 39 */ '    for (const candidate of validCandidates) {',
+    /* 40 */ '      if (remainingQty <= 0) break;',
+    /* 41 */ '      matchedOrders.push(candidate);',
+    /* 42 */ '      remainingQty -= candidate.quantity;',
+    /* 43 */ '    }',
+    /* 44 */ '',
+    /* 45 */ '    if (!this.enablePartialFills && remainingQty > 0) {',
+    /* 46 */ '      return { filled: [], avgPrice: 0, slippage: 0, rejected: false };',
+    /* 47 */ '    }',
+    /* 48 */ '',
+    /* 49 */ '    const fillIndex = matchedOrders.length;',
+    /* 50 */ '    const filled = candidates.slice(0, fillIndex);',
+    // 51–62: hunk 2 (placeholders)
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    /* 63 */ '',
+    /* 64 */ 'export default OrderMatcher;',
+    /* 65 */ '',
+  ],
+  'src/trading/types.ts': [
+    /* 1  */ 'export type OrderSide = "buy" | "sell";',
+    /* 2  */ '',
+    /* 3  */ 'export type Order = {',
+    /* 4  */ '  id: string;',
+    /* 5  */ '  side: OrderSide;',
+    /* 6  */ '  quantity: number;',
+    /* 7  */ '  limitPrice: number;',
+    /* 8  */ '  marketId: string;',
+    /* 9  */ '  createdAt: string;',
+    /* 10 */ '};',
+    /* 11 */ '',
+    /* 12 */ 'export type OrderBook = {',
+    /* 13 */ '  getOpposite(side: OrderSide): Order[];',
+    /* 14 */ '  getBySide(side: OrderSide): Order[];',
+    /* 15 */ '  getAll(): Order[];',
+    /* 16 */ '  remove(orderId: string): boolean;',
+    /* 17 */ '  add(order: Order): void;',
+    /* 18 */ '};',
+    /* 19 */ '',
+    /* 20 */ 'export type MarketConfig = {',
+    /* 21 */ '  id: string;',
+    /* 22 */ '  name: string;',
+    /* 23 */ '  minOrderSize: number;',
+    /* 24 */ '  maxSlippage: number;',
+    /* 25 */ '};',
+    /* 26 */ '',
+    /* 27 */ 'export type MatchResult = {',
+    // 28–37: hunk (placeholders)
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    /* 38 */ '',
+    /* 39 */ 'export default {};',
+    /* 40 */ '',
+  ],
+  'src/config/markets.json': [
+    /* 1  */ '{',
+    /* 2  */ '  "version": 2,',
+    /* 3  */ '  "markets": [',
+    /* 4  */ '',
+    // 5–13: hunk (placeholders)
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    /* 14 */ '    }',
+    /* 15 */ '  ]',
+    /* 16 */ '}',
+  ],
+  'src/api/routes/orders.ts': [
+    /* 1  */ 'import { Router } from "express";',
+    /* 2  */ 'import { OrderMatcher } from "../trading/order-matching";',
+    /* 3  */ 'import { parseOrder } from "../trading/utils/validation";',
+    /* 4  */ 'import { getOrderBook } from "../services/order-book";',
+    /* 5  */ '',
+    /* 6  */ 'const router = Router();',
+    /* 7  */ 'const orderBook = getOrderBook();',
+    /* 8  */ '',
+    /* 9  */ 'router.get("/", (req, res) => {',
+    /* 10 */ '  const orders = orderBook.getAll();',
+    /* 11 */ '  res.json(orders);',
+    /* 12 */ '});',
+    /* 13 */ '',
+    /* 14 */ 'router.get("/:id", (req, res) => {',
+    /* 15 */ '  res.json({ id: req.params.id });',
+    /* 16 */ '});',
+    /* 17 */ '',
+    // 18–31: hunk (placeholders)
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    /* 32 */ '',
+    /* 33 */ 'export default router;',
+    /* 34 */ '',
+  ],
+  'tests/trading/order-matching.test.ts': [
+    /* 1  */ 'import { describe, it, expect, beforeEach } from "vitest";',
+    /* 2  */ 'import { OrderMatcher } from "../../src/trading/order-matching";',
+    /* 3  */ 'import { createMockOrderBook, createOrder } from "../helpers";',
+    /* 4  */ '',
+    /* 5  */ 'describe("OrderMatcher", () => {',
+    /* 6  */ '  let orderBook: ReturnType<typeof createMockOrderBook>;',
+    /* 7  */ '  let matcher: OrderMatcher;',
+    /* 8  */ '  let unmatchableOrder: ReturnType<typeof createOrder>;',
+    /* 9  */ '',
+    /* 10 */ '  beforeEach(() => {',
+    /* 11 */ '    orderBook = createMockOrderBook([',
+    /* 12 */ '      createOrder({ side: "sell", price: 50, quantity: 10 }),',
+    /* 13 */ '      createOrder({ side: "sell", price: 51, quantity: 20 }),',
+    /* 14 */ '    ]);',
+    /* 15 */ '    matcher = new OrderMatcher(orderBook);',
+    /* 16 */ '    unmatchableOrder = createOrder({ side: "buy", limitPrice: 1 });',
+    /* 17 */ '  });',
+    /* 18 */ '',
+    /* 19 */ '  it("should match a simple buy order", () => {',
+    /* 20 */ '    const order = createOrder({ side: "buy", limitPrice: 55, quantity: 10 });',
+    /* 21 */ '    const result = matcher.match(order);',
+    /* 22 */ '    expect(result.filled).toHaveLength(1);',
+    /* 23 */ '    expect(result.rejected).toBe(false);',
+    /* 24 */ '  });',
+    /* 25 */ '',
+    /* 26 */ '  it("should match multiple orders for large quantity", () => {',
+    /* 27 */ '    const order = createOrder({ side: "buy", limitPrice: 55, quantity: 25 });',
+    /* 28 */ '    const result = matcher.match(order);',
+    /* 29 */ '    expect(result.filled).toHaveLength(2);',
+    /* 30 */ '  });',
+    /* 31 */ '',
+    /* 32 */ '  it("should calculate average fill price", () => {',
+    /* 33 */ '    const order = createOrder({ side: "buy", limitPrice: 55, quantity: 25 });',
+    /* 34 */ '    const result = matcher.match(order);',
+    /* 35 */ '    expect(result.filled).toHaveLength(2);',
+    /* 36 */ '    const expectedAvg = (50 + 51) / 2;',
+    /* 37 */ '    expect(result.avgPrice).toBeCloseTo(expectedAvg);',
+    /* 38 */ '  });',
+    /* 39 */ '',
+    /* 40 */ '  it("should calculate average price correctly", () => {',
+    /* 41 */ '    const result = matcher.match(createOrder({ limitPrice: 55, quantity: 25 }));',
+    // 42–59: hunk (placeholders)
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    /* 60 */ '});',
+    /* 61 */ '',
+  ],
+};
+
+function buildHunkMaps(hunks: MockDiffHunk[]) {
+  const startByNewLine = new Map<number, number>();
+  const endNewLine = new Map<number, number>();
+
+  for (let i = 0; i < hunks.length; i++) {
+    const hunk = hunks[i]!;
+    const firstNew = hunk.lines.find((l) => l.newLineNumber !== null)?.newLineNumber;
+    const lastNew = [...hunk.lines].reverse().find((l) => l.newLineNumber !== null)?.newLineNumber;
+    if (firstNew !== null && firstNew !== undefined) startByNewLine.set(firstNew, i);
+    if (lastNew !== null && lastNew !== undefined) endNewLine.set(i, lastNew);
+  }
+
+  return { startByNewLine, endNewLine };
+}
+
+function flattenHunks(hunks: MockDiffHunk[]): FullFileView {
+  const lines = hunks.flatMap((h) => h.lines);
+  let offset = 0;
+  const hunkStartIndices = hunks.map((h) => {
+    const idx = offset;
+    offset += h.lines.length;
+    return idx;
+  });
+  return { lines, hunkStartIndices };
+}
+
+/** Build a full-file view by filling gaps between hunks with file content. */
+export function buildFullFileView(file: MockDiffFile): FullFileView {
+  // For added/deleted files, the entire file IS the diff
+  if (file.status === 'added' || file.status === 'deleted') {
+    return { lines: file.hunks.flatMap((h) => h.lines), hunkStartIndices: [0] };
+  }
+
+  const newContent = FILE_NEW_CONTENTS[file.filePath];
+  if (!newContent) return flattenHunks(file.hunks);
+
+  const { startByNewLine, endNewLine } = buildHunkMaps(file.hunks);
+  const result: MockDiffLine[] = [];
+  const hunkStartIndices: number[] = [];
+  let currentNewLine = 1;
+  let currentOldLine = 1;
+
+  while (currentNewLine <= newContent.length) {
+    const hunkIdx = startByNewLine.get(currentNewLine);
+
+    if (hunkIdx !== undefined) {
+      const hunk = file.hunks[hunkIdx]!;
+      hunkStartIndices.push(result.length);
+      result.push(...hunk.lines);
+
+      const lastNew = endNewLine.get(hunkIdx);
+      const lastOld = [...hunk.lines]
+        .reverse()
+        .find((l) => l.oldLineNumber !== null)?.oldLineNumber;
+
+      if (lastNew !== null && lastNew !== undefined) currentNewLine = lastNew + 1;
+      if (lastOld !== null && lastOld !== undefined) currentOldLine = lastOld + 1;
+    } else {
+      result.push({
+        type: 'context',
+        content: newContent[currentNewLine - 1] ?? '',
+        oldLineNumber: currentOldLine,
+        newLineNumber: currentNewLine,
+      });
+      currentNewLine++;
+      currentOldLine++;
+    }
+  }
+
+  return { lines: result, hunkStartIndices };
+}
+
 export function getMockBranchDiff(): MockBranchDiff {
   const files: MockDiffFile[] = [
     {
