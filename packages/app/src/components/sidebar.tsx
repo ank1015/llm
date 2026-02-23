@@ -22,6 +22,7 @@ import { memo, useEffect, useMemo, useState } from 'react';
 import type { MockBranch, MockProject, MockThread } from '@/lib/mock-data';
 import type { FC, ReactNode } from 'react';
 
+import { NewProjectDialog } from '@/components/new-project-dialog';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -389,6 +390,7 @@ function SidebarComponent() {
   const isSidebarCollapsed = useUiStore((s) => s.isSidebarCollapsed);
   const toggleSidebarCollapsed = useUiStore((s) => s.toggleSidebarCollapsed);
   const [isHovered, setIsHovered] = useState(false);
+  const [isNewProjectOpen, setIsNewProjectOpen] = useState(false);
 
   const showToggleIcon = isSidebarCollapsed && isHovered;
 
@@ -446,6 +448,7 @@ function SidebarComponent() {
           icon={<FolderPlus size={18} strokeWidth={1.8} />}
           label="New project"
           collapsed={isSidebarCollapsed}
+          onClick={() => setIsNewProjectOpen(true)}
         />
       </div>
 
@@ -461,6 +464,8 @@ function SidebarComponent() {
           collapsed={isSidebarCollapsed}
         />
       </div>
+
+      <NewProjectDialog open={isNewProjectOpen} onOpenChange={setIsNewProjectOpen} />
     </div>
   );
 }

@@ -2,19 +2,26 @@ import { create } from 'zustand';
 
 import type { MockProject } from '@/lib/mock-data';
 
-import { getProjects } from '@/lib/client-api';
+import { createProject as apiCreateProject, getProjects } from '@/lib/client-api';
 
 type ProjectsState = {
   projects: MockProject[];
   isLoading: boolean;
   error: string | null;
   fetchProjects: () => Promise<void>;
+  createProject: (name: string) => Promise<MockProject>;
 };
 
 export const useProjectsStore = create<ProjectsState>((set, get) => ({
   projects: [],
   isLoading: false,
   error: null,
+
+  createProject: async (name: string) => {
+    const project = await apiCreateProject(name);
+    set((state) => ({ projects: [...state.projects, project] }));
+    return project;
+  },
 
   fetchProjects: async () => {
     // Idempotent: skip if already loaded or in-flight

@@ -26,6 +26,16 @@ export async function getBranchBySlug(
   return findBranchBySlug(project, slug);
 }
 
+export async function createProject(name: string): Promise<MockProject> {
+  await delay();
+  const project: MockProject = {
+    projectId: `p${Date.now()}`,
+    projectName: name,
+    branches: [],
+  };
+  return project;
+}
+
 export async function getThreadMessages(
   projectName: string,
   branchSlug: string,

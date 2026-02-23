@@ -1,1 +1,7 @@
-export { getBranchBySlug, getProjectByName, getProjects, getThreadMessages } from './projects';
+export {
+  createProject,
+  getBranchBySlug,
+  getProjectByName,
+  getProjects,
+  getThreadMessages,
+} from './projects';
