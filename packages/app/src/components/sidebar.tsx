@@ -350,37 +350,33 @@ const ProjectList: FC<{
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {!collapsed && (
-        <div className="flex items-center px-3 pt-4 pb-1 mb-1">
-          <span className="text-muted-foreground flex-1 text-[14px]">Projects</span>
-          <button
-            onClick={handleCollapseAll}
-            className="text-muted-foreground hover:text-foreground flex h-6 w-6 cursor-pointer items-center justify-center rounded-md hover:bg-home-hover"
-          >
-            <ChevronsDownUp size={15} strokeWidth={1.8} />
-          </button>
-        </div>
-      )}
-      {!collapsed && (
-        <div className="no-scrollbar flex-1 overflow-y-auto px-2">
-          {projects.length === 0 ? (
-            <p className="text-muted-foreground flex justify-center whitespace-nowrap py-2 mt-12 text-xs">
-              No projects yet.
-            </p>
-          ) : (
-            <div className="flex flex-col gap-0.5">
-              {projects.map((project) => (
-                <ProjectGroup
-                  key={project.projectId}
-                  project={project}
-                  routeCtx={routeCtx}
-                  collapseAllKey={collapseAllKey}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      <div className={cn('flex items-center px-3 pt-4 pb-1 mb-1', collapsed && 'hidden')}>
+        <span className="text-muted-foreground flex-1 text-[14px]">Projects</span>
+        <button
+          onClick={handleCollapseAll}
+          className="text-muted-foreground hover:text-foreground flex h-6 w-6 cursor-pointer items-center justify-center rounded-md hover:bg-home-hover"
+        >
+          <ChevronsDownUp size={15} strokeWidth={1.8} />
+        </button>
+      </div>
+      <div className={cn('no-scrollbar flex-1 overflow-y-auto px-2', collapsed && 'hidden')}>
+        {projects.length === 0 ? (
+          <p className="text-muted-foreground flex justify-center whitespace-nowrap py-2 mt-12 text-xs">
+            No projects yet.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-0.5">
+            {projects.map((project) => (
+              <ProjectGroup
+                key={project.projectId}
+                project={project}
+                routeCtx={routeCtx}
+                collapseAllKey={collapseAllKey}
+              />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
