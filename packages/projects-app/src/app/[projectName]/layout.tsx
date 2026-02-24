@@ -16,7 +16,9 @@ function HeaderBreadcrumb() {
 
   const projectName = segments[0]!;
   const artifactName = segments[1];
-  const isLastProject = !artifactName;
+  const threadId = segments[2];
+
+  const lastSegment = threadId ? 'thread' : artifactName ? 'artifact' : 'project';
 
   const linkClass = (active: boolean) =>
     active
@@ -29,15 +31,24 @@ function HeaderBreadcrumb() {
         Projects
       </Link>
       <ChevronRight size={14} className="text-muted-foreground" />
-      <Link href={`/${projectName}`} className={linkClass(isLastProject)}>
+      <Link href={`/${projectName}`} className={linkClass(lastSegment === 'project')}>
         {decodeURIComponent(projectName)}
       </Link>
       {artifactName && (
         <>
           <ChevronRight size={14} className="text-muted-foreground" />
-          <Link href={`/${projectName}/${artifactName}`} className={linkClass(true)}>
+          <Link
+            href={`/${projectName}/${artifactName}`}
+            className={linkClass(lastSegment === 'artifact')}
+          >
             {decodeURIComponent(artifactName)}
           </Link>
+        </>
+      )}
+      {threadId && (
+        <>
+          <ChevronRight size={14} className="text-muted-foreground" />
+          <span className={linkClass(true)}>{threadId}</span>
         </>
       )}
     </div>

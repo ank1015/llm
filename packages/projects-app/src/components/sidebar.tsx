@@ -52,9 +52,22 @@ function SidebarItem({
 // ThreadItem
 // ---------------------------------------------------------------------------
 
-function ThreadItem({ thread }: { thread: Thread }) {
+function ThreadItem({
+  thread,
+  projectName,
+  artifactName,
+}: {
+  thread: Thread;
+  projectName: string;
+  artifactName: string;
+}) {
+  const router = useRouter();
+
   return (
-    <div className="flex h-8 w-full cursor-pointer items-center rounded-lg pr-2 pl-8 hover:bg-home-hover">
+    <div
+      onClick={() => router.push(`/${projectName}/${artifactName}/${thread.id}`)}
+      className="flex h-8 w-full cursor-pointer items-center rounded-lg pr-2 pl-8 hover:bg-home-hover"
+    >
       <span className="flex-1 truncate text-[13px] text-foreground">{thread.name}</span>
       <span className="ml-2 shrink-0 text-[12px] text-muted-foreground">{thread.age}</span>
     </div>
@@ -123,7 +136,12 @@ function ArtifactGroup({
       {!isCollapsed && hasThreads && (
         <div className="mt-0.5 flex flex-col gap-0.5">
           {artifact.threads.map((thread) => (
-            <ThreadItem key={thread.id} thread={thread} />
+            <ThreadItem
+              key={thread.id}
+              thread={thread}
+              projectName={projectName}
+              artifactName={artifact.name}
+            />
           ))}
         </div>
       )}
