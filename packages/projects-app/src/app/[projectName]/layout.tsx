@@ -1,14 +1,56 @@
 'use client';
 
+import { ChevronRight } from 'lucide-react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { useMemo } from 'react';
+
 import { Sidebar } from '@/components/sidebar';
 import { ThemeToggle } from '@/components/theme-toggle';
+
+function HeaderBreadcrumb() {
+  const pathname = usePathname();
+  const segments = useMemo(() => pathname.split('/').filter(Boolean), [pathname]);
+
+  if (segments.length === 0) return null;
+
+  const projectName = segments[0]!;
+  const artifactName = segments[1];
+  const isLastProject = !artifactName;
+
+  const linkClass = (active: boolean) =>
+    active
+      ? 'text-foreground font-medium hover:text-foreground/80 transition-colors'
+      : 'text-muted-foreground hover:text-foreground transition-colors';
+
+  return (
+    <div className="flex items-center gap-1.5 text-sm">
+      <Link href="/" className="text-muted-foreground hover:text-foreground transition-colors">
+        Projects
+      </Link>
+      <ChevronRight size={14} className="text-muted-foreground" />
+      <Link href={`/${projectName}`} className={linkClass(isLastProject)}>
+        {decodeURIComponent(projectName)}
+      </Link>
+      {artifactName && (
+        <>
+          <ChevronRight size={14} className="text-muted-foreground" />
+          <Link href={`/${projectName}/${artifactName}`} className={linkClass(true)}>
+            {decodeURIComponent(artifactName)}
+          </Link>
+        </>
+      )}
+    </div>
+  );
+}
 
 export default function ProjectLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="bg-home-page flex h-dvh w-full overflow-hidden">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-12 w-full shrink-0 items-center justify-end px-3">
+        <header className="flex h-12 w-full shrink-0 items-center justify-between px-3">
+          <HeaderBreadcrumb />
           <ThemeToggle />
         </header>
         <main className="relative flex-1 overflow-hidden">{children}</main>
