@@ -4,12 +4,16 @@ type Theme = 'light' | 'dark';
 
 type UiState = {
   theme: Theme;
+  isSidebarCollapsed: boolean;
   setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
+  setSidebarCollapsed: (collapsed: boolean) => void;
+  toggleSidebarCollapsed: () => void;
 };
 
 export const useUiStore = create<UiState>((set) => ({
   theme: 'light',
+  isSidebarCollapsed: false,
 
   setTheme: (theme) => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
@@ -25,4 +29,8 @@ export const useUiStore = create<UiState>((set) => ({
       return { theme: next };
     });
   },
+
+  setSidebarCollapsed: (collapsed) => set({ isSidebarCollapsed: collapsed }),
+
+  toggleSidebarCollapsed: () => set((state) => ({ isSidebarCollapsed: !state.isSidebarCollapsed })),
 }));
