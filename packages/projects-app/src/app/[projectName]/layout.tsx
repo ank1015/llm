@@ -7,6 +7,7 @@ import { useMemo } from 'react';
 
 import { Sidebar } from '@/components/sidebar';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { useProjectOverview } from '@/hooks/use-project-overview';
 
 function HeaderBreadcrumb() {
   const pathname = usePathname();
@@ -14,11 +15,11 @@ function HeaderBreadcrumb() {
 
   if (segments.length === 0) return null;
 
-  const projectName = segments[0]!;
-  const artifactName = segments[1];
-  const threadId = segments[2];
+  const projectId = segments[0]!;
+  const artifactId = segments[1];
+  const sessionId = segments[2];
 
-  const lastSegment = threadId ? 'thread' : artifactName ? 'artifact' : 'project';
+  const lastSegment = sessionId ? 'session' : artifactId ? 'artifact' : 'project';
 
   const linkClass = (active: boolean) =>
     active
@@ -31,24 +32,24 @@ function HeaderBreadcrumb() {
         Projects
       </Link>
       <ChevronRight size={14} className="text-muted-foreground" />
-      <Link href={`/${projectName}`} className={linkClass(lastSegment === 'project')}>
-        {decodeURIComponent(projectName)}
+      <Link href={`/${projectId}`} className={linkClass(lastSegment === 'project')}>
+        {decodeURIComponent(projectId)}
       </Link>
-      {artifactName && (
+      {artifactId && (
         <>
           <ChevronRight size={14} className="text-muted-foreground" />
           <Link
-            href={`/${projectName}/${artifactName}`}
+            href={`/${projectId}/${artifactId}`}
             className={linkClass(lastSegment === 'artifact')}
           >
-            {decodeURIComponent(artifactName)}
+            {decodeURIComponent(artifactId)}
           </Link>
         </>
       )}
-      {threadId && (
+      {sessionId && (
         <>
           <ChevronRight size={14} className="text-muted-foreground" />
-          <span className={linkClass(true)}>{threadId}</span>
+          <span className={linkClass(true)}>{sessionId}</span>
         </>
       )}
     </div>
@@ -56,6 +57,12 @@ function HeaderBreadcrumb() {
 }
 
 export default function ProjectLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const projectId = useMemo(() => pathname.split('/').filter(Boolean)[0] ?? '', [pathname]);
+
+  // Fetch overview data — populates artifact dirs + sessions stores
+  useProjectOverview(projectId);
+
   return (
     <div className="bg-home-page flex h-dvh w-full overflow-hidden">
       <Sidebar />

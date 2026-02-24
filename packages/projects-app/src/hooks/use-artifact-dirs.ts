@@ -36,6 +36,7 @@ export function useCreateArtifactDir(projectId: string) {
     onSuccess: (data) => {
       addArtifactDir(data);
       queryClient.invalidateQueries({ queryKey: ['artifactDirs', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['projectOverview', projectId] });
     },
   });
 }

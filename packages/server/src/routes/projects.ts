@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 
-import { Project } from '../core/index.js';
+import { ArtifactDir, Project, Session } from '../core/index.js';
 
 export const projectRoutes = new Hono();
 
@@ -36,6 +36,29 @@ projectRoutes.get('/projects/:projectId', async (c) => {
     const project = await Project.getById(projectId);
     const metadata = await project.getMetadata();
     return c.json(metadata);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Project not found';
+    return c.json({ error: message }, 404);
+  }
+});
+
+/** GET /api/projects/:projectId/overview — Get project with all artifact dirs and their sessions */
+projectRoutes.get('/projects/:projectId/overview', async (c) => {
+  const { projectId } = c.req.param();
+
+  try {
+    const project = await Project.getById(projectId);
+    const projectMeta = await project.getMetadata();
+    const dirs = await ArtifactDir.list(projectId);
+
+    const artifactDirs = await Promise.all(
+      dirs.map(async (dir) => {
+        const sessions = await Session.list(projectId, dir.id).catch(() => []);
+        return { ...dir, sessions };
+      })
+    );
+
+    return c.json({ project: projectMeta, artifactDirs });
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Project not found';
     return c.json({ error: message }, 404);

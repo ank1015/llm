@@ -4,6 +4,7 @@ import type {
   CreateProjectInput,
   CreateSessionInput,
   ProjectMetadata,
+  ProjectOverview,
   PromptInput,
   SessionMetadata,
   SessionSummary,
@@ -44,6 +45,10 @@ export function createProject(input: CreateProjectInput): Promise<ProjectMetadat
 
 export function deleteProject(projectId: string): Promise<{ deleted: boolean }> {
   return request(`/projects/${projectId}`, { method: 'DELETE' });
+}
+
+export function getProjectOverview(projectId: string): Promise<ProjectOverview> {
+  return request(`/projects/${projectId}/overview`);
 }
 
 // ---------------------------------------------------------------------------

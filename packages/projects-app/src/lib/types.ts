@@ -35,6 +35,17 @@ export type SessionMetadata = {
   createdAt: string;
 };
 
+/** Artifact dir with its sessions, returned by the overview endpoint */
+export type ArtifactDirWithSessions = ArtifactDirMetadata & {
+  sessions: SessionSummary[];
+};
+
+/** Response from GET /api/projects/:projectId/overview */
+export type ProjectOverview = {
+  project: ProjectMetadata;
+  artifactDirs: ArtifactDirWithSessions[];
+};
+
 /** Simplified message for UI display */
 export type DisplayMessage = {
   id: string;

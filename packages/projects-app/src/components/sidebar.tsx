@@ -12,11 +12,22 @@ import {
 import { usePathname, useRouter } from 'next/navigation';
 import { memo, useMemo, useState } from 'react';
 
-import type { Artifact, Thread } from '@/lib/mock-data';
+import type { ArtifactDirMetadata, SessionSummary } from '@/lib/types';
 
 import { Button } from '@/components/ui/button';
-import { mockArtifacts } from '@/lib/mock-data';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { useCreateArtifactDir } from '@/hooks/use-artifact-dirs';
+import { relativeTime } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { useArtifactDirsStore } from '@/stores/artifact-dirs-store';
+import { useSessionsStore } from '@/stores/sessions-store';
 import { useUiStore } from '@/stores/ui-store';
 
 // ---------------------------------------------------------------------------
@@ -49,27 +60,29 @@ function SidebarItem({
 }
 
 // ---------------------------------------------------------------------------
-// ThreadItem
+// SessionItem (was ThreadItem)
 // ---------------------------------------------------------------------------
 
-function ThreadItem({
-  thread,
-  projectName,
-  artifactName,
+function SessionItem({
+  session,
+  projectId,
+  artifactDirId,
 }: {
-  thread: Thread;
-  projectName: string;
-  artifactName: string;
+  session: SessionSummary;
+  projectId: string;
+  artifactDirId: string;
 }) {
   const router = useRouter();
 
   return (
     <div
-      onClick={() => router.push(`/${projectName}/${artifactName}/${thread.id}`)}
+      onClick={() => router.push(`/${projectId}/${artifactDirId}/${session.sessionId}`)}
       className="flex h-8 w-full cursor-pointer items-center rounded-lg pr-2 pl-8 hover:bg-home-hover"
     >
-      <span className="flex-1 truncate text-[13px] text-foreground">{thread.name}</span>
-      <span className="ml-2 shrink-0 text-[12px] text-muted-foreground">{thread.age}</span>
+      <span className="flex-1 truncate text-[13px] text-foreground">{session.sessionName}</span>
+      <span className="ml-2 shrink-0 text-[12px] text-muted-foreground">
+        {relativeTime(session.updatedAt)}
+      </span>
     </div>
   );
 }
@@ -79,16 +92,18 @@ function ThreadItem({
 // ---------------------------------------------------------------------------
 
 function ArtifactGroup({
-  artifact,
-  projectName,
+  artifactDir,
+  sessions,
+  projectId,
   collapseAllKey,
 }: {
-  artifact: Artifact;
-  projectName: string;
+  artifactDir: ArtifactDirMetadata;
+  sessions: SessionSummary[];
+  projectId: string;
   collapseAllKey: number;
 }) {
   const router = useRouter();
-  const hasThreads = artifact.threads.length > 0;
+  const hasSessions = sessions.length > 0;
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const [prevCollapseAllKey, setPrevCollapseAllKey] = useState(collapseAllKey);
@@ -120,10 +135,10 @@ function ArtifactGroup({
             />
           </button>
           <button
-            onClick={() => router.push(`/${projectName}/${artifact.name}`)}
+            onClick={() => router.push(`/${projectId}/${artifactDir.id}`)}
             className="flex-1 cursor-pointer truncate text-left"
           >
-            <span className="truncate text-[14px] text-foreground">{artifact.name}</span>
+            <span className="truncate text-[14px] text-foreground">{artifactDir.name}</span>
           </button>
         </div>
         <div className="flex shrink-0 items-center opacity-0 transition-opacity duration-150 group-hover:opacity-100">
@@ -133,14 +148,14 @@ function ArtifactGroup({
         </div>
       </div>
 
-      {!isCollapsed && hasThreads && (
+      {!isCollapsed && hasSessions && (
         <div className="mt-0.5 flex flex-col gap-0.5">
-          {artifact.threads.map((thread) => (
-            <ThreadItem
-              key={thread.id}
-              thread={thread}
-              projectName={projectName}
-              artifactName={artifact.name}
+          {sessions.map((session) => (
+            <SessionItem
+              key={session.sessionId}
+              session={session}
+              projectId={projectId}
+              artifactDirId={artifactDir.id}
             />
           ))}
         </div>
@@ -155,8 +170,11 @@ function ArtifactGroup({
 
 function ArtifactList({ collapsed }: { collapsed?: boolean }) {
   const pathname = usePathname();
-  const projectName = useMemo(() => pathname.split('/').filter(Boolean)[0] ?? '', [pathname]);
+  const projectId = useMemo(() => pathname.split('/').filter(Boolean)[0] ?? '', [pathname]);
   const [collapseAllKey, setCollapseAllKey] = useState(0);
+
+  const artifactDirs = useArtifactDirsStore((s) => s.artifactDirs);
+  const sessionsByDir = useSessionsStore((s) => s.sessionsByDir);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -170,17 +188,18 @@ function ArtifactList({ collapsed }: { collapsed?: boolean }) {
         </button>
       </div>
       <div className={cn('no-scrollbar flex-1 overflow-y-auto px-2', collapsed && 'hidden')}>
-        {mockArtifacts.length === 0 ? (
+        {artifactDirs.length === 0 ? (
           <p className="mt-12 flex justify-center whitespace-nowrap py-2 text-xs text-muted-foreground">
             No artifacts yet.
           </p>
         ) : (
           <div className="flex flex-col gap-0.5">
-            {mockArtifacts.map((artifact) => (
+            {artifactDirs.map((dir) => (
               <ArtifactGroup
-                key={artifact.id}
-                artifact={artifact}
-                projectName={projectName}
+                key={dir.id}
+                artifactDir={dir}
+                sessions={sessionsByDir[dir.id] ?? []}
+                projectId={projectId}
                 collapseAllKey={collapseAllKey}
               />
             ))}
@@ -192,10 +211,92 @@ function ArtifactList({ collapsed }: { collapsed?: boolean }) {
 }
 
 // ---------------------------------------------------------------------------
+// CreateArtifactDialog
+// ---------------------------------------------------------------------------
+
+function CreateArtifactDialog({ projectId, collapsed }: { projectId: string; collapsed: boolean }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState('');
+  const createArtifactDir = useCreateArtifactDir(projectId);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = name.trim();
+    if (!trimmed) return;
+
+    createArtifactDir.mutate(
+      { name: trimmed },
+      {
+        onSuccess: () => {
+          setName('');
+          setOpen(false);
+        },
+      }
+    );
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <div>
+          <SidebarItem
+            icon={<FolderPlus size={18} strokeWidth={1.8} />}
+            label="New Artifact"
+            collapsed={collapsed}
+          />
+        </div>
+      </DialogTrigger>
+
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Create Artifact</DialogTitle>
+          <DialogDescription>Enter a name for the new artifact directory.</DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-4">
+          <input
+            autoFocus
+            type="text"
+            placeholder="Artifact name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="bg-home-input border-home-border h-10 w-full rounded-lg border px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+          />
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="cursor-pointer"
+              onClick={() => setOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              size="sm"
+              className="cursor-pointer"
+              disabled={!name.trim() || createArtifactDir.isPending}
+            >
+              {createArtifactDir.isPending ? 'Creating...' : 'Create'}
+            </Button>
+          </div>
+          {createArtifactDir.isError && (
+            <p className="text-xs text-red-500">{createArtifactDir.error.message}</p>
+          )}
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Sidebar
 // ---------------------------------------------------------------------------
 
 function SidebarComponent() {
+  const pathname = usePathname();
+  const projectId = useMemo(() => pathname.split('/').filter(Boolean)[0] ?? '', [pathname]);
   const isSidebarCollapsed = useUiStore((s) => s.isSidebarCollapsed);
   const toggleSidebarCollapsed = useUiStore((s) => s.toggleSidebarCollapsed);
   const [isHovered, setIsHovered] = useState(false);
@@ -252,11 +353,7 @@ function SidebarComponent() {
 
       {/* New Artifact button */}
       <div className="mt-2 flex flex-col gap-0.5 px-2">
-        <SidebarItem
-          icon={<FolderPlus size={18} strokeWidth={1.8} />}
-          label="New Artifact"
-          collapsed={isSidebarCollapsed}
-        />
+        <CreateArtifactDialog projectId={projectId} collapsed={isSidebarCollapsed} />
       </div>
 
       {/* Artifacts list */}
