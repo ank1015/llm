@@ -51,6 +51,7 @@ export class ArtifactDir {
       id,
       name: input.name,
       description: input.description ?? null,
+      type: input.type ?? 'base',
       createdAt: new Date().toISOString(),
     };
 

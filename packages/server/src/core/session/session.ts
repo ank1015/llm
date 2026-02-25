@@ -9,11 +9,17 @@ import {
 } from '@ank1015/llm-sdk';
 import { createFileSessionsAdapter, createFileKeysAdapter } from '@ank1015/llm-sdk-adapters';
 
+import { getArtifactTypeConfig } from '../artifact-type/artifact-type.js';
 import { getConfig } from '../config.js';
 import { ensureDir, readMetadata, writeMetadata, pathExists, removeDir } from '../storage/fs.js';
-import { createAllTools } from '../tools/index.js';
 
-import type { CreateSessionOptions, PromptInput, SessionMetadata } from '../types.js';
+import type { ArtifactTypeConfig } from '../artifact-type/artifact-type.js';
+import type {
+  ArtifactDirMetadata,
+  CreateSessionOptions,
+  PromptInput,
+  SessionMetadata,
+} from '../types.js';
 import type {
   AgentEvent,
   AgentTool,
@@ -25,8 +31,8 @@ import type {
   Provider,
   SessionManager,
   SessionSummary,
-
-  GoogleProviderOptions} from '@ank1015/llm-sdk';
+  GoogleProviderOptions,
+} from '@ank1015/llm-sdk';
 
 /**
  * Manages sessions within an artifact directory.
@@ -250,7 +256,6 @@ export class Session {
       throw new Error(`Model "${this.modelId}" not found for API "${this.api}"`);
     }
 
-    // const provider: Provider<typeof this.api> = { model };
     const keysAdapter = createFileKeysAdapter();
 
     // Load existing messages
@@ -263,10 +268,11 @@ export class Session {
       (node: MessageNode) => node.message
     );
 
-    // Create tools scoped to the artifact directory's working path
+    // Resolve artifact type config for tools and system prompt
+    const typeConfig = await this.getArtifactTypeConfig();
     const { projectsRoot } = getConfig();
     const artifactDirPath = join(projectsRoot, this.projectId, this.artifactDirId);
-    const tools = createAllTools(artifactDirPath);
+    const tools = typeConfig.createTools(artifactDirPath);
 
     // Create conversation and configure
     const conversation = new Conversation({
@@ -283,6 +289,7 @@ export class Session {
         },
       } as GoogleProviderOptions,
     } as Provider<Api>);
+    conversation.setSystemPrompt(typeConfig.systemPrompt);
     conversation.setTools(Object.values(tools));
 
     if (existingMessages.length > 0) {
@@ -331,10 +338,11 @@ export class Session {
       (node: MessageNode) => node.message
     );
 
-    // Create tools scoped to the artifact directory's working path
+    // Resolve artifact type config for tools and system prompt
+    const typeConfig = await this.getArtifactTypeConfig();
     const { projectsRoot } = getConfig();
     const artifactDirPath = join(projectsRoot, this.projectId, this.artifactDirId);
-    const tools = createAllTools(artifactDirPath);
+    const tools = typeConfig.createTools(artifactDirPath);
 
     // Create conversation with streaming enabled
     const conversation = new Conversation({
@@ -356,6 +364,7 @@ export class Session {
         },
       } as GoogleProviderOptions,
     } as Provider<Api>);
+    conversation.setSystemPrompt(typeConfig.systemPrompt);
 
     // Subscribe to conversation events
     const unsubscribe = conversation.subscribe((event) => options.onEvent(event));
@@ -399,6 +408,17 @@ export class Session {
       'main'
     );
     return messageNodes ?? [];
+  }
+
+  /**
+   * Look up the artifact directory's type and return its config
+   * (system prompt + tools factory).
+   */
+  private async getArtifactTypeConfig(): Promise<ArtifactTypeConfig> {
+    const { dataRoot } = getConfig();
+    const artifactMetaPath = join(dataRoot, this.projectId, 'artifacts', this.artifactDirId);
+    const metadata = await readMetadata<ArtifactDirMetadata>(artifactMetaPath);
+    return getArtifactTypeConfig(metadata.type);
   }
 
   /**

@@ -1,7 +1,9 @@
 'use client';
 import {
+  BookOpen,
   ChevronDown,
   ChevronsDownUp,
+  Code,
   Ellipsis,
   Folder,
   FolderPlus,
@@ -20,7 +22,7 @@ import Image from 'next/image';
 import { useParams, useRouter } from 'next/navigation';
 import { memo, useEffect, useRef, useState } from 'react';
 
-import type { ArtifactDirWithSessions, OverviewSession } from '@/lib/client-api';
+import type { ArtifactDirWithSessions, ArtifactType, OverviewSession } from '@/lib/client-api';
 import type { FC, FormEvent, ReactNode } from 'react';
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -44,7 +46,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { createArtifactDir, getProjectOverview } from '@/lib/client-api';
+import { ARTIFACT_TYPES, createArtifactDir, getProjectOverview } from '@/lib/client-api';
 import { cn } from '@/lib/utils';
 import { useChatStore, useSidebarStore, useUiStore } from '@/stores';
 
@@ -144,6 +146,12 @@ const SessionItem: FC<{
 // ArtifactGroup — a collapsible artifact folder with sessions inside
 // ---------------------------------------------------------------------------
 
+const ARTIFACT_TYPE_ICON: Record<ArtifactType, typeof Folder> = {
+  base: Folder,
+  research: BookOpen,
+  code: Code,
+};
+
 const ArtifactGroup: FC<{
   artifact: ArtifactDirWithSessions;
   projectId: string;
@@ -160,6 +168,8 @@ const ArtifactGroup: FC<{
     setPrevDefaultExpanded(defaultExpanded);
     if (defaultExpanded) setIsCollapsed(false);
   }
+
+  const ArtifactIcon = ARTIFACT_TYPE_ICON[artifact.type] ?? Folder;
 
   const handleSessionSelect = (session: OverviewSession) => {
     setActiveSession({ sessionId: session.sessionId });
@@ -185,7 +195,7 @@ const ArtifactGroup: FC<{
             }}
             className="relative flex h-4 w-4 shrink-0 items-center justify-center"
           >
-            <Folder
+            <ArtifactIcon
               size={16}
               strokeWidth={1.8}
               className="text-muted-foreground absolute transition-opacity duration-200 group-hover:opacity-0"
@@ -387,6 +397,12 @@ const ArtifactListInner: FC<{
 // NewArtifactDialog
 // ---------------------------------------------------------------------------
 
+const ARTIFACT_TYPE_LABELS: Record<ArtifactType, string> = {
+  base: 'Base',
+  research: 'Research',
+  code: 'Code',
+};
+
 const NewArtifactDialog: FC<{
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -394,6 +410,7 @@ const NewArtifactDialog: FC<{
   onCreated: () => void;
 }> = ({ open, onOpenChange, projectId, onCreated }) => {
   const [name, setName] = useState('');
+  const [type, setType] = useState<ArtifactType>('base');
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -401,6 +418,7 @@ const NewArtifactDialog: FC<{
   useEffect(() => {
     if (open) {
       setName('');
+      setType('base');
       setError(null);
       setTimeout(() => inputRef.current?.focus(), 0);
     }
@@ -414,7 +432,7 @@ const NewArtifactDialog: FC<{
     setIsCreating(true);
     setError(null);
     try {
-      await createArtifactDir(projectId, { name: trimmed });
+      await createArtifactDir(projectId, { name: trimmed, type });
       onOpenChange(false);
       onCreated();
     } catch (err) {
@@ -444,6 +462,29 @@ const NewArtifactDialog: FC<{
             className="bg-home-panel border-home-border text-foreground placeholder:text-muted-foreground w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-foreground/20"
             placeholder="Artifact name"
           />
+
+          {/* Artifact type selector */}
+          <div className="mt-3">
+            <span className="text-muted-foreground mb-1.5 block text-xs font-medium">Type</span>
+            <div className="bg-home-panel border-home-border inline-flex rounded-lg border p-0.5">
+              {ARTIFACT_TYPES.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setType(t)}
+                  className={cn(
+                    'cursor-pointer rounded-md px-3 py-1 text-xs font-medium transition-colors',
+                    t === type
+                      ? 'bg-foreground text-background shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  {ARTIFACT_TYPE_LABELS[t]}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {error && <p className="mt-2 text-xs text-red-500">{error}</p>}
           <DialogFooter className="mt-4">
             <Button
