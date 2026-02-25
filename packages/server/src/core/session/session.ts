@@ -10,6 +10,7 @@ import {
 import { createFileSessionsAdapter, createFileKeysAdapter } from '@ank1015/llm-sdk-adapters';
 
 import { getArtifactTypeConfig } from '../artifact-type/artifact-type.js';
+import { resolveSkills } from '../artifact-type/utils.js';
 import { getConfig } from '../config.js';
 import { ensureDir, readMetadata, writeMetadata, pathExists, removeDir } from '../storage/fs.js';
 
@@ -272,7 +273,15 @@ export class Session {
     const typeConfig = await this.getArtifactTypeConfig();
     const { projectsRoot } = getConfig();
     const artifactDirPath = join(projectsRoot, this.projectId, this.artifactDirId);
+    const projectDirPath = join(projectsRoot, this.projectId);
     const tools = typeConfig.createTools(artifactDirPath);
+    const skills = resolveSkills(input.skills ?? []);
+
+    const systemPrompt = typeConfig.createSystemPrompt({
+      artifactDirectory: artifactDirPath,
+      projectDirectory: projectDirPath,
+      skills,
+    });
 
     // Create conversation and configure
     const conversation = new Conversation({
@@ -289,7 +298,7 @@ export class Session {
         },
       } as GoogleProviderOptions,
     } as Provider<Api>);
-    conversation.setSystemPrompt(typeConfig.systemPrompt);
+    conversation.setSystemPrompt(systemPrompt);
     conversation.setTools(Object.values(tools));
 
     if (existingMessages.length > 0) {
@@ -342,7 +351,15 @@ export class Session {
     const typeConfig = await this.getArtifactTypeConfig();
     const { projectsRoot } = getConfig();
     const artifactDirPath = join(projectsRoot, this.projectId, this.artifactDirId);
+    const projectDirPath = join(projectsRoot, this.projectId);
     const tools = typeConfig.createTools(artifactDirPath);
+    const skills = resolveSkills(input.skills ?? []);
+
+    const systemPrompt = typeConfig.createSystemPrompt({
+      artifactDirectory: artifactDirPath,
+      projectDirectory: projectDirPath,
+      skills,
+    });
 
     // Create conversation with streaming enabled
     const conversation = new Conversation({
@@ -364,7 +381,7 @@ export class Session {
         },
       } as GoogleProviderOptions,
     } as Provider<Api>);
-    conversation.setSystemPrompt(typeConfig.systemPrompt);
+    conversation.setSystemPrompt(systemPrompt);
 
     // Subscribe to conversation events
     const unsubscribe = conversation.subscribe((event) => options.onEvent(event));

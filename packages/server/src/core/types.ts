@@ -84,4 +84,6 @@ export interface CreateSessionOptions {
 export interface PromptInput {
   /** The user's message text */
   message: string;
+  /** Skill names to activate for this prompt (resolved from globalSkills) */
+  skills?: string[];
 }

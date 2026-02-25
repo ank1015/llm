@@ -94,6 +94,7 @@ export type StreamHandlers = {
 export type StreamRequest = ArtifactContext & {
   sessionId: string;
   message: string;
+  skills?: string[];
 };
 
 // eslint-disable-next-line sonarjs/cognitive-complexity
@@ -109,7 +110,7 @@ export async function streamConversation(
       Accept: 'text/event-stream',
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ message: request.message }),
+    body: JSON.stringify({ message: request.message, skills: request.skills ?? [] }),
     signal,
   });
 

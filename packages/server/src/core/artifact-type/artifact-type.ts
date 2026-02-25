@@ -1,36 +1,44 @@
-import { createAllTools } from '../tools/index.js';
+import { createBaseSystemPrompt, baseTools } from './base.js';
 
+import type { Skill } from './utils.js';
 import type { Tool, ToolName, ToolsOptions } from '../tools/index.js';
 import type { ArtifactType } from '../types.js';
+
+/** Arguments passed to the system prompt factory */
+export interface SystemPromptContext {
+  artifactDirectory: string;
+  projectDirectory: string;
+  skills: Skill[];
+}
 
 /** Configuration for an artifact type that determines session behavior */
 export interface ArtifactTypeConfig {
   /** The artifact type identifier */
   type: ArtifactType;
-  /** System prompt injected into every session conversation */
-  systemPrompt: string;
+  /** Factory that builds the system prompt from runtime context */
+  createSystemPrompt: (ctx: SystemPromptContext) => string;
   /** Factory function that creates tools scoped to a working directory */
   createTools: (cwd: string, options?: ToolsOptions) => Record<ToolName, Tool>;
 }
 
-const DEFAULT_SYSTEM_PROMPT =
-  'You are a helpful AI assistant with access to tools for reading, writing, and editing files, running commands, and searching codebases.';
-
 const artifactTypeConfigs: Record<ArtifactType, ArtifactTypeConfig> = {
   base: {
     type: 'base',
-    systemPrompt: DEFAULT_SYSTEM_PROMPT,
-    createTools: createAllTools,
+    createSystemPrompt: (ctx) =>
+      createBaseSystemPrompt(ctx.artifactDirectory, ctx.projectDirectory, ctx.skills),
+    createTools: baseTools,
   },
   research: {
     type: 'research',
-    systemPrompt: DEFAULT_SYSTEM_PROMPT,
-    createTools: createAllTools,
+    createSystemPrompt: (ctx) =>
+      createBaseSystemPrompt(ctx.artifactDirectory, ctx.projectDirectory, ctx.skills),
+    createTools: baseTools,
   },
   code: {
     type: 'code',
-    systemPrompt: DEFAULT_SYSTEM_PROMPT,
-    createTools: createAllTools,
+    createSystemPrompt: (ctx) =>
+      createBaseSystemPrompt(ctx.artifactDirectory, ctx.projectDirectory, ctx.skills),
+    createTools: baseTools,
   },
 };
 

@@ -71,7 +71,7 @@ sessionRoutes.get(`${BASE}/:sessionId/messages`, async (c) => {
 /** POST /api/.../sessions/:sessionId/prompt — Send a message (non-streaming) */
 sessionRoutes.post(`${BASE}/:sessionId/prompt`, async (c) => {
   const { projectId, artifactDirId, sessionId } = c.req.param();
-  const body = await c.req.json<{ message: string }>();
+  const body = await c.req.json<{ message: string; skills?: string[] }>();
 
   if (!body.message) {
     return c.json({ error: 'message is required' }, 400);
@@ -79,7 +79,10 @@ sessionRoutes.post(`${BASE}/:sessionId/prompt`, async (c) => {
 
   try {
     const session = await Session.getById(projectId, artifactDirId, sessionId);
-    const newMessages = await session.prompt(body);
+    const newMessages = await session.prompt({
+      message: body.message,
+      skills: body.skills ?? [],
+    });
     return c.json(newMessages);
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Failed to prompt session';
@@ -156,11 +159,13 @@ function toSseChunk(event: string, data: unknown): Uint8Array {
 /** POST /api/.../sessions/:sessionId/stream — Stream a conversation turn via SSE */
 sessionRoutes.post(`${BASE}/:sessionId/stream`, async (c) => {
   const { projectId, artifactDirId, sessionId } = c.req.param();
-  const body = await c.req.json<{ message: string }>().catch(() => undefined);
+  const body = await c.req.json<{ message: string; skills?: string[] }>().catch(() => undefined);
 
   if (!body?.message) {
     return c.json({ error: 'message is required' }, 400);
   }
+
+  const promptInput = { message: body.message, skills: body.skills ?? [] };
 
   let session: Session;
   try {
@@ -193,15 +198,12 @@ sessionRoutes.post(`${BASE}/:sessionId/stream`, async (c) => {
         send('ready', { ok: true, sessionId });
 
         try {
-          const newMessages = await session.streamPrompt(
-            { message: body.message },
-            {
-              onEvent: (event: AgentEvent) => {
-                send('agent_event', event);
-              },
-              signal: c.req.raw.signal,
-            }
-          );
+          const newMessages = await session.streamPrompt(promptInput, {
+            onEvent: (event: AgentEvent) => {
+              send('agent_event', event);
+            },
+            signal: c.req.raw.signal,
+          });
 
           send('done', {
             ok: true,
