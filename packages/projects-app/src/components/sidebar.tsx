@@ -45,7 +45,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { createArtifactDir, getProjectOverview } from '@/lib/client-api';
 import { cn } from '@/lib/utils';
-import { useChatStore, useUiStore } from '@/stores';
+import { useChatStore, useSidebarStore, useUiStore } from '@/stores';
 
 // ---------------------------------------------------------------------------
 // SidebarItem
@@ -74,6 +74,48 @@ const SidebarItem: FC<SidebarItemProps> = ({ icon, label, collapsed, onClick }) 
 };
 
 // ---------------------------------------------------------------------------
+// useTypewriter — animate text changes character-by-character
+// ---------------------------------------------------------------------------
+
+function useTypewriter(text: string, speed = 30): string {
+  const [display, setDisplay] = useState(text);
+  const prevRef = useRef(text);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (prevRef.current === text) return;
+    prevRef.current = text;
+
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+
+    let i = 0;
+    setDisplay('');
+
+    const tick = () => {
+      i++;
+      setDisplay(text.slice(0, i));
+      if (i < text.length) {
+        timerRef.current = setTimeout(tick, speed);
+      }
+    };
+
+    timerRef.current = setTimeout(tick, speed);
+
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [text, speed]);
+
+  return display;
+}
+
+// ---------------------------------------------------------------------------
 // SessionItem — a single thread inside an artifact folder
 // ---------------------------------------------------------------------------
 
@@ -82,6 +124,8 @@ const SessionItem: FC<{
   isActive: boolean;
   onSelect: (session: OverviewSession) => void;
 }> = ({ session, isActive, onSelect }) => {
+  const displayName = useTypewriter(session.sessionName);
+
   return (
     <div
       onClick={() => onSelect(session)}
@@ -90,7 +134,7 @@ const SessionItem: FC<{
         isActive ? 'bg-home-hover' : 'hover:bg-home-hover'
       )}
     >
-      <span className="flex-1 truncate text-foreground text-[13px]">{session.sessionName}</span>
+      <span className="flex-1 truncate text-foreground text-[13px]">{displayName}</span>
     </div>
   );
 };
@@ -230,8 +274,10 @@ const ArtifactList: FC<{ collapsed?: boolean }> = ({ collapsed }) => {
     artifactId?: string;
     threadId?: string;
   }>();
-  const [artifactDirs, setArtifactDirs] = useState<ArtifactDirWithSessions[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const artifactDirs = useSidebarStore((s) => s.artifactDirs);
+  const isLoading = useSidebarStore((s) => s.isLoading);
+  const setArtifactDirs = useSidebarStore((s) => s.setArtifactDirs);
+  const setIsLoading = useSidebarStore((s) => s.setIsLoading);
   const [collapseAllKey, setCollapseAllKey] = useState(0);
 
   useEffect(() => {
@@ -247,7 +293,7 @@ const ArtifactList: FC<{ collapsed?: boolean }> = ({ collapsed }) => {
       .finally(() => {
         setIsLoading(false);
       });
-  }, [projectId]);
+  }, [projectId, setArtifactDirs, setIsLoading]);
 
   const handleCollapseAll = () => setCollapseAllKey((k) => k + 1);
 

@@ -15,7 +15,7 @@ import type { SessionRef } from '@/lib/contracts';
 
 import { Button } from '@/components/ui/button';
 import { generateSessionName } from '@/lib/client-api';
-import { useChatStore, useSessionsStore } from '@/stores';
+import { useChatStore, useSessionsStore, useSidebarStore } from '@/stores';
 
 function isAbortError(error: unknown): boolean {
   if (!error) return false;
@@ -59,7 +59,9 @@ function PromptInputWithActions() {
   });
 
   const createSession = useSessionsStore((state) => state.createSession);
-  const optimisticRenameSession = useSessionsStore((state) => state.optimisticRenameSession);
+
+  const sidebarAddSession = useSidebarStore((state) => state.addSession);
+  const sidebarRenameSession = useSidebarStore((state) => state.renameSession);
 
   const handleSubmit = async () => {
     const trimmed = input.trim();
@@ -74,6 +76,16 @@ function PromptInputWithActions() {
         const created = await createSession(ctx, { sessionName: 'New chat' });
         const ref: SessionRef = { sessionId: created.sessionId };
         setActiveSession(ref);
+
+        // Optimistically add the new thread to the sidebar immediately
+        sidebarAddSession(artifactId, {
+          sessionId: created.sessionId,
+          sessionName: 'New chat',
+          createdAt: new Date().toISOString(),
+          updatedAt: null,
+          nodeCount: 0,
+        });
+
         router.push(`/${projectId}/${artifactId}/${created.sessionId}`);
         await loadMessages({ session: ref, projectId, artifactId, force: true });
         session = ref;
@@ -83,7 +95,7 @@ function PromptInputWithActions() {
           query: trimmed,
         })
           .then((result) => {
-            optimisticRenameSession(created.sessionId, result.sessionName);
+            sidebarRenameSession(created.sessionId, result.sessionName);
           })
           .catch(() => {
             // Naming failed silently — keep "New chat"
