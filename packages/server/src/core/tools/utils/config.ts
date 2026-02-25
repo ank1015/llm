@@ -1,15 +1,16 @@
 import { existsSync, readFileSync } from 'fs';
 import { homedir } from 'os';
 import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 /**
  * Get the base directory for resolving package assets (themes, package.json, README.md, CHANGELOG.md).
- * - For Bun binary: returns the directory containing the executable
- * - For Node.js (dist/): returns __dirname (the dist/ directory)
- * - For tsx (src/): returns parent directory (the package root)
+ * Walks up from the current file's directory until it finds a package.json.
  */
 export function getPackageDir(): string {
-  // Node.js: walk up from __dirname until we find package.json
   let dir = __dirname;
   while (dir !== dirname(dir)) {
     if (existsSync(join(dir, 'package.json'))) {
@@ -17,7 +18,6 @@ export function getPackageDir(): string {
     }
     dir = dirname(dir);
   }
-  // Fallback (shouldn't happen)
   return __dirname;
 }
 

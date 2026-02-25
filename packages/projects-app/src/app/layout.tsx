@@ -2,8 +2,10 @@ import { Geist, Geist_Mono } from 'next/font/google';
 
 import type { Metadata } from 'next';
 
-import { QueryProvider } from '@/providers/query-provider';
+import { ChatInput } from '@/components/chat-input';
+import { HomeLayout } from '@/components/root-layout';
 
+import 'katex/dist/katex.min.css';
 import './globals.css';
 
 const geistSans = Geist({
@@ -17,8 +19,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Projects',
-  description: 'Projects application built with Next.js',
+  title: 'LLM Chat App',
+  description: 'Chat application built with Next.js',
 };
 
 export default function RootLayout({
@@ -29,7 +31,10 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <QueryProvider>{children}</QueryProvider>
+        <HomeLayout>
+          <div className="relative flex h-full w-full flex-col">{children}</div>
+          <ChatInput />
+        </HomeLayout>
       </body>
     </html>
   );

@@ -1,52 +1,260 @@
+'use client';
+
 import { create } from 'zustand';
 
-import type { DisplayMessage, SessionSummary } from '@/lib/types';
+import type { SessionSummary } from '@ank1015/llm-sdk';
 
-type SessionsState = {
-  /** Sessions keyed by artifactDirId */
-  sessionsByDir: Record<string, SessionSummary[]>;
-  setSessions: (artifactDirId: string, sessions: SessionSummary[]) => void;
-  addSession: (artifactDirId: string, session: SessionSummary) => void;
+import {
+  createSession as createSessionApi,
+  deleteSession as deleteSessionApi,
+  listSessions,
+  renameSession as renameSessionApi,
+} from '@/lib/client-api';
 
-  /** Messages keyed by sessionId */
-  messagesBySession: Record<string, DisplayMessage[]>;
-  setMessages: (sessionId: string, messages: DisplayMessage[]) => void;
-  appendMessages: (sessionId: string, messages: DisplayMessage[]) => void;
+type SessionsStoreState = {
+  sessions: SessionSummary[];
+  isLoading: boolean;
+  isRefreshing: boolean;
+  error: string | null;
+  isCreating: boolean;
+  renamingSessionId: string | null;
+  deletingSessionId: string | null;
+  mutationError: string | null;
+  clearMutationError: () => void;
+  fetchSessions: () => Promise<void>;
+  refresh: () => Promise<void>;
+  createSession: (input?: { sessionName?: string }) => Promise<{ sessionId: string }>;
+  renameSession: (input: { sessionId: string; sessionName: string }) => Promise<void>;
+  deleteSession: (sessionId: string) => Promise<void>;
+  reset: () => void;
+  optimisticRenameSession: (sessionId: string, sessionName: string) => void;
+  optimisticRemoveSession: (sessionId: string) => void;
+  upsertSession: (session: SessionSummary) => void;
 };
 
-export const useSessionsStore = create<SessionsState>((set) => ({
-  sessionsByDir: {},
-  messagesBySession: {},
+let latestRequestId = 0;
 
-  setSessions: (artifactDirId, sessions) =>
-    set((state) => ({
-      sessionsByDir: { ...state.sessionsByDir, [artifactDirId]: sessions },
-    })),
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
 
-  addSession: (artifactDirId, session) =>
-    set((state) => {
-      const existing = state.sessionsByDir[artifactDirId] ?? [];
+  return 'Unknown error while loading sessions.';
+}
+
+const initialState = {
+  sessions: [] as SessionSummary[],
+  isLoading: false,
+  isRefreshing: false,
+  error: null as string | null,
+  isCreating: false,
+  renamingSessionId: null as string | null,
+  deletingSessionId: null as string | null,
+  mutationError: null as string | null,
+};
+
+export const useSessionsStore = create<SessionsStoreState>((set, get) => ({
+  ...initialState,
+
+  clearMutationError: () => {
+    set({ mutationError: null });
+  },
+
+  fetchSessions: async () => {
+    const requestId = ++latestRequestId;
+
+    set({
+      isLoading: true,
+      isRefreshing: false,
+      error: null,
+    });
+
+    try {
+      const sessions = await listSessions();
+
+      if (requestId !== latestRequestId) {
+        return;
+      }
+
+      set({
+        sessions,
+        isLoading: false,
+      });
+    } catch (error) {
+      if (requestId !== latestRequestId) {
+        return;
+      }
+
+      set({
+        isLoading: false,
+        error: getErrorMessage(error),
+      });
+    }
+  },
+
+  refresh: async () => {
+    const requestId = ++latestRequestId;
+
+    set({
+      isRefreshing: true,
+      error: null,
+    });
+
+    try {
+      const sessions = await listSessions();
+
+      if (requestId !== latestRequestId) {
+        return;
+      }
+
+      set({
+        sessions,
+        isRefreshing: false,
+      });
+    } catch (error) {
+      if (requestId !== latestRequestId) {
+        return;
+      }
+
+      set({
+        isRefreshing: false,
+        error: getErrorMessage(error),
+      });
+    }
+  },
+
+  createSession: async (input) => {
+    set({
+      isCreating: true,
+      mutationError: null,
+    });
+
+    try {
+      const metadata = await createSessionApi({
+        name: input?.sessionName,
+      });
+
+      await get().refresh();
+
       return {
-        sessionsByDir: {
-          ...state.sessionsByDir,
-          [artifactDirId]: [...existing, session],
-        },
+        sessionId: metadata.id,
       };
-    }),
+    } catch (error) {
+      const message = getErrorMessage(error);
+      set({ mutationError: message });
+      throw error;
+    } finally {
+      set({ isCreating: false });
+    }
+  },
 
-  setMessages: (sessionId, messages) =>
+  renameSession: async ({ sessionId, sessionName }) => {
+    const trimmedName = sessionName.trim();
+    if (trimmedName.length === 0) {
+      throw new Error('Session name cannot be empty.');
+    }
+
+    const previousSession = get().sessions.find((session) => session.sessionId === sessionId);
+    const previousName = previousSession?.sessionName;
+
+    set({
+      renamingSessionId: sessionId,
+      mutationError: null,
+    });
+
+    get().optimisticRenameSession(sessionId, trimmedName);
+
+    try {
+      await renameSessionApi({
+        sessionId,
+        name: trimmedName,
+      });
+    } catch (error) {
+      if (previousName) {
+        get().optimisticRenameSession(sessionId, previousName);
+      }
+
+      set({
+        mutationError: getErrorMessage(error),
+      });
+      throw error;
+    } finally {
+      set({
+        renamingSessionId: null,
+      });
+    }
+  },
+
+  deleteSession: async (sessionId) => {
+    const hadSession = get().sessions.some((session) => session.sessionId === sessionId);
+
+    set({
+      deletingSessionId: sessionId,
+      mutationError: null,
+    });
+
+    if (hadSession) {
+      get().optimisticRemoveSession(sessionId);
+    }
+
+    try {
+      await deleteSessionApi(sessionId);
+    } catch (error) {
+      set({
+        mutationError: getErrorMessage(error),
+      });
+
+      if (hadSession) {
+        await get().refresh();
+      }
+
+      throw error;
+    } finally {
+      set({
+        deletingSessionId: null,
+      });
+    }
+  },
+
+  reset: () => {
+    set(initialState);
+  },
+
+  optimisticRenameSession: (sessionId, sessionName) => {
+    const trimmedName = sessionName.trim();
+    if (trimmedName.length === 0) {
+      return;
+    }
+
     set((state) => ({
-      messagesBySession: { ...state.messagesBySession, [sessionId]: messages },
-    })),
+      sessions: state.sessions.map((session) =>
+        session.sessionId === sessionId ? { ...session, sessionName: trimmedName } : session
+      ),
+    }));
+  },
 
-  appendMessages: (sessionId, messages) =>
+  optimisticRemoveSession: (sessionId) => {
+    set((state) => ({
+      sessions: state.sessions.filter((session) => session.sessionId !== sessionId),
+    }));
+  },
+
+  upsertSession: (session) => {
     set((state) => {
-      const existing = state.messagesBySession[sessionId] ?? [];
+      const index = state.sessions.findIndex((item) => item.sessionId === session.sessionId);
+
+      if (index === -1) {
+        return {
+          sessions: [session, ...state.sessions],
+        };
+      }
+
+      const nextSessions = [...state.sessions];
+      nextSessions[index] = session;
+
       return {
-        messagesBySession: {
-          ...state.messagesBySession,
-          [sessionId]: [...existing, ...messages],
-        },
+        sessions: nextSessions,
       };
-    }),
+    });
+  },
 }));

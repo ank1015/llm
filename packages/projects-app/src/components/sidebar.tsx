@@ -1,50 +1,62 @@
+/* eslint-disable sonarjs/no-duplicate-string */
 'use client';
-
 import {
+  Archive,
   ChevronDown,
-  ChevronsDownUp,
-  Folder,
-  FolderPlus,
+  Ellipsis,
+  Images,
+  LifeBuoy,
+  LogOut,
   PanelLeft,
+  Pen,
+  Pin,
   Settings,
+  Share,
+  Smile,
+  SparklesIcon,
   SquarePen,
+  Trash2,
 } from 'lucide-react';
-import { usePathname, useRouter } from 'next/navigation';
-import { memo, useMemo, useState } from 'react';
+import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+import { memo, useEffect, useRef, useState } from 'react';
 
-import type { ArtifactDirMetadata, SessionSummary } from '@/lib/types';
+import type { SessionSummary } from '@ank1015/llm-sdk';
+import type { FC, FormEvent, ReactNode } from 'react';
 
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
-import { useCreateArtifactDir } from '@/hooks/use-artifact-dirs';
-import { relativeTime } from '@/lib/types';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import { useArtifactDirsStore } from '@/stores/artifact-dirs-store';
-import { useSessionsStore } from '@/stores/sessions-store';
-import { useUiStore } from '@/stores/ui-store';
+import { useChatStore, useSessionsStore, useUiStore } from '@/stores';
 
-// ---------------------------------------------------------------------------
-// SidebarItem
-// ---------------------------------------------------------------------------
-
-function SidebarItem({
-  icon,
-  label,
-  collapsed,
-  onClick,
-}: {
-  icon: React.ReactNode;
+type SidebarItemProps = {
+  icon: ReactNode;
   label: string;
+  shortcut?: string;
   collapsed?: boolean;
   onClick?: () => void;
-}) {
+};
+
+const SidebarItem: FC<SidebarItemProps> = ({ icon, label, shortcut, collapsed, onClick }) => {
   return (
     <button
       onClick={onClick}
@@ -55,275 +67,452 @@ function SidebarItem({
     >
       <span className="shrink-0">{icon}</span>
       {!collapsed && <span className="flex-1 text-left text-[14px]">{label}</span>}
+      {!collapsed && shortcut && (
+        <span className="text-muted-foreground text-xs opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+          {shortcut}
+        </span>
+      )}
     </button>
   );
-}
+};
 
-// ---------------------------------------------------------------------------
-// SessionItem (was ThreadItem)
-// ---------------------------------------------------------------------------
+function useTypewriter(text: string, speed = 30): string {
+  const [display, setDisplay] = useState(text);
+  const prevRef = useRef(text);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-function SessionItem({
-  session,
-  projectId,
-  artifactDirId,
-}: {
-  session: SessionSummary;
-  projectId: string;
-  artifactDirId: string;
-}) {
-  const router = useRouter();
+  useEffect(() => {
+    if (prevRef.current === text) return;
+    prevRef.current = text;
 
-  return (
-    <div
-      onClick={() => router.push(`/${projectId}/${artifactDirId}/${session.sessionId}`)}
-      className="flex h-8 w-full cursor-pointer items-center rounded-lg pr-2 pl-8 hover:bg-home-hover"
-    >
-      <span className="flex-1 truncate text-[13px] text-foreground">{session.sessionName}</span>
-      <span className="ml-2 shrink-0 text-[12px] text-muted-foreground">
-        {relativeTime(session.updatedAt)}
-      </span>
-    </div>
-  );
-}
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
 
-// ---------------------------------------------------------------------------
-// ArtifactGroup
-// ---------------------------------------------------------------------------
+    let i = 0;
+    setDisplay('');
 
-function ArtifactGroup({
-  artifactDir,
-  sessions,
-  projectId,
-  collapseAllKey,
-}: {
-  artifactDir: ArtifactDirMetadata;
-  sessions: SessionSummary[];
-  projectId: string;
-  collapseAllKey: number;
-}) {
-  const router = useRouter();
-  const hasSessions = sessions.length > 0;
-  const [isCollapsed, setIsCollapsed] = useState(false);
-
-  const [prevCollapseAllKey, setPrevCollapseAllKey] = useState(collapseAllKey);
-  if (prevCollapseAllKey !== collapseAllKey) {
-    setPrevCollapseAllKey(collapseAllKey);
-    if (collapseAllKey > 0) setIsCollapsed(true);
-  }
-
-  return (
-    <div>
-      <div className="group flex w-full items-center gap-1 whitespace-nowrap rounded-lg py-1.5 pl-2 pr-1 hover:bg-home-hover">
-        <div className="flex flex-1 items-center gap-2 overflow-hidden">
-          <button
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className="relative flex h-4 w-4 shrink-0 cursor-pointer items-center justify-center"
-          >
-            <Folder
-              size={16}
-              strokeWidth={1.8}
-              className="text-muted-foreground absolute transition-opacity duration-200 group-hover:opacity-0"
-            />
-            <ChevronDown
-              size={14}
-              strokeWidth={2}
-              className={cn(
-                'text-muted-foreground absolute opacity-0 transition-all duration-200 group-hover:opacity-100',
-                isCollapsed && '-rotate-90'
-              )}
-            />
-          </button>
-          <button
-            onClick={() => router.push(`/${projectId}/${artifactDir.id}`)}
-            className="flex-1 cursor-pointer truncate text-left"
-          >
-            <span className="truncate text-[14px] text-foreground">{artifactDir.name}</span>
-          </button>
-        </div>
-        <div className="flex shrink-0 items-center opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-          <button className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:text-foreground">
-            <SquarePen size={13} strokeWidth={1.8} />
-          </button>
-        </div>
-      </div>
-
-      {!isCollapsed && hasSessions && (
-        <div className="mt-0.5 flex flex-col gap-0.5">
-          {sessions.map((session) => (
-            <SessionItem
-              key={session.sessionId}
-              session={session}
-              projectId={projectId}
-              artifactDirId={artifactDir.id}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// ArtifactList
-// ---------------------------------------------------------------------------
-
-function ArtifactList({ collapsed }: { collapsed?: boolean }) {
-  const pathname = usePathname();
-  const projectId = useMemo(() => pathname.split('/').filter(Boolean)[0] ?? '', [pathname]);
-  const [collapseAllKey, setCollapseAllKey] = useState(0);
-
-  const artifactDirs = useArtifactDirsStore((s) => s.artifactDirs);
-  const sessionsByDir = useSessionsStore((s) => s.sessionsByDir);
-
-  return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className={cn('mb-1 flex items-center px-3 pt-4 pb-1', collapsed && 'hidden')}>
-        <span className="flex-1 text-[14px] text-muted-foreground">Artifacts</span>
-        <button
-          onClick={() => setCollapseAllKey((k) => k + 1)}
-          className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-home-hover hover:text-foreground"
-        >
-          <ChevronsDownUp size={15} strokeWidth={1.8} />
-        </button>
-      </div>
-      <div className={cn('no-scrollbar flex-1 overflow-y-auto px-2', collapsed && 'hidden')}>
-        {artifactDirs.length === 0 ? (
-          <p className="mt-12 flex justify-center whitespace-nowrap py-2 text-xs text-muted-foreground">
-            No artifacts yet.
-          </p>
-        ) : (
-          <div className="flex flex-col gap-0.5">
-            {artifactDirs.map((dir) => (
-              <ArtifactGroup
-                key={dir.id}
-                artifactDir={dir}
-                sessions={sessionsByDir[dir.id] ?? []}
-                projectId={projectId}
-                collapseAllKey={collapseAllKey}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// CreateArtifactDialog
-// ---------------------------------------------------------------------------
-
-function CreateArtifactDialog({ projectId, collapsed }: { projectId: string; collapsed: boolean }) {
-  const [open, setOpen] = useState(false);
-  const [name, setName] = useState('');
-  const createArtifactDir = useCreateArtifactDir(projectId);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = name.trim();
-    if (!trimmed) return;
-
-    createArtifactDir.mutate(
-      { name: trimmed },
-      {
-        onSuccess: () => {
-          setName('');
-          setOpen(false);
-        },
+    const tick = () => {
+      i++;
+      setDisplay(text.slice(0, i));
+      if (i < text.length) {
+        timerRef.current = setTimeout(tick, speed);
       }
-    );
+    };
+
+    timerRef.current = setTimeout(tick, speed);
+
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [text, speed]);
+
+  return display;
+}
+
+type ChatItemProps = {
+  session: SessionSummary;
+  isActive: boolean;
+  onSelect: (session: SessionSummary) => void;
+  onRename: (session: SessionSummary) => void;
+  onDelete: (session: SessionSummary) => void;
+};
+
+const ChatItem: FC<ChatItemProps> = ({ session, isActive, onSelect, onRename, onDelete }) => {
+  const displayName = useTypewriter(session.sessionName);
+
+  return (
+    <DropdownMenu>
+      <div
+        onClick={() => onSelect(session)}
+        className={cn(
+          'group flex h-9 w-full cursor-pointer items-center rounded-lg pr-1 pl-3 text-[13px]',
+          isActive ? 'bg-home-hover' : 'hover:bg-home-hover'
+        )}
+      >
+        <span className="flex-1 truncate text-foreground text-[14px]">{displayName}</span>
+        <DropdownMenuTrigger asChild>
+          <button
+            className={cn(
+              'text-muted-foreground hover:text-foreground flex h-6 w-6 shrink-0 items-center justify-center rounded-md opacity-0 transition-opacity group-hover:opacity-100',
+              isActive && 'opacity-100'
+            )}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Ellipsis size={16} strokeWidth={2} />
+          </button>
+        </DropdownMenuTrigger>
+      </div>
+      <DropdownMenuContent side="right" align="start" className="w-[200px]">
+        <DropdownMenuItem>
+          <Share size={16} />
+          Share
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={(e) => {
+            e.stopPropagation();
+            onRename(session);
+          }}
+        >
+          <Pen size={16} />
+          Rename
+        </DropdownMenuItem>
+        <DropdownMenuItem>
+          <Pin size={16} />
+          Pin chat
+        </DropdownMenuItem>
+        <DropdownMenuItem>
+          <Archive size={16} />
+          Archive
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          variant="destructive"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(session);
+          }}
+        >
+          <Trash2 size={16} />
+          Delete
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+};
+
+const ChatList: FC<{ collapsed?: boolean }> = ({ collapsed }) => {
+  const [isSectionCollapsed, setIsSectionCollapsed] = useState(false);
+
+  const sessions = useSessionsStore((state) => state.sessions);
+  const isLoading = useSessionsStore((state) => state.isLoading);
+  const fetchSessions = useSessionsStore((state) => state.fetchSessions);
+  const renameSession = useSessionsStore((state) => state.renameSession);
+  const deleteSession = useSessionsStore((state) => state.deleteSession);
+
+  const activeSession = useChatStore((state) => state.activeSession);
+  const setActiveSession = useChatStore((state) => state.setActiveSession);
+  const clearSessionState = useChatStore((state) => state.clearSessionState);
+
+  const router = useRouter();
+
+  useEffect(() => {
+    void fetchSessions();
+  }, [fetchSessions]);
+
+  const handleSelect = (session: SessionSummary) => {
+    setActiveSession({ sessionId: session.sessionId });
+    router.push(`/${session.sessionId}`);
+  };
+
+  const [renamingSession, setRenamingSession] = useState<SessionSummary | null>(null);
+  const [deletingSession, setDeletingSession] = useState<SessionSummary | null>(null);
+
+  const handleRename = (session: SessionSummary) => {
+    setRenamingSession(session);
+  };
+
+  const handleDelete = (session: SessionSummary) => {
+    setDeletingSession(session);
+  };
+
+  const confirmRename = (newName: string) => {
+    if (!renamingSession) return;
+    void renameSession({ sessionId: renamingSession.sessionId, sessionName: newName });
+    setRenamingSession(null);
+  };
+
+  const confirmDelete = async () => {
+    if (!deletingSession) return;
+    const sessionId = deletingSession.sessionId;
+    setDeletingSession(null);
+    await deleteSession(sessionId);
+    if (activeSession?.sessionId === sessionId) {
+      clearSessionState(activeSession);
+      setActiveSession(null);
+      router.push('/');
+    }
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <div>
-          <SidebarItem
-            icon={<FolderPlus size={18} strokeWidth={1.8} />}
-            label="New Artifact"
-            collapsed={collapsed}
+    <div className="flex min-h-0 flex-1 flex-col">
+      {!collapsed && (
+        <button
+          onClick={() => setIsSectionCollapsed(!isSectionCollapsed)}
+          className="flex cursor-pointer items-center gap-1 whitespace-nowrap px-3 pt-4 pb-1 mb-1"
+        >
+          <span className="text-muted-foreground text-[14px]">Your chats</span>
+          <ChevronDown
+            size={12}
+            strokeWidth={2}
+            className={cn(
+              'text-muted-foreground transition-transform duration-200',
+              isSectionCollapsed && '-rotate-90'
+            )}
           />
+        </button>
+      )}
+      {!isSectionCollapsed && !collapsed && (
+        <div className="no-scrollbar flex-1 overflow-y-auto px-2">
+          {isLoading && sessions.length === 0 ? (
+            <div className="space-y-1 px-1">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={`skel-${i}`} className="bg-home-hover/50 h-9 animate-pulse rounded-lg" />
+              ))}
+            </div>
+          ) : sessions.length === 0 ? (
+            <p className="text-muted-foreground flex justify-center whitespace-nowrap py-2 mt-12 text-xs">
+              No chats yet.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-0.5">
+              {sessions.map((session) => (
+                <ChatItem
+                  key={session.sessionId}
+                  session={session}
+                  isActive={activeSession?.sessionId === session.sessionId}
+                  onSelect={handleSelect}
+                  onRename={handleRename}
+                  onDelete={(s) => void handleDelete(s)}
+                />
+              ))}
+            </div>
+          )}
         </div>
-      </DialogTrigger>
+      )}
 
-      <DialogContent>
+      {/* Rename dialog */}
+      <RenameDialog
+        session={renamingSession}
+        onOpenChange={(open) => !open && setRenamingSession(null)}
+        onConfirm={confirmRename}
+      />
+
+      {/* Delete confirmation dialog */}
+      <DeleteDialog
+        session={deletingSession}
+        onOpenChange={(open) => !open && setDeletingSession(null)}
+        onConfirm={() => void confirmDelete()}
+      />
+    </div>
+  );
+};
+
+const RenameDialog: FC<{
+  session: SessionSummary | null;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: (newName: string) => void;
+}> = ({ session, onOpenChange, onConfirm }) => {
+  const [name, setName] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (session) {
+      setName(session.sessionName);
+      // Focus after dialog animation
+      setTimeout(() => inputRef.current?.select(), 0);
+    }
+  }, [session]);
+
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    const trimmed = name.trim();
+    if (trimmed && trimmed !== session?.sessionName) {
+      onConfirm(trimmed);
+    } else {
+      onOpenChange(false);
+    }
+  };
+
+  return (
+    <Dialog open={!!session} onOpenChange={onOpenChange}>
+      <DialogContent
+        className="bg-home-page border-home-border sm:max-w-sm"
+        showCloseButton={false}
+      >
         <DialogHeader>
-          <DialogTitle>Create Artifact</DialogTitle>
-          <DialogDescription>Enter a name for the new artifact directory.</DialogDescription>
+          <DialogTitle className="text-foreground text-base">Rename chat</DialogTitle>
+          <DialogDescription className="sr-only">Enter a new name for this chat.</DialogDescription>
         </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-4">
+        <form onSubmit={handleSubmit}>
           <input
-            autoFocus
-            type="text"
-            placeholder="Artifact name"
+            ref={inputRef}
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="bg-home-input border-home-border h-10 w-full rounded-lg border px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+            className="bg-home-panel border-home-border text-foreground placeholder:text-muted-foreground w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-foreground/20"
+            placeholder="Chat name"
           />
-          <div className="flex justify-end gap-2">
+          <DialogFooter className="mt-4">
             <Button
               type="button"
               variant="ghost"
-              size="sm"
+              onClick={() => onOpenChange(false)}
               className="cursor-pointer"
-              onClick={() => setOpen(false)}
             >
               Cancel
             </Button>
-            <Button
-              type="submit"
-              size="sm"
-              className="cursor-pointer"
-              disabled={!name.trim() || createArtifactDir.isPending}
-            >
-              {createArtifactDir.isPending ? 'Creating...' : 'Create'}
+            <Button type="submit" className="cursor-pointer" disabled={!name.trim()}>
+              Rename
             </Button>
-          </div>
-          {createArtifactDir.isError && (
-            <p className="text-xs text-red-500">{createArtifactDir.error.message}</p>
-          )}
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
   );
-}
+};
 
-// ---------------------------------------------------------------------------
-// Sidebar
-// ---------------------------------------------------------------------------
+const DeleteDialog: FC<{
+  session: SessionSummary | null;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: () => void;
+}> = ({ session, onOpenChange, onConfirm }) => {
+  return (
+    <Dialog open={!!session} onOpenChange={onOpenChange}>
+      <DialogContent
+        className="bg-home-page border-home-border sm:max-w-sm"
+        showCloseButton={false}
+      >
+        <DialogHeader>
+          <DialogTitle className="text-foreground text-base">Delete chat?</DialogTitle>
+          <DialogDescription className="text-muted-foreground text-sm">
+            This will delete{' '}
+            <span className="text-foreground font-medium">{session?.sessionName}</span>. This action
+            cannot be undone.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="mt-2">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => onOpenChange(false)}
+            className="cursor-pointer"
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={onConfirm}
+            className="cursor-pointer"
+          >
+            Delete
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+const AccountMenu: FC<{ collapsed?: boolean }> = ({ collapsed }) => {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          className={cn(
+            'group flex h-10 w-full items-center whitespace-nowrap rounded-lg pl-[5px] pr-3 text-sm text-foreground hover:bg-home-hover',
+            !collapsed && 'cursor-pointer gap-2'
+          )}
+        >
+          <Avatar className="size-6">
+            <AvatarFallback className="bg-muted-foreground/20 text-[10px] font-medium">
+              SU
+            </AvatarFallback>
+          </Avatar>
+          {!collapsed && <span className="flex-1 text-left text-[14px]">sugarkid</span>}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent side="top" align="start" className="w-[240px]">
+        {/* User info */}
+        <div className="flex items-center gap-3 px-2 py-2">
+          <Avatar className="size-8">
+            <AvatarFallback className="bg-muted-foreground/20 text-xs font-medium">
+              SU
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex flex-col">
+            <span className="text-sm font-medium">sugarkid</span>
+            <span className="text-muted-foreground text-xs">@sugarkid</span>
+          </div>
+        </div>
+        <DropdownMenuSeparator />
+
+        {/* Main actions */}
+        <DropdownMenuGroup>
+          <DropdownMenuItem>
+            <SparklesIcon />
+            Upgrade plan
+          </DropdownMenuItem>
+          <DropdownMenuItem>
+            <Smile />
+            Personalization
+          </DropdownMenuItem>
+          <DropdownMenuItem>
+            <Settings />
+            Settings
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+
+        {/* Help submenu */}
+        <DropdownMenuGroup>
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger>
+              <LifeBuoy />
+              Help
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent>
+              <DropdownMenuItem>Documentation</DropdownMenuItem>
+              <DropdownMenuItem>Support</DropdownMenuItem>
+              <DropdownMenuItem>Feedback</DropdownMenuItem>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+          <DropdownMenuItem>
+            <LogOut />
+            Log out
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+};
 
 function SidebarComponent() {
-  const pathname = usePathname();
-  const projectId = useMemo(() => pathname.split('/').filter(Boolean)[0] ?? '', [pathname]);
-  const isSidebarCollapsed = useUiStore((s) => s.isSidebarCollapsed);
-  const toggleSidebarCollapsed = useUiStore((s) => s.toggleSidebarCollapsed);
+  const isSidebarCollapsed = useUiStore((state) => state.isSidebarCollapsed);
+  const toggleSidebarCollapsed = useUiStore((state) => state.toggleSidebarCollapsed);
+  const theme = useUiStore((state) => state.theme);
+  const setActiveSession = useChatStore((state) => state.setActiveSession);
   const [isHovered, setIsHovered] = useState(false);
+  const router = useRouter();
 
+  const logoSrc = theme === 'dark' ? '/logo-light.png' : '/logo-dark.png';
   const showToggleIcon = isSidebarCollapsed && isHovered;
 
   return (
     <div
       className={cn(
         'border-home-border flex h-full shrink-0 flex-col overflow-hidden border-r transition-all duration-300 ease-in-out',
-        isSidebarCollapsed ? 'w-[50px] cursor-w-resize bg-home-page' : 'w-[260px] bg-home-panel'
+        isSidebarCollapsed ? 'w-[50px] bg-home-page cursor-w-resize' : 'w-[260px] bg-home-panel'
       )}
       onMouseEnter={() => isSidebarCollapsed && setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onClick={() => isSidebarCollapsed && toggleSidebarCollapsed()}
     >
-      {/* Header — logo / toggle */}
+      {/* Header — logo pinned at fixed left offset so it doesn't move on collapse */}
       <div className="flex items-center pt-3 pb-2 pl-[9px] pr-2">
         <div className="relative flex h-8 w-8 shrink-0 items-center justify-center">
-          <span
+          <Image
+            src={logoSrc}
+            alt="logo"
+            width={22}
+            height={22}
             className={cn(
-              'text-foreground absolute text-base font-semibold transition-opacity duration-200',
+              'absolute transition-opacity duration-200',
               showToggleIcon ? 'opacity-0' : 'opacity-100'
             )}
-          >
-            A
-          </span>
+          />
           <PanelLeft
             size={18}
             strokeWidth={1.8}
@@ -351,22 +540,32 @@ function SidebarComponent() {
         )}
       </div>
 
-      {/* New Artifact button */}
+      {/* Navigation items */}
       <div className="mt-2 flex flex-col gap-0.5 px-2">
-        <CreateArtifactDialog projectId={projectId} collapsed={isSidebarCollapsed} />
-      </div>
-
-      {/* Artifacts list */}
-      <ArtifactList collapsed={isSidebarCollapsed} />
-
-      {/* Settings — pinned to bottom */}
-      {!isSidebarCollapsed && <div className="border-home-border mx-2 border-t" />}
-      <div className="px-2 pt-2 pb-3">
         <SidebarItem
-          icon={<Settings size={18} strokeWidth={1.8} />}
-          label="Settings"
+          icon={<SquarePen size={18} strokeWidth={1.8} />}
+          label="New chat"
+          shortcut="⇧⌘O"
+          onClick={() => {
+            setActiveSession(null);
+            router.push('/');
+          }}
           collapsed={isSidebarCollapsed}
         />
+        <SidebarItem
+          icon={<Images size={18} strokeWidth={1.8} />}
+          label="Images"
+          collapsed={isSidebarCollapsed}
+        />
+      </div>
+
+      {/* Chat list */}
+      <ChatList collapsed={isSidebarCollapsed} />
+
+      {/* Account menu — pinned to bottom */}
+      {!isSidebarCollapsed && <div className="border-home-border mx-2 border-t" />}
+      <div className="px-2 pt-2 pb-3">
+        <AccountMenu collapsed={isSidebarCollapsed} />
       </div>
     </div>
   );
