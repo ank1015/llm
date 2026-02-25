@@ -1,6 +1,5 @@
 'use client';
 
-import { motion } from 'framer-motion';
 import { ArrowUp, Square } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -16,7 +15,6 @@ import type { SessionRef } from '@/lib/contracts';
 
 import { Button } from '@/components/ui/button';
 import { generateSessionName } from '@/lib/client-api';
-import { cn } from '@/lib/utils';
 import { useChatStore, useSessionsStore } from '@/stores';
 
 function isAbortError(error: unknown): boolean {
@@ -29,18 +27,6 @@ function isAbortError(error: unknown): boolean {
   }
   return false;
 }
-
-/* ------------------------------------------------------------------ */
-/*  Greeting                                                          */
-/* ------------------------------------------------------------------ */
-
-const Greeting = () => {
-  return (
-    <h1 className="text-foreground text-center text-[29px] font-semibold tracking-tight">
-      What&apos;s on your mind today?
-    </h1>
-  );
-};
 
 /* ------------------------------------------------------------------ */
 /*  PromptInputWithActions                                            */
@@ -157,34 +143,10 @@ function PromptInputWithActions() {
 /* ------------------------------------------------------------------ */
 
 export const ChatInput = () => {
-  const { threadId } = useParams();
-
   return (
-    <div
-      className={cn(
-        'bg-home-page w-full',
-        threadId
-          ? 'absolute bottom-0'
-          : 'absolute inset-0 flex h-full w-full flex-col items-center justify-center pb-16'
-      )}
-    >
-      <div
-        className={cn('mx-auto flex w-full max-w-3xl flex-col items-start', !threadId && 'px-8')}
-      >
-        <div className="flex h-full w-full flex-col items-start justify-start pb-4">
-          {!threadId && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.3, ease: 'easeOut' }}
-              className="mb-8 flex w-full flex-col items-center gap-1"
-            >
-              <Greeting />
-            </motion.div>
-          )}
-
-          <PromptInputWithActions />
-        </div>
+    <div className="bg-home-page absolute bottom-0 w-full px-8">
+      <div className="mx-auto flex w-full max-w-3xl flex-col items-start pb-4">
+        <PromptInputWithActions />
       </div>
     </div>
   );
