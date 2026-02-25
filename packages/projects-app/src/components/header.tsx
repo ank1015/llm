@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronRight, Moon, Sun } from 'lucide-react';
+import { ChevronRight, FolderOpen, Moon, Sun } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -80,6 +80,7 @@ function HeaderBreadcrumb() {
 }
 
 export function Header() {
+  const { artifactId } = useParams<{ artifactId?: string }>();
   const theme = useUiStore((state) => state.theme);
   const toggleTheme = useUiStore((state) => state.toggleTheme);
 
@@ -87,8 +88,18 @@ export function Header() {
     <header className="flex h-12 w-full shrink-0 items-center justify-between px-3">
       <HeaderBreadcrumb />
 
-      {/* Right — Theme toggle */}
+      {/* Right — Actions + Theme toggle */}
       <div className="flex items-center gap-1">
+        {artifactId && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="cursor-pointer gap-1.5 text-muted-foreground hover:text-foreground"
+          >
+            <FolderOpen size={16} strokeWidth={1.8} />
+            <span className="text-[13px]">Artifacts</span>
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="icon-sm"
