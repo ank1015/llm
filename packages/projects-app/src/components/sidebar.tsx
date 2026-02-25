@@ -5,6 +5,7 @@ import {
   Ellipsis,
   Folder,
   FolderPlus,
+  LayoutGrid,
   LifeBuoy,
   LogOut,
   MessageSquarePlus,
@@ -264,7 +265,10 @@ const ArtifactGroup: FC<{
 // ArtifactList — fetches project overview and renders artifact folders
 // ---------------------------------------------------------------------------
 
-const ArtifactList: FC<{ collapsed?: boolean }> = ({ collapsed }) => {
+const ArtifactList: FC<{ collapsed?: boolean; onNewArtifact?: () => void }> = ({
+  collapsed,
+  onNewArtifact,
+}) => {
   const {
     projectId,
     artifactId: urlArtifactId,
@@ -276,6 +280,7 @@ const ArtifactList: FC<{ collapsed?: boolean }> = ({ collapsed }) => {
   }>();
   const artifactDirs = useSidebarStore((s) => s.artifactDirs);
   const isLoading = useSidebarStore((s) => s.isLoading);
+  const setProjectName = useSidebarStore((s) => s.setProjectName);
   const setArtifactDirs = useSidebarStore((s) => s.setArtifactDirs);
   const setIsLoading = useSidebarStore((s) => s.setIsLoading);
   const [collapseAllKey, setCollapseAllKey] = useState(0);
@@ -285,6 +290,7 @@ const ArtifactList: FC<{ collapsed?: boolean }> = ({ collapsed }) => {
     setIsLoading(true);
     void getProjectOverview(projectId)
       .then((overview) => {
+        setProjectName(overview.project.name);
         setArtifactDirs(overview.artifactDirs);
       })
       .catch(() => {
@@ -304,6 +310,12 @@ const ArtifactList: FC<{ collapsed?: boolean }> = ({ collapsed }) => {
       {!collapsed && (
         <div className="flex items-center px-3 pt-4 pb-1 mb-1">
           <span className="text-muted-foreground flex-1 text-[14px]">Artifacts</span>
+          <button
+            onClick={onNewArtifact}
+            className="text-muted-foreground hover:text-foreground flex h-6 w-6 cursor-pointer items-center justify-center rounded-md hover:bg-home-hover"
+          >
+            <FolderPlus size={15} strokeWidth={1.8} />
+          </button>
           <button
             onClick={handleCollapseAll}
             className="text-muted-foreground hover:text-foreground flex h-6 w-6 cursor-pointer items-center justify-center rounded-md hover:bg-home-hover"
@@ -533,6 +545,8 @@ function SidebarComponent() {
   const isSidebarCollapsed = useUiStore((state) => state.isSidebarCollapsed);
   const toggleSidebarCollapsed = useUiStore((state) => state.toggleSidebarCollapsed);
   const theme = useUiStore((state) => state.theme);
+  const projectName = useSidebarStore((s) => s.projectName);
+  const router = useRouter();
   const [isHovered, setIsHovered] = useState(false);
   const [isNewArtifactOpen, setIsNewArtifactOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -594,15 +608,19 @@ function SidebarComponent() {
       {/* Navigation items */}
       <div className="mt-2 flex flex-col gap-0.5 px-2">
         <SidebarItem
-          icon={<FolderPlus size={18} strokeWidth={1.8} />}
-          label="New Artifact"
+          icon={<LayoutGrid size={18} strokeWidth={1.8} />}
+          label={projectName ?? projectId}
           collapsed={isSidebarCollapsed}
-          onClick={() => setIsNewArtifactOpen(true)}
+          onClick={() => router.push(`/${projectId}`)}
         />
       </div>
 
       {/* Artifact list */}
-      <ArtifactList collapsed={isSidebarCollapsed} key={refreshKey} />
+      <ArtifactList
+        collapsed={isSidebarCollapsed}
+        key={refreshKey}
+        onNewArtifact={() => setIsNewArtifactOpen(true)}
+      />
 
       {/* Account menu — pinned to bottom */}
       {!isSidebarCollapsed && <div className="border-home-border mx-2 border-t" />}

@@ -5,9 +5,11 @@ import { create } from 'zustand';
 import type { ArtifactDirWithSessions, OverviewSession } from '@/lib/client-api';
 
 type SidebarStoreState = {
+  projectName: string | null;
   artifactDirs: ArtifactDirWithSessions[];
   isLoading: boolean;
 
+  setProjectName: (name: string) => void;
   setArtifactDirs: (dirs: ArtifactDirWithSessions[]) => void;
   setIsLoading: (loading: boolean) => void;
 
@@ -19,9 +21,11 @@ type SidebarStoreState = {
 };
 
 export const useSidebarStore = create<SidebarStoreState>((set) => ({
+  projectName: null,
   artifactDirs: [],
   isLoading: true,
 
+  setProjectName: (name) => set({ projectName: name }),
   setArtifactDirs: (dirs) => set({ artifactDirs: dirs }),
   setIsLoading: (loading) => set({ isLoading: loading }),
 
