@@ -2,11 +2,9 @@
 
 import type { ReactNode } from 'react';
 
-import { ChatInput } from '@/components/chat-input';
 import { Header } from '@/components/header';
 import { SideDrawer } from '@/components/side-drawer';
 import { Sidebar } from '@/components/sidebar';
-
 
 export default function ProjectLayout({ children }: { children: ReactNode }) {
   return (
@@ -14,10 +12,7 @@ export default function ProjectLayout({ children }: { children: ReactNode }) {
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <Header />
-        <main className="relative flex-1 overflow-auto">
-          <div className="relative flex h-full w-full flex-col">{children}</div>
-          <ChatInput />
-        </main>
+        <main className="relative flex-1 overflow-auto">{children}</main>
       </div>
       <SideDrawer />
     </div>

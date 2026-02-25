@@ -50,7 +50,7 @@ function PromptInputWithActions() {
   const [input, setInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  const { projectId } = useParams<{ projectId: string }>();
+  const { projectId, artifactId } = useParams<{ projectId: string; artifactId: string }>();
 
   const activeSession = useChatStore((state) => state.activeSession);
   const startStream = useChatStore((state) => state.startStream);
@@ -79,7 +79,7 @@ function PromptInputWithActions() {
         const created = await createSession({ sessionName: 'New chat' });
         const ref: SessionRef = { sessionId: created.sessionId };
         setActiveSession(ref);
-        router.push(`/${projectId}/${created.sessionId}`);
+        router.push(`/${projectId}/${artifactId}/${created.sessionId}`);
         await loadMessages({ session: ref, force: true });
         session = ref;
 
@@ -157,20 +157,22 @@ function PromptInputWithActions() {
 /* ------------------------------------------------------------------ */
 
 export const ChatInput = () => {
-  const { id } = useParams();
+  const { threadId } = useParams();
 
   return (
     <div
       className={cn(
         'bg-home-page w-full',
-        id
+        threadId
           ? 'absolute bottom-0'
           : 'absolute inset-0 flex h-full w-full flex-col items-center justify-center pb-16'
       )}
     >
-      <div className={cn('mx-auto flex w-full max-w-3xl flex-col items-start', !id && 'px-8')}>
+      <div
+        className={cn('mx-auto flex w-full max-w-3xl flex-col items-start', !threadId && 'px-8')}
+      >
         <div className="flex h-full w-full flex-col items-start justify-start pb-4">
-          {!id && (
+          {!threadId && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}

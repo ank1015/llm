@@ -1,4 +1,3 @@
- 
 'use client';
 import {
   ChevronDown,
@@ -114,7 +113,7 @@ const ArtifactGroup: FC<{
 
   const handleSessionSelect = (session: OverviewSession) => {
     setActiveSession({ sessionId: session.sessionId });
-    router.push(`/${projectId}/${session.sessionId}`);
+    router.push(`/${projectId}/${artifact.id}/${session.sessionId}`);
   };
 
   return (

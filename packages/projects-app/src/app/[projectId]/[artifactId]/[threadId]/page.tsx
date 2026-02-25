@@ -8,7 +8,7 @@ import { ChatMessages } from '@/components/chat-messages';
 import { useChatStore } from '@/stores/chat-store';
 
 export default function ConversationPage() {
-  const { id } = useParams<{ projectId: string; id: string }>();
+  const { threadId } = useParams<{ projectId: string; artifactId: string; threadId: string }>();
   const activeSession = useChatStore((state) => state.activeSession);
   const setActiveSession = useChatStore((state) => state.setActiveSession);
   const loadMessages = useChatStore((state) => state.loadMessages);
@@ -20,16 +20,16 @@ export default function ConversationPage() {
   });
 
   useEffect(() => {
-    if (!id) return;
+    if (!threadId) return;
 
-    const ref = { sessionId: id };
+    const ref = { sessionId: threadId };
 
-    if (activeSession?.sessionId !== id) {
+    if (activeSession?.sessionId !== threadId) {
       setActiveSession(ref);
     }
 
     void loadMessages({ session: ref });
-  }, [id]);
+  }, [threadId]);
 
   return (
     <div
