@@ -2,8 +2,7 @@ import { Geist, Geist_Mono } from 'next/font/google';
 
 import type { Metadata } from 'next';
 
-import { ChatInput } from '@/components/chat-input';
-import { HomeLayout } from '@/components/root-layout';
+import { ThemeInit } from '@/components/theme-init';
 
 import 'katex/dist/katex.min.css';
 import './globals.css';
@@ -31,10 +30,8 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <HomeLayout>
-          <div className="relative flex h-full w-full flex-col">{children}</div>
-          <ChatInput />
-        </HomeLayout>
+        <ThemeInit />
+        {children}
       </body>
     </html>
   );

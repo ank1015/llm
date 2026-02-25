@@ -50,6 +50,7 @@ function PromptInputWithActions() {
   const [input, setInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const { projectId } = useParams<{ projectId: string }>();
 
   const activeSession = useChatStore((state) => state.activeSession);
   const startStream = useChatStore((state) => state.startStream);
@@ -78,7 +79,7 @@ function PromptInputWithActions() {
         const created = await createSession({ sessionName: 'New chat' });
         const ref: SessionRef = { sessionId: created.sessionId };
         setActiveSession(ref);
-        router.push(`/${created.sessionId}`);
+        router.push(`/${projectId}/${created.sessionId}`);
         await loadMessages({ session: ref, force: true });
         session = ref;
 

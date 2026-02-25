@@ -8,7 +8,7 @@ import { ChatMessages } from '@/components/chat-messages';
 import { useChatStore } from '@/stores/chat-store';
 
 export default function ConversationPage() {
-  const { id } = useParams<{ id: string }>();
+  const { id } = useParams<{ projectId: string; id: string }>();
   const activeSession = useChatStore((state) => state.activeSession);
   const setActiveSession = useChatStore((state) => state.setActiveSession);
   const loadMessages = useChatStore((state) => state.loadMessages);

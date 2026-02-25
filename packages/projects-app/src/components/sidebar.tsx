@@ -18,7 +18,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { memo, useEffect, useRef, useState } from 'react';
 
 import type { SessionSummary } from '@ank1015/llm-sdk';
@@ -198,6 +198,7 @@ const ChatList: FC<{ collapsed?: boolean }> = ({ collapsed }) => {
   const clearSessionState = useChatStore((state) => state.clearSessionState);
 
   const router = useRouter();
+  const { projectId } = useParams<{ projectId: string }>();
 
   useEffect(() => {
     void fetchSessions();
@@ -205,7 +206,7 @@ const ChatList: FC<{ collapsed?: boolean }> = ({ collapsed }) => {
 
   const handleSelect = (session: SessionSummary) => {
     setActiveSession({ sessionId: session.sessionId });
-    router.push(`/${session.sessionId}`);
+    router.push(`/${projectId}/${session.sessionId}`);
   };
 
   const [renamingSession, setRenamingSession] = useState<SessionSummary | null>(null);
@@ -233,7 +234,7 @@ const ChatList: FC<{ collapsed?: boolean }> = ({ collapsed }) => {
     if (activeSession?.sessionId === sessionId) {
       clearSessionState(activeSession);
       setActiveSession(null);
-      router.push('/');
+      router.push(`/${projectId}`);
     }
   };
 
@@ -486,6 +487,7 @@ function SidebarComponent() {
   const setActiveSession = useChatStore((state) => state.setActiveSession);
   const [isHovered, setIsHovered] = useState(false);
   const router = useRouter();
+  const { projectId } = useParams<{ projectId: string }>();
 
   const logoSrc = theme === 'dark' ? '/logo-light.png' : '/logo-dark.png';
   const showToggleIcon = isSidebarCollapsed && isHovered;
@@ -548,7 +550,7 @@ function SidebarComponent() {
           shortcut="⇧⌘O"
           onClick={() => {
             setActiveSession(null);
-            router.push('/');
+            router.push(`/${projectId}`);
           }}
           collapsed={isSidebarCollapsed}
         />
