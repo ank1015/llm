@@ -36,19 +36,26 @@ function PromptInputWithActions() {
   const [input, setInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  const { projectId, artifactId } = useParams<{ projectId: string; artifactId: string }>();
+  const { projectId, artifactId, threadId } = useParams<{
+    projectId: string;
+    artifactId: string;
+    threadId?: string;
+  }>();
 
   const ctx = { projectId, artifactId };
 
-  const activeSession = useChatStore((state) => state.activeSession);
+  // Use threadId from URL as the source of truth — the store's activeSession
+  // can be stale when navigating between artifacts.
+  const currentSession: SessionRef | null = threadId ? { sessionId: threadId } : null;
+
   const startStream = useChatStore((state) => state.startStream);
   const abortStream = useChatStore((state) => state.abortStream);
   const loadMessages = useChatStore((state) => state.loadMessages);
   const setActiveSession = useChatStore((state) => state.setActiveSession);
 
   const isStreaming = useChatStore((state) => {
-    if (!activeSession) return false;
-    return state.isStreamingBySession[activeSession.sessionId] ?? false;
+    if (!currentSession) return false;
+    return state.isStreamingBySession[currentSession.sessionId] ?? false;
   });
 
   const createSession = useSessionsStore((state) => state.createSession);
@@ -61,7 +68,7 @@ function PromptInputWithActions() {
     setError(null);
 
     try {
-      let session: SessionRef | undefined = activeSession ?? undefined;
+      let session: SessionRef | undefined = currentSession ?? undefined;
 
       if (!session) {
         const created = await createSession(ctx, { sessionName: 'New chat' });
@@ -103,8 +110,8 @@ function PromptInputWithActions() {
   };
 
   const handleStop = () => {
-    if (activeSession) {
-      abortStream(activeSession);
+    if (currentSession) {
+      abortStream(currentSession);
     }
   };
 
