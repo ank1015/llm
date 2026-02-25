@@ -11,6 +11,11 @@ import {
   renameSession as renameSessionApi,
 } from '@/lib/client-api';
 
+type ArtifactContext = {
+  projectId: string;
+  artifactId: string;
+};
+
 type SessionsStoreState = {
   sessions: SessionSummary[];
   isLoading: boolean;
@@ -21,11 +26,17 @@ type SessionsStoreState = {
   deletingSessionId: string | null;
   mutationError: string | null;
   clearMutationError: () => void;
-  fetchSessions: () => Promise<void>;
-  refresh: () => Promise<void>;
-  createSession: (input?: { sessionName?: string }) => Promise<{ sessionId: string }>;
-  renameSession: (input: { sessionId: string; sessionName: string }) => Promise<void>;
-  deleteSession: (sessionId: string) => Promise<void>;
+  fetchSessions: (ctx: ArtifactContext) => Promise<void>;
+  refresh: (ctx: ArtifactContext) => Promise<void>;
+  createSession: (
+    ctx: ArtifactContext,
+    input?: { sessionName?: string }
+  ) => Promise<{ sessionId: string }>;
+  renameSession: (
+    ctx: ArtifactContext,
+    input: { sessionId: string; sessionName: string }
+  ) => Promise<void>;
+  deleteSession: (ctx: ArtifactContext, sessionId: string) => Promise<void>;
   reset: () => void;
   optimisticRenameSession: (sessionId: string, sessionName: string) => void;
   optimisticRemoveSession: (sessionId: string) => void;
@@ -60,7 +71,7 @@ export const useSessionsStore = create<SessionsStoreState>((set, get) => ({
     set({ mutationError: null });
   },
 
-  fetchSessions: async () => {
+  fetchSessions: async (ctx) => {
     const requestId = ++latestRequestId;
 
     set({
@@ -70,7 +81,7 @@ export const useSessionsStore = create<SessionsStoreState>((set, get) => ({
     });
 
     try {
-      const sessions = await listSessions();
+      const sessions = await listSessions(ctx);
 
       if (requestId !== latestRequestId) {
         return;
@@ -92,7 +103,7 @@ export const useSessionsStore = create<SessionsStoreState>((set, get) => ({
     }
   },
 
-  refresh: async () => {
+  refresh: async (ctx) => {
     const requestId = ++latestRequestId;
 
     set({
@@ -101,7 +112,7 @@ export const useSessionsStore = create<SessionsStoreState>((set, get) => ({
     });
 
     try {
-      const sessions = await listSessions();
+      const sessions = await listSessions(ctx);
 
       if (requestId !== latestRequestId) {
         return;
@@ -123,18 +134,18 @@ export const useSessionsStore = create<SessionsStoreState>((set, get) => ({
     }
   },
 
-  createSession: async (input) => {
+  createSession: async (ctx, input) => {
     set({
       isCreating: true,
       mutationError: null,
     });
 
     try {
-      const metadata = await createSessionApi({
+      const metadata = await createSessionApi(ctx, {
         name: input?.sessionName,
       });
 
-      await get().refresh();
+      await get().refresh(ctx);
 
       return {
         sessionId: metadata.id,
@@ -148,7 +159,7 @@ export const useSessionsStore = create<SessionsStoreState>((set, get) => ({
     }
   },
 
-  renameSession: async ({ sessionId, sessionName }) => {
+  renameSession: async (ctx, { sessionId, sessionName }) => {
     const trimmedName = sessionName.trim();
     if (trimmedName.length === 0) {
       throw new Error('Session name cannot be empty.');
@@ -165,7 +176,7 @@ export const useSessionsStore = create<SessionsStoreState>((set, get) => ({
     get().optimisticRenameSession(sessionId, trimmedName);
 
     try {
-      await renameSessionApi({
+      await renameSessionApi(ctx, {
         sessionId,
         name: trimmedName,
       });
@@ -185,7 +196,7 @@ export const useSessionsStore = create<SessionsStoreState>((set, get) => ({
     }
   },
 
-  deleteSession: async (sessionId) => {
+  deleteSession: async (ctx, sessionId) => {
     const hadSession = get().sessions.some((session) => session.sessionId === sessionId);
 
     set({
@@ -198,14 +209,14 @@ export const useSessionsStore = create<SessionsStoreState>((set, get) => ({
     }
 
     try {
-      await deleteSessionApi(sessionId);
+      await deleteSessionApi(ctx, sessionId);
     } catch (error) {
       set({
         mutationError: getErrorMessage(error),
       });
 
       if (hadSession) {
-        await get().refresh();
+        await get().refresh(ctx);
       }
 
       throw error;

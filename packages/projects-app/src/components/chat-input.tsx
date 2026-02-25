@@ -38,6 +38,8 @@ function PromptInputWithActions() {
   const router = useRouter();
   const { projectId, artifactId } = useParams<{ projectId: string; artifactId: string }>();
 
+  const ctx = { projectId, artifactId };
+
   const activeSession = useChatStore((state) => state.activeSession);
   const startStream = useChatStore((state) => state.startStream);
   const abortStream = useChatStore((state) => state.abortStream);
@@ -62,14 +64,14 @@ function PromptInputWithActions() {
       let session: SessionRef | undefined = activeSession ?? undefined;
 
       if (!session) {
-        const created = await createSession({ sessionName: 'New chat' });
+        const created = await createSession(ctx, { sessionName: 'New chat' });
         const ref: SessionRef = { sessionId: created.sessionId };
         setActiveSession(ref);
         router.push(`/${projectId}/${artifactId}/${created.sessionId}`);
-        await loadMessages({ session: ref, force: true });
+        await loadMessages({ session: ref, projectId, artifactId, force: true });
         session = ref;
 
-        void generateSessionName({
+        void generateSessionName(ctx, {
           sessionId: created.sessionId,
           query: trimmed,
         })
@@ -90,6 +92,8 @@ function PromptInputWithActions() {
       await startStream({
         sessionId: session.sessionId,
         prompt: trimmed,
+        projectId,
+        artifactId,
       });
     } catch (err) {
       if (isAbortError(err)) return;

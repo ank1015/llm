@@ -2,14 +2,18 @@
 import {
   ChevronDown,
   ChevronsDownUp,
+  Ellipsis,
   Folder,
   FolderPlus,
   LifeBuoy,
   LogOut,
+  MessageSquarePlus,
   PanelLeft,
+  Pencil,
   Settings,
   Smile,
   SparklesIcon,
+  Trash2,
 } from 'lucide-react';
 import Image from 'next/image';
 import { useParams, useRouter } from 'next/navigation';
@@ -98,9 +102,10 @@ const SessionItem: FC<{
 const ArtifactGroup: FC<{
   artifact: ArtifactDirWithSessions;
   projectId: string;
-  activeSessionId: string | null;
+  activeArtifactId: string | null;
+  urlThreadId: string | null;
   defaultExpanded?: boolean;
-}> = ({ artifact, projectId, activeSessionId, defaultExpanded = false }) => {
+}> = ({ artifact, projectId, activeArtifactId, urlThreadId, defaultExpanded = false }) => {
   const router = useRouter();
   const setActiveSession = useChatStore((state) => state.setActiveSession);
   const [isCollapsed, setIsCollapsed] = useState(!defaultExpanded);
@@ -116,12 +121,23 @@ const ArtifactGroup: FC<{
     router.push(`/${projectId}/${artifact.id}/${session.sessionId}`);
   };
 
+  // Artifact row is highlighted only when on the artifact page (no thread in URL)
+  const isActive = activeArtifactId === artifact.id && !urlThreadId;
+
   return (
     <div>
-      <div className="group flex w-full items-center gap-1 whitespace-nowrap rounded-lg py-1.5 pl-2 pr-1 hover:bg-home-hover">
+      <div
+        className={cn(
+          'group flex w-full items-center gap-1 whitespace-nowrap rounded-lg py-1.5 pl-2 pr-1 hover:bg-home-hover',
+          isActive && 'bg-home-hover'
+        )}
+      >
         <div className="flex flex-1 cursor-pointer items-center gap-2 overflow-hidden">
           <button
-            onClick={() => setIsCollapsed(!isCollapsed)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsCollapsed(!isCollapsed);
+            }}
             className="relative flex h-4 w-4 shrink-0 items-center justify-center"
           >
             <Folder
@@ -139,20 +155,55 @@ const ArtifactGroup: FC<{
             />
           </button>
           <button
-            onClick={() => setIsCollapsed(!isCollapsed)}
+            onClick={() => router.push(`/${projectId}/${artifact.id}`)}
             className="flex-1 cursor-pointer truncate text-left"
           >
             <span className="text-foreground truncate text-[14px]">{artifact.name}</span>
           </button>
         </div>
+
+        {/* Hover actions: new thread + menu */}
+        <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              router.push(`/${projectId}/${artifact.id}`);
+            }}
+            className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-foreground/10 hover:text-foreground"
+            title="New thread"
+          >
+            <MessageSquarePlus size={14} strokeWidth={1.8} />
+          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                onClick={(e) => e.stopPropagation()}
+                className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-foreground/10 hover:text-foreground"
+              >
+                <Ellipsis size={14} strokeWidth={1.8} />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent side="right" align="start" className="w-[160px]">
+              <DropdownMenuItem>
+                <Pencil size={14} />
+                Rename
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="text-red-500 focus:text-red-500">
+                <Trash2 size={14} />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
       {!isCollapsed && artifact.sessions.length > 0 && (
-        <div className="flex flex-col gap-0.5">
+        <div className="mt-1 flex flex-col gap-1">
           {artifact.sessions.map((session) => (
             <SessionItem
               key={session.sessionId}
               session={session}
-              isActive={activeSessionId === session.sessionId}
+              isActive={urlThreadId === session.sessionId}
               onSelect={handleSessionSelect}
             />
           ))}
@@ -170,13 +221,18 @@ const ArtifactGroup: FC<{
 // ---------------------------------------------------------------------------
 
 const ArtifactList: FC<{ collapsed?: boolean }> = ({ collapsed }) => {
-  const { projectId, id } = useParams<{ projectId: string; id: string }>();
+  const {
+    projectId,
+    artifactId: urlArtifactId,
+    threadId: urlThreadId,
+  } = useParams<{
+    projectId: string;
+    artifactId?: string;
+    threadId?: string;
+  }>();
   const [artifactDirs, setArtifactDirs] = useState<ArtifactDirWithSessions[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [collapseAllKey, setCollapseAllKey] = useState(0);
-
-  const activeSession = useChatStore((state) => state.activeSession);
-  const activeSessionId = activeSession?.sessionId ?? id ?? null;
 
   useEffect(() => {
     if (!projectId) return;
@@ -195,11 +251,7 @@ const ArtifactList: FC<{ collapsed?: boolean }> = ({ collapsed }) => {
 
   const handleCollapseAll = () => setCollapseAllKey((k) => k + 1);
 
-  // Determine which artifact contains the active session for auto-expand
-  const activeArtifactId = activeSessionId
-    ? (artifactDirs.find((dir) => dir.sessions.some((s) => s.sessionId === activeSessionId))?.id ??
-      null)
-    : null;
+  const activeArtifactId = urlArtifactId ?? null;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -230,8 +282,8 @@ const ArtifactList: FC<{ collapsed?: boolean }> = ({ collapsed }) => {
             <ArtifactListInner
               artifactDirs={artifactDirs}
               projectId={projectId}
-              activeSessionId={activeSessionId}
-              activeArtifactId={activeArtifactId}
+              activeArtifactId={activeArtifactId ?? null}
+              urlThreadId={urlThreadId ?? null}
               collapseAllKey={collapseAllKey}
             />
           )}
@@ -244,10 +296,10 @@ const ArtifactList: FC<{ collapsed?: boolean }> = ({ collapsed }) => {
 const ArtifactListInner: FC<{
   artifactDirs: ArtifactDirWithSessions[];
   projectId: string;
-  activeSessionId: string | null;
   activeArtifactId: string | null;
+  urlThreadId: string | null;
   collapseAllKey: number;
-}> = ({ artifactDirs, projectId, activeSessionId, activeArtifactId, collapseAllKey }) => {
+}> = ({ artifactDirs, projectId, activeArtifactId, urlThreadId, collapseAllKey }) => {
   // Track collapse-all resets
   const [prevKey, setPrevKey] = useState(collapseAllKey);
   const [forceCollapseKey, setForceCollapseKey] = useState(0);
@@ -264,7 +316,8 @@ const ArtifactListInner: FC<{
           key={`${artifact.id}-${forceCollapseKey}`}
           artifact={artifact}
           projectId={projectId}
-          activeSessionId={activeSessionId}
+          activeArtifactId={activeArtifactId}
+          urlThreadId={urlThreadId}
           defaultExpanded={activeArtifactId === artifact.id}
         />
       ))}

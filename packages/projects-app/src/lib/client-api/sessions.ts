@@ -3,16 +3,26 @@ import { apiRequestJson, SERVER_BASE } from './http';
 import type { SessionMetadata } from '@/lib/contracts';
 import type { SessionSummary } from '@ank1015/llm-sdk';
 
-const SESSIONS_BASE = `${SERVER_BASE}/api/projects/test1/artifacts/research/sessions`;
+type ArtifactContext = {
+  projectId: string;
+  artifactId: string;
+};
 
-export async function listSessions(): Promise<SessionSummary[]> {
-  return apiRequestJson<SessionSummary[]>(SESSIONS_BASE, {
+function buildSessionsBase(ctx: ArtifactContext): string {
+  return `${SERVER_BASE}/api/projects/${encodeURIComponent(ctx.projectId)}/artifacts/${encodeURIComponent(ctx.artifactId)}/sessions`;
+}
+
+export async function listSessions(ctx: ArtifactContext): Promise<SessionSummary[]> {
+  return apiRequestJson<SessionSummary[]>(buildSessionsBase(ctx), {
     method: 'GET',
   });
 }
 
-export async function createSession(input: { name?: string }): Promise<SessionMetadata> {
-  return apiRequestJson<SessionMetadata>(SESSIONS_BASE, {
+export async function createSession(
+  ctx: ArtifactContext,
+  input: { name?: string }
+): Promise<SessionMetadata> {
+  return apiRequestJson<SessionMetadata>(buildSessionsBase(ctx), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -23,32 +33,36 @@ export async function createSession(input: { name?: string }): Promise<SessionMe
   });
 }
 
-export async function renameSession(input: {
-  sessionId: string;
-  name: string;
-}): Promise<{ ok: true; sessionId: string; sessionName: string }> {
-  return apiRequestJson(`${SESSIONS_BASE}/${encodeURIComponent(input.sessionId)}/name`, {
+export async function renameSession(
+  ctx: ArtifactContext,
+  input: { sessionId: string; name: string }
+): Promise<{ ok: true; sessionId: string; sessionName: string }> {
+  return apiRequestJson(`${buildSessionsBase(ctx)}/${encodeURIComponent(input.sessionId)}/name`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name: input.name }),
   });
 }
 
-export async function generateSessionName(input: {
-  sessionId: string;
-  query: string;
-}): Promise<{ ok: true; sessionId: string; sessionName: string }> {
-  return apiRequestJson(`${SESSIONS_BASE}/${encodeURIComponent(input.sessionId)}/generate-name`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query: input.query }),
-  });
+export async function generateSessionName(
+  ctx: ArtifactContext,
+  input: { sessionId: string; query: string }
+): Promise<{ ok: true; sessionId: string; sessionName: string }> {
+  return apiRequestJson(
+    `${buildSessionsBase(ctx)}/${encodeURIComponent(input.sessionId)}/generate-name`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: input.query }),
+    }
+  );
 }
 
 export async function deleteSession(
+  ctx: ArtifactContext,
   sessionId: string
 ): Promise<{ ok: true; sessionId: string; deleted: boolean }> {
-  return apiRequestJson(`${SESSIONS_BASE}/${encodeURIComponent(sessionId)}`, {
+  return apiRequestJson(`${buildSessionsBase(ctx)}/${encodeURIComponent(sessionId)}`, {
     method: 'DELETE',
   });
 }

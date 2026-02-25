@@ -34,8 +34,18 @@ type ChatStoreState = {
   setActiveSession: (session: SessionRef | null) => void;
   clearSessionState: (session: SessionRef) => void;
   clearSessionError: (session: SessionRef) => void;
-  loadMessages: (options?: { session?: SessionRef; force?: boolean }) => Promise<void>;
-  startStream: (input: { sessionId: string; prompt: string }) => Promise<void>;
+  loadMessages: (options?: {
+    session?: SessionRef;
+    projectId?: string;
+    artifactId?: string;
+    force?: boolean;
+  }) => Promise<void>;
+  startStream: (input: {
+    sessionId: string;
+    prompt: string;
+    projectId: string;
+    artifactId: string;
+  }) => Promise<void>;
   abortStream: (session: SessionRef) => void;
 };
 
@@ -311,7 +321,8 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     }));
 
     try {
-      const messages = await getSessionMessages(session.sessionId);
+      const ctx = { projectId: options?.projectId ?? '', artifactId: options?.artifactId ?? '' };
+      const messages = await getSessionMessages(ctx, session.sessionId);
 
       if ((messageLoadRequestIds.get(key) ?? 0) !== nextRequestId) {
         return;
@@ -387,7 +398,12 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
 
     try {
       await streamConversation(
-        { sessionId: input.sessionId, message: prompt },
+        {
+          sessionId: input.sessionId,
+          message: prompt,
+          projectId: input.projectId,
+          artifactId: input.artifactId,
+        },
         {
           onEvent: (eventName, data) => {
             if (eventName === 'agent_event') {
@@ -467,7 +483,12 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
         controller.signal
       );
 
-      await get().loadMessages({ session, force: true });
+      await get().loadMessages({
+        session,
+        projectId: input.projectId,
+        artifactId: input.artifactId,
+        force: true,
+      });
 
       set((state) => ({
         pendingPromptsBySession: removePendingPrompt(

@@ -3,14 +3,21 @@ import { apiRequestJson, SERVER_BASE } from './http';
 import type { StreamEventMap, StreamEventName } from '@/lib/contracts';
 import type { MessageNode } from '@ank1015/llm-sdk';
 
-const SESSIONS_BASE = `${SERVER_BASE}/api/projects/test1/artifacts/research/sessions`;
+type ArtifactContext = {
+  projectId: string;
+  artifactId: string;
+};
 
-function buildMessagesPath(sessionId: string): string {
-  return `${SESSIONS_BASE}/${encodeURIComponent(sessionId)}/messages`;
+function buildSessionsBase(ctx: ArtifactContext): string {
+  return `${SERVER_BASE}/api/projects/${encodeURIComponent(ctx.projectId)}/artifacts/${encodeURIComponent(ctx.artifactId)}/sessions`;
 }
 
-function buildStreamPath(sessionId: string): string {
-  return `${SESSIONS_BASE}/${encodeURIComponent(sessionId)}/stream`;
+function buildMessagesPath(ctx: ArtifactContext, sessionId: string): string {
+  return `${buildSessionsBase(ctx)}/${encodeURIComponent(sessionId)}/messages`;
+}
+
+function buildStreamPath(ctx: ArtifactContext, sessionId: string): string {
+  return `${buildSessionsBase(ctx)}/${encodeURIComponent(sessionId)}/stream`;
 }
 
 type SseParsedEvent = {
@@ -68,8 +75,11 @@ function normalizeSseChunk(value: string): string {
   return value.replaceAll('\r\n', '\n');
 }
 
-export async function getSessionMessages(sessionId: string): Promise<MessageNode[]> {
-  return apiRequestJson<MessageNode[]>(buildMessagesPath(sessionId), {
+export async function getSessionMessages(
+  ctx: ArtifactContext,
+  sessionId: string
+): Promise<MessageNode[]> {
+  return apiRequestJson<MessageNode[]>(buildMessagesPath(ctx, sessionId), {
     method: 'GET',
   });
 }
@@ -81,7 +91,7 @@ export type StreamHandlers = {
   ) => void;
 };
 
-export type StreamRequest = {
+export type StreamRequest = ArtifactContext & {
   sessionId: string;
   message: string;
 };
@@ -92,7 +102,8 @@ export async function streamConversation(
   handlers: StreamHandlers = {},
   signal?: AbortSignal
 ): Promise<void> {
-  const response = await fetch(buildStreamPath(request.sessionId), {
+  const ctx: ArtifactContext = { projectId: request.projectId, artifactId: request.artifactId };
+  const response = await fetch(buildStreamPath(ctx, request.sessionId), {
     method: 'POST',
     headers: {
       Accept: 'text/event-stream',

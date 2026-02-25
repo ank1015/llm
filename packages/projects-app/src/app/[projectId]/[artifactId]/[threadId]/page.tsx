@@ -8,7 +8,11 @@ import { ChatMessages } from '@/components/chat-messages';
 import { useChatStore } from '@/stores/chat-store';
 
 export default function ConversationPage() {
-  const { threadId } = useParams<{ projectId: string; artifactId: string; threadId: string }>();
+  const { projectId, artifactId, threadId } = useParams<{
+    projectId: string;
+    artifactId: string;
+    threadId: string;
+  }>();
   const activeSession = useChatStore((state) => state.activeSession);
   const setActiveSession = useChatStore((state) => state.setActiveSession);
   const loadMessages = useChatStore((state) => state.loadMessages);
@@ -28,7 +32,7 @@ export default function ConversationPage() {
       setActiveSession(ref);
     }
 
-    void loadMessages({ session: ref });
+    void loadMessages({ session: ref, projectId, artifactId });
   }, [threadId]);
 
   return (
