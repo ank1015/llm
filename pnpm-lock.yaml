@@ -47,6 +47,9 @@ importers:
 
   packages/agents:
     dependencies:
+      '@ank1015/llm-extension':
+        specifier: workspace:^
+        version: link:../extension
       '@ank1015/llm-sdk':
         specifier: workspace:^
         version: link:../sdk
