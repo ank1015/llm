@@ -6,6 +6,22 @@ export {
   type DownloadToolOptions,
 } from './download.js';
 export {
+  createInspectTool,
+  type InspectBBox,
+  type InspectFormSummary,
+  type InspectInteractiveElement,
+  type InspectLocator,
+  type InspectOperations,
+  type InspectPageInfo,
+  type InspectPageSummary,
+  type InspectTab,
+  type InspectTextBlock,
+  type InspectToolDetails,
+  type InspectToolInput,
+  type InspectToolOptions,
+  type InspectTruncation,
+} from './inspect.js';
+export {
   createNavigationTool,
   type NavigationAction,
   type NavigationToolDetails,
