@@ -16,6 +16,14 @@ Agent toolkit package for the LLM monorepo.
 ```
 src/
   index.ts              — Public exports
+  tools/
+    index.ts            — Tool exports and shared entrypoint
+    browser/
+      search.ts         — Web search tool
+    file-system/
+      index.ts          — File-system tool exports and factories
+      *.ts              — File-system tools (read, write, edit, bash, grep, find, ls)
+      utils/            — Shared file-system tool utilities
 tests/
   unit/
     index.test.ts       — Unit smoke tests

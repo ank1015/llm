@@ -4,6 +4,13 @@ import { stdin as input, stdout as output } from 'node:process';
 import { createInterface } from 'node:readline/promises';
 
 import {
+  createBashTool,
+  createEditTool,
+  createReadTool,
+  createWriteTool,
+  searchTool,
+} from '@ank1015/llm-agents';
+import {
   Conversation,
   createSessionManager,
   getModel,
@@ -11,12 +18,6 @@ import {
   KnownApis,
 } from '@ank1015/llm-sdk';
 import { createFileKeysAdapter, createFileSessionsAdapter } from '@ank1015/llm-sdk-adapters';
-
-import { createBashTool } from './core/tools/bash.js';
-import { createEditTool } from './core/tools/edit.js';
-import { createReadTool } from './core/tools/read.js';
-import { searchTool } from './core/tools/search.js';
-import { createWriteTool } from './core/tools/write.js';
 
 import type { CodexProviderOptions } from '../../types/dist/providers/codex.js';
 import type {

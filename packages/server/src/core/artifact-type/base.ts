@@ -1,4 +1,4 @@
-import { createAllTools } from '../tools/index.js';
+import { createAllTools } from '@ank1015/llm-agents';
 
 import { formatSkillsForPrompt } from './utils.js';
 

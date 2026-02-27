@@ -1,8 +1,8 @@
 import { createBaseSystemPrompt, baseTools } from './base.js';
 
 import type { Skill } from './utils.js';
-import type { Tool, ToolName, ToolsOptions } from '../tools/index.js';
 import type { ArtifactType } from '../types.js';
+import type { Tool, ToolName, ToolsOptions } from '@ank1015/llm-agents';
 
 /** Arguments passed to the system prompt factory */
 export interface SystemPromptContext {
