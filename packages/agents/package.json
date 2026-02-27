@@ -1,0 +1,38 @@
+{
+  "name": "@ank1015/llm-agents",
+  "version": "0.0.1",
+  "description": "Agent toolkit for the LLM SDK",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "typecheck": "tsc --noEmit",
+    "lint": "echo 'No linter configured yet'",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "keywords": [
+    "llm",
+    "agents",
+    "sdk",
+    "ai"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "vitest": "^2.1.0"
+  }
+}
