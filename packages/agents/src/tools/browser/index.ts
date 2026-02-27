@@ -1,4 +1,15 @@
 export {
+  createActTool,
+  type ActAction,
+  type ActElementSummary,
+  type ActOperations,
+  type ActTab,
+  type ActTarget,
+  type ActToolDetails,
+  type ActToolInput,
+  type ActToolOptions,
+} from './act.js';
+export {
   createDownloadTool,
   type DownloadOperations,
   type DownloadToolDetails,
