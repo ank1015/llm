@@ -1,7 +1,10 @@
 import { connect, type ConnectOptions } from '@ank1015/llm-extension';
 import { type Static, Type } from '@sinclair/typebox';
 
+import { createInspectTool, type InspectInteractiveElement } from './inspect.js';
+
 import type { AgentTool } from '@ank1015/llm-sdk';
+
 
 const actActionSchema = Type.Union([
   Type.Literal('click'),
@@ -26,7 +29,12 @@ const targetLocatorSchema = Type.Object({
 
 const targetObjectSchema = Type.Object({
   selector: Type.Optional(Type.String({ description: 'CSS selector' })),
-  id: Type.Optional(Type.String({ description: 'Element id without # prefix' })),
+  id: Type.Optional(
+    Type.String({
+      description:
+        'Element id without # prefix. If this is the only target field and value looks like E<number>, it resolves using inspect_page element ids.',
+    })
+  ),
   testId: Type.Optional(Type.String({ description: 'data-testid or similar test id value' })),
   name: Type.Optional(Type.String({ description: 'Element name attribute' })),
   role: Type.Optional(Type.String({ description: 'ARIA role, e.g. button, link' })),
@@ -62,7 +70,12 @@ const actSchema = Type.Object({
   ),
   type: actActionSchema,
   target: Type.Optional(
-    Type.Union([Type.String({ description: 'Target CSS selector' }), targetObjectSchema])
+    Type.Union([
+      Type.String({
+        description: 'Target CSS selector or inspect_page element id (for example: E1).',
+      }),
+      targetObjectSchema,
+    ])
   ),
   value: Type.Optional(
     Type.Union([
@@ -105,7 +118,8 @@ const actSchema = Type.Object({
 });
 
 export type ActToolInput = Static<typeof actSchema>;
-export type ActTarget = Static<typeof targetObjectSchema> | string;
+type ActTargetObject = Static<typeof targetObjectSchema>;
+export type ActTarget = ActTargetObject | string;
 
 interface ChromeTab {
   id?: number;
@@ -198,6 +212,7 @@ interface DebuggerEvaluateResult {
 }
 
 const DEFAULT_WAIT_FOR_NAV_MS = 3000;
+const INSPECT_ELEMENT_ID_PATTERN = /^E\d+$/u;
 
 function createDefaultGetClient(connectOptions?: ConnectOptions): () => Promise<ActChromeClient> {
   let clientPromise: Promise<ActChromeClient> | undefined;
@@ -333,6 +348,134 @@ function validateInput(input: ActToolInput): void {
       throw new Error('Action "scroll" value must be a number or object');
     }
   }
+}
+
+function normalizeInspectElementId(value: string): string | undefined {
+  const normalized = value.trim().toUpperCase();
+  if (!INSPECT_ELEMENT_ID_PATTERN.test(normalized)) {
+    return undefined;
+  }
+  return normalized;
+}
+
+function hasOnlyIdTargetField(target: ActTargetObject): boolean {
+  return (
+    target.selector === undefined &&
+    target.testId === undefined &&
+    target.name === undefined &&
+    target.role === undefined &&
+    target.text === undefined &&
+    target.href === undefined &&
+    target.index === undefined &&
+    target.locator === undefined
+  );
+}
+
+function getInspectElementIdFromTarget(target: ActTarget | undefined): string | undefined {
+  if (typeof target === 'string') {
+    return normalizeInspectElementId(target);
+  }
+
+  if (!target || typeof target !== 'object') {
+    return undefined;
+  }
+
+  if (!hasOnlyIdTargetField(target)) {
+    return undefined;
+  }
+
+  if (typeof target.id !== 'string') {
+    return undefined;
+  }
+
+  return normalizeInspectElementId(target.id);
+}
+
+function parseInspectInteractiveElements(details: unknown): InspectInteractiveElement[] {
+  if (!isObject(details) || !Array.isArray(details.interactive)) {
+    throw new Error('inspect_page did not return interactive elements');
+  }
+
+  return details.interactive.filter((element): element is InspectInteractiveElement => {
+    return isObject(element) && typeof element.id === 'string' && isObject(element.locator);
+  });
+}
+
+function toTargetFromInspectElement(element: InspectInteractiveElement): ActTargetObject {
+  const target: ActTargetObject = {};
+
+  if (element.locator.cssPath) {
+    target.selector = element.locator.cssPath;
+  }
+  if (element.locator.id) {
+    target.id = element.locator.id;
+  }
+  if (element.locator.testId) {
+    target.testId = element.locator.testId;
+  }
+  if (element.locator.name) {
+    target.name = element.locator.name;
+  }
+  const role = element.role || element.locator.role;
+  if (role) {
+    target.role = role;
+  }
+  if (element.name) {
+    target.text = element.name;
+  }
+  if (element.href) {
+    target.href = element.href;
+  }
+
+  const locator: ActTargetObject['locator'] = {};
+  if (element.locator.id) {
+    locator.id = element.locator.id;
+  }
+  if (element.locator.testId) {
+    locator.testId = element.locator.testId;
+  }
+  if (element.locator.name) {
+    locator.name = element.locator.name;
+  }
+  if (element.locator.role) {
+    locator.role = element.locator.role;
+  }
+  if (element.locator.cssPath) {
+    locator.cssPath = element.locator.cssPath;
+  }
+  if (Object.keys(locator).length > 0) {
+    target.locator = locator;
+  }
+
+  if (Object.keys(target).length === 0) {
+    target.text = element.id;
+  }
+
+  return target;
+}
+
+async function resolveTargetFromInspectElementId(
+  inspectTool: ReturnType<typeof createInspectTool>,
+  toolCallId: string,
+  tabId: number,
+  target: ActTarget | undefined
+): Promise<ActTarget | undefined> {
+  const inspectElementId = getInspectElementIdFromTarget(target);
+  if (!inspectElementId) {
+    return target;
+  }
+
+  const inspectResult = await inspectTool.execute(`${toolCallId}:inspect`, { tabId });
+  const interactive = parseInspectInteractiveElements(inspectResult.details);
+  const mapped = interactive.find((element) => element.id.toUpperCase() === inspectElementId);
+
+  if (!mapped) {
+    throw new Error(
+      `Element id "${inspectElementId}" was not found in inspect_page snapshot for tab ${tabId}`
+    );
+  }
+
+  return toTargetFromInspectElement(mapped);
 }
 
 function buildActScript(payload: ActPayload): string {
@@ -1030,12 +1173,18 @@ export function createActTool(options: ActToolOptions): AgentTool<typeof actSche
 
   const windowId = options.windowId;
   const getClient = options.operations?.getClient ?? createDefaultGetClient(options.connectOptions);
+  const inspectTool = createInspectTool({
+    windowId,
+    operations: {
+      getClient,
+    },
+  });
 
   return {
     name: 'act',
     label: 'act',
     description:
-      'Perform browser actions on page elements. Supports click, type, clear, pressEnter, select, scroll, hover, and focus.',
+      'Perform browser actions on page elements. Supports click, type, clear, pressEnter, select, scroll, hover, and focus. Target can be CSS/locator fields or inspect_page ids like E1.',
     parameters: actSchema,
     execute: async (_toolCallId: string, input: ActToolInput) => {
       validateInput(input);
@@ -1052,13 +1201,20 @@ export function createActTool(options: ActToolOptions): AgentTool<typeof actSche
       await callChrome<ChromeTab>(client, 'tabs.update', targetTabId, { active: true });
       await callChrome<unknown>(client, 'windows.update', windowId, { focused: true });
 
+      const resolvedTarget = await resolveTargetFromInspectElementId(
+        inspectTool,
+        _toolCallId,
+        targetTabId,
+        input.target
+      );
+
       const payloadBase: ActPayload = {
         type: input.type,
         opts: normalizedOptions,
       };
       const payload: ActPayload = {
         ...payloadBase,
-        ...(input.target !== undefined ? { target: input.target } : {}),
+        ...(resolvedTarget !== undefined ? { target: resolvedTarget } : {}),
         ...(input.value !== undefined ? { value: input.value } : {}),
       };
 

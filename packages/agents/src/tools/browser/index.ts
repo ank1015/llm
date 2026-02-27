@@ -17,6 +17,17 @@ export {
   type DownloadToolOptions,
 } from './download.js';
 export {
+  createExtractTool,
+  type ExtractKind,
+  type ExtractLink,
+  type ExtractOperations,
+  type ExtractTab,
+  type ExtractToolDetails,
+  type ExtractToolInput,
+  type ExtractToolOptions,
+  type ExtractWhatInput,
+} from './extract.js';
+export {
   createInspectTool,
   type InspectBBox,
   type InspectFormSummary,

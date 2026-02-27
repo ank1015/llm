@@ -114,6 +114,151 @@ describe('createActTool', () => {
     expect(result.content[0]?.content).toContain('Result: Clicked target element');
   });
 
+  it('resolves inspect_page element ids before acting', async () => {
+    let evaluateCalls = 0;
+
+    const call = vi.fn(async (method: string, ...args: unknown[]) => {
+      if (method === 'tabs.query') {
+        const query = args[0] as { active?: boolean; windowId?: number };
+        if (query.active && query.windowId === 7001) {
+          return [
+            {
+              id: 33,
+              url: 'https://example.com/login',
+              title: 'Login',
+              windowId: 7001,
+              active: true,
+            },
+          ];
+        }
+      }
+
+      if (method === 'tabs.update') {
+        return {
+          id: 33,
+          url: 'https://example.com/login',
+          title: 'Login',
+          windowId: 7001,
+          active: true,
+        };
+      }
+
+      if (method === 'windows.update') {
+        return { id: 7001, focused: true };
+      }
+
+      if (method === 'debugger.evaluate') {
+        const payload = args[0] as { tabId?: number; code?: string };
+        expect(payload.tabId).toBe(33);
+        evaluateCalls += 1;
+
+        if (evaluateCalls === 1) {
+          return {
+            result: {
+              page: {
+                url: 'https://example.com/login',
+                title: 'Login',
+                lang: 'en',
+                capturedAt: '2026-02-27T12:00:00.000Z',
+                viewport: { width: 1440, height: 900 },
+                scroll: { x: 0, y: 0, maxY: 1200 },
+              },
+              summary: {
+                interactiveCount: 1,
+                totalInteractiveCount: 1,
+                textBlockCount: 0,
+                totalTextBlockCount: 0,
+                formCount: 0,
+                alertCount: 0,
+                totalLinks: 0,
+                totalButtons: 1,
+                totalInputs: 0,
+              },
+              interactive: [
+                {
+                  id: 'E1',
+                  tag: 'button',
+                  role: '',
+                  name: 'Sign in',
+                  actions: ['click'],
+                  state: [],
+                  locator: { id: 'submit', cssPath: '#submit' },
+                  bbox: { x: 100, y: 200, width: 100, height: 40 },
+                },
+              ],
+              textBlocks: [],
+              forms: [],
+              alerts: [],
+              truncation: {
+                interactive: false,
+                textBlocks: false,
+                hiddenFilteredCount: 0,
+                offscreenFilteredCount: 0,
+              },
+              warnings: [],
+            },
+          };
+        }
+
+        expect(typeof payload.code).toBe('string');
+        expect(payload.code).toContain('"selector":"#submit"');
+        expect(payload.code).toContain('"type":"click"');
+        return {
+          result: {
+            success: true,
+            action: 'click',
+            message: 'Clicked target element',
+            url: 'https://example.com/login',
+            title: 'Login',
+            element: {
+              tag: 'button',
+              role: '',
+              name: 'Sign in',
+              selectorUsed: '#submit',
+              bbox: { x: 100, y: 200, width: 100, height: 40 },
+            },
+            warnings: [],
+          },
+        };
+      }
+
+      if (method === 'tabs.get') {
+        return {
+          id: 33,
+          url: 'https://example.com/dashboard',
+          title: 'Dashboard',
+          windowId: 7001,
+          status: 'complete',
+        };
+      }
+
+      throw new Error(`Unexpected method call: ${method}`);
+    });
+
+    const tool = createActTool({
+      windowId: 7001,
+      operations: {
+        getClient: async () => createMockClient(call),
+      },
+    });
+
+    const result = await tool.execute('act-inspect-id', {
+      type: 'click',
+      target: 'E1',
+    });
+
+    expect(evaluateCalls).toBe(2);
+    expect(result.details).toMatchObject({
+      action: 'click',
+      target: 'E1',
+      message: 'Clicked target element',
+      element: {
+        tag: 'button',
+        name: 'Sign in',
+      },
+    });
+  });
+
   it('rejects target tab from another window', async () => {
     const call = vi.fn(async (method: string, ...args: unknown[]) => {
       if (method === 'tabs.get') {
