@@ -1,6 +1,15 @@
 import { connect } from './connect.js';
+import {
+  buildObserveScript,
+  createObserveView,
+  normalizeObserveOptions,
+  parseObserveSnapshot,
+  persistObserveSnapshot,
+  renderObserveMarkdown,
+} from './observe/index.js';
 
 import type { ChromeClient } from './client.js';
+import type { WindowObserveOptions } from './observe/index.js';
 
 const DEFAULT_WAIT_TIMEOUT_MS = 30_000;
 const TAB_POLL_INTERVAL_MS = 100;
@@ -13,6 +22,15 @@ export interface WindowOpenOptions {
   timeoutMs?: number;
 }
 
+export interface WindowScreenshotOptions {
+  tabId?: number;
+  /** Capture full-page screenshot when true. Default: false (viewport only). */
+  fullPage?: boolean;
+}
+
+export type { ObserveFilter, WindowObserveOptions } from './observe/index.js';
+export type WindowSemanticFilter = (input: string) => string | Promise<string>;
+
 export interface WindowTab {
   id?: number;
   windowId?: number;
@@ -20,6 +38,10 @@ export interface WindowTab {
   status?: string;
   url?: string;
   title?: string;
+}
+
+interface DebuggerEvaluateResult {
+  result?: unknown;
 }
 
 /**
@@ -30,14 +52,21 @@ export interface WindowTab {
  */
 export class Window {
   private chromePromise: Promise<ChromeClient> | null = null;
+  private semanticFilter: WindowSemanticFilter;
   private windowId: number | null = null;
 
   /** Resolves when constructor initialization completes. */
   readonly ready: Promise<void>;
 
-  constructor(windowId?: number) {
-    if (typeof windowId === 'number') {
-      this.windowId = windowId;
+  constructor(windowId?: number | WindowSemanticFilter, semanticFilter?: WindowSemanticFilter) {
+    const resolvedWindowId = typeof windowId === 'number' ? windowId : undefined;
+    const resolvedSemanticFilter =
+      (typeof windowId === 'function' ? windowId : semanticFilter) ?? ((input: string) => input);
+
+    this.semanticFilter = resolvedSemanticFilter;
+
+    if (typeof resolvedWindowId === 'number') {
+      this.windowId = resolvedWindowId;
       this.ready = Promise.resolve();
       return;
     }
@@ -170,6 +199,105 @@ export class Window {
     return this.assertTabInWindow(targetTabId);
   }
 
+  async screenshot(options?: WindowScreenshotOptions): Promise<string> {
+    const chrome = await this.getChrome();
+    const targetTabId = await this.resolveTargetTabId(options?.tabId);
+    const fullPage = options?.fullPage ?? false;
+
+    await this.waitForTabLoad(targetTabId);
+
+    let attachedByThisMethod = false;
+
+    try {
+      const attachResult = (await chrome.call('debugger.attach', {
+        tabId: targetTabId,
+      })) as { attached?: boolean; alreadyAttached?: boolean };
+
+      attachedByThisMethod = attachResult.attached === true;
+
+      await chrome.call('debugger.sendCommand', {
+        tabId: targetTabId,
+        method: 'Page.enable',
+      });
+
+      const params = fullPage
+        ? await this.getFullPageCaptureParams(targetTabId)
+        : {
+            format: 'png',
+          };
+
+      const result = (await chrome.call('debugger.sendCommand', {
+        tabId: targetTabId,
+        method: 'Page.captureScreenshot',
+        params,
+      })) as { data?: string };
+
+      if (typeof result.data !== 'string' || result.data.length === 0) {
+        throw new Error('Screenshot capture returned no image data');
+      }
+
+      return result.data;
+    } finally {
+      if (attachedByThisMethod) {
+        try {
+          await chrome.call('debugger.detach', { tabId: targetTabId });
+        } catch {
+          // Ignore detach errors (tab may have closed)
+        }
+      }
+    }
+  }
+
+  async observe(options?: WindowObserveOptions): Promise<string> {
+    const chrome = await this.getChrome();
+    const windowId = await this.getWindowId();
+    const targetTabId = await this.resolveTargetTabId(options?.tabId);
+    const timeoutMs = options?.timeoutMs ?? DEFAULT_WAIT_TIMEOUT_MS;
+
+    await this.waitForTabLoad(targetTabId, timeoutMs);
+
+    const normalizedOptions = normalizeObserveOptions(options);
+    const script = buildObserveScript({
+      maxInteractive: normalizedOptions.max,
+      maxTextBlocks: Math.min(normalizedOptions.max, 120),
+    });
+
+    const evaluation = (await chrome.call('debugger.evaluate', {
+      tabId: targetTabId,
+      code: script,
+    })) as DebuggerEvaluateResult;
+
+    const snapshot = parseObserveSnapshot(evaluation.result);
+    const persisted = await persistObserveSnapshot({
+      windowId,
+      tabId: targetTabId,
+      snapshot,
+      options: normalizedOptions,
+    });
+    const view = createObserveView(snapshot, normalizedOptions);
+
+    const markdown = renderObserveMarkdown({
+      windowId,
+      tabId: targetTabId,
+      snapshotId: persisted.snapshotId,
+      snapshotPath: persisted.snapshotPath,
+      options: normalizedOptions,
+      snapshot,
+      view,
+    });
+
+    if (normalizedOptions.semanticFilter) {
+      const semanticInput = [
+        `Semantic Filter Query: ${normalizedOptions.semanticFilter}`,
+        '',
+        markdown,
+      ].join('\n');
+      return await this.semanticFilter(semanticInput);
+    }
+
+    return markdown;
+  }
+
   async current(): Promise<WindowTab | null> {
     const chrome = await this.getChrome();
     const windowId = await this.getWindowId();
@@ -262,6 +390,49 @@ export class Window {
     }
 
     throw new Error(`Tab ${tabId} was not closed within ${timeoutMs}ms`);
+  }
+
+  private async getFullPageCaptureParams(tabId: number): Promise<{
+    format: 'png';
+    captureBeyondViewport: boolean;
+    clip: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      scale: number;
+    };
+  }> {
+    const chrome = await this.getChrome();
+    const metrics = (await chrome.call('debugger.sendCommand', {
+      tabId,
+      method: 'Page.getLayoutMetrics',
+    })) as {
+      contentSize?: { x?: number; y?: number; width?: number; height?: number };
+      cssContentSize?: { x?: number; y?: number; width?: number; height?: number };
+    };
+
+    const contentSize = metrics.cssContentSize ?? metrics.contentSize;
+
+    if (
+      !contentSize ||
+      typeof contentSize.width !== 'number' ||
+      typeof contentSize.height !== 'number'
+    ) {
+      throw new Error('Failed to determine page dimensions for full-page screenshot');
+    }
+
+    return {
+      format: 'png',
+      captureBeyondViewport: true,
+      clip: {
+        x: contentSize.x ?? 0,
+        y: contentSize.y ?? 0,
+        width: Math.max(1, Math.ceil(contentSize.width)),
+        height: Math.max(1, Math.ceil(contentSize.height)),
+        scale: 1,
+      },
+    };
   }
 }
 

@@ -31,6 +31,8 @@
     "test:e2e:windows": "tsx tests/e2e/windows.e2e.ts",
     "test:e2e:window-class": "tsx tests/e2e/window-class.e2e.ts",
     "test:e2e:window-navigation": "tsx tests/e2e/window-navigation.e2e.ts",
+    "test:e2e:window-screenshot": "tsx tests/e2e/window-screenshot.e2e.ts",
+    "test:e2e:window-observe": "tsx tests/e2e/window-observe.e2e.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.chrome.json",
     "clean": "rm -rf dist *.tsbuildinfo"
   },

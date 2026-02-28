@@ -22,7 +22,11 @@ export { ChromeClient, createChromeClient, connect, Window } from './sdk/index.j
 export type {
   ChromeClientOptions,
   ConnectOptions,
+  ObserveFilter,
+  WindowObserveOptions,
   WindowOpenOptions,
+  WindowSemanticFilter,
+  WindowScreenshotOptions,
   WindowTab,
 } from './sdk/index.js';
 
