@@ -23,11 +23,18 @@ export type {
   ChromeClientOptions,
   ConnectOptions,
   ObserveFilter,
+  WindowActionOptions,
+  WindowDownloadOptions,
+  WindowEvaluateOptions,
+  WindowGetPageOptions,
   WindowObserveOptions,
   WindowOpenOptions,
+  WindowScrollBehavior,
+  WindowScrollOptions,
   WindowSemanticFilter,
   WindowScreenshotOptions,
   WindowTab,
+  WindowTypeOptions,
 } from './sdk/index.js';
 
 // Server

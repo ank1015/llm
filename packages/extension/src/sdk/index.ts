@@ -10,11 +10,18 @@ export type { ConnectOptions } from './connect.js';
 export { Window } from './window.js';
 export type {
   ObserveFilter,
+  WindowActionOptions,
+  WindowDownloadOptions,
+  WindowEvaluateOptions,
+  WindowGetPageOptions,
   WindowObserveOptions,
   WindowOpenOptions,
+  WindowScrollBehavior,
+  WindowScrollOptions,
   WindowSemanticFilter,
   WindowScreenshotOptions,
   WindowTab,
+  WindowTypeOptions,
 } from './window.js';
 
 /**

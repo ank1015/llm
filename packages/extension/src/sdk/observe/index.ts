@@ -5,7 +5,13 @@ export {
   parseObserveSnapshot,
   renderObserveMarkdown,
 } from './helpers.js';
-export { getObserveTabDir, persistObserveSnapshot } from './storage.js';
+export {
+  getObserveLatestPath,
+  getObserveTabDir,
+  persistObserveSnapshot,
+  readLatestObserveSnapshot,
+} from './storage.js';
+export type { ObserveSnapshotPointer, ObserveSnapshotRecord } from './storage.js';
 export type {
   NormalizedObserveOptions,
   ObserveBBox,

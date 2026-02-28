@@ -33,6 +33,9 @@
     "test:e2e:window-navigation": "tsx tests/e2e/window-navigation.e2e.ts",
     "test:e2e:window-screenshot": "tsx tests/e2e/window-screenshot.e2e.ts",
     "test:e2e:window-observe": "tsx tests/e2e/window-observe.e2e.ts",
+    "test:e2e:window-actions": "tsx tests/e2e/window-actions.e2e.ts",
+    "test:e2e:window-download-evaluate": "tsx tests/e2e/window-download-evaluate.e2e.ts",
+    "test:e2e:window-get-page": "tsx tests/e2e/window-get-page.e2e.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.chrome.json",
     "clean": "rm -rf dist *.tsbuildinfo"
   },
