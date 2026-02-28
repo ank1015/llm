@@ -18,8 +18,13 @@ export {
 } from './protocol/constants.js';
 
 // SDK
-export { ChromeClient, createChromeClient, connect } from './sdk/index.js';
-export type { ChromeClientOptions, ConnectOptions } from './sdk/index.js';
+export { ChromeClient, createChromeClient, connect, Window } from './sdk/index.js';
+export type {
+  ChromeClientOptions,
+  ConnectOptions,
+  WindowOpenOptions,
+  WindowTab,
+} from './sdk/index.js';
 
 // Server
 export { ChromeServer } from './native/server.js';
