@@ -70,4 +70,11 @@ export {
   type ScreenshotToolInput,
   type ScreenshotToolOptions,
 } from './screenshot.js';
+export {
+  createWindowReplTool,
+  type WindowReplOperations,
+  type WindowReplToolDetails,
+  type WindowReplToolInput,
+  type WindowReplToolOptions,
+} from './repl.js';
 export { createParallelClient, searchTool } from './search.js';

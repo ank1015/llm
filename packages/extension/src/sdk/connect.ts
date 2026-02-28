@@ -1,7 +1,7 @@
 import { exec } from 'node:child_process';
 import { connect as tcpConnect } from 'node:net';
 
-import { DEFAULT_PORT } from '../protocol/constants.js';
+import { DEFAULT_PORT, MAX_TCP_MESSAGE_SIZE_BYTES } from '../protocol/constants.js';
 
 import { ChromeClient } from './client.js';
 
@@ -71,7 +71,12 @@ export async function connect(opts?: ConnectOptions): Promise<ChromeClient> {
 function tryConnect(port: number, host: string): Promise<ChromeClient> {
   return new Promise<ChromeClient>((resolve, reject) => {
     const socket = tcpConnect({ port, host }, () => {
-      const client = new ChromeClient({ input: socket, output: socket });
+      const client = new ChromeClient({
+        input: socket,
+        output: socket,
+        maxIncomingMessageSizeBytes: MAX_TCP_MESSAGE_SIZE_BYTES,
+        maxOutgoingMessageSizeBytes: MAX_TCP_MESSAGE_SIZE_BYTES,
+      });
       client.run().catch(() => {
         // Errors propagate to pending calls via client.closed
       });

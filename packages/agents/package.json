@@ -23,6 +23,7 @@
     "test:integration": "vitest run tests/integration",
     "inspect:page": "node scripts/inspect-page.mjs",
     "test:cli": "node dist/test-cli.js",
+    "repl:cli": "node dist/repl-cli.js",
     "typecheck": "tsc --noEmit",
     "lint": "echo 'No linter configured yet'",
     "clean": "rm -rf dist *.tsbuildinfo"

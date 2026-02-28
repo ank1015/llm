@@ -1,8 +1,8 @@
 import { createServer } from 'node:net';
 
-import { DEFAULT_PORT } from '../protocol/constants.js';
+import { DEFAULT_PORT, MAX_TCP_MESSAGE_SIZE_BYTES } from '../protocol/constants.js';
 
-import { readMessage, writeMessage } from './stdio.js';
+import { readMessageWithOptions, writeMessageWithOptions } from './stdio.js';
 
 import type {
   HostMessage,
@@ -60,7 +60,9 @@ export class ChromeServer {
       let msg: HostMessage | null;
 
       try {
-        msg = await readMessage<HostMessage>(socket);
+        msg = await readMessageWithOptions<HostMessage>(socket, {
+          maxMessageSizeBytes: MAX_TCP_MESSAGE_SIZE_BYTES,
+        });
       } catch {
         break;
       }
@@ -121,7 +123,9 @@ export class ChromeServer {
   private send(socket: Socket, message: ChromeMessage): void {
     try {
       if (!socket.destroyed) {
-        writeMessage(message, socket);
+        writeMessageWithOptions(message, socket, {
+          maxMessageSizeBytes: MAX_TCP_MESSAGE_SIZE_BYTES,
+        });
       }
     } catch {
       // Socket write failed — client likely disconnected

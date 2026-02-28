@@ -176,7 +176,11 @@ export interface WindowInstance {
   - `options.tabId` optional.
   - `options.fullPage` optional. Default is viewport-only (`false`).
 - Return:
-  - Screenshot Image
+  - base64-encoded PNG image string
+- Agent REPL integration note:
+  - In the `repl` tool, return this base64 string directly when you want image output.
+  - Do not slice/truncate/inspect or wrap it in an object.
+  - Direct returns are converted to an image attachment (`Image attached`) by the tool.
 
 ### `observe(options?) -> Promise<string>`
 
