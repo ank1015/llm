@@ -33,6 +33,13 @@ const TEST_HTML = `
         <option value="free">Free</option>
         <option value="pro">Pro</option>
       </select>
+      <label for="editor-input">Nested Input</label>
+      <div id="editor-shell" role="group">
+        <input id="editor-input" name="editor-input" />
+      </div>
+      <label for="composer">Composer</label>
+      <div id="composer" role="textbox" contenteditable="true"></div>
+      <button id="hidden-action" style="display:none">Hidden Action</button>
       <button id="go" onclick="location.href='https://example.com/'">Continue</button>
     </main>
   </body>
@@ -80,6 +87,33 @@ describe.skipIf(!runRealChromeIntegration)('act tool real integration', () => {
       })) as { details: ActToolDetails };
       expect(selectResult.details.action).toBe('select');
       expect(selectResult.details.value).toBe('pro');
+
+      const nestedTypeResult = (await actTool.execute('type-nested-input', {
+        tabId,
+        type: 'type',
+        target: { id: 'editor-shell' },
+        value: 'Nested Value',
+      })) as { details: ActToolDetails };
+      expect(nestedTypeResult.details.action).toBe('type');
+      expect(nestedTypeResult.details.value).toBe('Nested Value');
+
+      const multiline = 'Line 1\nLine 2';
+      const composerTypeResult = (await actTool.execute('type-composer', {
+        tabId,
+        type: 'type',
+        target: { id: 'composer' },
+        value: multiline,
+      })) as { details: ActToolDetails };
+      expect(composerTypeResult.details.action).toBe('type');
+      expect(composerTypeResult.details.value).toBe(multiline);
+
+      await expect(
+        actTool.execute('click-hidden', {
+          tabId,
+          type: 'click',
+          target: { id: 'hidden-action' },
+        })
+      ).rejects.toThrow('Target element is not interactable');
 
       const clickResult = (await actTool.execute('click-continue', {
         tabId,

@@ -22,6 +22,7 @@
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
     "inspect:page": "node scripts/inspect-page.mjs",
+    "test:cli": "node dist/test-cli.js",
     "typecheck": "tsc --noEmit",
     "lint": "echo 'No linter configured yet'",
     "clean": "rm -rf dist *.tsbuildinfo"
@@ -36,6 +37,7 @@
   "dependencies": {
     "@ank1015/llm-extension": "workspace:^",
     "@ank1015/llm-sdk": "workspace:^",
+    "@ank1015/llm-sdk-adapters": "workspace:^",
     "@silvia-odwyer/photon-node": "^0.3.4",
     "@sinclair/typebox": "^0.34.48",
     "chalk": "^5.6.2",
@@ -46,6 +48,8 @@
     "proper-lockfile": "^4.1.2"
   },
   "devDependencies": {
+    "@types/node": "^25.3.2",
+    "tsx": "^4.19.0",
     "vitest": "^2.1.0"
   }
 }

@@ -18,6 +18,9 @@ describe('createActTool', () => {
   });
 
   it('executes click action and returns action summary', async () => {
+    let actionEvaluateCalls = 0;
+    let sampleEvaluateCalls = 0;
+
     const call = vi.fn(async (method: string, ...args: unknown[]) => {
       if (method === 'tabs.query') {
         const query = args[0] as { active?: boolean; windowId?: number };
@@ -51,8 +54,19 @@ describe('createActTool', () => {
       if (method === 'debugger.evaluate') {
         const payload = args[0] as { tabId?: number; code?: string };
         expect(payload.tabId).toBe(33);
-        expect(typeof payload.code).toBe('string');
-        expect(payload.code).toContain('"type":"click"');
+        const code = typeof payload.code === 'string' ? payload.code : '';
+        if (code.includes('readyState') && code.includes('nodeCount')) {
+          sampleEvaluateCalls += 1;
+          return {
+            result: {
+              readyState: 'complete',
+              textLength: 220,
+              nodeCount: 14,
+            },
+          };
+        }
+        expect(code).toContain('"type":"click"');
+        actionEvaluateCalls += 1;
         return {
           result: {
             success: true,
@@ -66,6 +80,10 @@ describe('createActTool', () => {
               name: 'Sign in',
               selectorUsed: '#submit',
               bbox: { x: 100, y: 200, width: 100, height: 40 },
+            },
+            outcome: {
+              observed: true,
+              signals: ['focus moved to target'],
             },
             warnings: [],
           },
@@ -110,12 +128,111 @@ describe('createActTool', () => {
         name: 'Sign in',
       },
     });
+    expect(actionEvaluateCalls).toBe(1);
+    expect(sampleEvaluateCalls).toBeGreaterThan(0);
     expect(result.content[0]?.content).toContain('Action: click');
     expect(result.content[0]?.content).toContain('Result: Clicked target element');
   });
 
+  it('fails click when no observable effect is detected', async () => {
+    const call = vi.fn(async (method: string, ...args: unknown[]) => {
+      if (method === 'tabs.query') {
+        const query = args[0] as { active?: boolean; windowId?: number };
+        if (query.active && query.windowId === 7001) {
+          return [
+            {
+              id: 33,
+              url: 'https://example.com/login',
+              title: 'Login',
+              windowId: 7001,
+              active: true,
+            },
+          ];
+        }
+      }
+
+      if (method === 'tabs.update') {
+        return {
+          id: 33,
+          url: 'https://example.com/login',
+          title: 'Login',
+          windowId: 7001,
+          active: true,
+        };
+      }
+
+      if (method === 'windows.update') {
+        return { id: 7001, focused: true };
+      }
+
+      if (method === 'tabs.get') {
+        return {
+          id: 33,
+          url: 'https://example.com/login',
+          title: 'Login',
+          windowId: 7001,
+          status: 'complete',
+        };
+      }
+
+      if (method === 'debugger.evaluate') {
+        const payload = args[0] as { tabId?: number; code?: string };
+        expect(payload.tabId).toBe(33);
+        const code = typeof payload.code === 'string' ? payload.code : '';
+        if (code.includes('readyState') && code.includes('nodeCount')) {
+          return {
+            result: {
+              readyState: 'complete',
+              textLength: 220,
+              nodeCount: 14,
+            },
+          };
+        }
+        return {
+          result: {
+            success: true,
+            action: 'click',
+            message: 'Clicked target element',
+            url: 'https://example.com/login',
+            title: 'Login',
+            element: {
+              tag: 'button',
+              role: '',
+              name: 'Sign in',
+              selectorUsed: '#submit',
+              bbox: { x: 100, y: 200, width: 100, height: 40 },
+            },
+            outcome: {
+              observed: false,
+              signals: [],
+            },
+            warnings: [],
+          },
+        };
+      }
+
+      throw new Error(`Unexpected method call: ${method}`);
+    });
+
+    const tool = createActTool({
+      windowId: 7001,
+      operations: {
+        getClient: async () => createMockClient(call),
+      },
+    });
+
+    await expect(
+      tool.execute('act-no-effect', {
+        type: 'click',
+        target: { id: 'submit' },
+      })
+    ).rejects.toThrow('[NO_OBSERVABLE_EFFECT]');
+  });
+
   it('resolves inspect_page element ids before acting', async () => {
     let evaluateCalls = 0;
+    let sampleCalls = 0;
+    let postAction = false;
 
     const call = vi.fn(async (method: string, ...args: unknown[]) => {
       if (method === 'tabs.query') {
@@ -151,8 +268,9 @@ describe('createActTool', () => {
         const payload = args[0] as { tabId?: number; code?: string };
         expect(payload.tabId).toBe(33);
         evaluateCalls += 1;
+        const code = typeof payload.code === 'string' ? payload.code : '';
 
-        if (evaluateCalls === 1) {
+        if (code.includes('const options =')) {
           return {
             result: {
               page: {
@@ -173,6 +291,12 @@ describe('createActTool', () => {
                 totalLinks: 0,
                 totalButtons: 1,
                 totalInputs: 0,
+                mediaCount: 0,
+                playingMediaCount: 0,
+                pausedMediaCount: 0,
+                bufferingMediaCount: 0,
+                endedMediaCount: 0,
+                mutedMediaCount: 0,
               },
               interactive: [
                 {
@@ -188,21 +312,160 @@ describe('createActTool', () => {
               ],
               textBlocks: [],
               forms: [],
+              media: [],
               alerts: [],
               truncation: {
                 interactive: false,
                 textBlocks: false,
                 hiddenFilteredCount: 0,
                 offscreenFilteredCount: 0,
+                suppressedAlertCount: 0,
+              },
+              warnings: [],
+            },
+          };
+        }
+        if (code.includes('"type":"click"')) {
+          expect(code).toContain('"selector":"#submit"');
+          postAction = true;
+          return {
+            result: {
+              success: true,
+              action: 'click',
+              message: 'Clicked target element',
+              url: 'https://example.com/login',
+              title: 'Login',
+              element: {
+                tag: 'button',
+                role: '',
+                name: 'Sign in',
+                selectorUsed: '#submit',
+                bbox: { x: 100, y: 200, width: 100, height: 40 },
+              },
+              outcome: {
+                observed: true,
+                signals: ['target class changed'],
               },
               warnings: [],
             },
           };
         }
 
-        expect(typeof payload.code).toBe('string');
-        expect(payload.code).toContain('"selector":"#submit"');
-        expect(payload.code).toContain('"type":"click"');
+        if (code.includes('readyState') && code.includes('nodeCount')) {
+          sampleCalls += 1;
+          return {
+            result: {
+              readyState: 'complete',
+              textLength: postAction ? 240 : 180,
+              nodeCount: postAction ? 16 : 12,
+            },
+          };
+        }
+
+        throw new Error('Unexpected debugger.evaluate code payload');
+      }
+
+      if (method === 'tabs.get') {
+        if (postAction) {
+          return {
+            id: 33,
+            url: 'https://example.com/dashboard',
+            title: 'Dashboard',
+            windowId: 7001,
+            status: 'complete',
+          };
+        }
+        return {
+          id: 33,
+          url: 'https://example.com/login',
+          title: 'Login',
+          windowId: 7001,
+          status: 'complete',
+        };
+      }
+
+      throw new Error(`Unexpected method call: ${method}`);
+    });
+
+    const tool = createActTool({
+      windowId: 7001,
+      operations: {
+        getClient: async () => createMockClient(call),
+      },
+    });
+
+    const result = await tool.execute('act-inspect-id', {
+      type: 'click',
+      target: 'E1',
+    });
+
+    expect(evaluateCalls).toBeGreaterThanOrEqual(3);
+    expect(sampleCalls).toBeGreaterThan(0);
+    expect(result.details).toMatchObject({
+      action: 'click',
+      target: 'E1',
+      message: 'Clicked target element',
+      element: {
+        tag: 'button',
+        name: 'Sign in',
+      },
+    });
+  });
+
+  it('uses inspect_page result from context before re-inspecting', async () => {
+    let evaluateCalls = 0;
+    let sampleCalls = 0;
+
+    const call = vi.fn(async (method: string, ...args: unknown[]) => {
+      if (method === 'tabs.query') {
+        const query = args[0] as { active?: boolean; windowId?: number };
+        if (query.active && query.windowId === 7001) {
+          return [
+            {
+              id: 33,
+              url: 'https://example.com/login',
+              title: 'Login',
+              windowId: 7001,
+              active: true,
+            },
+          ];
+        }
+      }
+
+      if (method === 'tabs.update') {
+        return {
+          id: 33,
+          url: 'https://example.com/login',
+          title: 'Login',
+          windowId: 7001,
+          active: true,
+        };
+      }
+
+      if (method === 'windows.update') {
+        return { id: 7001, focused: true };
+      }
+
+      if (method === 'debugger.evaluate') {
+        const payload = args[0] as { tabId?: number; code?: string };
+        expect(payload.tabId).toBe(33);
+        const code = typeof payload.code === 'string' ? payload.code : '';
+        if (code.includes('readyState') && code.includes('nodeCount')) {
+          sampleCalls += 1;
+          return {
+            result: {
+              readyState: 'complete',
+              textLength: 110,
+              nodeCount: 9,
+            },
+          };
+        }
+
+        expect(code).toContain('"type":"click"');
+        expect(code).toContain('"selector":"#submit"');
+        expect(code).not.toContain('const options =');
+
+        evaluateCalls += 1;
         return {
           result: {
             success: true,
@@ -216,6 +479,10 @@ describe('createActTool', () => {
               name: 'Sign in',
               selectorUsed: '#submit',
               bbox: { x: 100, y: 200, width: 100, height: 40 },
+            },
+            outcome: {
+              observed: true,
+              signals: ['focus moved to target'],
             },
             warnings: [],
           },
@@ -242,12 +509,51 @@ describe('createActTool', () => {
       },
     });
 
-    const result = await tool.execute('act-inspect-id', {
-      type: 'click',
-      target: 'E1',
-    });
+    const result = await tool.execute(
+      'act-context-id',
+      {
+        type: 'click',
+        target: 'E1',
+      },
+      undefined,
+      undefined,
+      {
+        messages: [
+          {
+            role: 'toolResult',
+            id: 'inspect-msg-1',
+            toolName: 'inspect_page',
+            toolCallId: 'inspect-call-1',
+            content: [{ type: 'text', content: '# Page Snapshot' }],
+            details: {
+              tab: {
+                tabId: 33,
+              },
+              interactive: [
+                {
+                  id: 'E1',
+                  tag: 'button',
+                  role: '',
+                  name: 'Sign in',
+                  actions: ['click'],
+                  state: [],
+                  locator: {
+                    id: 'submit',
+                    cssPath: '#submit',
+                  },
+                  bbox: { x: 100, y: 200, width: 100, height: 40 },
+                },
+              ],
+            },
+            isError: false,
+            timestamp: Date.now(),
+          },
+        ],
+      } as never
+    );
 
-    expect(evaluateCalls).toBe(2);
+    expect(evaluateCalls).toBe(1);
+    expect(sampleCalls).toBeGreaterThan(0);
     expect(result.details).toMatchObject({
       action: 'click',
       target: 'E1',
@@ -342,7 +648,27 @@ describe('createActTool', () => {
         return { id: 7001, focused: true };
       }
 
+      if (method === 'tabs.get') {
+        return {
+          id: 33,
+          url: 'https://example.com',
+          title: 'Example',
+          windowId: 7001,
+          status: 'complete',
+        };
+      }
+
       if (method === 'debugger.evaluate') {
+        const payload = args[0] as { code?: string };
+        if (typeof payload.code === 'string' && payload.code.includes('readyState')) {
+          return {
+            result: {
+              readyState: 'complete',
+              textLength: 120,
+              nodeCount: 10,
+            },
+          };
+        }
         return {
           result: {
             success: false,
@@ -370,6 +696,6 @@ describe('createActTool', () => {
         type: 'click',
         target: { id: 'missing' },
       })
-    ).rejects.toThrow('Target element not found');
+    ).rejects.toThrow('[TARGET_NOT_FOUND]');
   });
 });

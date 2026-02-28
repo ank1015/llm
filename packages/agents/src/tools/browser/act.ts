@@ -1,10 +1,14 @@
 import { connect, type ConnectOptions } from '@ank1015/llm-extension';
 import { type Static, Type } from '@sinclair/typebox';
 
+import {
+  browserToolError,
+  formatBrowserToolErrorMessage,
+  type BrowserToolErrorCode,
+} from './errors.js';
 import { createInspectTool, type InspectInteractiveElement } from './inspect.js';
 
-import type { AgentTool } from '@ank1015/llm-sdk';
-
+import type { AgentTool, Message, ToolExecutionContext } from '@ank1015/llm-sdk';
 
 const actActionSchema = Type.Union([
   Type.Literal('click'),
@@ -105,7 +109,7 @@ const actSchema = Type.Object({
       waitForNavigationMs: Type.Optional(
         Type.Number({
           description:
-            'After action, wait up to this many ms for tab load status to settle (default: 3000 for click/pressEnter, else 0).',
+            'After action, wait up to this many ms for tab/page state to settle (default: 5000 for click, pressEnter, select, and type+pressEnter; else 0).',
         })
       ),
       delayMs: Type.Optional(
@@ -161,7 +165,13 @@ interface ActExecutionScriptResult {
   title: string;
   element?: ActElementSummary;
   value?: string;
+  outcome?: ActActionOutcome;
   warnings: string[];
+}
+
+export interface ActActionOutcome {
+  observed: boolean;
+  signals: string[];
 }
 
 export interface ActToolDetails {
@@ -176,6 +186,7 @@ export interface ActToolDetails {
   target?: ActTarget;
   value?: string;
   element?: ActElementSummary;
+  outcome?: ActActionOutcome;
   warnings?: string[];
 }
 
@@ -211,7 +222,24 @@ interface DebuggerEvaluateResult {
   result?: unknown;
 }
 
-const DEFAULT_WAIT_FOR_NAV_MS = 3000;
+interface ActionWaitSample {
+  status: string;
+  url: string;
+  title: string;
+  readyState: string;
+  textLength: number;
+  nodeCount: number;
+}
+
+interface ActionWaitResult {
+  changedObserved: boolean;
+  finalSample: ActionWaitSample;
+}
+
+const DEFAULT_WAIT_FOR_NAV_MS = 5000;
+const ACTION_WAIT_POLL_INTERVAL_MS = 150;
+const ACTION_WAIT_STABLE_POLLS = 2;
+const ACTION_WAIT_QUIET_MS = 350;
 const INSPECT_ELEMENT_ID_PATTERN = /^E\d+$/u;
 
 function createDefaultGetClient(connectOptions?: ConnectOptions): () => Promise<ActChromeClient> {
@@ -235,7 +263,10 @@ async function callChrome<T>(
 
 function toActTab(tab: ChromeTab): ActTab {
   if (typeof tab.id !== 'number') {
-    throw new Error('Chrome tab response did not include a numeric tab id');
+    throw browserToolError(
+      'TAB_ID_MISSING',
+      'Chrome tab response did not include a numeric tab id'
+    );
   }
 
   return {
@@ -269,14 +300,17 @@ async function getTargetTab(
   if (typeof tabId === 'number') {
     const tab = await callChrome<ChromeTab>(client, 'tabs.get', tabId);
     if (tab.windowId !== windowId) {
-      throw new Error(`Tab ${tabId} does not belong to window ${windowId}`);
+      throw browserToolError(
+        'TAB_SCOPE_VIOLATION',
+        `Tab ${tabId} does not belong to window ${windowId}`
+      );
     }
     return tab;
   }
 
   const activeTab = await findActiveTab(client, windowId);
   if (!activeTab) {
-    throw new Error(`No tab found in window ${windowId}`);
+    throw browserToolError('TAB_NOT_FOUND', `No tab found in window ${windowId}`);
   }
 
   return activeTab;
@@ -289,8 +323,13 @@ function clamp(value: number | undefined, min: number, max: number, fallback: nu
   return Math.min(Math.max(Math.floor(value), min), max);
 }
 
-function getDefaultWaitMs(action: ActAction): number {
-  if (action === 'click' || action === 'pressEnter') {
+function getDefaultWaitMs(input: ActToolInput): number {
+  if (
+    input.type === 'click' ||
+    input.type === 'pressEnter' ||
+    input.type === 'select' ||
+    (input.type === 'type' && input.opts?.pressEnter === true)
+  ) {
     return DEFAULT_WAIT_FOR_NAV_MS;
   }
   return 0;
@@ -302,14 +341,14 @@ function normalizeOptions(input: ActToolInput): NormalizedActOptions {
     clearBeforeType: opts?.clearBeforeType ?? true,
     pressEnter: opts?.pressEnter ?? false,
     scrollBehavior: opts?.scrollBehavior ?? 'auto',
-    waitForNavigationMs: clamp(opts?.waitForNavigationMs, 0, 30000, getDefaultWaitMs(input.type)),
+    waitForNavigationMs: clamp(opts?.waitForNavigationMs, 0, 30000, getDefaultWaitMs(input)),
     delayMs: clamp(opts?.delayMs, 0, 30000, 0),
   };
 }
 
 function requireValue(input: ActToolInput, name: string): void {
   if (input.value === undefined) {
-    throw new Error(`Action "${input.type}" requires ${name}`);
+    throw browserToolError('INVALID_INPUT', `Action "${input.type}" requires ${name}`);
   }
 }
 
@@ -324,20 +363,20 @@ function validateInput(input: ActToolInput): void {
       input.type === 'focus') &&
     !input.target
   ) {
-    throw new Error(`Action "${input.type}" requires target`);
+    throw browserToolError('INVALID_INPUT', `Action "${input.type}" requires target`);
   }
 
   if (input.type === 'type') {
     requireValue(input, 'a string value');
     if (typeof input.value !== 'string') {
-      throw new Error('Action "type" requires value to be a string');
+      throw browserToolError('INVALID_INPUT', 'Action "type" requires value to be a string');
     }
   }
 
   if (input.type === 'select') {
     requireValue(input, 'a string value');
     if (typeof input.value !== 'string') {
-      throw new Error('Action "select" requires value to be a string');
+      throw browserToolError('INVALID_INPUT', 'Action "select" requires value to be a string');
     }
   }
 
@@ -345,7 +384,7 @@ function validateInput(input: ActToolInput): void {
     const isNumber = typeof input.value === 'number';
     const isObject = typeof input.value === 'object' && input.value !== null;
     if (!isNumber && !isObject) {
-      throw new Error('Action "scroll" value must be a number or object');
+      throw browserToolError('INVALID_INPUT', 'Action "scroll" value must be a number or object');
     }
   }
 }
@@ -393,7 +432,7 @@ function getInspectElementIdFromTarget(target: ActTarget | undefined): string | 
 
 function parseInspectInteractiveElements(details: unknown): InspectInteractiveElement[] {
   if (!isObject(details) || !Array.isArray(details.interactive)) {
-    throw new Error('inspect_page did not return interactive elements');
+    throw browserToolError('PAYLOAD_INVALID', 'inspect_page did not return interactive elements');
   }
 
   return details.interactive.filter((element): element is InspectInteractiveElement => {
@@ -458,11 +497,17 @@ async function resolveTargetFromInspectElementId(
   inspectTool: ReturnType<typeof createInspectTool>,
   toolCallId: string,
   tabId: number,
-  target: ActTarget | undefined
+  target: ActTarget | undefined,
+  context?: ToolExecutionContext
 ): Promise<ActTarget | undefined> {
   const inspectElementId = getInspectElementIdFromTarget(target);
   if (!inspectElementId) {
     return target;
+  }
+
+  const cached = findInspectElementInContext(context?.messages, tabId, inspectElementId);
+  if (cached) {
+    return toTargetFromInspectElement(cached);
   }
 
   const inspectResult = await inspectTool.execute(`${toolCallId}:inspect`, { tabId });
@@ -470,12 +515,50 @@ async function resolveTargetFromInspectElementId(
   const mapped = interactive.find((element) => element.id.toUpperCase() === inspectElementId);
 
   if (!mapped) {
-    throw new Error(
+    throw browserToolError(
+      'TARGET_NOT_FOUND',
       `Element id "${inspectElementId}" was not found in inspect_page snapshot for tab ${tabId}`
     );
   }
 
   return toTargetFromInspectElement(mapped);
+}
+
+function findInspectElementInContext(
+  messages: readonly Message[] | undefined,
+  tabId: number,
+  inspectElementId: string
+): InspectInteractiveElement | undefined {
+  if (!messages || messages.length === 0) {
+    return undefined;
+  }
+
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (!message || message.role !== 'toolResult' || message.isError) {
+      continue;
+    }
+    if (message.toolName !== 'inspect_page' || !isObject(message.details)) {
+      continue;
+    }
+
+    const details = message.details as Record<string, unknown>;
+    if (
+      !isObject(details.tab) ||
+      typeof details.tab.tabId !== 'number' ||
+      details.tab.tabId !== tabId
+    ) {
+      continue;
+    }
+
+    const interactive = parseInspectInteractiveElements(details);
+    const mapped = interactive.find((element) => element.id.toUpperCase() === inspectElementId);
+    if (mapped) {
+      return mapped;
+    }
+  }
+
+  return undefined;
 }
 
 function buildActScript(payload: ActPayload): string {
@@ -490,6 +573,36 @@ function buildActScript(payload: ActPayload): string {
     if (!compact) return '';
     if (compact.length <= maxLength) return compact;
     return compact.slice(0, Math.max(1, maxLength - 1)) + '…';
+  };
+
+  const normalizeNewlines = (value) => {
+    if (typeof value !== 'string') return '';
+    return value.replace(/\\r\\n?/g, '\\n');
+  };
+
+  const normalizeForComparison = (value) => {
+    return normalizeNewlines(value).replace(/\\u00a0/g, ' ');
+  };
+
+  const toCodedMessage = (code, message) => '[' + code + '] ' + message;
+
+  const fail = (code, message) => {
+    throw new Error(toCodedMessage(code, message));
+  };
+
+  const classifyErrorCode = (message) => {
+    if (/^\\[[A-Z0-9_]+\\]/.test(message)) return '';
+    if (message.startsWith('Target element is not interactable')) return 'TARGET_NOT_INTERACTABLE';
+    if (message.includes('Target element not found')) return 'TARGET_NOT_FOUND';
+    if (message.includes('No matching select option found')) return 'TARGET_NOT_FOUND';
+    if (message.includes('requires target')) return 'INVALID_INPUT';
+    if (message.includes('requires string value')) return 'INVALID_INPUT';
+    if (message.includes('requires an input') || message.includes('requires a <select>')) return 'INVALID_INPUT';
+    if (message.includes('did not update target value')) return 'NO_OBSERVABLE_EFFECT';
+    if (message.includes('did not change target value')) return 'NO_OBSERVABLE_EFFECT';
+    if (message.includes('did not move focus')) return 'NO_OBSERVABLE_EFFECT';
+    if (message.includes('Unsupported action type')) return 'UNSUPPORTED_ACTION';
+    return 'INTERNAL';
   };
 
   const cssEscape = (value) => {
@@ -560,10 +673,59 @@ function buildActScript(payload: ActPayload): string {
     };
   };
 
+  const getCandidateScore = (element) => {
+    if (!element || !element.isConnected) return -10000;
+
+    let score = 0;
+    const rect = element.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) score += 220;
+    else score -= 220;
+
+    const style = window.getComputedStyle(element);
+    const hidden =
+      element.hidden ||
+      element.getAttribute('aria-hidden') === 'true' ||
+      style.display === 'none' ||
+      style.visibility === 'hidden' ||
+      Number.parseFloat(style.opacity || '1') === 0;
+    if (!hidden) score += 90;
+    else score -= 120;
+
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+    const offscreen =
+      rect.bottom < 0 || rect.right < 0 || rect.top > viewportHeight || rect.left > viewportWidth;
+    if (!offscreen) score += 35;
+    else score -= 20;
+
+    if (typeof element.disabled === 'boolean' && element.disabled) {
+      score -= 40;
+    }
+    if (style.pointerEvents === 'none') {
+      score -= 25;
+    }
+
+    return score;
+  };
+
   const selectByIndex = (elements, indexValue) => {
     if (!elements.length) return undefined;
-    const index = Number.isInteger(indexValue) ? Math.max(0, indexValue) : 0;
-    return elements[index] || elements[0];
+
+    if (Number.isInteger(indexValue)) {
+      const index = Math.max(0, indexValue);
+      return elements[index] || elements[0];
+    }
+
+    let best = elements[0];
+    let bestScore = getCandidateScore(best);
+    for (let i = 1; i < elements.length; i++) {
+      const score = getCandidateScore(elements[i]);
+      if (score > bestScore) {
+        best = elements[i];
+        bestScore = score;
+      }
+    }
+    return best;
   };
 
   const buildSelectorCandidates = (target) => {
@@ -647,7 +809,7 @@ function buildActScript(payload: ActPayload): string {
       const targetRole = normalizeMatcher(target.role);
       const candidates = Array.from(
         document.querySelectorAll(
-          'a, button, input, select, textarea, [role], [contenteditable="true"], [tabindex]'
+          'a, button, input, select, textarea, [role], [contenteditable], [tabindex]'
         )
       );
 
@@ -706,16 +868,62 @@ function buildActScript(payload: ActPayload): string {
 
   const getValueText = (element) => {
     if (typeof element.value === 'string') {
-      return element.value;
+      return normalizeNewlines(element.value);
     }
-    if (element.isContentEditable) {
-      return normalizeText(element.textContent || '', 500);
+    if (isContentEditableElement(element)) {
+      return normalizeNewlines(element.textContent || '');
     }
     if (element instanceof HTMLSelectElement) {
       const option = element.options[element.selectedIndex];
       return option ? option.value : '';
     }
     return '';
+  };
+
+  const createOutcome = (observed, signals) => ({
+    observed: !!observed,
+    signals: Array.from(new Set((Array.isArray(signals) ? signals : []).filter(Boolean))),
+  });
+
+  const getOutcomeSnapshot = (element) => {
+    const active = document.activeElement;
+    const activeOnTarget = !!active && (active === element || element.contains(active));
+    const checked =
+      typeof element.checked === 'boolean'
+        ? element.checked
+        : undefined;
+    const ariaExpanded =
+      typeof element.getAttribute === 'function' ? element.getAttribute('aria-expanded') || '' : '';
+    const ariaPressed =
+      typeof element.getAttribute === 'function' ? element.getAttribute('aria-pressed') || '' : '';
+    const ariaSelected =
+      typeof element.getAttribute === 'function' ? element.getAttribute('aria-selected') || '' : '';
+    return {
+      activeOnTarget,
+      value: normalizeForComparison(getValueText(element)),
+      checked,
+      ariaExpanded,
+      ariaPressed,
+      ariaSelected,
+      text: normalizeForComparison(normalizeText(element.textContent || '', 240)),
+      className:
+        typeof element.className === 'string'
+          ? normalizeForComparison(element.className)
+          : '',
+    };
+  };
+
+  const evaluateOutcome = (before, after) => {
+    const signals = [];
+    if (!before.activeOnTarget && after.activeOnTarget) signals.push('focus moved to target');
+    if (before.value !== after.value) signals.push('target value changed');
+    if (before.checked !== after.checked) signals.push('checked state changed');
+    if (before.ariaExpanded !== after.ariaExpanded) signals.push('aria-expanded changed');
+    if (before.ariaPressed !== after.ariaPressed) signals.push('aria-pressed changed');
+    if (before.ariaSelected !== after.ariaSelected) signals.push('aria-selected changed');
+    if (before.text !== after.text) signals.push('target text changed');
+    if (before.className !== after.className) signals.push('target class changed');
+    return createOutcome(signals.length > 0, signals);
   };
 
   const pressEnter = (element) => {
@@ -765,6 +973,244 @@ function buildActScript(payload: ActPayload): string {
     }
   };
 
+  const isContentEditableElement = (element) => {
+    if (!element) return false;
+    if (element.isContentEditable) return true;
+    const value =
+      typeof element.getAttribute === 'function' ? element.getAttribute('contenteditable') : null;
+    if (typeof value !== 'string') return false;
+    const normalized = value.trim().toLowerCase();
+    return normalized === '' || normalized === 'true' || normalized === 'plaintext-only';
+  };
+
+  const hasValueProperty = (element) => {
+    return !!(
+      element &&
+      typeof element === 'object' &&
+      'value' in element &&
+      typeof element.value === 'string'
+    );
+  };
+
+  const resolveTypeableElement = (element) => {
+    if (!element) return undefined;
+
+    if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+      return element;
+    }
+
+    if (isContentEditableElement(element)) {
+      return element;
+    }
+
+    if (hasValueProperty(element)) {
+      return element;
+    }
+
+    const candidates = Array.from(
+      element.querySelectorAll(
+        'input:not([type="hidden"]), textarea, [contenteditable], [role="textbox"], [role="searchbox"], [role="combobox"]'
+      )
+    );
+
+    for (const candidate of candidates) {
+      if (
+        candidate instanceof HTMLInputElement ||
+        candidate instanceof HTMLTextAreaElement ||
+        isContentEditableElement(candidate) ||
+        hasValueProperty(candidate)
+      ) {
+        return candidate;
+      }
+    }
+
+    return undefined;
+  };
+
+  const resolveSelectElement = (element) => {
+    if (element instanceof HTMLSelectElement) {
+      return element;
+    }
+    const nested = element.querySelector('select');
+    return nested instanceof HTMLSelectElement ? nested : undefined;
+  };
+
+  const getInteractabilityIssue = (element, actionType) => {
+    if (!element || !element.isConnected) {
+      return 'target is detached from the DOM';
+    }
+
+    const style = window.getComputedStyle(element);
+    if (
+      element.hidden ||
+      element.getAttribute('aria-hidden') === 'true' ||
+      style.display === 'none' ||
+      style.visibility === 'hidden' ||
+      Number.parseFloat(style.opacity || '1') === 0
+    ) {
+      return 'target is hidden';
+    }
+
+    if ((actionType === 'click' || actionType === 'hover') && style.pointerEvents === 'none') {
+      return 'target ignores pointer events';
+    }
+
+    const rect = element.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) {
+      return 'target has zero area';
+    }
+
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+    if (rect.bottom < 0 || rect.right < 0 || rect.top > viewportHeight || rect.left > viewportWidth) {
+      return 'target is outside the viewport';
+    }
+
+    if (typeof element.disabled === 'boolean' && element.disabled) {
+      return 'target is disabled';
+    }
+
+    if (
+      (actionType === 'type' || actionType === 'clear') &&
+      typeof element.readOnly === 'boolean' &&
+      element.readOnly
+    ) {
+      return 'target is readonly';
+    }
+
+    const requiresHitTest =
+      actionType === 'click' ||
+      actionType === 'hover' ||
+      actionType === 'focus' ||
+      actionType === 'type' ||
+      actionType === 'clear' ||
+      actionType === 'select' ||
+      actionType === 'pressEnter';
+
+    if (!requiresHitTest) {
+      return '';
+    }
+
+    const maxX = Math.max(0, viewportWidth - 1);
+    const maxY = Math.max(0, viewportHeight - 1);
+    const centerX = Math.min(Math.max(rect.left + rect.width / 2, 0), maxX);
+    const centerY = Math.min(Math.max(rect.top + rect.height / 2, 0), maxY);
+    const topElement = document.elementFromPoint(centerX, centerY);
+    if (
+      topElement &&
+      topElement !== element &&
+      !element.contains(topElement) &&
+      !topElement.contains(element)
+    ) {
+      return 'target is covered by another element';
+    }
+
+    return '';
+  };
+
+  const ensureInteractable = (element, actionType) => {
+    const issue = getInteractabilityIssue(element, actionType);
+    if (issue) {
+      fail('TARGET_NOT_INTERACTABLE', 'Target element is not interactable: ' + issue);
+    }
+  };
+
+  const canAutoActivateContainer = (actionType) => {
+    return (
+      actionType === 'type' ||
+      actionType === 'clear' ||
+      actionType === 'select' ||
+      actionType === 'pressEnter' ||
+      actionType === 'focus'
+    );
+  };
+
+  const collectActivationCandidates = (element) => {
+    const candidates = [];
+    const seen = new Set();
+
+    const add = (candidate) => {
+      if (!candidate || candidate === element || seen.has(candidate)) return;
+      seen.add(candidate);
+      candidates.push(candidate);
+    };
+
+    if (element.id) {
+      try {
+        add(document.querySelector('label[for="' + cssEscape(element.id) + '"]'));
+      } catch {
+        // Ignore selector errors.
+      }
+    }
+
+    if (typeof element.closest === 'function') {
+      add(element.closest('label'));
+      add(
+        element.closest(
+          '[role="combobox"], [role="textbox"], [role="group"], [role="dialog"], [contenteditable], form, section'
+        )
+      );
+    }
+
+    let current = element.parentElement;
+    let depth = 0;
+    while (current && depth < 8) {
+      add(current);
+      current = current.parentElement;
+      depth += 1;
+    }
+
+    return candidates;
+  };
+
+  const tryActivateTargetContainer = (element, scrollBehavior, warnings) => {
+    const candidates = collectActivationCandidates(element);
+
+    for (const candidate of candidates) {
+      scrollElementIntoView(candidate, scrollBehavior);
+      const issue = getInteractabilityIssue(candidate, 'click');
+      if (issue) {
+        continue;
+      }
+
+      clickElement(candidate);
+      focusElement(candidate);
+      warnings.push('Activated a nearby container before interacting with the target.');
+      return true;
+    }
+
+    return false;
+  };
+
+  const resolveElementForAction = (target, actionType, scrollBehavior, warnings) => {
+    const resolved = resolveElement(target);
+    if (!resolved.element) {
+      return resolved;
+    }
+
+    if (!canAutoActivateContainer(actionType)) {
+      return resolved;
+    }
+
+    const issue = getInteractabilityIssue(resolved.element, actionType);
+    if (issue !== 'target has zero area') {
+      return resolved;
+    }
+
+    const activated = tryActivateTargetContainer(resolved.element, scrollBehavior, warnings);
+    if (!activated) {
+      return resolved;
+    }
+
+    const retried = resolveElement(target);
+    if (retried.element) {
+      warnings.push('Retried target lookup after activating container.');
+      return retried;
+    }
+
+    return resolved;
+  };
+
   try {
     const { type, target, value, opts } = payload;
     const warnings = [];
@@ -773,7 +1219,7 @@ function buildActScript(payload: ActPayload): string {
       if (target) {
         const resolved = resolveElement(target);
         if (!resolved.element) {
-          throw new Error('Target element not found for scroll');
+          fail('TARGET_NOT_FOUND', 'Target element not found for scroll');
         }
         scrollElementIntoView(resolved.element, opts.scrollBehavior);
         return {
@@ -874,17 +1320,22 @@ function buildActScript(payload: ActPayload): string {
       };
     }
 
-    const resolved = resolveElement(target);
+    const resolved = resolveElementForAction(target, type, opts.scrollBehavior, warnings);
     const element = resolved.element;
     if (!element) {
-      throw new Error('Target element not found');
+      fail('TARGET_NOT_FOUND', 'Target element not found');
     }
 
     scrollElementIntoView(element, opts.scrollBehavior);
-    const summary = getElementSummary(element, resolved.selectorUsed);
 
     if (type === 'focus') {
+      ensureInteractable(element, 'focus');
       focusElement(element);
+      const summary = getElementSummary(element, resolved.selectorUsed);
+      const activeElement = document.activeElement;
+      if (activeElement !== element && !element.contains(activeElement)) {
+        fail('NO_OBSERVABLE_EFFECT', 'Focus action did not move focus to target element');
+      }
       return {
         success: true,
         action: type,
@@ -892,12 +1343,15 @@ function buildActScript(payload: ActPayload): string {
         url: location.href,
         title: document.title || '',
         element: summary,
+        outcome: createOutcome(true, ['focus moved to target']),
         warnings,
       };
     }
 
     if (type === 'hover') {
+      ensureInteractable(element, 'hover');
       hoverElement(element);
+      const summary = getElementSummary(element, resolved.selectorUsed);
       return {
         success: true,
         action: type,
@@ -910,7 +1364,12 @@ function buildActScript(payload: ActPayload): string {
     }
 
     if (type === 'click') {
+      ensureInteractable(element, 'click');
+      const beforeOutcome = getOutcomeSnapshot(element);
       clickElement(element);
+      const afterOutcome = getOutcomeSnapshot(element);
+      const outcome = evaluateOutcome(beforeOutcome, afterOutcome);
+      const summary = getElementSummary(element, resolved.selectorUsed);
       return {
         success: true,
         action: type,
@@ -918,12 +1377,18 @@ function buildActScript(payload: ActPayload): string {
         url: location.href,
         title: document.title || '',
         element: summary,
+        outcome,
         warnings,
       };
     }
 
     if (type === 'pressEnter') {
+      ensureInteractable(element, 'pressEnter');
+      const beforeOutcome = getOutcomeSnapshot(element);
       pressEnter(element);
+      const afterOutcome = getOutcomeSnapshot(element);
+      const outcome = evaluateOutcome(beforeOutcome, afterOutcome);
+      const summary = getElementSummary(element, resolved.selectorUsed);
       return {
         success: true,
         action: type,
@@ -931,73 +1396,128 @@ function buildActScript(payload: ActPayload): string {
         url: location.href,
         title: document.title || '',
         element: summary,
+        outcome,
         warnings,
       };
     }
 
     if (type === 'clear') {
-      if (element.isContentEditable) {
-        focusElement(element);
-        element.textContent = '';
-        dispatchInputLikeEvents(element);
-        return {
-          success: true,
-          action: type,
-          message: 'Cleared contenteditable element',
-          url: location.href,
-          title: document.title || '',
-          element: summary,
-          value: '',
-          warnings,
-        };
+      const clearElement = resolveTypeableElement(element);
+      if (!clearElement) {
+        fail(
+          'INVALID_INPUT',
+          'Clear action requires an input, textarea, select, contenteditable, or nested editable control'
+        );
       }
 
-      if ('value' in element) {
-        focusElement(element);
-        setNativeInputValue(element, '');
-        dispatchInputLikeEvents(element);
-        return {
-          success: true,
-          action: type,
-          message: 'Cleared input-like element',
-          url: location.href,
-          title: document.title || '',
-          element: summary,
-          value: getValueText(element),
-          warnings,
-        };
+      if (clearElement !== element) {
+        warnings.push('Resolved target to a nested editable control.');
       }
 
-      throw new Error('Clear action requires an input, textarea, select, or contenteditable element');
+      scrollElementIntoView(clearElement, opts.scrollBehavior);
+      ensureInteractable(clearElement, 'clear');
+      focusElement(clearElement);
+
+      if (isContentEditableElement(clearElement)) {
+        clearElement.textContent = '';
+        dispatchInputLikeEvents(clearElement);
+      } else if (hasValueProperty(clearElement)) {
+        setNativeInputValue(clearElement, '');
+        dispatchInputLikeEvents(clearElement);
+      } else {
+        fail(
+          'INVALID_INPUT',
+          'Clear action requires an input, textarea, select, contenteditable, or nested editable control'
+        );
+      }
+
+      const clearedValue = getValueText(clearElement);
+      if (clearedValue !== '') {
+        fail('NO_OBSERVABLE_EFFECT', 'Clear action did not update target value');
+      }
+
+      const summary = getElementSummary(clearElement, resolved.selectorUsed);
+      return {
+        success: true,
+        action: type,
+        message: 'Cleared input-like element',
+        url: location.href,
+        title: document.title || '',
+        element: summary,
+        value: clearedValue,
+        outcome: createOutcome(true, ['target value changed']),
+        warnings,
+      };
     }
 
     if (type === 'type') {
       if (typeof value !== 'string') {
-        throw new Error('Type action requires string value');
+        fail('INVALID_INPUT', 'Type action requires string value');
       }
 
-      focusElement(element);
-      if (element.isContentEditable) {
+      const typeElement = resolveTypeableElement(element);
+      if (!typeElement) {
+        fail(
+          'INVALID_INPUT',
+          'Type action requires an input, textarea, contenteditable, or nested editable control'
+        );
+      }
+
+      if (typeElement !== element) {
+        warnings.push('Resolved target to a nested editable control.');
+      }
+
+      scrollElementIntoView(typeElement, opts.scrollBehavior);
+      ensureInteractable(typeElement, 'type');
+
+      const beforeValue = getValueText(typeElement);
+      focusElement(typeElement);
+
+      if (isContentEditableElement(typeElement)) {
         if (opts.clearBeforeType) {
-          element.textContent = '';
-        }
-        element.textContent = value;
-        dispatchInputLikeEvents(element);
-      } else if ('value' in element) {
-        if (!opts.clearBeforeType && typeof element.value === 'string' && element.value.length > 0) {
-          setNativeInputValue(element, element.value + value);
+          typeElement.textContent = '';
         } else {
-          setNativeInputValue(element, value);
+          typeElement.textContent = normalizeNewlines(typeElement.textContent || '') + value;
         }
-        dispatchInputLikeEvents(element);
+        if (opts.clearBeforeType) typeElement.textContent = value;
+        dispatchInputLikeEvents(typeElement);
+      } else if (hasValueProperty(typeElement)) {
+        if (!opts.clearBeforeType && typeof typeElement.value === 'string' && typeElement.value.length > 0) {
+          setNativeInputValue(typeElement, typeElement.value + value);
+        } else {
+          setNativeInputValue(typeElement, value);
+        }
+        dispatchInputLikeEvents(typeElement);
       } else {
-        throw new Error('Type action requires an input, textarea, or contenteditable element');
+        fail(
+          'INVALID_INPUT',
+          'Type action requires an input, textarea, contenteditable, or nested editable control'
+        );
       }
 
       if (opts.pressEnter) {
-        pressEnter(element);
+        pressEnter(typeElement);
       }
 
+      const typedValue = getValueText(typeElement);
+      if (value.length > 0) {
+        if (opts.clearBeforeType) {
+          const expectedNormalized = normalizeForComparison(value);
+          const actualNormalized = normalizeForComparison(typedValue);
+          const expectedTrimmed = expectedNormalized.replace(/\\n+$/g, '');
+          const actualTrimmed = actualNormalized.replace(/\\n+$/g, '');
+          if (
+            actualNormalized !== expectedNormalized &&
+            actualTrimmed !== expectedTrimmed
+          ) {
+            fail('NO_OBSERVABLE_EFFECT', 'Type action did not update target value');
+          }
+        } else if (normalizeForComparison(typedValue) === normalizeForComparison(beforeValue)) {
+          fail('NO_OBSERVABLE_EFFECT', 'Type action did not change target value');
+        }
+      }
+
+      const summary = getElementSummary(typeElement, resolved.selectorUsed);
       return {
         success: true,
         action: type,
@@ -1007,36 +1527,49 @@ function buildActScript(payload: ActPayload): string {
         url: location.href,
         title: document.title || '',
         element: summary,
-        value: getValueText(element),
+        value: typedValue,
+        outcome: createOutcome(true, ['target value changed']),
         warnings,
       };
     }
 
     if (type === 'select') {
-      if (!(element instanceof HTMLSelectElement)) {
-        throw new Error('Select action requires a <select> element target');
+      const selectElement = resolveSelectElement(element);
+      if (!selectElement) {
+        fail('INVALID_INPUT', 'Select action requires a <select> element target or nested <select>');
+      }
+      if (selectElement !== element) {
+        warnings.push('Resolved target to a nested <select> control.');
       }
       if (typeof value !== 'string') {
-        throw new Error('Select action requires string value');
+        fail('INVALID_INPUT', 'Select action requires string value');
       }
+
+      scrollElementIntoView(selectElement, opts.scrollBehavior);
+      ensureInteractable(selectElement, 'select');
 
       const matcher = normalizeText(value, 200).toLowerCase();
       let selectedOption =
-        Array.from(element.options).find((option) => option.value === value) ||
-        Array.from(element.options).find(
+        Array.from(selectElement.options).find((option) => option.value === value) ||
+        Array.from(selectElement.options).find(
           (option) => normalizeText(option.textContent || '', 200).toLowerCase() === matcher
         ) ||
-        Array.from(element.options).find((option) =>
+        Array.from(selectElement.options).find((option) =>
           normalizeText(option.textContent || '', 200).toLowerCase().includes(matcher)
         );
 
       if (!selectedOption) {
-        throw new Error('No matching select option found for value: ' + value);
+        fail('TARGET_NOT_FOUND', 'No matching select option found for value: ' + value);
       }
 
-      element.value = selectedOption.value;
-      dispatchInputLikeEvents(element);
+      selectElement.value = selectedOption.value;
+      dispatchInputLikeEvents(selectElement);
 
+      if (selectElement.value !== selectedOption.value) {
+        fail('NO_OBSERVABLE_EFFECT', 'Select action did not update selected value');
+      }
+
+      const summary = getElementSummary(selectElement, resolved.selectorUsed);
       return {
         success: true,
         action: type,
@@ -1044,18 +1577,21 @@ function buildActScript(payload: ActPayload): string {
         url: location.href,
         title: document.title || '',
         element: summary,
-        value: element.value,
+        value: selectElement.value,
+        outcome: createOutcome(true, ['target value changed']),
         warnings,
       };
     }
 
-    throw new Error('Unsupported action type: ' + type);
+    fail('UNSUPPORTED_ACTION', 'Unsupported action type: ' + type);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    const code = classifyErrorCode(message);
+    const normalizedMessage = code ? toCodedMessage(code, message) : message;
     return {
       success: false,
       action: payload.type,
-      message,
+      message: normalizedMessage,
       url: location.href,
       title: document.title || '',
       warnings: [],
@@ -1065,16 +1601,12 @@ function buildActScript(payload: ActPayload): string {
 `.trim();
 }
 
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
 function parseExecutionResult(raw: unknown): ActExecutionScriptResult {
   if (!isObject(raw)) {
-    throw new Error('Action returned an invalid payload');
+    throw browserToolError('PAYLOAD_INVALID', 'Action returned an invalid payload');
   }
 
-  const { success, action, message, url, title, element, value, warnings } =
+  const { success, action, message, url, title, element, value, outcome, warnings } =
     raw as Partial<ActExecutionScriptResult>;
 
   if (
@@ -1085,7 +1617,7 @@ function parseExecutionResult(raw: unknown): ActExecutionScriptResult {
     typeof title !== 'string' ||
     !Array.isArray(warnings)
   ) {
-    throw new Error('Action payload is missing required fields');
+    throw browserToolError('PAYLOAD_INVALID', 'Action payload is missing required fields');
   }
 
   const parsed: ActExecutionScriptResult = {
@@ -1099,6 +1631,14 @@ function parseExecutionResult(raw: unknown): ActExecutionScriptResult {
 
   if (typeof value === 'string') {
     parsed.value = value;
+  }
+
+  if (isObject(outcome)) {
+    const observed = typeof outcome.observed === 'boolean' ? outcome.observed : false;
+    const signals = Array.isArray(outcome.signals)
+      ? outcome.signals.filter((signal): signal is string => typeof signal === 'string')
+      : [];
+    parsed.outcome = { observed, signals };
   }
 
   if (isObject(element)) {
@@ -1140,6 +1680,12 @@ function formatActionContent(details: ActToolDetails): string {
     lines.push(`Value: ${details.value}`);
   }
 
+  if (details.outcome) {
+    const signals =
+      details.outcome.signals.length > 0 ? details.outcome.signals.join(' | ') : 'none';
+    lines.push(`Outcome Observed: ${details.outcome.observed ? 'yes' : 'no'} (${signals})`);
+  }
+
   if (details.warnings?.length) {
     lines.push(`Warnings: ${details.warnings.join(' | ')}`);
   }
@@ -1147,28 +1693,192 @@ function formatActionContent(details: ActToolDetails): string {
   return lines.join('\n');
 }
 
+function requiresObservableOutcome(input: ActToolInput): boolean {
+  return input.type === 'click' || input.type === 'pressEnter';
+}
+
+function combineOutcomeSignals(
+  scriptOutcome: ActActionOutcome | undefined,
+  waitResult: ActionWaitResult
+): ActActionOutcome | undefined {
+  const signals: string[] = [];
+  if (waitResult.changedObserved) {
+    signals.push('page state changed');
+  }
+  if (scriptOutcome?.signals.length) {
+    signals.push(...scriptOutcome.signals);
+  }
+
+  if (signals.length === 0 && !scriptOutcome) {
+    return undefined;
+  }
+
+  return {
+    observed: waitResult.changedObserved || scriptOutcome?.observed === true,
+    signals: Array.from(new Set(signals)),
+  };
+}
+
+function hasErrorCodePrefix(message: string): boolean {
+  return /^\[[A-Z0-9_]+\]/u.test(message.trim());
+}
+
+function classifyActionFailureCode(message: string): BrowserToolErrorCode {
+  if (message.startsWith('Target element is not interactable')) return 'TARGET_NOT_INTERACTABLE';
+  if (message.includes('Target element not found')) return 'TARGET_NOT_FOUND';
+  if (message.includes('No matching select option found')) return 'TARGET_NOT_FOUND';
+  if (message.includes('requires target')) return 'INVALID_INPUT';
+  if (message.includes('requires string value')) return 'INVALID_INPUT';
+  if (message.includes('requires an input') || message.includes('requires a <select>'))
+    return 'INVALID_INPUT';
+  if (message.includes('did not update target value')) return 'NO_OBSERVABLE_EFFECT';
+  if (message.includes('did not change target value')) return 'NO_OBSERVABLE_EFFECT';
+  if (message.includes('did not move focus')) return 'NO_OBSERVABLE_EFFECT';
+  if (message.includes('Unsupported action type')) return 'UNSUPPORTED_ACTION';
+  return 'INTERNAL';
+}
+
+function toCodedActionFailureMessage(message: string): string {
+  if (hasErrorCodePrefix(message)) {
+    return message;
+  }
+  const code = classifyActionFailureCode(message);
+  return formatBrowserToolErrorMessage(code, message);
+}
+
 async function waitForTabSettled(
   client: ActChromeClient,
   tabId: number,
-  timeoutMs: number
-): Promise<void> {
+  timeoutMs: number,
+  baseline: ActionWaitSample
+): Promise<ActionWaitResult> {
   if (timeoutMs <= 0) {
-    return;
+    return {
+      changedObserved: false,
+      finalSample: baseline,
+    };
   }
 
   const start = Date.now();
+  let previousSignature = '';
+  let stableCount = 0;
+  let changedObserved = false;
+  let latestSample = baseline;
+
   while (Date.now() - start < timeoutMs) {
-    const tab = await callChrome<ChromeTab>(client, 'tabs.get', tabId);
-    if (tab.status === 'complete') {
-      return;
+    const sample = await getActionWaitSample(client, tabId);
+    latestSample = sample;
+
+    if (
+      sample.status !== baseline.status ||
+      sample.url !== baseline.url ||
+      sample.title !== baseline.title ||
+      sample.readyState !== baseline.readyState ||
+      sample.textLength !== baseline.textLength ||
+      sample.nodeCount !== baseline.nodeCount
+    ) {
+      changedObserved = true;
     }
-    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    const signature = `${sample.status}|${sample.url}|${sample.title}|${sample.readyState}|${sample.textLength}|${sample.nodeCount}`;
+    if (signature === previousSignature) {
+      stableCount += 1;
+    } else {
+      stableCount = 0;
+      previousSignature = signature;
+    }
+
+    if (
+      sample.status === 'complete' &&
+      stableCount >= ACTION_WAIT_STABLE_POLLS &&
+      changedObserved
+    ) {
+      return {
+        changedObserved: true,
+        finalSample: sample,
+      };
+    }
+
+    if (!changedObserved && Date.now() - start >= ACTION_WAIT_QUIET_MS && stableCount >= 1) {
+      return {
+        changedObserved: false,
+        finalSample: sample,
+      };
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, ACTION_WAIT_POLL_INTERVAL_MS));
   }
+
+  throw browserToolError(
+    'ACTION_TIMEOUT',
+    `Action did not settle within ${timeoutMs}ms for tab ${tabId} (status=${latestSample.status}, url=${latestSample.url || '(empty)'})`,
+    {
+      retryable: true,
+    }
+  );
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function toSafeString(value: unknown): string {
+  return typeof value === 'string' ? value : '';
+}
+
+function toSafeNumber(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
+
+async function getActionWaitSample(
+  client: ActChromeClient,
+  tabId: number
+): Promise<ActionWaitSample> {
+  const tab = await callChrome<ChromeTab>(client, 'tabs.get', tabId);
+  const status = typeof tab.status === 'string' && tab.status ? tab.status : 'complete';
+  const url = tab.url ?? '';
+  const title = tab.title ?? '';
+
+  let readyState = 'unknown';
+  let textLength = 0;
+  let nodeCount = 0;
+
+  try {
+    const evaluation = await callChrome<DebuggerEvaluateResult>(client, 'debugger.evaluate', {
+      tabId,
+      code: `
+(() => {
+  const body = document.body;
+  return {
+    readyState: document.readyState || 'unknown',
+    textLength: typeof body?.innerText === 'string' ? body.innerText.length : 0,
+    nodeCount: document.getElementsByTagName('*').length,
+  };
+})()
+      `.trim(),
+    });
+    if (isObject(evaluation.result)) {
+      readyState = toSafeString(evaluation.result.readyState) || readyState;
+      textLength = toSafeNumber(evaluation.result.textLength);
+      nodeCount = toSafeNumber(evaluation.result.nodeCount);
+    }
+  } catch {
+    // Keep tab-level fallback metrics when page evaluation is unavailable.
+  }
+
+  return {
+    status,
+    url,
+    title,
+    readyState,
+    textLength,
+    nodeCount,
+  };
 }
 
 export function createActTool(options: ActToolOptions): AgentTool<typeof actSchema> {
   if (!Number.isInteger(options.windowId) || options.windowId <= 0) {
-    throw new Error('createActTool requires a positive integer windowId');
+    throw browserToolError('INVALID_INPUT', 'createActTool requires a positive integer windowId');
   }
 
   const windowId = options.windowId;
@@ -1186,7 +1896,13 @@ export function createActTool(options: ActToolOptions): AgentTool<typeof actSche
     description:
       'Perform browser actions on page elements. Supports click, type, clear, pressEnter, select, scroll, hover, and focus. Target can be CSS/locator fields or inspect_page ids like E1.',
     parameters: actSchema,
-    execute: async (_toolCallId: string, input: ActToolInput) => {
+    execute: async (
+      _toolCallId: string,
+      input: ActToolInput,
+      _signal?: AbortSignal,
+      _onUpdate?: unknown,
+      context?: ToolExecutionContext
+    ) => {
       validateInput(input);
 
       const client = await getClient();
@@ -1195,7 +1911,7 @@ export function createActTool(options: ActToolOptions): AgentTool<typeof actSche
       const targetTab = await getTargetTab(client, windowId, input.tabId);
       const targetTabId = targetTab.id;
       if (typeof targetTabId !== 'number') {
-        throw new Error('Target tab id is missing');
+        throw browserToolError('TAB_ID_MISSING', 'Target tab id is missing');
       }
 
       await callChrome<ChromeTab>(client, 'tabs.update', targetTabId, { active: true });
@@ -1205,7 +1921,8 @@ export function createActTool(options: ActToolOptions): AgentTool<typeof actSche
         inspectTool,
         _toolCallId,
         targetTabId,
-        input.target
+        input.target,
+        context
       );
 
       const payloadBase: ActPayload = {
@@ -1218,6 +1935,7 @@ export function createActTool(options: ActToolOptions): AgentTool<typeof actSche
         ...(input.value !== undefined ? { value: input.value } : {}),
       };
 
+      const baseline = await getActionWaitSample(client, targetTabId);
       const script = buildActScript(payload);
       const evaluation = await callChrome<DebuggerEvaluateResult>(client, 'debugger.evaluate', {
         tabId: targetTabId,
@@ -1226,10 +1944,22 @@ export function createActTool(options: ActToolOptions): AgentTool<typeof actSche
       const executionResult = parseExecutionResult(evaluation.result);
 
       if (!executionResult.success) {
-        throw new Error(executionResult.message);
+        throw new Error(toCodedActionFailureMessage(executionResult.message));
       }
 
-      await waitForTabSettled(client, targetTabId, normalizedOptions.waitForNavigationMs);
+      const waitResult = await waitForTabSettled(
+        client,
+        targetTabId,
+        normalizedOptions.waitForNavigationMs,
+        baseline
+      );
+      const outcome = combineOutcomeSignals(executionResult.outcome, waitResult);
+      if (requiresObservableOutcome(input) && (!outcome || !outcome.observed)) {
+        throw browserToolError(
+          'NO_OBSERVABLE_EFFECT',
+          `Action "${input.type}" completed but no observable page or element change was detected`
+        );
+      }
 
       if (normalizedOptions.delayMs > 0) {
         await new Promise((resolve) => setTimeout(resolve, normalizedOptions.delayMs));
@@ -1243,13 +1973,14 @@ export function createActTool(options: ActToolOptions): AgentTool<typeof actSche
         windowId,
         tab,
         page: {
-          url: executionResult.url || tab.url,
-          title: executionResult.title || tab.title,
+          url: tab.url || executionResult.url,
+          title: tab.title || executionResult.title,
         },
         message: executionResult.message,
         ...(input.target !== undefined ? { target: input.target } : {}),
         ...(executionResult.value !== undefined ? { value: executionResult.value } : {}),
         ...(executionResult.element !== undefined ? { element: executionResult.element } : {}),
+        ...(outcome ? { outcome } : {}),
       };
 
       const details: ActToolDetails =

@@ -1,6 +1,8 @@
 import { connect, type ConnectOptions } from '@ank1015/llm-extension';
 import { type Static, Type } from '@sinclair/typebox';
 
+import { browserToolError } from './errors.js';
+
 import type { AgentTool } from '@ank1015/llm-sdk';
 
 const navigationActionSchema = Type.Union([
@@ -38,6 +40,7 @@ interface ChromeTab {
   id?: number;
   url?: string;
   title?: string;
+  status?: string;
   windowId?: number;
   active?: boolean;
 }
@@ -72,6 +75,10 @@ export interface NavigationToolOptions {
   operations?: NavigationOperations;
 }
 
+const NAVIGATION_SETTLE_TIMEOUT_MS = 15000;
+const NAVIGATION_POLL_INTERVAL_MS = 150;
+const NAVIGATION_STABLE_POLLS = 2;
+
 function createDefaultGetClient(
   connectOptions?: ConnectOptions
 ): () => Promise<NavigationChromeClient> {
@@ -95,7 +102,10 @@ async function callChrome<T>(
 
 function toNavigationTab(tab: ChromeTab): NavigationTab {
   if (typeof tab.id !== 'number') {
-    throw new Error('Chrome tab response did not include a numeric tab id');
+    throw browserToolError(
+      'TAB_ID_MISSING',
+      'Chrome tab response did not include a numeric tab id'
+    );
   }
 
   return {
@@ -131,9 +141,73 @@ function formatTabLine(tab: NavigationTab): string {
 
 function ensureTabId(tab: ChromeTab): number {
   if (typeof tab.id !== 'number') {
-    throw new Error('Tab id is missing');
+    throw browserToolError('TAB_ID_MISSING', 'Tab id is missing');
   }
   return tab.id;
+}
+
+function isMeaningfulNavigationUrl(url: string | undefined): boolean {
+  if (!url) {
+    return false;
+  }
+
+  const normalized = url.trim().toLowerCase();
+  if (!normalized || normalized === 'about:blank') {
+    return false;
+  }
+
+  return true;
+}
+
+async function waitForNavigationSettled(
+  client: NavigationChromeClient,
+  tabId: number,
+  timeoutMs = NAVIGATION_SETTLE_TIMEOUT_MS
+): Promise<ChromeTab> {
+  const start = Date.now();
+  let lastSignature = '';
+  let stableCount = 0;
+  let latest: ChromeTab | undefined;
+
+  while (Date.now() - start < timeoutMs) {
+    const current = await callChrome<ChromeTab>(client, 'tabs.get', tabId);
+    latest = current;
+
+    const status = current.status ?? 'complete';
+    const url = current.url ?? '';
+    const title = current.title ?? '';
+    const signature = `${status}|${url}|${title}`;
+
+    if (signature === lastSignature) {
+      stableCount += 1;
+    } else {
+      stableCount = 0;
+      lastSignature = signature;
+    }
+
+    const ready = status === 'complete' && isMeaningfulNavigationUrl(url);
+    if (ready && stableCount >= NAVIGATION_STABLE_POLLS) {
+      return current;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, NAVIGATION_POLL_INTERVAL_MS));
+  }
+
+  if (latest) {
+    const status = latest.status ?? 'complete';
+    const url = latest.url ?? '(empty)';
+    throw browserToolError(
+      'NAVIGATION_TIMEOUT',
+      `Navigation did not settle for tab ${tabId} within ${timeoutMs}ms (status=${status}, url=${url})`,
+      { retryable: true }
+    );
+  }
+
+  throw browserToolError(
+    'NAVIGATION_TIMEOUT',
+    `Navigation did not settle for tab ${tabId} within ${timeoutMs}ms`,
+    { retryable: true }
+  );
 }
 
 async function getTargetTab(
@@ -144,14 +218,17 @@ async function getTargetTab(
   if (typeof tabId === 'number') {
     const tab = await callChrome<ChromeTab>(client, 'tabs.get', tabId);
     if (tab.windowId !== windowId) {
-      throw new Error(`Tab ${tabId} does not belong to window ${windowId}`);
+      throw browserToolError(
+        'TAB_SCOPE_VIOLATION',
+        `Tab ${tabId} does not belong to window ${windowId}`
+      );
     }
     return tab;
   }
 
   const activeTab = await findActiveTab(client, windowId);
   if (!activeTab) {
-    throw new Error(`No target tab found in window ${windowId}`);
+    throw browserToolError('TAB_NOT_FOUND', `No target tab found in window ${windowId}`);
   }
   return activeTab;
 }
@@ -160,7 +237,10 @@ export function createNavigationTool(
   options: NavigationToolOptions
 ): AgentTool<typeof navigationSchema> {
   if (!Number.isInteger(options.windowId) || options.windowId <= 0) {
-    throw new Error('createNavigationTool requires a positive integer windowId');
+    throw browserToolError(
+      'INVALID_INPUT',
+      'createNavigationTool requires a positive integer windowId'
+    );
   }
 
   const windowId = options.windowId;
@@ -176,7 +256,7 @@ export function createNavigationTool(
       const client = await getClient();
 
       if ((action === 'open_url' || action === 'open_url_new_tab') && !url) {
-        throw new Error(`action "${action}" requires a url`);
+        throw browserToolError('INVALID_INPUT', `action "${action}" requires a url`);
       }
 
       let resultTab: NavigationTab;
@@ -187,17 +267,20 @@ export function createNavigationTool(
           const activeTab = await findActiveTab(client, windowId);
           if (activeTab) {
             const activeTabId = ensureTabId(activeTab);
-            const updatedTab = await callChrome<ChromeTab>(client, 'tabs.update', activeTabId, {
+            await callChrome<ChromeTab>(client, 'tabs.update', activeTabId, {
               url,
             });
-            resultTab = toNavigationTab(updatedTab);
+            const settledTab = await waitForNavigationSettled(client, activeTabId);
+            resultTab = toNavigationTab(settledTab);
           } else {
             const createdTab = await callChrome<ChromeTab>(client, 'tabs.create', {
               url,
               active: true,
               windowId,
             });
-            resultTab = toNavigationTab(createdTab);
+            const createdTabId = ensureTabId(createdTab);
+            const settledTab = await waitForNavigationSettled(client, createdTabId);
+            resultTab = toNavigationTab(settledTab);
           }
           break;
         }
@@ -208,7 +291,9 @@ export function createNavigationTool(
             active: true,
             windowId,
           });
-          resultTab = toNavigationTab(createdTab);
+          const createdTabId = ensureTabId(createdTab);
+          const settledTab = await waitForNavigationSettled(client, createdTabId);
+          resultTab = toNavigationTab(settledTab);
           break;
         }
 
@@ -216,7 +301,7 @@ export function createNavigationTool(
           const targetTab = await getTargetTab(client, windowId, tabId);
           const targetTabId = ensureTabId(targetTab);
           await callChrome<unknown>(client, 'tabs.goBack', targetTabId);
-          const refreshedTab = await callChrome<ChromeTab>(client, 'tabs.get', targetTabId);
+          const refreshedTab = await waitForNavigationSettled(client, targetTabId);
           resultTab = toNavigationTab(refreshedTab);
           break;
         }
@@ -225,7 +310,7 @@ export function createNavigationTool(
           const targetTab = await getTargetTab(client, windowId, tabId);
           const targetTabId = ensureTabId(targetTab);
           await callChrome<unknown>(client, 'tabs.goForward', targetTabId);
-          const refreshedTab = await callChrome<ChromeTab>(client, 'tabs.get', targetTabId);
+          const refreshedTab = await waitForNavigationSettled(client, targetTabId);
           resultTab = toNavigationTab(refreshedTab);
           break;
         }
@@ -234,14 +319,14 @@ export function createNavigationTool(
           const targetTab = await getTargetTab(client, windowId, tabId);
           const targetTabId = ensureTabId(targetTab);
           await callChrome<unknown>(client, 'tabs.reload', targetTabId);
-          const refreshedTab = await callChrome<ChromeTab>(client, 'tabs.get', targetTabId);
+          const refreshedTab = await waitForNavigationSettled(client, targetTabId);
           resultTab = toNavigationTab(refreshedTab);
           break;
         }
 
         case 'switch_tab': {
           if (typeof tabId !== 'number') {
-            throw new Error('action "switch_tab" requires tabId');
+            throw browserToolError('INVALID_INPUT', 'action "switch_tab" requires tabId');
           }
 
           await getTargetTab(client, windowId, tabId);
@@ -268,7 +353,7 @@ export function createNavigationTool(
             .map((tab) => toNavigationTab(tab));
 
           if (tabSummaries.length === 0) {
-            throw new Error(`No tabs available in window ${windowId}`);
+            throw browserToolError('TAB_NOT_FOUND', `No tabs available in window ${windowId}`);
           }
 
           const active = tabs.find((tab) => tab.active && typeof tab.id === 'number');
@@ -280,7 +365,7 @@ export function createNavigationTool(
         case 'get_active_tab': {
           const activeTab = await findActiveTab(client, windowId);
           if (!activeTab) {
-            throw new Error(`No active tab found in window ${windowId}`);
+            throw browserToolError('TAB_NOT_FOUND', `No active tab found in window ${windowId}`);
           }
           resultTab = toNavigationTab(activeTab);
           break;

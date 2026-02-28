@@ -18,6 +18,8 @@ describe('createNavigationTool', () => {
   });
 
   it('uses scoped windowId for navigation actions', async () => {
+    let getCallCount = 0;
+
     const call = vi.fn(async (method: string, ...args: unknown[]) => {
       if (method === 'tabs.create') {
         const payload = args[0] as { url?: string; windowId?: number };
@@ -26,6 +28,18 @@ describe('createNavigationTool', () => {
           url: payload.url,
           title: 'Example Domain',
           windowId: payload.windowId,
+          active: true,
+        };
+      }
+
+      if (method === 'tabs.get') {
+        getCallCount += 1;
+        return {
+          id: 11,
+          url: 'https://example.com',
+          title: 'Example Domain',
+          windowId: 7001,
+          status: 'complete',
           active: true,
         };
       }
@@ -92,6 +106,70 @@ describe('createNavigationTool', () => {
       active: true,
       windowId: 7001,
     });
+    expect(getCallCount).toBeGreaterThanOrEqual(2);
+  });
+
+  it('waits through intermediate about:blank before reporting open_url_new_tab success', async () => {
+    let getCallCount = 0;
+
+    const call = vi.fn(async (method: string, ...args: unknown[]) => {
+      if (method === 'tabs.create') {
+        const payload = args[0] as { url?: string; windowId?: number };
+        return {
+          id: 51,
+          url: payload.url,
+          title: '',
+          windowId: payload.windowId,
+          active: true,
+          status: 'loading',
+        };
+      }
+
+      if (method === 'tabs.get') {
+        getCallCount += 1;
+        if (getCallCount <= 2) {
+          return {
+            id: 51,
+            url: 'about:blank',
+            title: '',
+            windowId: 7001,
+            status: 'loading',
+          };
+        }
+        return {
+          id: 51,
+          url: 'https://example.com/final',
+          title: 'Final',
+          windowId: 7001,
+          status: 'complete',
+        };
+      }
+
+      throw new Error(`Unexpected method call: ${method}`);
+    });
+
+    const tool = createNavigationTool({
+      windowId: 7001,
+      operations: {
+        getClient: async () => createMockClient(call),
+      },
+    });
+
+    const result = await tool.execute('open-settled', {
+      action: 'open_url_new_tab',
+      url: 'https://example.com/start',
+    });
+
+    expect(result.details).toMatchObject({
+      action: 'open_url_new_tab',
+      tab: {
+        tabId: 51,
+        url: 'https://example.com/final',
+        title: 'Final',
+      },
+      windowId: 7001,
+    });
+    expect(getCallCount).toBeGreaterThanOrEqual(3);
   });
 
   it('lists tabs in the scoped window and returns active tab as primary', async () => {
@@ -167,6 +245,6 @@ describe('createNavigationTool', () => {
         action: 'close_tab',
         tabId: 9,
       })
-    ).rejects.toThrow('Tab 9 does not belong to window 7001');
+    ).rejects.toThrow('[TAB_SCOPE_VIOLATION]');
   });
 });

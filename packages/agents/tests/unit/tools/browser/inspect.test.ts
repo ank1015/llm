@@ -37,6 +37,12 @@ describe('createInspectTool', () => {
         totalLinks: 1,
         totalButtons: 1,
         totalInputs: 2,
+        mediaCount: 1,
+        playingMediaCount: 1,
+        pausedMediaCount: 0,
+        bufferingMediaCount: 0,
+        endedMediaCount: 0,
+        mutedMediaCount: 0,
       },
       interactive: [
         {
@@ -72,12 +78,28 @@ describe('createInspectTool', () => {
           submitButtons: ['Sign in'],
         },
       ],
+      media: [
+        {
+          id: 'M1',
+          kind: 'video',
+          name: 'Intro clip',
+          state: ['playing'],
+          locator: { id: 'hero-video', cssPath: '#hero-video' },
+          bbox: { x: 200, y: 320, width: 640, height: 360 },
+          currentTime: 8.2,
+          duration: 32.1,
+          readyState: 4,
+          networkState: 1,
+          src: 'https://cdn.example.com/intro.mp4',
+        },
+      ],
       alerts: ['Invalid password'],
       truncation: {
         interactive: false,
         textBlocks: false,
         hiddenFilteredCount: 3,
         offscreenFilteredCount: 0,
+        suppressedAlertCount: 2,
       },
       warnings: ['Iframe contents are not expanded in this snapshot.'],
     };
@@ -208,7 +230,7 @@ describe('createInspectTool', () => {
       tool.execute('inspect-2', {
         tabId: 99,
       })
-    ).rejects.toThrow('Tab 99 does not belong to window 7001');
+    ).rejects.toThrow('[TAB_SCOPE_VIOLATION]');
   });
 
   it('throws when debugger payload is invalid', async () => {
@@ -253,8 +275,6 @@ describe('createInspectTool', () => {
       },
     });
 
-    await expect(tool.execute('inspect-3', {})).rejects.toThrow(
-      'Page inspection returned an invalid payload'
-    );
+    await expect(tool.execute('inspect-3', {})).rejects.toThrow('[PAYLOAD_INVALID]');
   });
 });

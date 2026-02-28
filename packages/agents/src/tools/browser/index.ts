@@ -1,4 +1,13 @@
 export {
+  browserToolError,
+  browserToolErrorCodes,
+  BrowserToolError,
+  formatBrowserToolErrorMessage,
+  toBrowserToolError,
+  type BrowserToolErrorCode,
+  type BrowserToolErrorOptions,
+} from './errors.js';
+export {
   createActTool,
   type ActAction,
   type ActElementSummary,
@@ -32,7 +41,9 @@ export {
   type InspectBBox,
   type InspectFormSummary,
   type InspectInteractiveElement,
+  type InspectLatentElement,
   type InspectLocator,
+  type InspectMediaElement,
   type InspectOperations,
   type InspectPageInfo,
   type InspectPageSummary,
