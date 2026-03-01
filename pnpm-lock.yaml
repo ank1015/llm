@@ -572,12 +572,21 @@ importers:
 
   packages/server:
     dependencies:
+      '@ank1015/llm-agents':
+        specifier: workspace:^
+        version: link:../agents
       '@ank1015/llm-extension':
         specifier: workspace:^
         version: link:../extension
       '@ank1015/llm-research':
         specifier: workspace:^
         version: link:../research
+      '@ank1015/llm-sdk':
+        specifier: workspace:^
+        version: link:../sdk
+      '@ank1015/llm-sdk-adapters':
+        specifier: workspace:^
+        version: link:../sdk-adapters
       '@hono/node-server':
         specifier: ^1.14.1
         version: 1.19.9(hono@4.12.0)

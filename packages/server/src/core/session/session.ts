@@ -1,12 +1,6 @@
 import { join } from 'node:path';
 
-import {
-  complete,
-  Conversation,
-  createSessionManager,
-  getModel,
-  GoogleThinkingLevel,
-} from '@ank1015/llm-sdk';
+import { complete, Conversation, createSessionManager, getModel } from '@ank1015/llm-sdk';
 import { createFileSessionsAdapter, createFileKeysAdapter } from '@ank1015/llm-sdk-adapters';
 
 import { getArtifactTypeConfig } from '../artifact-type/artifact-type.js';
@@ -32,7 +26,6 @@ import type {
   Provider,
   SessionManager,
   SessionSummary,
-  GoogleProviderOptions,
 } from '@ank1015/llm-sdk';
 
 /**
@@ -288,16 +281,7 @@ export class Session {
       keysAdapter,
       streamAssistantMessage: false,
     });
-    // conversation.setProvider({model} as Provider<Api>);
-    conversation.setProvider({
-      model: getModel('google', 'gemini-3-pro-preview'),
-      providerOptions: {
-        thinkingConfig: {
-          thinkingLevel: GoogleThinkingLevel.HIGH,
-          includeThoughts: true,
-        },
-      } as GoogleProviderOptions,
-    } as Provider<Api>);
+    conversation.setProvider({ model } as Provider<Api>);
     conversation.setSystemPrompt(systemPrompt);
     conversation.setTools(Object.values(tools));
 
@@ -371,16 +355,7 @@ export class Session {
       },
     });
 
-    // conversation.setProvider({ model } as Provider<Api>);
-    conversation.setProvider({
-      model: getModel('google', 'gemini-3-pro-preview'),
-      providerOptions: {
-        thinkingConfig: {
-          thinkingLevel: GoogleThinkingLevel.HIGH,
-          includeThoughts: true,
-        },
-      } as GoogleProviderOptions,
-    } as Provider<Api>);
+    conversation.setProvider({ model } as Provider<Api>);
     conversation.setSystemPrompt(systemPrompt);
 
     // Subscribe to conversation events

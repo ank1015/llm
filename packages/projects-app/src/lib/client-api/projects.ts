@@ -56,6 +56,12 @@ export async function createProject(input: {
   });
 }
 
+export async function deleteProject(projectId: string): Promise<{ deleted: boolean }> {
+  return apiRequestJson<{ deleted: boolean }>(`${PROJECTS_BASE}/${encodeURIComponent(projectId)}`, {
+    method: 'DELETE',
+  });
+}
+
 export async function getProjectOverview(projectId: string): Promise<ProjectOverview> {
   return apiRequestJson<ProjectOverview>(
     `${PROJECTS_BASE}/${encodeURIComponent(projectId)}/overview`,

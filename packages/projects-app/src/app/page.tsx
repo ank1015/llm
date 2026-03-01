@@ -1,6 +1,6 @@
 'use client';
 
-import { FolderOpen, Loader2, Plus } from 'lucide-react';
+import { Ellipsis, FolderOpen, Loader2, Plus, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
@@ -16,13 +16,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { createProject, listProjects } from '@/lib/client-api';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { createProject, deleteProject, listProjects } from '@/lib/client-api';
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<ProjectMetadata[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -50,6 +57,21 @@ export default function ProjectsPage() {
     setProjects((prev) => [project, ...prev]);
     setIsCreateOpen(false);
     router.push(`/${project.id}`);
+  };
+
+  const handleDeleteProject = async (projectId: string) => {
+    if (deletingProjectId) return;
+
+    setDeletingProjectId(projectId);
+    setError(null);
+    try {
+      await deleteProject(projectId);
+      setProjects((prev) => prev.filter((project) => project.id !== projectId));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete project');
+    } finally {
+      setDeletingProjectId(null);
+    }
   };
 
   return (
@@ -94,21 +116,49 @@ export default function ProjectsPage() {
         ) : (
           <div className="mx-auto grid max-w-4xl grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {projects.map((project) => (
-              <button
+              <div
                 key={project.id}
-                onClick={() => handleProjectClick(project)}
-                className="bg-home-panel border-home-border hover:bg-home-hover flex cursor-pointer flex-col items-start gap-1 rounded-xl border p-5 text-left transition-colors"
+                className="bg-home-panel border-home-border hover:bg-home-hover relative flex rounded-xl border p-5 transition-colors"
               >
-                <span className="text-foreground text-sm font-medium">{project.name}</span>
-                {project.description && (
-                  <span className="text-muted-foreground text-xs line-clamp-2">
-                    {project.description}
+                <button
+                  onClick={() => handleProjectClick(project)}
+                  className="flex flex-1 cursor-pointer flex-col items-start gap-1 pr-8 text-left"
+                >
+                  <span className="text-foreground text-sm font-medium">{project.name}</span>
+                  {project.description && (
+                    <span className="text-muted-foreground text-xs line-clamp-2">
+                      {project.description}
+                    </span>
+                  )}
+                  <span className="text-muted-foreground mt-1 text-[11px]">
+                    {new Date(project.createdAt).toLocaleDateString()}
                   </span>
-                )}
-                <span className="text-muted-foreground mt-1 text-[11px]">
-                  {new Date(project.createdAt).toLocaleDateString()}
-                </span>
-              </button>
+                </button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      className="absolute top-3 right-3 flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-foreground/10 hover:text-foreground"
+                      aria-label={`Project actions for ${project.name}`}
+                    >
+                      <Ellipsis size={14} strokeWidth={1.8} />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-[150px]">
+                    <DropdownMenuItem
+                      variant="destructive"
+                      disabled={deletingProjectId === project.id}
+                      onClick={() => void handleDeleteProject(project.id)}
+                    >
+                      {deletingProjectId === project.id ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : (
+                        <Trash2 size={14} />
+                      )}
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             ))}
           </div>
         )}

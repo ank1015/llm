@@ -15,8 +15,8 @@
   ],
   "scripts": {
     "build": "tsc",
-    "dev": "tsc --watch",
-    "start": "node dist/index.js",
+    "dev": "sh -c 'tsc && tsc --watch --preserveWatchOutput & TSC_PID=$!; trap \"kill $TSC_PID\" EXIT; node --watch dist/server.js'",
+    "start": "node dist/server.js",
     "test": "vitest run --exclude tests/integration/**",
     "test:watch": "vitest --exclude tests/integration/**",
     "test:integration": "vitest run tests/integration",
@@ -24,8 +24,11 @@
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
+    "@ank1015/llm-agents": "workspace:^",
     "@ank1015/llm-extension": "workspace:^",
     "@ank1015/llm-research": "workspace:^",
+    "@ank1015/llm-sdk": "workspace:^",
+    "@ank1015/llm-sdk-adapters": "workspace:^",
     "@hono/node-server": "^1.14.1",
     "better-sqlite3": "^11.0.0",
     "hono": "^4.7.6"
