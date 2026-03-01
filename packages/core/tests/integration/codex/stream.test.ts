@@ -4,7 +4,7 @@ import path from 'node:path';
 import { Type } from '@sinclair/typebox';
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { getModel } from '../../../src/models.js';
+import { getModel } from '../../../src/models/index.js';
 import { streamCodex } from '../../../src/providers/codex/stream.js';
 
 import type { BaseAssistantEvent, CodexProviderOptions, Context, Model } from '@ank1015/llm-types';

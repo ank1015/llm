@@ -2,7 +2,7 @@ import { Type } from '@sinclair/typebox';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 import { runAgentLoop } from '../../../src/agent/runner.js';
-import { getModel } from '../../../src/models.js';
+import { getModel } from '../../../src/models/index.js';
 
 import type {
   AgentRunnerCallbacks,

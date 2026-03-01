@@ -85,6 +85,7 @@ Manifest V3 permissions (in `manifest.json`):
 | `activeTab`, `tabs`            | Tab queries, create, update, remove                              |
 | `storage`                      | `storage.local` get/set/remove                                   |
 | `cookies`                      | `cookies.getAll`, `cookies.get`, `cookies.set`, `cookies.remove` |
+| `downloads`                    | `downloads.download`, `downloads.search`, cleanup APIs           |
 | `debugger`                     | `debugger.evaluate`, debugger sessions (Network, etc.)           |
 | `accessibilityFeatures.read`   | Read accessibility settings                                      |
 | `accessibilityFeatures.modify` | Modify accessibility settings                                    |

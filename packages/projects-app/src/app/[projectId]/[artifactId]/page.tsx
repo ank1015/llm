@@ -1,0 +1,95 @@
+'use client';
+
+import { Folder, Loader2, MessageSquare } from 'lucide-react';
+import Link from 'next/link';
+import { useParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
+
+import type { ArtifactDirWithSessions } from '@/lib/client-api';
+
+import { getProjectOverview } from '@/lib/client-api';
+
+export default function ArtifactPage() {
+  const { projectId, artifactId } = useParams<{ projectId: string; artifactId: string }>();
+  const [artifact, setArtifact] = useState<ArtifactDirWithSessions | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!projectId || !artifactId) return;
+    setIsLoading(true);
+    void getProjectOverview(projectId)
+      .then((overview) => {
+        const dir = overview.artifactDirs.find((d) => d.id === artifactId) ?? null;
+        setArtifact(dir);
+      })
+      .catch(() => {
+        setArtifact(null);
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
+  }, [projectId, artifactId]);
+
+  if (isLoading) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <Loader2 size={24} className="text-muted-foreground animate-spin" />
+      </div>
+    );
+  }
+
+  if (!artifact) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <p className="text-muted-foreground text-sm">Artifact not found</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 overflow-y-auto px-8 pt-6">
+      <div className="mx-auto w-full max-w-3xl pb-[200px]">
+        {/* Header */}
+        <div className="mt-10 mb-6 flex items-center gap-2">
+          <Folder size={18} className="text-muted-foreground" />
+          <h1 className="text-foreground text-lg font-medium">{artifact.name}</h1>
+          <div className="flex-1" />
+          <span className="text-muted-foreground flex items-center gap-1 text-xs">
+            <MessageSquare size={14} />
+            {artifact.sessions.length}
+          </span>
+        </div>
+
+        {/* Thread list */}
+        {artifact.sessions.length > 0 && (
+          <div className="mb-14 flex flex-col gap-1">
+            {artifact.sessions.map((session) => (
+              <Link
+                key={session.sessionId}
+                href={`/${projectId}/${artifactId}/${session.sessionId}`}
+                className="hover:bg-home-hover flex items-center justify-between rounded-lg px-3 py-2 transition-colors"
+              >
+                <span className="text-foreground text-sm">{session.sessionName}</span>
+                <span className="text-muted-foreground text-xs">
+                  {new Date(session.createdAt).toLocaleDateString()}
+                </span>
+              </Link>
+            ))}
+          </div>
+        )}
+
+        {/* Description */}
+        {artifact.description && (
+          <div className="flex flex-col items-start gap-1">
+            <h2 className="text-muted-foreground mb-2 text-xs font-medium uppercase tracking-wide">
+              Info
+            </h2>
+            <div className="text-foreground max-w-[85%] whitespace-pre-wrap text-[15px] leading-relaxed">
+              {artifact.description}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

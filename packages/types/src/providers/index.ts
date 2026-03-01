@@ -9,22 +9,32 @@ import type { Api } from '../api.js';
 // Import native response types for the map
 // Import provider options for the map
 import type { AnthropicNativeResponse, AnthropicProviderOptions } from './anthropic.js';
+import type { CerebrasNativeResponse, CerebrasProviderOptions } from './cerebras.js';
 import type { ClaudeCodeNativeResponse, ClaudeCodeProviderOptions } from './claude-code.js';
 import type { CodexNativeResponse, CodexProviderOptions } from './codex.js';
 import type { DeepSeekNativeResponse, DeepSeekProviderOptions } from './deepseek.js';
 import type { GoogleNativeResponse, GoogleProviderOptions } from './google.js';
 import type { KimiNativeResponse, KimiProviderOptions } from './kimi.js';
+import type { MiniMaxNativeResponse, MiniMaxProviderOptions } from './minimax.js';
 import type { OpenAINativeResponse, OpenAIProviderOptions } from './openai.js';
+import type { OpenRouterNativeResponse, OpenRouterProviderOptions } from './openrouter.js';
 import type { ZaiNativeResponse, ZaiProviderOptions } from './zai.js';
 
 // Re-export all provider types
 export type { AnthropicNativeResponse, AnthropicProviderOptions } from './anthropic.js';
+export type {
+  CerebrasNativeResponse,
+  CerebrasProviderOptions,
+  CerebrasReasoningFormat,
+} from './cerebras.js';
 export type { ClaudeCodeNativeResponse, ClaudeCodeProviderOptions } from './claude-code.js';
 export type { CodexNativeResponse, CodexProviderOptions } from './codex.js';
 export type { DeepSeekNativeResponse, DeepSeekProviderOptions } from './deepseek.js';
 export type { GoogleNativeResponse, GoogleProviderOptions } from './google.js';
 export type { KimiNativeResponse, KimiProviderOptions, KimiThinkingConfig } from './kimi.js';
+export type { MiniMaxNativeResponse, MiniMaxProviderOptions } from './minimax.js';
 export type { OpenAINativeResponse, OpenAIProviderOptions } from './openai.js';
+export type { OpenRouterNativeResponse, OpenRouterProviderOptions } from './openrouter.js';
 export type { ZaiNativeResponse, ZaiProviderOptions, ZaiThinkingConfig } from './zai.js';
 
 /**
@@ -42,6 +52,9 @@ export interface ApiNativeResponseMap {
   'claude-code': ClaudeCodeNativeResponse;
   zai: ZaiNativeResponse;
   kimi: KimiNativeResponse;
+  minimax: MiniMaxNativeResponse;
+  cerebras: CerebrasNativeResponse;
+  openrouter: OpenRouterNativeResponse;
 }
 
 /**
@@ -61,6 +74,9 @@ export interface ApiOptionsMap {
   'claude-code': ClaudeCodeProviderOptions;
   zai: ZaiProviderOptions;
   kimi: KimiProviderOptions;
+  minimax: MiniMaxProviderOptions;
+  cerebras: CerebrasProviderOptions;
+  openrouter: OpenRouterProviderOptions;
 }
 
 /**

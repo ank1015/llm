@@ -7,8 +7,7 @@
 export const VERSION = '0.0.1';
 
 // Models
-export { MODELS } from './models.generated.js';
-export { getProviders, getModel, getModels, calculateCost } from './models.js';
+export { MODELS, getProviders, getModel, getModels, calculateCost } from './models/index.js';
 
 // Utilities
 export {
@@ -33,6 +32,9 @@ export * from './providers/google/index.js';
 export * from './providers/deepseek/index.js';
 export * from './providers/zai/index.js';
 export * from './providers/kimi/index.js';
+export * from './providers/minimax/index.js';
+export * from './providers/cerebras/index.js';
+export * from './providers/openrouter/index.js';
 
 // LLM - Central entry point (dispatches to providers)
 export { complete, stream } from './llm/index.js';

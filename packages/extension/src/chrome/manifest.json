@@ -10,6 +10,7 @@
     "tabs",
     "storage",
     "cookies",
+    "downloads",
     "debugger",
     "accessibilityFeatures.read",
     "accessibilityFeatures.modify"

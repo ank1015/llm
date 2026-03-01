@@ -12,3 +12,6 @@ import './src/providers/google/index.js';
 import './src/providers/deepseek/index.js';
 import './src/providers/kimi/index.js';
 import './src/providers/zai/index.js';
+import './src/providers/minimax/index.js';
+import './src/providers/cerebras/index.js';
+import './src/providers/openrouter/index.js';

@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { MODELS } from '../../src/models.generated.js';
-import { calculateCost, getModel, getModels, getProviders } from '../../src/models.js';
+import {
+  MODELS,
+  calculateCost,
+  getModel,
+  getModels,
+  getProviders,
+} from '../../src/models/index.js';
 
 import type { Api, Model, Usage } from '@ank1015/llm-types';
 

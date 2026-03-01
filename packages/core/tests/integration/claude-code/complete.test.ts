@@ -2,7 +2,7 @@ import { Type } from '@sinclair/typebox';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { complete as coreComplete } from '../../../src/llm/complete.js';
-import { getModel } from '../../../src/models.js';
+import { getModel } from '../../../src/models/index.js';
 
 import type { ClaudeCodeProviderOptions, Context, Model } from '@ank1015/llm-types';
 

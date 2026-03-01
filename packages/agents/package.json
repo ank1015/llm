@@ -1,0 +1,56 @@
+{
+  "name": "@ank1015/llm-agents",
+  "version": "0.0.1",
+  "description": "Agent toolkit for the LLM SDK",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "inspect:page": "node scripts/inspect-page.mjs",
+    "test:cli": "node dist/test-cli.js",
+    "repl:cli": "node dist/repl-cli.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "echo 'No linter configured yet'",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "keywords": [
+    "llm",
+    "agents",
+    "sdk",
+    "ai"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@ank1015/llm-extension": "workspace:^",
+    "@ank1015/llm-sdk": "workspace:^",
+    "@ank1015/llm-sdk-adapters": "workspace:^",
+    "@silvia-odwyer/photon-node": "^0.3.4",
+    "@sinclair/typebox": "^0.34.48",
+    "chalk": "^5.6.2",
+    "diff": "^8.0.3",
+    "file-type": "^21.3.0",
+    "glob": "^13.0.6",
+    "parallel-web": "^0.3.1",
+    "proper-lockfile": "^4.1.2"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.2",
+    "tsx": "^4.19.0",
+    "vitest": "^2.1.0"
+  }
+}

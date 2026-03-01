@@ -12,14 +12,33 @@ export type {
 
 export {
   NATIVE_HOST_NAME,
+  MAX_HOST_TO_CHROME_MESSAGE_SIZE_BYTES,
+  MAX_CHROME_TO_HOST_MESSAGE_SIZE_BYTES,
+  MAX_TCP_MESSAGE_SIZE_BYTES,
   MAX_MESSAGE_SIZE_BYTES,
   LENGTH_PREFIX_BYTES,
   DEFAULT_PORT,
 } from './protocol/constants.js';
 
 // SDK
-export { ChromeClient, createChromeClient, connect } from './sdk/index.js';
-export type { ChromeClientOptions, ConnectOptions } from './sdk/index.js';
+export { ChromeClient, createChromeClient, connect, Window } from './sdk/index.js';
+export type {
+  ChromeClientOptions,
+  ConnectOptions,
+  ObserveFilter,
+  WindowActionOptions,
+  WindowDownloadOptions,
+  WindowEvaluateOptions,
+  WindowGetPageOptions,
+  WindowObserveOptions,
+  WindowOpenOptions,
+  WindowScrollBehavior,
+  WindowScrollOptions,
+  WindowSemanticFilter,
+  WindowScreenshotOptions,
+  WindowTab,
+  WindowTypeOptions,
+} from './sdk/index.js';
 
 // Server
 export { ChromeServer } from './native/server.js';

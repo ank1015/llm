@@ -1,0 +1,74 @@
+import type { Model } from '@ank1015/llm-types';
+
+const anthropicBaseUrl = `https://api.anthropic.com`;
+
+export const anthropicModels = {
+  'claude-haiku-4-5': {
+    id: 'claude-haiku-4-5',
+    name: 'Haiku 4.5',
+    api: 'anthropic',
+    baseUrl: anthropicBaseUrl,
+    reasoning: true,
+    input: ['text', 'image'],
+    cost: {
+      input: 1,
+      output: 5,
+      cacheRead: 0.1,
+      cacheWrite: 1.25,
+    },
+    contextWindow: 200000,
+    maxTokens: 64000,
+    tools: ['function_calling'],
+  } satisfies Model<'anthropic'>,
+  'claude-opus-4-5': {
+    id: 'claude-opus-4-5',
+    name: 'Opus 4.5',
+    api: 'anthropic',
+    baseUrl: anthropicBaseUrl,
+    reasoning: true,
+    input: ['text', 'image'],
+    cost: {
+      input: 5,
+      output: 25,
+      cacheRead: 0.5,
+      cacheWrite: 6.25,
+    },
+    contextWindow: 200000,
+    maxTokens: 64000,
+    tools: ['function_calling'],
+  } satisfies Model<'anthropic'>,
+  'claude-opus-4-6': {
+    id: 'claude-opus-4-6',
+    name: 'Opus 4.6',
+    api: 'anthropic',
+    baseUrl: anthropicBaseUrl,
+    reasoning: true,
+    input: ['text', 'image'],
+    cost: {
+      input: 5,
+      output: 25,
+      cacheRead: 0.5,
+      cacheWrite: 6.25,
+    },
+    contextWindow: 200000,
+    maxTokens: 64000,
+    tools: ['function_calling'],
+  } satisfies Model<'anthropic'>,
+  'claude-sonnet-4-5': {
+    id: 'claude-sonnet-4-5',
+    name: 'Sonnet 4.5',
+    api: 'anthropic',
+    baseUrl: anthropicBaseUrl,
+    reasoning: true,
+    input: ['text', 'image'],
+    cost: {
+      input: 3,
+      output: 15,
+      cacheRead: 0.3,
+      cacheWrite: 3.75,
+    },
+    contextWindow: 200000,
+    maxTokens: 64000,
+    tools: ['function_calling'],
+  } satisfies Model<'anthropic'>,
+};

@@ -28,20 +28,12 @@ export type {
 export { complete, stream } from './llm/index.js';
 export type { CompleteOptions, StreamOptions } from './llm/index.js';
 
-// Client
-export { LLMClient } from './client.js';
-export type { LLMClientConfig } from './client.js';
-
 // Utilities
 export { resolveApiKey, resolveProviderCredentials } from './utils/resolve-key.js';
 
 // Agent
 export { Conversation } from './agent/index.js';
-export type {
-  ConversationExternalCallback,
-  ConversationOptions,
-  ConversationSessionConfig,
-} from './agent/index.js';
+export type { ConversationExternalCallback, ConversationOptions } from './agent/index.js';
 
 // Session Manager
 export { SessionManager, createSessionManager } from './session/index.js';

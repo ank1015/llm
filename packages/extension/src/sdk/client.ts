@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
-import { readMessage, writeMessage } from '../native/stdio.js';
+import { readMessageWithOptions, writeMessageWithOptions } from '../native/stdio.js';
+import { MAX_MESSAGE_SIZE_BYTES } from '../protocol/constants.js';
 
 import type { HostMessage, ChromeMessage } from '../protocol/types.js';
 import type { Readable, Writable } from 'node:stream';
@@ -8,6 +9,8 @@ import type { Readable, Writable } from 'node:stream';
 export interface ChromeClientOptions {
   input?: Readable;
   output?: Writable;
+  maxIncomingMessageSizeBytes?: number;
+  maxOutgoingMessageSizeBytes?: number;
 }
 
 interface PendingCall {
@@ -27,10 +30,14 @@ export class ChromeClient {
   private pendingCalls = new Map<string, PendingCall>();
   private eventCallbacks = new Map<string, (data: unknown) => void>();
   private closed = false;
+  private maxIncomingMessageSizeBytes: number;
+  private maxOutgoingMessageSizeBytes: number;
 
   constructor(opts?: ChromeClientOptions) {
     this.input = opts?.input;
     this.output = opts?.output;
+    this.maxIncomingMessageSizeBytes = opts?.maxIncomingMessageSizeBytes ?? MAX_MESSAGE_SIZE_BYTES;
+    this.maxOutgoingMessageSizeBytes = opts?.maxOutgoingMessageSizeBytes ?? MAX_MESSAGE_SIZE_BYTES;
   }
 
   /** Call a Chrome API method and wait for the result. */
@@ -79,7 +86,9 @@ export class ChromeClient {
       let message: ChromeMessage | null;
 
       try {
-        message = await readMessage<ChromeMessage>(this.input);
+        message = await readMessageWithOptions<ChromeMessage>(this.input, {
+          maxMessageSizeBytes: this.maxIncomingMessageSizeBytes,
+        });
       } catch (error) {
         this.cleanup(error instanceof Error ? error : new Error(String(error)));
         throw error;
@@ -123,7 +132,9 @@ export class ChromeClient {
   }
 
   private send(message: HostMessage): void {
-    writeMessage(message, this.output);
+    writeMessageWithOptions(message, this.output, {
+      maxMessageSizeBytes: this.maxOutgoingMessageSizeBytes,
+    });
   }
 
   private cleanup(error: Error): void {
