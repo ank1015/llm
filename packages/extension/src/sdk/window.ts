@@ -383,7 +383,7 @@ export class Window {
       targetTabId = opened.id;
       createdTabId = opened.id;
     } else {
-      throw new Error('getPage requires either tabId or url');
+      targetTabId = await this.resolveTargetTabId();
     }
 
     try {

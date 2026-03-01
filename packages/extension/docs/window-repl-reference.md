@@ -193,6 +193,9 @@ export interface WindowInstance {
   - `options.timeoutMs` optional wait timeout.
 - Return:
   - markdown string containing summary and elements (including `E*` ids).
+  - Interactive lines include `group=G*` for structural correlation.
+  - `<select>` interactive lines include available option values (`options=[...]`).
+  - Text blocks are emitted in visual order (top-to-bottom, then left-to-right).
 
 ### Action Methods (`Promise<string>`)
 
@@ -263,12 +266,15 @@ Special action return strings:
 
 - Purpose: return page markdown text for a tab or URL.
 - Accepted input forms:
+  - `getPage()`
   - `getPage(tabIdNumber)`
   - `getPage(urlString)`
   - `getPage({ tabId })`
   - `getPage({ url })`
   - `getPage({ tabId, timeoutMs, converterUrl })`
   - `getPage({ url, timeoutMs, converterUrl })`
+- Default behavior:
+  - `getPage()` with no arguments reads the current active tab in the scoped window.
 - Return:
   - markdown string for the page content.
 - Converter fallback:

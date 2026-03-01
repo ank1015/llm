@@ -265,10 +265,78 @@ export function buildObserveScript(options: ObserveScriptOptions): string {
     return locator;
   };
 
+  const getSelectOptions = (element, maxOptions = 30) => {
+    if (!(element instanceof HTMLSelectElement)) return [];
+
+    const options = [];
+    for (const option of Array.from(element.options).slice(0, maxOptions)) {
+      const value = normalizeText(option.value || '', 140);
+      const label = normalizeText(option.textContent || '', 140);
+      if (!value && !label) continue;
+
+      options.push({
+        value,
+        label,
+        selected: Boolean(option.selected),
+        disabled: Boolean(option.disabled),
+      });
+    }
+
+    return options;
+  };
+
+  const groupSelector = [
+    '[data-testid]',
+    '[id]',
+    'article',
+    '[role="article"]',
+    'li',
+    '[role="listitem"]',
+    'tr',
+    'section',
+    'form',
+    'main',
+  ].join(',');
+  const groupIdByKey = new Map();
+  let groupCounter = 1;
+
+  const getGroupContainer = (element) => {
+    if (!(element instanceof Element)) return null;
+    return element.closest(groupSelector) || element.parentElement || document.body;
+  };
+
+  const getGroupKey = (element) => {
+    const testId = normalizeText(element.getAttribute('data-testid') || '', 120);
+    if (testId) return 'testid:' + testId;
+
+    const id = normalizeText(element.id || '', 120);
+    if (id) return 'id:' + id;
+
+    const cssPath = normalizeText(buildCssPath(element), 240);
+    if (cssPath) return 'css:' + cssPath;
+
+    return 'tag:' + element.tagName.toLowerCase();
+  };
+
+  const getGroupId = (element) => {
+    const container = getGroupContainer(element);
+    if (!(container instanceof Element)) return 'G0';
+
+    const key = getGroupKey(container);
+    const existing = groupIdByKey.get(key);
+    if (existing) return existing;
+
+    const next = 'G' + groupCounter++;
+    groupIdByKey.set(key, next);
+    return next;
+  };
+
   const sortByPosition = (a, b) => {
     if (a.bbox.y !== b.bbox.y) return a.bbox.y - b.bbox.y;
     if (a.bbox.x !== b.bbox.x) return a.bbox.x - b.bbox.x;
-    return a.tag.localeCompare(b.tag);
+    const aLabel = typeof a.tag === 'string' ? a.tag : typeof a.kind === 'string' ? a.kind : '';
+    const bLabel = typeof b.tag === 'string' ? b.tag : typeof b.kind === 'string' ? b.kind : '';
+    return aLabel.localeCompare(bLabel);
   };
 
   const interactiveSelectors = [
@@ -323,6 +391,7 @@ export function buildObserveScript(options: ObserveScriptOptions): string {
       tag,
       role,
       name,
+      groupId: getGroupId(element),
       actions,
       state,
       locator,
@@ -332,6 +401,10 @@ export function buildObserveScript(options: ObserveScriptOptions): string {
     if (tag === 'a') {
       const href = normalizeText(element.getAttribute('href') || '', 320);
       if (href) row.href = href;
+    }
+    if (tag === 'select') {
+      const selectOptions = getSelectOptions(element);
+      if (selectOptions.length > 0) row.selectOptions = selectOptions;
     }
 
     interactiveRows.push(row);
@@ -346,10 +419,13 @@ export function buildObserveScript(options: ObserveScriptOptions): string {
 
   const textSeen = new Set();
   const textBlocks = [];
-  const addTextBlock = (kind, text, source, level) => {
+  const addTextBlock = (kind, text, source, groupId, level) => {
     const normalized = normalizeText(text, 360);
     if (!normalized) return;
-    const key = normalized.toLowerCase();
+
+    const normalizedGroupId =
+      typeof groupId === 'string' && groupId.trim() ? normalizeText(groupId, 24) : 'G0';
+    const key = normalizedGroupId + ':' + kind + ':' + normalized.toLowerCase();
     if (textSeen.has(key)) return;
     textSeen.add(key);
 
@@ -358,36 +434,70 @@ export function buildObserveScript(options: ObserveScriptOptions): string {
       kind,
       text: normalized,
       source: normalizeText(source || '', 200),
+      groupId: normalizedGroupId,
     };
 
     if (typeof level === 'number') block.level = level;
     textBlocks.push(block);
   };
 
+  const textRows = [];
   const headingNodes = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6'));
   for (const heading of headingNodes) {
-    if (textBlocks.length >= options.maxTextBlocks) break;
     const visibility = getVisibility(heading);
     if (visibility.hidden || visibility.offscreen) continue;
+    const headingText = getElementText(heading, 280);
+    if (!headingText) continue;
+
     const level = Number.parseInt(heading.tagName.slice(1), 10);
-    addTextBlock('heading', getElementText(heading, 280), buildCssPath(heading), level);
+    textRows.push({
+      kind: 'heading',
+      text: headingText,
+      source: buildCssPath(heading),
+      level: Number.isFinite(level) ? level : undefined,
+      groupId: getGroupId(heading),
+      bbox: {
+        x: visibility.rect.x,
+        y: visibility.rect.y,
+        width: visibility.rect.width,
+        height: visibility.rect.height,
+      },
+    });
   }
 
   const textSelectors = ['main p', 'article p', '[role="main"] p', 'section p', 'p', 'li'];
   const textCandidates = Array.from(document.querySelectorAll(textSelectors.join(',')));
   for (const node of textCandidates) {
-    if (textBlocks.length >= options.maxTextBlocks * 2) break;
     const visibility = getVisibility(node);
     if (visibility.hidden || visibility.offscreen) continue;
+
     const text = getElementText(node, 360);
     if (!text || text.length < 28) continue;
-    addTextBlock('text', text, buildCssPath(node));
+
+    textRows.push({
+      kind: 'text',
+      text,
+      source: buildCssPath(node),
+      groupId: getGroupId(node),
+      bbox: {
+        x: visibility.rect.x,
+        y: visibility.rect.y,
+        width: visibility.rect.width,
+        height: visibility.rect.height,
+      },
+    });
+  }
+
+  textRows.sort(sortByPosition);
+  for (const row of textRows) {
+    if (textBlocks.length >= options.maxTextBlocks * 2) break;
+    addTextBlock(row.kind, row.text, row.source, row.groupId, row.level);
   }
 
   const totalTextBlockCount = textBlocks.length;
   const trimmedTextBlocks = textBlocks.slice(0, options.maxTextBlocks);
 
-  const forms = [];
+  const formRows = [];
   const formNodes = Array.from(document.querySelectorAll('form'));
   for (const formNode of formNodes) {
     const visibility = getVisibility(formNode);
@@ -423,13 +533,25 @@ export function buildObserveScript(options: ObserveScriptOptions): string {
       normalizeText(formNode.getAttribute('id') || '', 100) ||
       'form';
 
-    forms.push({
-      id: 'F' + (forms.length + 1),
+    formRows.push({
       name: formName,
       fields,
       submitButtons,
+      bbox: {
+        x: visibility.rect.x,
+        y: visibility.rect.y,
+        width: visibility.rect.width,
+        height: visibility.rect.height,
+      },
     });
   }
+  formRows.sort(sortByPosition);
+  const forms = formRows.map((row, index) => ({
+    id: 'F' + (index + 1),
+    name: row.name,
+    fields: row.fields,
+    submitButtons: row.submitButtons,
+  }));
 
   const mediaRows = [];
   const mediaNodes = Array.from(document.querySelectorAll('audio, video'));

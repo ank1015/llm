@@ -40,6 +40,31 @@ function normalizeLine(value: string, max = 220): string {
   return `${compact.slice(0, Math.max(1, max - 3))}...`;
 }
 
+function formatSelectOptions(
+  options: Array<{ value?: string; label?: string }> | undefined
+): string {
+  if (!Array.isArray(options) || options.length === 0) {
+    return '';
+  }
+
+  const normalizedValues = options
+    .map((option) => normalizeLine((option.value || option.label || '').trim(), 80))
+    .filter((value) => value.length > 0);
+
+  if (normalizedValues.length === 0) {
+    return '';
+  }
+
+  const limit = 8;
+  const rendered = normalizedValues
+    .slice(0, limit)
+    .map((value) => `"${value}"`)
+    .join(', ');
+  const suffix =
+    normalizedValues.length > limit ? ` (+${normalizedValues.length - limit} more)` : '';
+  return ` | options=[${rendered}]${suffix}`;
+}
+
 function getLocatorText(locator: {
   id?: string;
   testId?: string;
@@ -219,9 +244,11 @@ export function renderObserveMarkdown(input: RenderObserveMarkdownInput): string
       for (const element of view.interactive) {
         const roleText = element.role ? ` role=${element.role}` : '';
         const stateText = element.state.length > 0 ? element.state.join(', ') : 'none';
+        const groupText = element.groupId || 'G0';
         const hrefText = element.href ? ` href=${normalizeLine(element.href, 120)}` : '';
+        const selectOptionsText = formatSelectOptions(element.selectOptions);
         lines.push(
-          `- **${element.id}** [${element.category}] \`${element.tag}${roleText}\` "${normalizeLine(element.name || '(unnamed)', 120)}" | actions=${element.actions.join(', ')} | state=${stateText} | locator=${normalizeLine(getLocatorText(element.locator), 120)} | box=(${element.bbox.x},${element.bbox.y},${element.bbox.width}x${element.bbox.height})${hrefText}`
+          `- **${element.id}** [${element.category}] \`${element.tag}${roleText}\` "${normalizeLine(element.name || '(unnamed)', 120)}" | actions=${element.actions.join(', ')} | state=${stateText} | locator=${normalizeLine(getLocatorText(element.locator), 120)} | group=${groupText} | box=(${element.bbox.x},${element.bbox.y},${element.bbox.width}x${element.bbox.height})${hrefText}${selectOptionsText}`
         );
       }
     }
@@ -235,8 +262,9 @@ export function renderObserveMarkdown(input: RenderObserveMarkdownInput): string
     } else {
       for (const block of view.textBlocks) {
         const levelSuffix = block.level ? ` h${block.level}` : '';
+        const groupText = block.groupId || 'G0';
         lines.push(
-          `- **${block.id}** [${block.kind}${levelSuffix}] ${normalizeLine(block.text, 280)}`
+          `- **${block.id}** [${block.kind}${levelSuffix}] ${normalizeLine(block.text, 280)} | group=${groupText}`
         );
       }
     }
@@ -292,6 +320,9 @@ export function renderObserveMarkdown(input: RenderObserveMarkdownInput): string
   } else {
     lines.push('- Applied filters: none');
   }
+  lines.push(
+    '- Items with the same group id (`group=G*`) are likely in the same visual container.'
+  );
 
   if (snapshot.truncation.interactive) {
     lines.push(

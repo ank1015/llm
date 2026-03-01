@@ -23,6 +23,7 @@ export type {
   ObserveMediaElement,
   ObservePageInfo,
   ObservePageSummary,
+  ObserveSelectOption,
   ObserveSnapshot,
   ObserveTextBlock,
   ObserveTruncation,

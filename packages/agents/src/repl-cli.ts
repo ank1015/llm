@@ -18,7 +18,7 @@ import { createFileKeysAdapter, createFileSessionsAdapter } from '@ank1015/llm-s
 
 import { createWindowReplTool } from './tools/browser/index.js';
 
-import type { CodexProviderOptions } from '../../types/dist/providers/codex.js';
+// import type { CodexProviderOptions } from '../../types/dist/providers/codex.js';
 import type {
   AgentEvent,
   AgentTool,
@@ -26,6 +26,7 @@ import type {
   BaseAssistantEvent,
   BaseAssistantMessage,
   ConversationExternalCallback,
+  GoogleProviderOptions,
   Message,
   SessionManager,
 } from '@ank1015/llm-sdk';
@@ -657,13 +658,20 @@ async function runCli(): Promise<void> {
     keysAdapter,
   });
   conversation.setProvider({
-    model: getModel('codex', 'gpt-5.3-codex')!,
+    model: getModel('google', 'gemini-3-flash-preview')!,
     providerOptions: {
-      reasoning: {
-        effort: 'high',
-        summary: 'auto',
+      thinkingConfig: {
+        includeThoughts: true,
       },
-    } as CodexProviderOptions,
+    } as GoogleProviderOptions,
+    // conversation.setProvider({
+    //   model: getModel('codex', 'gpt-5.3-codex')!,
+    //   providerOptions: {
+    //     reasoning: {
+    //       effort: 'high',
+    //       summary: 'auto',
+    //     },
+    //   } as CodexProviderOptions,
   });
 
   if (SYSTEM_PROMPT.trim()) {

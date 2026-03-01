@@ -189,6 +189,19 @@ async function main(): Promise<void> {
   );
 
   results.push(
+    await test('getPage without tabId/url reads current active tab', async () => {
+      const markdown = await window.getPage({
+        converterUrl: converter.endpoint,
+      });
+
+      return {
+        pass: markdown.includes('# Alpha Page') && markdown.includes('Alpha paragraph text.'),
+        data: { markdown },
+      };
+    })
+  );
+
+  results.push(
     await test('getPage with url closes temporary tab after conversion', async () => {
       const beforeTabs = await window.tabs();
       const markdown = await window.getPage({

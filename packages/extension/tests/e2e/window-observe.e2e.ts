@@ -51,6 +51,21 @@ function buildObserveDataUrl(): string {
       <head>
         <meta charset="utf-8" />
         <title>Observe E2E Page</title>
+        <style>
+          .visual-order {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+          }
+
+          .card-old {
+            order: 2;
+          }
+
+          .card-new {
+            order: 1;
+          }
+        </style>
       </head>
       <body>
         <h1>Newsletter Signup</h1>
@@ -59,6 +74,24 @@ function buildObserveDataUrl(): string {
           <input type="email" name="email" placeholder="Email address" />
           <button id="subscribe-btn" data-testid="subscribe-button">Subscribe</button>
         </form>
+        <label for="sort-select">Sort</label>
+        <select id="sort-select" name="sort" aria-label="Sort order">
+          <option value="oldest">Oldest</option>
+          <option value="newest">Newest</option>
+          <option value="questionsperday">Questions Per Day</option>
+        </select>
+
+        <div class="visual-order">
+          <article id="card-old" class="card-old">
+            <a href="https://example.com/old">Old Link</a>
+            <p>Old metric block: 3 answers and 120 views.</p>
+          </article>
+          <article id="card-new" class="card-new">
+            <a href="https://example.com/new">New Link</a>
+            <p>New metric block: 8 answers and 450 views.</p>
+          </article>
+        </div>
+
         <button id="cancel-btn">Cancel</button>
         <a href="https://example.com/docs">Read docs</a>
       </body>
@@ -71,6 +104,23 @@ function buildObserveDataUrl(): string {
 function extractSnapshotPath(markdown: string): string | null {
   const match = markdown.match(/^- Full snapshot file: (.+)$/m);
   return match?.[1]?.trim() ?? null;
+}
+
+function collectGroupIds(lines: string[], idPrefix: 'E' | 'T'): Set<string> {
+  const groups = new Set<string>();
+
+  for (const line of lines) {
+    if (!line.includes(`**${idPrefix}`) || !line.includes('| group=')) {
+      continue;
+    }
+
+    const match = line.match(/\| group=(G\d+)/);
+    if (match?.[1]) {
+      groups.add(match[1]);
+    }
+  }
+
+  return groups;
 }
 
 async function main(): Promise<void> {
@@ -120,14 +170,37 @@ async function main(): Promise<void> {
       const hasText = markdown.includes('## Text Blocks');
       const hasKnownButton = markdown.includes('Subscribe');
       const hasKnownHeading = markdown.includes('Newsletter Signup');
+      const hasSelectOptions = markdown.includes('options=["oldest", "newest", "questionsperday"]');
+
+      const lines = markdown.split('\n');
+      const interactiveGroups = collectGroupIds(lines, 'E');
+      const textGroups = collectGroupIds(lines, 'T');
+      const sharedGroups = Array.from(interactiveGroups).filter((group) => textGroups.has(group));
+      const hasSharedGroups = sharedGroups.length > 0;
+
+      const newMetricIndex = markdown.indexOf('New metric block: 8 answers and 450 views.');
+      const oldMetricIndex = markdown.indexOf('Old metric block: 3 answers and 120 views.');
+      const visualOrderingApplied =
+        newMetricIndex !== -1 && oldMetricIndex !== -1 && newMetricIndex < oldMetricIndex;
 
       return {
-        pass: hasInteractive && hasText && hasKnownButton && hasKnownHeading && !!snapshotPath,
+        pass:
+          hasInteractive &&
+          hasText &&
+          hasKnownButton &&
+          hasKnownHeading &&
+          hasSelectOptions &&
+          hasSharedGroups &&
+          visualOrderingApplied &&
+          !!snapshotPath,
         data: {
           hasInteractive,
           hasText,
           hasKnownButton,
           hasKnownHeading,
+          hasSelectOptions,
+          hasSharedGroups,
+          visualOrderingApplied,
           snapshotPath,
         },
       };

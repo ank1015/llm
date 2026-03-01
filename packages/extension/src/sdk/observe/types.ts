@@ -41,17 +41,26 @@ export interface ObserveBBox {
 
 export type ObserveInteractiveCategory = 'button' | 'link' | 'input' | 'interactive';
 
+export interface ObserveSelectOption {
+  value: string;
+  label: string;
+  selected: boolean;
+  disabled: boolean;
+}
+
 export interface ObserveInteractiveElement {
   id: string;
   category: ObserveInteractiveCategory;
   tag: string;
   role: string;
   name: string;
+  groupId: string;
   actions: string[];
   state: string[];
   locator: ObserveLocator;
   bbox: ObserveBBox;
   href?: string;
+  selectOptions?: ObserveSelectOption[];
 }
 
 export interface ObserveTextBlock {
@@ -59,6 +68,7 @@ export interface ObserveTextBlock {
   kind: 'heading' | 'text';
   text: string;
   source: string;
+  groupId: string;
   level?: number;
 }
 
