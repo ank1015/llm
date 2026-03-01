@@ -17,8 +17,8 @@ import {
 import { createFileKeysAdapter, createFileSessionsAdapter } from '@ank1015/llm-sdk-adapters';
 
 import { createWindowReplTool } from './tools/browser/index.js';
+import { createReadTool } from './tools/file-system/index.js';
 
-// import type { CodexProviderOptions } from '../../types/dist/providers/codex.js';
 import type {
   AgentEvent,
   AgentTool,
@@ -26,18 +26,23 @@ import type {
   BaseAssistantEvent,
   BaseAssistantMessage,
   ConversationExternalCallback,
-  GoogleProviderOptions,
   Message,
   SessionManager,
 } from '@ank1015/llm-sdk';
+// import type { CodexProviderOptions } from '@ank1015/llm-types';
+
+// import type { CodexProviderOptions } from '../../types/dist/providers/codex.js';
 
 const TEST_TOOLS_CWD = '/Users/notacoder/Desktop/test';
+const REPO_ROOT_DIR = '/Users/notacoder/Desktop/agents/llm';
 const AGENTS_PACKAGE_DIR = '/Users/notacoder/Desktop/agents/llm/packages/agents';
 const EXTENSION_PACKAGE_DIR = '/Users/notacoder/Desktop/agents/llm/packages/extension';
 const AGENT_SCRIPT_WORKSPACE_DIR = `${AGENTS_PACKAGE_DIR}/scripts/workspace`;
 const AGENT_SCRIPT_RUNNER_PATH = `${AGENTS_PACKAGE_DIR}/scripts/run.sh`;
 const AGENT_SESSIONS_DIR = `${AGENTS_PACKAGE_DIR}/sessions`;
 const WINDOW_REPL_REFERENCE_PATH = `${EXTENSION_PACKAGE_DIR}/docs/window-repl-reference.md`;
+const WEB_SKILLS_DIR = `${AGENTS_PACKAGE_DIR}/src/tools/browser/web-skill`;
+const GOOGLE_WEB_SKILL_PATH = `${WEB_SKILLS_DIR}/google/google-skill.md`;
 const DEFAULT_PROJECT_NAME = 'agents-test-cli';
 const DEFAULT_SESSION_NAME = 'Agents Test CLI Session';
 const DEFAULT_API: Api = 'openai';
@@ -76,7 +81,9 @@ function buildSystemPrompt(toolsCwd: string, today: string, windowReplReference:
 Identity:
 - You are a browser operations agent that controls a real Chrome browser to complete user tasks end-to-end.
 - You are practical, deterministic, and action-oriented. Prefer execution over speculation.
-- You have one browser tool: \`repl\`.
+- You have two tools:
+  - \`repl\` (browser execution with Window SDK)
+  - \`read\` (filesystem reader for markdown/code/reference files)
 
 About the repl tool:
 - \`repl\` executes TypeScript snippets.
@@ -91,9 +98,35 @@ About the repl tool:
   - Console output is captured separately from the result.
 - Use \`repl\` for both single-step actions and full automation scripts.
 
+About the read tool:
+- \`read\` reads local files by path (absolute or relative), including markdown and code files.
+- Use \`read\` to load web skill files on demand instead of relying on memory.
+- For large files, continue reading with \`offset\`/\`limit\` as needed.
+
+Web skills (discoverable, on-demand):
+- Skills root: ${WEB_SKILLS_DIR}
+- Available apps:
+  - google: ${GOOGLE_WEB_SKILL_PATH}
+- What web skills are:
+  - Curated, app-specific operating playbooks with working code patterns for real tasks.
+  - A faster and more reliable alternative to rediscovering page structure from scratch.
+- Priority rule:
+  - For apps with a known skill, use the skill-first workflow by default.
+  - Do NOT jump straight to blind page exploration when a relevant skill exists.
+- Mandatory skill-first workflow (for known apps such as Google):
+  1) Use \`read\` to open the app skill markdown file.
+  2) Use \`read\` to open the referenced task file(s) for the exact user intent.
+  3) Adapt and execute those code patterns via \`repl\` (prefer plain JavaScript syntax for maximum REPL compatibility).
+  4) Only fall back to generic inspect/observe exploration if the skill path fails.
+  5) If fallback is needed, stay close to the skill pattern and report what changed.
+- Trigger guidance:
+  - Use Google web skill for Google search workflows (normal search, advanced search, pagination, sponsored-result handling, time filters).
+  - Re-read skill/task files when task intent changes materially (e.g., normal search -> advanced search).
+
 Interaction strategy:
 - Default to one command per repl call. Keep each call focused on a single intent.
 - Avoid grouping many unrelated operations in one call unless the task is clearly automation.
+- For known skilled apps, start with the web-skill read step before browser actions.
 - Normal browsing flow:
   1) Navigate/open page.
   2) Understand structure with \`window.observe()\`.
@@ -604,9 +637,11 @@ async function resolveWindowId(chrome: ChromeClient): Promise<number> {
   return created.id;
 }
 
-function createCliTools(chrome: ChromeClient, windowId: number): AgentTool[] {
-  void chrome;
-  return [createWindowReplTool({ windowId })] as unknown as AgentTool[];
+function createCliTools(windowId: number): AgentTool[] {
+  return [
+    createReadTool(REPO_ROOT_DIR),
+    createWindowReplTool({ windowId }),
+  ] as unknown as AgentTool[];
 }
 
 async function runCli(): Promise<void> {
@@ -657,28 +692,28 @@ async function runCli(): Promise<void> {
     streamAssistantMessage: true,
     keysAdapter,
   });
+  // conversation.setProvider({
+  //   model: getModel('google', 'gemini-3-flash-preview')!,
+  //   providerOptions: {
+  //     thinkingConfig: {
+  //       includeThoughts: true,
+  //     },
+  //   } as GoogleProviderOptions,
   conversation.setProvider({
-    model: getModel('google', 'gemini-3-flash-preview')!,
+    model: getModel('codex', 'gpt-5.3-codex')!,
     providerOptions: {
-      thinkingConfig: {
-        includeThoughts: true,
+      reasoning: {
+        effort: 'high',
+        summary: 'auto',
       },
-    } as GoogleProviderOptions,
-    // conversation.setProvider({
-    //   model: getModel('codex', 'gpt-5.3-codex')!,
-    //   providerOptions: {
-    //     reasoning: {
-    //       effort: 'high',
-    //       summary: 'auto',
-    //     },
-    //   } as CodexProviderOptions,
+    } as any,
   });
 
   if (SYSTEM_PROMPT.trim()) {
     conversation.setSystemPrompt(SYSTEM_PROMPT);
   }
 
-  const tools = createCliTools(chrome, windowId);
+  const tools = createCliTools(windowId);
   conversation.setTools(tools);
   if (existingMessages.length > 0) {
     conversation.replaceMessages(existingMessages);
@@ -732,6 +767,9 @@ async function runCli(): Promise<void> {
   console.log(`Project/Path: ${options.projectName}/${options.path || '(root)'}`);
   console.log(`API/Model: ${options.api}/${options.modelId}`);
   console.log(`Tool CWD: ${TEST_TOOLS_CWD}`);
+  console.log(`Read Tool CWD: ${REPO_ROOT_DIR}`);
+  console.log(`Web Skills Dir: ${WEB_SKILLS_DIR}`);
+  console.log(`Google Skill: ${GOOGLE_WEB_SKILL_PATH}`);
   console.log(`Script Workspace: ${AGENT_SCRIPT_WORKSPACE_DIR}`);
   console.log(`Script Runner: ${AGENT_SCRIPT_RUNNER_PATH}`);
   console.log(`Browser windowId: ${windowId}`);
