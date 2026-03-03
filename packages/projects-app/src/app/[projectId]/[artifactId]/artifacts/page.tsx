@@ -2,15 +2,14 @@
 
 import { ChevronRight, FileText, Folder, FolderOpen, Loader2, RefreshCw } from 'lucide-react';
 import { useParams } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { ArtifactExplorerResult, ArtifactFileResult } from '@/lib/client-api';
 import type { ReactNode } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { useArtifactFilesStore, useSidebarStore } from '@/stores';
-
+import { useArtifactFilesStore, useSidebarStore, useUiStore } from '@/stores';
 
 const EMPTY_DIRECTORY_MAP: Record<string, ArtifactExplorerResult> = {};
 const EMPTY_FILE_MAP: Record<string, ArtifactFileResult> = {};
@@ -41,10 +40,12 @@ export default function ArtifactFilesPage() {
   const { projectId, artifactId } = useParams<{ projectId: string; artifactId: string }>();
   const artifactCtx = useMemo(() => ({ projectId, artifactId }), [projectId, artifactId]);
   const artifactKey = useMemo(() => getArtifactKey(projectId, artifactId), [projectId, artifactId]);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const artifact = useSidebarStore(
     (state) => state.artifactDirs.find((dir) => dir.id === artifactId) ?? null
   );
+  const setSidebarCollapsed = useUiStore((state) => state.setSidebarCollapsed);
 
   const directories = useArtifactFilesStore(
     (state) => state.directoriesByArtifact[artifactKey] ?? EMPTY_DIRECTORY_MAP
@@ -68,16 +69,50 @@ export default function ArtifactFilesPage() {
   const loadDirectory = useArtifactFilesStore((state) => state.loadDirectory);
   const openFile = useArtifactFilesStore((state) => state.openFile);
   const setSelectedFile = useArtifactFilesStore((state) => state.setSelectedFile);
+  const clearArtifactCache = useArtifactFilesStore((state) => state.clearArtifactCache);
 
   const [expandedDirsByArtifact, setExpandedDirsByArtifact] = useState<
     Record<string, Record<string, boolean>>
   >({});
+  const [explorerWidthPx, setExplorerWidthPx] = useState(320);
+  const [isResizing, setIsResizing] = useState(false);
   const expandedDirs = expandedDirsByArtifact[artifactKey] ?? ROOT_EXPANDED;
 
   useEffect(() => {
+    setSidebarCollapsed(true);
+    clearArtifactCache(artifactCtx);
     setSelectedFile(artifactCtx, null);
-    void loadDirectory(artifactCtx, '');
-  }, [artifactCtx, loadDirectory, setSelectedFile]);
+    void loadDirectory(artifactCtx, '', true);
+  }, [artifactCtx, clearArtifactCache, loadDirectory, setSelectedFile, setSidebarCollapsed]);
+
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const onMouseMove = (event: MouseEvent) => {
+      const container = containerRef.current;
+      if (!container) return;
+
+      const rect = container.getBoundingClientRect();
+      const minWidth = 220;
+      const maxWidth = Math.max(minWidth, Math.floor(rect.width * 0.7));
+      const next = Math.min(maxWidth, Math.max(minWidth, event.clientX - rect.left));
+      setExplorerWidthPx(next);
+    };
+
+    const onMouseUp = () => setIsResizing(false);
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    };
+  }, [isResizing]);
 
   const rootRequestKey = getDirectoryRequestKey(artifactKey, '');
   const isRootLoading = directoryLoadingByKey[rootRequestKey] ?? false;
@@ -211,8 +246,11 @@ export default function ArtifactFilesPage() {
   };
 
   return (
-    <div className="flex h-full min-h-0 w-full">
-      <aside className="border-home-border bg-home-panel flex h-full w-[22%] min-w-[220px] max-w-[360px] shrink-0 flex-col border-r">
+    <div ref={containerRef} className="flex h-full min-h-0 w-full">
+      <aside
+        className="border-home-border bg-home-panel flex h-full min-w-[220px] max-w-[70%] shrink-0 flex-col border-r"
+        style={{ width: `${explorerWidthPx}px` }}
+      >
         <div className="border-home-border flex h-10 shrink-0 items-center justify-between border-b px-3">
           <span className="text-foreground text-sm font-medium">Explorer</span>
           <Button
@@ -243,7 +281,18 @@ export default function ArtifactFilesPage() {
         </div>
       </aside>
 
-      <section className="bg-home-page flex min-h-0 flex-1 flex-col">
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize explorer panel"
+        onMouseDown={(e) => {
+          e.preventDefault();
+          setIsResizing(true);
+        }}
+        className="bg-home-border hover:bg-muted-foreground/40 w-1 cursor-col-resize"
+      />
+
+      <section className="bg-home-page flex min-h-0 min-w-0 flex-1 flex-col">
         <div className="border-home-border bg-home-panel flex h-10 shrink-0 items-center justify-between border-b px-3">
           <span className="text-foreground truncate font-mono text-xs">
             {selectedFilePath ?? 'Select a file'}
