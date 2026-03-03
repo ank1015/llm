@@ -82,3 +82,15 @@ export async function createArtifactDir(
     }
   );
 }
+
+export async function deleteArtifactDir(
+  projectId: string,
+  artifactDirId: string
+): Promise<{ deleted: boolean }> {
+  return apiRequestJson<{ deleted: boolean }>(
+    `${PROJECTS_BASE}/${encodeURIComponent(projectId)}/artifacts/${encodeURIComponent(artifactDirId)}`,
+    {
+      method: 'DELETE',
+    }
+  );
+}

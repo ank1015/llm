@@ -8,6 +8,7 @@ import type { ArtifactDirWithSessions, ArtifactType } from '@/lib/client-api';
 
 import { Button } from '@/components/ui/button';
 import { getProjectOverview } from '@/lib/client-api';
+import { useSidebarStore } from '@/stores';
 
 const ARTIFACT_TYPE_ICON: Record<ArtifactType, typeof Folder> = {
   base: Folder,
@@ -20,12 +21,17 @@ export default function ProjectPage() {
   const [artifactDirs, setArtifactDirs] = useState<ArtifactDirWithSessions[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const sidebarArtifactDirs = useSidebarStore((state) => state.artifactDirs);
   const router = useRouter();
 
   useEffect(() => {
     if (!projectId) return;
     void loadArtifacts();
   }, [projectId]);
+
+  useEffect(() => {
+    setArtifactDirs(sidebarArtifactDirs);
+  }, [sidebarArtifactDirs]);
 
   const loadArtifacts = async () => {
     setIsLoading(true);

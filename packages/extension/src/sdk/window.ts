@@ -52,6 +52,8 @@ export interface WindowScreenshotOptions {
 export interface WindowEvaluateOptions {
   tabId?: number;
   timeoutMs?: number;
+  awaitPromise?: boolean;
+  userGesture?: boolean;
 }
 
 export interface WindowDownloadOptions {
@@ -354,6 +356,8 @@ export class Window {
     const evaluation = (await chrome.call('debugger.evaluate', {
       tabId: targetTabId,
       code,
+      awaitPromise: options?.awaitPromise ?? false,
+      userGesture: options?.userGesture ?? false,
     })) as DebuggerEvaluateResult;
 
     return evaluation.result as T;

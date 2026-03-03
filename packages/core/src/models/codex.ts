@@ -21,4 +21,22 @@ export const codexModels = {
     tools: ['function_calling'],
     excludeSettings: ['temperature', 'top_p', 'truncation', 'max_output_tokens'],
   } satisfies Model<'codex'>,
+  'gpt-5.3-codex-spark': {
+    id: 'gpt-5.3-codex-spark',
+    name: 'GPT-5.3 Codex Spark',
+    api: 'codex',
+    baseUrl: codexBaseUrl,
+    reasoning: true,
+    input: ['text', 'image', 'file'],
+    cost: {
+      input: 1.75,
+      output: 14,
+      cacheRead: 0.175,
+      cacheWrite: 0,
+    },
+    contextWindow: 400000,
+    maxTokens: 128000,
+    tools: ['function_calling'],
+    excludeSettings: ['temperature', 'top_p', 'truncation', 'max_output_tokens'],
+  } satisfies Model<'codex'>,
 };

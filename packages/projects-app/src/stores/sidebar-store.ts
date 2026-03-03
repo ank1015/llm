@@ -18,6 +18,9 @@ type SidebarStoreState = {
 
   /** Optimistically rename a session across all artifacts. */
   renameSession: (sessionId: string, sessionName: string) => void;
+
+  /** Optimistically remove a session from an artifact. */
+  removeSession: (artifactId: string, sessionId: string) => void;
 };
 
 export const useSidebarStore = create<SidebarStoreState>((set) => ({
@@ -42,5 +45,17 @@ export const useSidebarStore = create<SidebarStoreState>((set) => ({
         ...dir,
         sessions: dir.sessions.map((s) => (s.sessionId === sessionId ? { ...s, sessionName } : s)),
       })),
+    })),
+
+  removeSession: (artifactId, sessionId) =>
+    set((state) => ({
+      artifactDirs: state.artifactDirs.map((dir) =>
+        dir.id === artifactId
+          ? {
+              ...dir,
+              sessions: dir.sessions.filter((session) => session.sessionId !== sessionId),
+            }
+          : dir
+      ),
     })),
 }));

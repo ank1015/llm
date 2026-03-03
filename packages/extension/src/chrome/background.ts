@@ -158,10 +158,14 @@ async function debuggerEvaluate(args: unknown[]): Promise<unknown> {
     tabId,
     code,
     returnByValue = true,
+    awaitPromise = false,
+    userGesture = false,
   } = args[0] as {
     tabId: number;
     code: string;
     returnByValue?: boolean;
+    awaitPromise?: boolean;
+    userGesture?: boolean;
   };
 
   if (typeof tabId !== 'number') {
@@ -171,18 +175,25 @@ async function debuggerEvaluate(args: unknown[]): Promise<unknown> {
     throw new Error('debugger.evaluate requires a non-empty code string');
   }
 
+  let attachedByThisMethod = false;
+
   try {
     await chrome.debugger.attach({ tabId }, '1.3');
+    attachedByThisMethod = true;
   } catch (error) {
-    throw new Error(
-      `Failed to attach debugger to tab ${tabId}: ${error instanceof Error ? error.message : String(error)}`
-    );
+    const message = error instanceof Error ? error.message : String(error);
+    // Allow evaluate inside an existing debugger session (for example after attach+Page.bringToFront).
+    if (!message.includes('Another debugger is already attached')) {
+      throw new Error(`Failed to attach debugger to tab ${tabId}: ${message}`);
+    }
   }
 
   try {
     const response = (await chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
       expression: code,
       returnByValue,
+      awaitPromise,
+      userGesture,
     })) as {
       result?: { value?: unknown; type?: string };
       exceptionDetails?: { text?: string; exception?: { description?: string } };
@@ -198,10 +209,12 @@ async function debuggerEvaluate(args: unknown[]): Promise<unknown> {
 
     return { result: response.result?.value, type: response.result?.type };
   } finally {
-    try {
-      await chrome.debugger.detach({ tabId });
-    } catch {
-      // Tab may have closed — safe to ignore
+    if (attachedByThisMethod) {
+      try {
+        await chrome.debugger.detach({ tabId });
+      } catch {
+        // Tab may have closed — safe to ignore
+      }
     }
   }
 }

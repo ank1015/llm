@@ -3,32 +3,15 @@
 import { Folder, Loader2, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
 
-import type { ArtifactDirWithSessions } from '@/lib/client-api';
-
-import { getProjectOverview } from '@/lib/client-api';
+import { useSidebarStore } from '@/stores';
 
 export default function ArtifactPage() {
   const { projectId, artifactId } = useParams<{ projectId: string; artifactId: string }>();
-  const [artifact, setArtifact] = useState<ArtifactDirWithSessions | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    if (!projectId || !artifactId) return;
-    setIsLoading(true);
-    void getProjectOverview(projectId)
-      .then((overview) => {
-        const dir = overview.artifactDirs.find((d) => d.id === artifactId) ?? null;
-        setArtifact(dir);
-      })
-      .catch(() => {
-        setArtifact(null);
-      })
-      .finally(() => {
-        setIsLoading(false);
-      });
-  }, [projectId, artifactId]);
+  const isLoading = useSidebarStore((state) => state.isLoading);
+  const artifact = useSidebarStore(
+    (state) => state.artifactDirs.find((dir) => dir.id === artifactId) ?? null
+  );
 
   if (isLoading) {
     return (

@@ -4,6 +4,7 @@ export {
   ARTIFACT_TYPES,
   createArtifactDir,
   createProject,
+  deleteArtifactDir,
   deleteProject,
   getProjectOverview,
   listProjects,

@@ -43,6 +43,7 @@ const AGENT_SESSIONS_DIR = `${AGENTS_PACKAGE_DIR}/sessions`;
 const WINDOW_REPL_REFERENCE_PATH = `${EXTENSION_PACKAGE_DIR}/docs/window-repl-reference.md`;
 const WEB_SKILLS_DIR = `${AGENTS_PACKAGE_DIR}/src/tools/browser/web-skill`;
 const GOOGLE_WEB_SKILL_PATH = `${WEB_SKILLS_DIR}/google/google-skill.md`;
+const X_WEB_SKILL_PATH = `${WEB_SKILLS_DIR}/x/x-skill.md`;
 const DEFAULT_PROJECT_NAME = 'agents-test-cli';
 const DEFAULT_SESSION_NAME = 'Agents Test CLI Session';
 const DEFAULT_API: Api = 'openai';
@@ -107,6 +108,7 @@ Web skills (discoverable, on-demand):
 - Skills root: ${WEB_SKILLS_DIR}
 - Available apps:
   - google: ${GOOGLE_WEB_SKILL_PATH}
+  - x: ${X_WEB_SKILL_PATH}
 - What web skills are:
   - Curated, app-specific operating playbooks with working code patterns for real tasks.
   - A faster and more reliable alternative to rediscovering page structure from scratch.
@@ -121,6 +123,7 @@ Web skills (discoverable, on-demand):
   5) If fallback is needed, stay close to the skill pattern and report what changed.
 - Trigger guidance:
   - Use Google web skill for Google search workflows (normal search, advanced search, pagination, sponsored-result handling, time filters).
+  - Use X web skill for X/Twitter workflows (home feed collection, virtualized timeline scrolling, post/profile extraction tasks).
   - Re-read skill/task files when task intent changes materially (e.g., normal search -> advanced search).
 
 Interaction strategy:
@@ -700,7 +703,7 @@ async function runCli(): Promise<void> {
   //     },
   //   } as GoogleProviderOptions,
   conversation.setProvider({
-    model: getModel('codex', 'gpt-5.3-codex')!,
+    model: getModel('codex', 'gpt-5.3-codex-spark')!,
     providerOptions: {
       reasoning: {
         effort: 'high',
