@@ -2,13 +2,14 @@
 
 import { ChevronRight, FolderOpen, Moon, Sun } from 'lucide-react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 import type { ProjectOverview } from '@/lib/client-api';
 
 import { Button } from '@/components/ui/button';
 import { getProjectOverview } from '@/lib/client-api';
+import { cn } from '@/lib/utils';
 import { useUiStore } from '@/stores';
 
 function HeaderBreadcrumb() {
@@ -17,6 +18,7 @@ function HeaderBreadcrumb() {
     artifactId?: string;
     threadId?: string;
   }>();
+  const pathname = usePathname();
 
   const [overview, setOverview] = useState<ProjectOverview | null>(null);
 
@@ -35,9 +37,16 @@ function HeaderBreadcrumb() {
   const session =
     threadId && artifact ? artifact.sessions.find((s) => s.sessionId === threadId) : undefined;
   const threadName = session?.sessionName ?? threadId;
+  const isArtifactsView = Boolean(artifactId && pathname.endsWith('/artifacts'));
 
   // Determine which segment is the last (active) one
-  const lastSegment = threadId ? 'thread' : artifactId ? 'artifact' : 'project';
+  const lastSegment = threadId
+    ? 'thread'
+    : isArtifactsView
+      ? 'artifacts'
+      : artifactId
+        ? 'artifact'
+        : 'project';
 
   const linkClass = (active: boolean) =>
     active
@@ -75,14 +84,28 @@ function HeaderBreadcrumb() {
           </Link>
         </>
       )}
+      {isArtifactsView && artifactId && (
+        <>
+          <ChevronRight size={14} className="text-muted-foreground" />
+          <Link
+            href={`/${projectId}/${artifactId}/artifacts`}
+            className={linkClass(lastSegment === 'artifacts')}
+          >
+            Artifacts
+          </Link>
+        </>
+      )}
     </div>
   );
 }
 
 export function Header() {
-  const { artifactId } = useParams<{ artifactId?: string }>();
+  const router = useRouter();
+  const pathname = usePathname();
+  const { projectId, artifactId } = useParams<{ projectId: string; artifactId?: string }>();
   const theme = useUiStore((state) => state.theme);
   const toggleTheme = useUiStore((state) => state.toggleTheme);
+  const isArtifactsView = Boolean(artifactId && pathname.endsWith('/artifacts'));
 
   return (
     <header className="flex h-12 w-full shrink-0 items-center justify-between px-3">
@@ -94,7 +117,11 @@ export function Header() {
           <Button
             variant="ghost"
             size="sm"
-            className="cursor-pointer gap-1.5 text-muted-foreground hover:text-foreground"
+            onClick={() => router.push(`/${projectId}/${artifactId}/artifacts`)}
+            className={cn(
+              'cursor-pointer gap-1.5',
+              isArtifactsView ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
+            )}
           >
             <FolderOpen size={16} strokeWidth={1.8} />
             <span className="text-[13px]">Artifacts</span>

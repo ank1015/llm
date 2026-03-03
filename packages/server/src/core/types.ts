@@ -56,6 +56,85 @@ export interface CreateArtifactDirInput {
   type?: ArtifactType;
 }
 
+/** Type of an entry in the artifact file explorer */
+export type ArtifactExplorerEntryType = 'file' | 'directory';
+
+/** A single file or directory entry inside an artifact directory */
+export interface ArtifactExplorerEntry {
+  /** Base name of the entry */
+  name: string;
+  /** Relative path from artifact root, normalized with "/" separators */
+  path: string;
+  /** Whether the entry is a file or directory */
+  type: ArtifactExplorerEntryType;
+  /** File size in bytes. Null for directories. */
+  size: number | null;
+  /** Last modified timestamp (ISO 8601) */
+  updatedAt: string;
+}
+
+/** Explorer response for a single directory level */
+export interface ArtifactExplorerResult {
+  /** Relative path requested ("" means artifact root) */
+  path: string;
+  /** Immediate children of `path` */
+  entries: ArtifactExplorerEntry[];
+}
+
+/** File read response for artifact file viewer */
+export interface ArtifactFileResult {
+  /** Relative file path from artifact root */
+  path: string;
+  /** UTF-8 decoded file content. Empty for binary files. */
+  content: string;
+  /** Total file size in bytes */
+  size: number;
+  /** Last modified timestamp (ISO 8601) */
+  updatedAt: string;
+  /** Whether this file appears to be binary */
+  isBinary: boolean;
+  /** Whether returned content was truncated due to maxBytes limit */
+  truncated: boolean;
+}
+
+/** A file discovered while indexing one artifact directory */
+export interface ArtifactFileIndexEntry {
+  /** Relative file path from artifact root */
+  path: string;
+  /** File size in bytes */
+  size: number;
+  /** Last modified timestamp (ISO 8601) */
+  updatedAt: string;
+}
+
+/** Result of indexing one artifact directory */
+export interface ArtifactFileIndexResult {
+  files: ArtifactFileIndexEntry[];
+  /** True when `limit` was hit before scanning the full tree */
+  truncated: boolean;
+}
+
+/** Project-level file index entry (for mentions/search across artifacts) */
+export interface ProjectFileIndexEntry {
+  artifactId: string;
+  artifactName: string;
+  /** Relative path inside the artifact directory */
+  path: string;
+  /** Convenience path in form: "{artifactId}/{path}" */
+  artifactPath: string;
+  size: number;
+  updatedAt: string;
+}
+
+/** Response shape for project-wide file index/search */
+export interface ProjectFileIndexResult {
+  projectId: string;
+  query: string;
+  files: ProjectFileIndexEntry[];
+  /** True when `limit` was reached and more matches may exist */
+  truncated: boolean;
+}
+
 /** Metadata stored in each session's metadata.json */
 export interface SessionMetadata {
   /** Session ID (matches the JSONL session ID) */

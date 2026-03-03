@@ -1,4 +1,5 @@
-import { join } from 'node:path';
+import { readFile, readdir, stat } from 'node:fs/promises';
+import { isAbsolute, join, relative, resolve } from 'node:path';
 
 import { getConfig } from '../config.js';
 import {
@@ -11,7 +12,17 @@ import {
   listFiles,
 } from '../storage/fs.js';
 
-import type { ArtifactDirMetadata, CreateArtifactDirInput } from '../types.js';
+import type {
+  ArtifactDirMetadata,
+  ArtifactExplorerEntry,
+  ArtifactExplorerResult,
+  ArtifactFileIndexResult,
+  ArtifactFileResult,
+  CreateArtifactDirInput,
+} from '../types.js';
+
+const DEFAULT_MAX_FILE_BYTES = 200_000;
+const MAX_ALLOWED_FILE_BYTES = 2_000_000;
 
 /**
  * Manages a single artifact directory within a project.
@@ -102,6 +113,173 @@ export class ArtifactDir {
     return listFiles(this.dirPath);
   }
 
+  /** List one directory level in the artifact tree for explorer views */
+  async listArtifactEntries(relativePath = ''): Promise<ArtifactExplorerResult> {
+    const { absolutePath, relativePath: safePath } = this.resolveArtifactPath(relativePath);
+
+    const directoryStats = await this.statPath(absolutePath);
+    if (!directoryStats) {
+      throw new Error(`Path "${safePath || '.'}" not found`);
+    }
+    if (!directoryStats.isDirectory()) {
+      throw new Error(`Path "${safePath || '.'}" is not a directory`);
+    }
+
+    const entries = await readdir(absolutePath, { withFileTypes: true });
+    const mapped = await Promise.all(
+      entries.map(async (entry): Promise<ArtifactExplorerEntry | null> => {
+        if (!entry.isDirectory() && !entry.isFile()) {
+          return null;
+        }
+
+        const entryAbsolutePath = join(absolutePath, entry.name);
+        const entryStats = await stat(entryAbsolutePath);
+        const entryPath = safePath ? `${safePath}/${entry.name}` : entry.name;
+
+        return {
+          name: entry.name,
+          path: entryPath,
+          type: entry.isDirectory() ? 'directory' : 'file',
+          size: entry.isFile() ? entryStats.size : null,
+          updatedAt: entryStats.mtime.toISOString(),
+        };
+      })
+    );
+
+    const normalizedEntries = mapped
+      .filter((entry): entry is ArtifactExplorerEntry => entry !== null)
+      .sort((a, b) => {
+        if (a.type !== b.type) {
+          return a.type === 'directory' ? -1 : 1;
+        }
+        return a.name.localeCompare(b.name);
+      });
+
+    return {
+      path: safePath,
+      entries: normalizedEntries,
+    };
+  }
+
+  /** Read a file from the artifact tree for code/file previews */
+  async readArtifactFile(
+    relativePath: string,
+    maxBytes = DEFAULT_MAX_FILE_BYTES
+  ): Promise<ArtifactFileResult> {
+    const safeMaxBytes = Number.isFinite(maxBytes)
+      ? Math.max(1024, Math.min(Math.floor(maxBytes), MAX_ALLOWED_FILE_BYTES))
+      : DEFAULT_MAX_FILE_BYTES;
+
+    const { absolutePath, relativePath: safePath } = this.resolveArtifactPath(relativePath);
+
+    if (!safePath) {
+      throw new Error('Path is required');
+    }
+
+    const fileStats = await this.statPath(absolutePath);
+    if (!fileStats) {
+      throw new Error(`File "${safePath}" not found`);
+    }
+    if (!fileStats.isFile()) {
+      throw new Error(`Path "${safePath}" is not a file`);
+    }
+
+    const raw = await readFile(absolutePath);
+    const isBinary = looksBinary(raw);
+
+    if (isBinary) {
+      return {
+        path: safePath,
+        content: '',
+        size: raw.length,
+        updatedAt: fileStats.mtime.toISOString(),
+        isBinary: true,
+        truncated: false,
+      };
+    }
+
+    const truncated = raw.length > safeMaxBytes;
+    const content = (truncated ? raw.subarray(0, safeMaxBytes) : raw).toString('utf-8');
+
+    return {
+      path: safePath,
+      content,
+      size: raw.length,
+      updatedAt: fileStats.mtime.toISOString(),
+      isBinary: false,
+      truncated,
+    };
+  }
+
+  /** Recursively index files in this artifact directory (for mentions/search). */
+  async buildFileIndex(options?: {
+    query?: string;
+    limit?: number;
+  }): Promise<ArtifactFileIndexResult> {
+    const query = (options?.query ?? '').trim().toLowerCase();
+    const limit = Number.isFinite(options?.limit)
+      ? Math.max(1, Math.min(Math.floor(options?.limit ?? 1), 100_000))
+      : 10_000;
+
+    const files: ArtifactFileIndexResult['files'] = [];
+    let truncated = false;
+
+    const stack: string[] = [''];
+
+    while (stack.length > 0) {
+      const relativeDir = stack.pop() ?? '';
+      const { absolutePath } = this.resolveArtifactPath(relativeDir);
+      const entries = await readdir(absolutePath, { withFileTypes: true });
+
+      entries.sort((a, b) => {
+        if (a.isDirectory() !== b.isDirectory()) {
+          return a.isDirectory() ? -1 : 1;
+        }
+        return a.name.localeCompare(b.name);
+      });
+
+      for (const entry of entries) {
+        const relativePath = relativeDir ? `${relativeDir}/${entry.name}` : entry.name;
+
+        if (entry.isDirectory()) {
+          stack.push(relativePath);
+          continue;
+        }
+
+        if (!entry.isFile()) {
+          continue;
+        }
+
+        if (
+          query &&
+          !relativePath.toLowerCase().includes(query) &&
+          !entry.name.toLowerCase().includes(query)
+        ) {
+          continue;
+        }
+
+        const entryStats = await stat(join(absolutePath, entry.name));
+        files.push({
+          path: relativePath,
+          size: entryStats.size,
+          updatedAt: entryStats.mtime.toISOString(),
+        });
+
+        if (files.length >= limit) {
+          truncated = true;
+          break;
+        }
+      }
+
+      if (truncated) {
+        break;
+      }
+    }
+
+    files.sort((a, b) => a.path.localeCompare(b.path));
+    return { files, truncated };
+  }
+
   /** Check if both working directory and metadata directory exist */
   async exists(): Promise<boolean> {
     const [dirExists, dataExists] = await Promise.all([
@@ -118,6 +296,41 @@ export class ArtifactDir {
   async delete(): Promise<void> {
     await Promise.all([removeDir(this.dirPath), removeDir(this.dataPath)]);
   }
+
+  private resolveArtifactPath(relativePath: string): {
+    absolutePath: string;
+    relativePath: string;
+  } {
+    const normalizedInput = normalizeRelativePath(relativePath);
+
+    if (!normalizedInput) {
+      return { absolutePath: this.dirPath, relativePath: '' };
+    }
+
+    if (isAbsolute(normalizedInput)) {
+      throw new Error('Invalid path');
+    }
+
+    const absolutePath = resolve(this.dirPath, normalizedInput);
+    const rel = relative(this.dirPath, absolutePath);
+
+    if (rel.startsWith('..') || isAbsolute(rel)) {
+      throw new Error('Invalid path');
+    }
+
+    return {
+      absolutePath,
+      relativePath: rel.replace(/\\/g, '/'),
+    };
+  }
+
+  private async statPath(targetPath: string): Promise<Awaited<ReturnType<typeof stat>> | null> {
+    try {
+      return await stat(targetPath);
+    } catch {
+      return null;
+    }
+  }
 }
 
 function slugify(name: string): string {
@@ -126,4 +339,35 @@ function slugify(name: string): string {
     .trim()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
+}
+
+function normalizeRelativePath(path: string): string {
+  return path
+    .replace(/\\/g, '/')
+    .replace(/^\/+|\/+$/g, '')
+    .trim();
+}
+
+function looksBinary(content: Buffer): boolean {
+  if (content.length === 0) {
+    return false;
+  }
+
+  const sample = content.subarray(0, Math.min(content.length, 2048));
+  let suspicious = 0;
+
+  for (const byte of sample) {
+    if (byte === 0) {
+      return true;
+    }
+
+    const isTabOrNewline = byte === 9 || byte === 10 || byte === 13;
+    const isControl = byte < 32 || byte === 127;
+
+    if (isControl && !isTabOrNewline) {
+      suspicious += 1;
+    }
+  }
+
+  return suspicious / sample.length > 0.3;
 }

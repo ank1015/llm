@@ -2,7 +2,11 @@ import { Hono } from 'hono';
 
 import { ArtifactDir, Project, Session } from '../core/index.js';
 
+import type { ProjectFileIndexEntry } from '../core/index.js';
+
 export const projectRoutes = new Hono();
+const DEFAULT_FILE_INDEX_LIMIT = 2000;
+const MAX_FILE_INDEX_LIMIT = 10000;
 
 /** POST /api/projects — Create a new project */
 projectRoutes.post('/projects', async (c) => {
@@ -59,6 +63,77 @@ projectRoutes.get('/projects/:projectId/overview', async (c) => {
     );
 
     return c.json({ project: projectMeta, artifactDirs });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Project not found';
+    return c.json({ error: message }, 404);
+  }
+});
+
+/** GET /api/projects/:projectId/file-index — Search files across all artifact directories */
+projectRoutes.get('/projects/:projectId/file-index', async (c) => {
+  const { projectId } = c.req.param();
+  const query = (c.req.query('query') ?? '').trim();
+  const limitParam = c.req.query('limit');
+
+  let limit = DEFAULT_FILE_INDEX_LIMIT;
+  if (limitParam !== undefined) {
+    const parsed = Number(limitParam);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return c.json({ error: 'limit must be a positive number' }, 400);
+    }
+    limit = Math.min(Math.floor(parsed), MAX_FILE_INDEX_LIMIT);
+  }
+
+  try {
+    await Project.getById(projectId);
+    const artifactDirs = await ArtifactDir.list(projectId);
+    const files: ProjectFileIndexEntry[] = [];
+    let truncated = false;
+
+    for (const artifact of artifactDirs) {
+      if (files.length >= limit) {
+        truncated = true;
+        break;
+      }
+
+      const artifactDir = await ArtifactDir.getById(projectId, artifact.id);
+      const remaining = limit - files.length;
+      const indexed = await artifactDir.buildFileIndex({
+        query,
+        limit: remaining,
+      });
+
+      files.push(
+        ...indexed.files.map((file) => ({
+          artifactId: artifact.id,
+          artifactName: artifact.name,
+          path: file.path,
+          artifactPath: `${artifact.id}/${file.path}`,
+          size: file.size,
+          updatedAt: file.updatedAt,
+        }))
+      );
+
+      if (indexed.truncated) {
+        truncated = true;
+        break;
+      }
+    }
+
+    files.sort((a, b) => {
+      const artifactCompare = a.artifactId.localeCompare(b.artifactId);
+      if (artifactCompare !== 0) {
+        return artifactCompare;
+      }
+      return a.path.localeCompare(b.path);
+    });
+
+    return c.json({
+      projectId,
+      query,
+      files,
+      truncated,
+    });
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Project not found';
     return c.json({ error: message }, 404);

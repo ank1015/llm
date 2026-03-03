@@ -6,6 +6,7 @@ import type { ArtifactType } from '../core/index.js';
 
 const BASE = '/projects/:projectId/artifacts';
 const NOT_FOUND_MSG = 'Artifact directory not found';
+const FILE_READ_DEFAULT_MAX_BYTES = 200_000;
 
 export const artifactDirRoutes = new Hono();
 
@@ -79,6 +80,52 @@ artifactDirRoutes.get(`${BASE}/:artifactDirId/files`, async (c) => {
   }
 });
 
+/** GET /api/projects/:projectId/artifacts/:artifactDirId/explorer — List one directory level */
+artifactDirRoutes.get(`${BASE}/:artifactDirId/explorer`, async (c) => {
+  const { projectId, artifactDirId } = c.req.param();
+  const path = c.req.query('path') ?? '';
+
+  try {
+    const dir = await ArtifactDir.getById(projectId, artifactDirId);
+    const listing = await dir.listArtifactEntries(path);
+    return c.json(listing);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Failed to list artifact explorer entries';
+    const status = classifyExplorerErrorStatus(message);
+    return c.json({ error: message }, status);
+  }
+});
+
+/** GET /api/projects/:projectId/artifacts/:artifactDirId/file?path=... — Read a file */
+artifactDirRoutes.get(`${BASE}/:artifactDirId/file`, async (c) => {
+  const { projectId, artifactDirId } = c.req.param();
+  const path = c.req.query('path');
+  const maxBytesRaw = c.req.query('maxBytes');
+
+  if (!path || !path.trim()) {
+    return c.json({ error: 'path query parameter is required' }, 400);
+  }
+
+  let maxBytes = FILE_READ_DEFAULT_MAX_BYTES;
+  if (maxBytesRaw !== undefined) {
+    const parsed = Number(maxBytesRaw);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return c.json({ error: 'maxBytes must be a positive number' }, 400);
+    }
+    maxBytes = Math.floor(parsed);
+  }
+
+  try {
+    const dir = await ArtifactDir.getById(projectId, artifactDirId);
+    const file = await dir.readArtifactFile(path, maxBytes);
+    return c.json(file);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Failed to read artifact file';
+    const status = classifyFileReadErrorStatus(message);
+    return c.json({ error: message }, status);
+  }
+});
+
 /** DELETE /api/projects/:projectId/artifacts/:artifactDirId — Delete an artifact directory */
 artifactDirRoutes.delete(`${BASE}/:artifactDirId`, async (c) => {
   const { projectId, artifactDirId } = c.req.param();
@@ -92,3 +139,35 @@ artifactDirRoutes.delete(`${BASE}/:artifactDirId`, async (c) => {
     return c.json({ error: message }, 404);
   }
 });
+
+function classifyExplorerErrorStatus(message: string): 400 | 404 | 500 {
+  if (
+    message === NOT_FOUND_MSG ||
+    message.includes('not found in project') ||
+    message.includes('not found')
+  ) {
+    return 404;
+  }
+  if (message === 'Invalid path' || message.includes('not a directory')) {
+    return 400;
+  }
+  return 500;
+}
+
+function classifyFileReadErrorStatus(message: string): 400 | 404 | 500 {
+  if (
+    message === NOT_FOUND_MSG ||
+    message.includes('not found in project') ||
+    message.includes('not found')
+  ) {
+    return 404;
+  }
+  if (
+    message === 'Invalid path' ||
+    message.includes('Path is required') ||
+    message.includes('not a file')
+  ) {
+    return 400;
+  }
+  return 500;
+}

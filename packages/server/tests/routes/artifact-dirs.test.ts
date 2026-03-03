@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -145,6 +145,119 @@ describe('Artifact Dir Routes', () => {
     it('should return 404 for nonexistent artifact dir', async () => {
       const res = await get(`${BASE}/nonexistent/files`);
 
+      expect(res.status).toBe(404);
+    });
+  });
+
+  describe('GET /api/projects/:projectId/artifacts/:artifactDirId/explorer', () => {
+    it('should list root directory entries with directories first', async () => {
+      await post(BASE, { name: 'tree' });
+
+      const dirPath = join(projectsRoot, PROJECT, 'tree');
+      await mkdir(join(dirPath, 'src', 'utils'), { recursive: true });
+      await writeFile(join(dirPath, 'README.md'), '# Hello');
+      await writeFile(join(dirPath, 'src', 'index.ts'), 'export const x = 1;');
+
+      const res = await get(`${BASE}/tree/explorer`);
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.path).toBe('');
+      expect(body.entries.map((entry: { path: string }) => entry.path)).toEqual([
+        'src',
+        'README.md',
+      ]);
+      expect(body.entries[0].type).toBe('directory');
+      expect(body.entries[1].type).toBe('file');
+    });
+
+    it('should list nested directory entries when path is provided', async () => {
+      await post(BASE, { name: 'tree' });
+
+      const dirPath = join(projectsRoot, PROJECT, 'tree');
+      await mkdir(join(dirPath, 'src', 'utils'), { recursive: true });
+      await writeFile(join(dirPath, 'src', 'index.ts'), 'export const x = 1;');
+      await writeFile(
+        join(dirPath, 'src', 'utils', 'math.ts'),
+        'export const add = (a: number, b: number) => a + b;'
+      );
+
+      const res = await get(`${BASE}/tree/explorer?path=${encodeURIComponent('src')}`);
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.path).toBe('src');
+      expect(body.entries.map((entry: { path: string }) => entry.path)).toEqual([
+        'src/utils',
+        'src/index.ts',
+      ]);
+    });
+
+    it('should return 400 for invalid traversal path', async () => {
+      await post(BASE, { name: 'tree' });
+
+      const res = await get(`${BASE}/tree/explorer?path=${encodeURIComponent('../secrets')}`);
+      expect(res.status).toBe(400);
+
+      const body = await res.json();
+      expect(body.error).toBe('Invalid path');
+    });
+  });
+
+  describe('GET /api/projects/:projectId/artifacts/:artifactDirId/file', () => {
+    it('should return file content for text files', async () => {
+      await post(BASE, { name: 'reader' });
+
+      const dirPath = join(projectsRoot, PROJECT, 'reader');
+      await mkdir(join(dirPath, 'src'), { recursive: true });
+      await writeFile(join(dirPath, 'src', 'index.ts'), 'export const value = 42;\n');
+
+      const res = await get(`${BASE}/reader/file?path=${encodeURIComponent('src/index.ts')}`);
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.path).toBe('src/index.ts');
+      expect(body.content).toContain('value = 42');
+      expect(body.isBinary).toBe(false);
+      expect(body.truncated).toBe(false);
+    });
+
+    it('should mark binary files as binary', async () => {
+      await post(BASE, { name: 'reader' });
+
+      const dirPath = join(projectsRoot, PROJECT, 'reader');
+      await writeFile(join(dirPath, 'image.bin'), Buffer.from([0, 1, 2, 3]));
+
+      const res = await get(`${BASE}/reader/file?path=${encodeURIComponent('image.bin')}`);
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.isBinary).toBe(true);
+      expect(body.content).toBe('');
+    });
+
+    it('should return 400 when path query parameter is missing', async () => {
+      await post(BASE, { name: 'reader' });
+
+      const res = await get(`${BASE}/reader/file`);
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: 'path query parameter is required' });
+    });
+
+    it('should return 400 for invalid traversal path', async () => {
+      await post(BASE, { name: 'reader' });
+
+      const res = await get(`${BASE}/reader/file?path=${encodeURIComponent('../secret.txt')}`);
+      expect(res.status).toBe(400);
+
+      const body = await res.json();
+      expect(body.error).toBe('Invalid path');
+    });
+
+    it('should return 404 for missing file paths', async () => {
+      await post(BASE, { name: 'reader' });
+
+      const res = await get(`${BASE}/reader/file?path=${encodeURIComponent('missing.txt')}`);
       expect(res.status).toBe(404);
     });
   });

@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -107,6 +107,94 @@ describe('Project Routes', () => {
       expect(res.status).toBe(404);
       const body = await res.json();
       expect(body.error).toContain('not found');
+    });
+  });
+
+  describe('GET /api/projects/:projectId/file-index', () => {
+    it('should return files across all artifacts', async () => {
+      await post('/api/projects', { name: 'Index Project' });
+      await post('/api/projects/index-project/artifacts', {
+        name: 'docs',
+      });
+      await post('/api/projects/index-project/artifacts', {
+        name: 'code',
+      });
+
+      await writeFile(join(projectsRoot, 'index-project', 'docs', 'README.md'), '# Docs');
+      await mkdir(join(projectsRoot, 'index-project', 'code', 'src'), { recursive: true });
+      await writeFile(join(projectsRoot, 'index-project', 'code', 'src', 'index.ts'), 'export {};');
+
+      const res = await get('/api/projects/index-project/file-index');
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.projectId).toBe('index-project');
+      expect(body.truncated).toBe(false);
+      expect(body.files).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            artifactId: 'docs',
+            path: 'README.md',
+            artifactPath: 'docs/README.md',
+          }),
+          expect.objectContaining({
+            artifactId: 'code',
+            path: 'src/index.ts',
+            artifactPath: 'code/src/index.ts',
+          }),
+        ])
+      );
+    });
+
+    it('should filter files by query', async () => {
+      await post('/api/projects', { name: 'Filter Project' });
+      await post('/api/projects/filter-project/artifacts', {
+        name: 'work',
+      });
+
+      await writeFile(join(projectsRoot, 'filter-project', 'work', 'README.md'), '# Docs');
+      await writeFile(join(projectsRoot, 'filter-project', 'work', 'notes.txt'), 'notes');
+
+      const res = await get('/api/projects/filter-project/file-index?query=readme');
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.files).toHaveLength(1);
+      expect(body.files[0].path).toBe('README.md');
+    });
+
+    it('should respect limit and set truncated', async () => {
+      await post('/api/projects', { name: 'Limit Project' });
+      await post('/api/projects/limit-project/artifacts', {
+        name: 'bucket',
+      });
+
+      const base = join(projectsRoot, 'limit-project', 'bucket');
+      await writeFile(join(base, 'a.txt'), 'a');
+      await writeFile(join(base, 'b.txt'), 'b');
+      await writeFile(join(base, 'c.txt'), 'c');
+
+      const res = await get('/api/projects/limit-project/file-index?limit=2');
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.files).toHaveLength(2);
+      expect(body.truncated).toBe(true);
+    });
+
+    it('should return 400 for invalid limit', async () => {
+      await post('/api/projects', { name: 'Bad Limit Project' });
+
+      const res = await get('/api/projects/bad-limit-project/file-index?limit=0');
+      expect(res.status).toBe(400);
+
+      const body = await res.json();
+      expect(body.error).toBe('limit must be a positive number');
+    });
+
+    it('should return 404 for missing projects', async () => {
+      const res = await get('/api/projects/missing/file-index');
+      expect(res.status).toBe(404);
     });
   });
 

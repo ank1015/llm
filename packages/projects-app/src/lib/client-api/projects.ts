@@ -39,6 +39,51 @@ export type ProjectOverview = {
   artifactDirs: ArtifactDirWithSessions[];
 };
 
+export type ArtifactContext = {
+  projectId: string;
+  artifactId: string;
+};
+
+export type ArtifactExplorerEntryType = 'file' | 'directory';
+
+export type ArtifactExplorerEntry = {
+  name: string;
+  path: string;
+  type: ArtifactExplorerEntryType;
+  size: number | null;
+  updatedAt: string;
+};
+
+export type ArtifactExplorerResult = {
+  path: string;
+  entries: ArtifactExplorerEntry[];
+};
+
+export type ArtifactFileResult = {
+  path: string;
+  content: string;
+  size: number;
+  updatedAt: string;
+  isBinary: boolean;
+  truncated: boolean;
+};
+
+export type ProjectFileIndexEntry = {
+  artifactId: string;
+  artifactName: string;
+  path: string;
+  artifactPath: string;
+  size: number;
+  updatedAt: string;
+};
+
+export type ProjectFileIndexResult = {
+  projectId: string;
+  query: string;
+  files: ProjectFileIndexEntry[];
+  truncated: boolean;
+};
+
 export async function listProjects(): Promise<ProjectMetadata[]> {
   return apiRequestJson<ProjectMetadata[]>(PROJECTS_BASE, {
     method: 'GET',
@@ -93,4 +138,53 @@ export async function deleteArtifactDir(
       method: 'DELETE',
     }
   );
+}
+
+function buildArtifactBase(ctx: ArtifactContext): string {
+  return `${PROJECTS_BASE}/${encodeURIComponent(ctx.projectId)}/artifacts/${encodeURIComponent(ctx.artifactId)}`;
+}
+
+export async function getArtifactExplorer(
+  ctx: ArtifactContext,
+  path = ''
+): Promise<ArtifactExplorerResult> {
+  const params = new URLSearchParams();
+  if (path.trim().length > 0) {
+    params.set('path', path);
+  }
+
+  const query = params.toString();
+  const url = `${buildArtifactBase(ctx)}/explorer${query ? `?${query}` : ''}`;
+  return apiRequestJson<ArtifactExplorerResult>(url, { method: 'GET' });
+}
+
+export async function getArtifactFile(
+  ctx: ArtifactContext,
+  input: { path: string; maxBytes?: number }
+): Promise<ArtifactFileResult> {
+  const params = new URLSearchParams({ path: input.path });
+  if (typeof input.maxBytes === 'number' && Number.isFinite(input.maxBytes)) {
+    params.set('maxBytes', `${Math.floor(input.maxBytes)}`);
+  }
+
+  return apiRequestJson<ArtifactFileResult>(`${buildArtifactBase(ctx)}/file?${params.toString()}`, {
+    method: 'GET',
+  });
+}
+
+export async function getProjectFileIndex(
+  projectId: string,
+  input?: { query?: string; limit?: number }
+): Promise<ProjectFileIndexResult> {
+  const params = new URLSearchParams();
+  if (input?.query?.trim()) {
+    params.set('query', input.query.trim());
+  }
+  if (typeof input?.limit === 'number' && Number.isFinite(input.limit)) {
+    params.set('limit', `${Math.floor(input.limit)}`);
+  }
+
+  const query = params.toString();
+  const url = `${PROJECTS_BASE}/${encodeURIComponent(projectId)}/file-index${query ? `?${query}` : ''}`;
+  return apiRequestJson<ProjectFileIndexResult>(url, { method: 'GET' });
 }
