@@ -101,6 +101,7 @@ export type PromptInputTextareaProps = {
 
 function PromptInputTextarea({
   className,
+  onChange,
   onKeyDown,
   disableAutosize = false,
   ...props
@@ -136,19 +137,25 @@ function PromptInputTextarea({
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     adjustHeight(e.target);
     setValue(e.target.value);
+    onChange?.(e);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    onKeyDown?.(e);
+    if (e.defaultPrevented) {
+      return;
+    }
+
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       onSubmit?.();
     }
-    onKeyDown?.(e);
   };
 
   return (
     <Textarea
       ref={handleRef}
+      {...props}
       value={value}
       onChange={handleChange}
       onKeyDown={handleKeyDown}
@@ -158,7 +165,6 @@ function PromptInputTextarea({
       )}
       rows={1}
       disabled={disabled}
-      {...props}
     />
   );
 }
