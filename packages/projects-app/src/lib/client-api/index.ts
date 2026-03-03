@@ -4,6 +4,7 @@ export {
   ARTIFACT_TYPES,
   createArtifactDir,
   createProject,
+  deleteArtifactPath,
   deleteArtifactDir,
   deleteProject,
   getArtifactExplorer,
@@ -11,6 +12,7 @@ export {
   getProjectFileIndex,
   getProjectOverview,
   listProjects,
+  renameArtifactPath,
 } from './projects';
 export type {
   ArtifactContext,
@@ -20,6 +22,8 @@ export type {
   ArtifactExplorerEntryType,
   ArtifactExplorerResult,
   ArtifactFileResult,
+  ArtifactPathDeleteResult,
+  ArtifactPathRenameResult,
   ArtifactType,
   OverviewSession,
   ProjectFileIndexEntry,

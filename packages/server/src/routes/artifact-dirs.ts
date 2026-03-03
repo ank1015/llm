@@ -126,6 +126,58 @@ artifactDirRoutes.get(`${BASE}/:artifactDirId/file`, async (c) => {
   }
 });
 
+/** PATCH /api/projects/:projectId/artifacts/:artifactDirId/path/rename — Rename a file or directory */
+artifactDirRoutes.patch(`${BASE}/:artifactDirId/path/rename`, async (c) => {
+  const { projectId, artifactDirId } = c.req.param();
+  const body = await c.req.json<{ path?: string; newName?: string }>();
+  const path = body.path?.trim() ?? '';
+  const newName = body.newName?.trim() ?? '';
+
+  if (!path) {
+    return c.json({ error: 'path is required' }, 400);
+  }
+  if (!newName) {
+    return c.json({ error: 'newName is required' }, 400);
+  }
+
+  try {
+    const dir = await ArtifactDir.getById(projectId, artifactDirId);
+    const result = await dir.renameArtifactPath(path, newName);
+    return c.json({
+      ok: true,
+      ...result,
+    });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Failed to rename artifact path';
+    const status = classifyPathMutationErrorStatus(message);
+    return c.json({ error: message }, status);
+  }
+});
+
+/** DELETE /api/projects/:projectId/artifacts/:artifactDirId/path?path=... — Delete a file or directory */
+artifactDirRoutes.delete(`${BASE}/:artifactDirId/path`, async (c) => {
+  const { projectId, artifactDirId } = c.req.param();
+  const path = c.req.query('path')?.trim();
+
+  if (!path) {
+    return c.json({ error: 'path query parameter is required' }, 400);
+  }
+
+  try {
+    const dir = await ArtifactDir.getById(projectId, artifactDirId);
+    const result = await dir.deleteArtifactPath(path);
+    return c.json({
+      ok: true,
+      deleted: true,
+      ...result,
+    });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Failed to delete artifact path';
+    const status = classifyPathMutationErrorStatus(message);
+    return c.json({ error: message }, status);
+  }
+});
+
 /** DELETE /api/projects/:projectId/artifacts/:artifactDirId — Delete an artifact directory */
 artifactDirRoutes.delete(`${BASE}/:artifactDirId`, async (c) => {
   const { projectId, artifactDirId } = c.req.param();
@@ -166,6 +218,30 @@ function classifyFileReadErrorStatus(message: string): 400 | 404 | 500 {
     message === 'Invalid path' ||
     message.includes('Path is required') ||
     message.includes('not a file')
+  ) {
+    return 400;
+  }
+  return 500;
+}
+
+function classifyPathMutationErrorStatus(message: string): 400 | 404 | 409 | 500 {
+  if (
+    message === NOT_FOUND_MSG ||
+    message.includes('not found in project') ||
+    message.includes('not found')
+  ) {
+    return 404;
+  }
+  if (message.includes('already exists')) {
+    return 409;
+  }
+  if (
+    message === 'Invalid path' ||
+    message.includes('Path is required') ||
+    message.includes('newName is required') ||
+    message.includes('newName cannot contain path separators') ||
+    message.includes('newName is invalid') ||
+    message.includes('not a file or directory')
   ) {
     return 400;
   }

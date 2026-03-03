@@ -68,6 +68,20 @@ export type ArtifactFileResult = {
   truncated: boolean;
 };
 
+export type ArtifactPathRenameResult = {
+  ok: true;
+  oldPath: string;
+  newPath: string;
+  type: ArtifactExplorerEntryType;
+};
+
+export type ArtifactPathDeleteResult = {
+  ok: true;
+  deleted: true;
+  path: string;
+  type: ArtifactExplorerEntryType;
+};
+
 export type ProjectFileIndexEntry = {
   artifactId: string;
   artifactName: string;
@@ -170,6 +184,31 @@ export async function getArtifactFile(
   return apiRequestJson<ArtifactFileResult>(`${buildArtifactBase(ctx)}/file?${params.toString()}`, {
     method: 'GET',
   });
+}
+
+export async function renameArtifactPath(
+  ctx: ArtifactContext,
+  input: { path: string; newName: string }
+): Promise<ArtifactPathRenameResult> {
+  return apiRequestJson<ArtifactPathRenameResult>(`${buildArtifactBase(ctx)}/path/rename`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      path: input.path,
+      newName: input.newName,
+    }),
+  });
+}
+
+export async function deleteArtifactPath(
+  ctx: ArtifactContext,
+  input: { path: string }
+): Promise<ArtifactPathDeleteResult> {
+  const params = new URLSearchParams({ path: input.path });
+  return apiRequestJson<ArtifactPathDeleteResult>(
+    `${buildArtifactBase(ctx)}/path?${params.toString()}`,
+    { method: 'DELETE' }
+  );
 }
 
 export async function getProjectFileIndex(

@@ -1,5 +1,5 @@
-import { readFile, readdir, stat } from 'node:fs/promises';
-import { isAbsolute, join, relative, resolve } from 'node:path';
+import { readFile, readdir, rename, rm, stat } from 'node:fs/promises';
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 
 import { getConfig } from '../config.js';
 import {
@@ -15,6 +15,7 @@ import {
 import type {
   ArtifactDirMetadata,
   ArtifactExplorerEntry,
+  ArtifactExplorerEntryType,
   ArtifactExplorerResult,
   ArtifactFileIndexResult,
   ArtifactFileResult,
@@ -211,6 +212,92 @@ export class ArtifactDir {
     };
   }
 
+  /** Delete a file or directory inside the artifact tree */
+  async deleteArtifactPath(
+    relativePath: string
+  ): Promise<{ path: string; type: ArtifactExplorerEntryType }> {
+    const { absolutePath, relativePath: safePath } = this.resolveArtifactPath(relativePath);
+
+    if (!safePath) {
+      throw new Error('Path is required');
+    }
+
+    const targetStats = await this.statPath(absolutePath);
+    if (!targetStats) {
+      throw new Error(`Path "${safePath}" not found`);
+    }
+
+    if (!targetStats.isFile() && !targetStats.isDirectory()) {
+      throw new Error(`Path "${safePath}" is not a file or directory`);
+    }
+
+    const type: ArtifactExplorerEntryType = targetStats.isDirectory() ? 'directory' : 'file';
+    await rm(absolutePath, { recursive: targetStats.isDirectory(), force: false });
+
+    return {
+      path: safePath,
+      type,
+    };
+  }
+
+  /** Rename a file or directory inside the artifact tree */
+  async renameArtifactPath(
+    relativePath: string,
+    newName: string
+  ): Promise<{ oldPath: string; newPath: string; type: ArtifactExplorerEntryType }> {
+    const { absolutePath, relativePath: safePath } = this.resolveArtifactPath(relativePath);
+
+    if (!safePath) {
+      throw new Error('Path is required');
+    }
+
+    const normalizedName = normalizePathName(newName);
+    if (!normalizedName) {
+      throw new Error('newName is required');
+    }
+    if (normalizedName.includes('/') || normalizedName.includes('\\')) {
+      throw new Error('newName cannot contain path separators');
+    }
+    if (normalizedName === '.' || normalizedName === '..') {
+      throw new Error('newName is invalid');
+    }
+
+    const targetStats = await this.statPath(absolutePath);
+    if (!targetStats) {
+      throw new Error(`Path "${safePath}" not found`);
+    }
+
+    if (!targetStats.isFile() && !targetStats.isDirectory()) {
+      throw new Error(`Path "${safePath}" is not a file or directory`);
+    }
+
+    const currentName = basename(safePath);
+    if (currentName === normalizedName) {
+      return {
+        oldPath: safePath,
+        newPath: safePath,
+        type: targetStats.isDirectory() ? 'directory' : 'file',
+      };
+    }
+
+    const parentPath = dirname(safePath) === '.' ? '' : dirname(safePath).replace(/\\/g, '/');
+    const nextRelativePath = parentPath ? `${parentPath}/${normalizedName}` : normalizedName;
+    const resolvedNext = this.resolveArtifactPath(nextRelativePath);
+    const nextStats = await this.statPath(resolvedNext.absolutePath);
+
+    if (nextStats) {
+      throw new Error(`Path "${nextRelativePath}" already exists`);
+    }
+
+    await rename(absolutePath, resolvedNext.absolutePath);
+
+    return {
+      oldPath: safePath,
+      newPath: resolvedNext.relativePath,
+      type: targetStats.isDirectory() ? 'directory' : 'file',
+    };
+  }
+
   /** Recursively index files in this artifact directory (for mentions/search). */
   async buildFileIndex(options?: {
     query?: string;
@@ -346,6 +433,10 @@ function normalizeRelativePath(path: string): string {
     .replace(/\\/g, '/')
     .replace(/^\/+|\/+$/g, '')
     .trim();
+}
+
+function normalizePathName(name: string): string {
+  return name.trim();
 }
 
 function looksBinary(content: Buffer): boolean {

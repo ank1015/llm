@@ -6,11 +6,18 @@ import type {
   ArtifactContext,
   ArtifactExplorerResult,
   ArtifactFileResult,
+  ArtifactPathDeleteResult,
+  ArtifactPathRenameResult,
   ProjectFileIndexEntry,
 } from '@/lib/client-api';
 
-import { getArtifactExplorer, getArtifactFile, getProjectFileIndex } from '@/lib/client-api';
-
+import {
+  deleteArtifactPath,
+  getArtifactExplorer,
+  getArtifactFile,
+  getProjectFileIndex,
+  renameArtifactPath,
+} from '@/lib/client-api';
 
 const DEFAULT_PROJECT_FILE_INDEX_LIMIT = 10_000;
 const DEFAULT_PROJECT_FILE_SEARCH_LIMIT = 50;
@@ -41,6 +48,11 @@ type ArtifactFilesStoreState = {
     query: string,
     limit?: number
   ) => Promise<ProjectFileIndexEntry[]>;
+  renamePath: (
+    ctx: ArtifactContext,
+    input: { path: string; newName: string }
+  ) => Promise<ArtifactPathRenameResult>;
+  deletePath: (ctx: ArtifactContext, input: { path: string }) => Promise<ArtifactPathDeleteResult>;
   clearProjectFileIndex: (projectId: string) => void;
 };
 
@@ -341,6 +353,18 @@ export const useArtifactFilesStore = create<ArtifactFilesStoreState>((set, get) 
       limit: safeLimit,
     });
     return result.files;
+  },
+
+  renamePath: async (ctx, input) => {
+    const result = await renameArtifactPath(ctx, input);
+    get().clearProjectFileIndex(ctx.projectId);
+    return result;
+  },
+
+  deletePath: async (ctx, input) => {
+    const result = await deleteArtifactPath(ctx, input);
+    get().clearProjectFileIndex(ctx.projectId);
+    return result;
   },
 
   clearProjectFileIndex: (projectId) => {

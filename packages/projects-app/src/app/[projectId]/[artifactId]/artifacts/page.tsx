@@ -1,6 +1,16 @@
 'use client';
 
-import { ChevronRight, FileText, Folder, FolderOpen, Loader2, RefreshCw } from 'lucide-react';
+import {
+  ChevronRight,
+  Ellipsis,
+  FileText,
+  Folder,
+  FolderOpen,
+  Loader2,
+  Pencil,
+  RefreshCw,
+  Trash2,
+} from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -8,6 +18,20 @@ import type { ArtifactExplorerResult, ArtifactFileResult } from '@/lib/client-ap
 import type { ReactNode } from 'react';
 
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { useArtifactFilesStore, useSidebarStore, useUiStore } from '@/stores';
 
@@ -16,6 +40,12 @@ const EMPTY_FILE_MAP: Record<string, ArtifactFileResult> = {};
 const EMPTY_LOADING_MAP: Record<string, boolean> = {};
 const EMPTY_ERROR_MAP: Record<string, string | null> = {};
 const ROOT_EXPANDED: Record<string, boolean> = { '': true };
+
+type ExplorerEntryTarget = {
+  path: string;
+  name: string;
+  type: 'file' | 'directory';
+};
 
 function normalizeRelativePath(path: string): string {
   return path
@@ -34,6 +64,70 @@ function getDirectoryRequestKey(artifactKey: string, path: string): string {
 
 function getFileRequestKey(artifactKey: string, path: string): string {
   return `${artifactKey}::file::${path}`;
+}
+
+function isSameOrChildPath(path: string, basePath: string): boolean {
+  const safePath = normalizeRelativePath(path);
+  const safeBase = normalizeRelativePath(basePath);
+  if (!safePath || !safeBase) return false;
+  return safePath === safeBase || safePath.startsWith(`${safeBase}/`);
+}
+
+function replacePathPrefix(path: string, oldPath: string, newPath: string): string {
+  if (!isSameOrChildPath(path, oldPath)) {
+    return normalizeRelativePath(path);
+  }
+
+  const safePath = normalizeRelativePath(path);
+  const safeOldPath = normalizeRelativePath(oldPath);
+  const safeNewPath = normalizeRelativePath(newPath);
+  if (safePath === safeOldPath) {
+    return safeNewPath;
+  }
+
+  const suffix = safePath.slice(safeOldPath.length);
+  return `${safeNewPath}${suffix}`;
+}
+
+function dropExpandedPath(
+  expandedDirs: Record<string, boolean>,
+  removedPath: string
+): Record<string, boolean> {
+  const next: Record<string, boolean> = { '': true };
+  const safeRemoved = normalizeRelativePath(removedPath);
+
+  for (const [path, expanded] of Object.entries(expandedDirs)) {
+    if (path === '') continue;
+    if (safeRemoved && isSameOrChildPath(path, safeRemoved)) {
+      continue;
+    }
+    next[path] = expanded;
+  }
+
+  return next;
+}
+
+function renameExpandedPath(
+  expandedDirs: Record<string, boolean>,
+  oldPath: string,
+  newPath: string
+): Record<string, boolean> {
+  const next: Record<string, boolean> = { '': true };
+  const safeOldPath = normalizeRelativePath(oldPath);
+  const safeNewPath = normalizeRelativePath(newPath);
+
+  for (const [path, expanded] of Object.entries(expandedDirs)) {
+    if (path === '') continue;
+    if (!safeOldPath || !isSameOrChildPath(path, safeOldPath)) {
+      next[path] = expanded;
+      continue;
+    }
+
+    const renamedPath = replacePathPrefix(path, safeOldPath, safeNewPath);
+    next[renamedPath] = expanded;
+  }
+
+  return next;
 }
 
 export default function ArtifactFilesPage() {
@@ -70,12 +164,19 @@ export default function ArtifactFilesPage() {
   const openFile = useArtifactFilesStore((state) => state.openFile);
   const setSelectedFile = useArtifactFilesStore((state) => state.setSelectedFile);
   const clearArtifactCache = useArtifactFilesStore((state) => state.clearArtifactCache);
+  const renamePath = useArtifactFilesStore((state) => state.renamePath);
+  const deletePath = useArtifactFilesStore((state) => state.deletePath);
 
   const [expandedDirsByArtifact, setExpandedDirsByArtifact] = useState<
     Record<string, Record<string, boolean>>
   >({});
   const [explorerWidthPx, setExplorerWidthPx] = useState(320);
   const [isResizing, setIsResizing] = useState(false);
+  const [renameTarget, setRenameTarget] = useState<ExplorerEntryTarget | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ExplorerEntryTarget | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [isPathMutationPending, setIsPathMutationPending] = useState(false);
+  const [pathActionError, setPathActionError] = useState<string | null>(null);
   const expandedDirs = expandedDirsByArtifact[artifactKey] ?? ROOT_EXPANDED;
 
   useEffect(() => {
@@ -129,17 +230,137 @@ export default function ArtifactFilesPage() {
     ? (fileErrorByKey[selectedFileRequestKey] ?? null)
     : null;
 
-  const handleRefresh = () => {
-    const expandedPaths = Object.entries(expandedDirs)
-      .filter(([, expanded]) => expanded)
-      .map(([path]) => path);
+  const reloadExplorerState = async (
+    nextExpandedDirs: Record<string, boolean>,
+    nextSelectedFilePath: string | null
+  ): Promise<void> => {
+    clearArtifactCache(artifactCtx);
+    await loadDirectory(artifactCtx, '', true);
 
-    for (const path of expandedPaths) {
-      void loadDirectory(artifactCtx, path, true);
+    const expandedPaths = Object.entries(nextExpandedDirs)
+      .filter(([path, expanded]) => path !== '' && expanded)
+      .map(([path]) => path)
+      .sort((a, b) => a.length - b.length);
+
+    await Promise.all(
+      expandedPaths.map(async (path) => {
+        try {
+          await loadDirectory(artifactCtx, path, true);
+        } catch {
+          // Ignore stale paths after mutations.
+        }
+      })
+    );
+
+    if (!nextSelectedFilePath) {
+      setSelectedFile(artifactCtx, null);
+      return;
     }
 
-    if (selectedFilePath) {
-      void openFile(artifactCtx, selectedFilePath, true);
+    try {
+      await openFile(artifactCtx, nextSelectedFilePath, true);
+    } catch {
+      setSelectedFile(artifactCtx, null);
+    }
+  };
+
+  const handleRefresh = () => {
+    void reloadExplorerState(expandedDirs, selectedFilePath);
+  };
+
+  const handleOpenRename = (target: ExplorerEntryTarget) => {
+    setPathActionError(null);
+    setDeleteTarget(null);
+    setRenameTarget(target);
+    setRenameValue(target.name);
+  };
+
+  const closeRenameDialog = () => {
+    if (isPathMutationPending) return;
+    setRenameTarget(null);
+    setRenameValue('');
+  };
+
+  const handleOpenDelete = (target: ExplorerEntryTarget) => {
+    setPathActionError(null);
+    setRenameTarget(null);
+    setRenameValue('');
+    setDeleteTarget(target);
+  };
+
+  const closeDeleteDialog = () => {
+    if (isPathMutationPending) return;
+    setDeleteTarget(null);
+  };
+
+  const handleDeleteConfirm = async (): Promise<void> => {
+    if (!deleteTarget) {
+      return;
+    }
+
+    setIsPathMutationPending(true);
+
+    try {
+      await deletePath(artifactCtx, { path: deleteTarget.path });
+      const nextExpandedDirs = dropExpandedPath(expandedDirs, deleteTarget.path);
+      setExpandedDirsByArtifact((prev) => ({
+        ...prev,
+        [artifactKey]: nextExpandedDirs,
+      }));
+
+      const nextSelectedFilePath =
+        selectedFilePath && isSameOrChildPath(selectedFilePath, deleteTarget.path)
+          ? null
+          : selectedFilePath;
+
+      setDeleteTarget(null);
+      await reloadExplorerState(nextExpandedDirs, nextSelectedFilePath);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to delete path.';
+      setPathActionError(message);
+    } finally {
+      setIsPathMutationPending(false);
+    }
+  };
+
+  const handleRenameSubmit = async (): Promise<void> => {
+    if (!renameTarget) return;
+
+    const nextName = renameValue.trim();
+    if (!nextName) {
+      setPathActionError('Name is required.');
+      return;
+    }
+
+    setIsPathMutationPending(true);
+    setPathActionError(null);
+
+    try {
+      const result = await renamePath(artifactCtx, {
+        path: renameTarget.path,
+        newName: nextName,
+      });
+
+      const nextExpandedDirs = renameExpandedPath(expandedDirs, result.oldPath, result.newPath);
+      setExpandedDirsByArtifact((prev) => ({
+        ...prev,
+        [artifactKey]: nextExpandedDirs,
+      }));
+
+      const nextSelectedFilePath =
+        selectedFilePath && isSameOrChildPath(selectedFilePath, result.oldPath)
+          ? replacePathPrefix(selectedFilePath, result.oldPath, result.newPath)
+          : selectedFilePath;
+
+      setRenameTarget(null);
+      setRenameValue('');
+
+      await reloadExplorerState(nextExpandedDirs, nextSelectedFilePath);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to rename path.';
+      setPathActionError(message);
+    } finally {
+      setIsPathMutationPending(false);
     }
   };
 
@@ -158,6 +379,45 @@ export default function ArtifactFilesPage() {
     if (isExpanding) {
       void loadDirectory(artifactCtx, safePath);
     }
+  };
+
+  const renderEntryActions = (target: ExplorerEntryTarget): ReactNode => {
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            onClick={(event) => event.stopPropagation()}
+            className="text-muted-foreground hover:text-foreground data-[state=open]:bg-home-hover data-[state=open]:opacity-100 h-6 w-6 rounded opacity-0 transition-opacity group-hover:opacity-100"
+            aria-label={`Actions for ${target.name}`}
+            disabled={isPathMutationPending}
+          >
+            <Ellipsis size={14} />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" side="right" className="w-[148px]">
+          <DropdownMenuItem
+            onSelect={(event) => {
+              event.preventDefault();
+              handleOpenRename(target);
+            }}
+          >
+            <Pencil size={14} />
+            Rename
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            variant="destructive"
+            onSelect={(event) => {
+              event.preventDefault();
+              handleOpenDelete(target);
+            }}
+          >
+            <Trash2 size={14} />
+            Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
   };
 
   const renderDirectory = (path: string, depth: number): ReactNode => {
@@ -197,28 +457,40 @@ export default function ArtifactFilesPage() {
 
         return (
           <div key={entry.path}>
-            <button
-              type="button"
-              onClick={() => toggleDirectory(entry.path)}
-              className={cn(
-                'flex h-8 w-full items-center gap-1.5 pr-2 text-left text-[13px] text-foreground hover:bg-home-hover'
-              )}
-              style={{ paddingLeft: `${14 + depth * 14}px` }}
-            >
-              <ChevronRight
-                size={14}
+            <div className="px-1 py-0.5" style={{ paddingLeft: `${8 + depth * 14}px` }}>
+              <div
                 className={cn(
-                  'text-muted-foreground transition-transform',
-                  isExpanded && 'rotate-90'
+                  'group flex h-8 items-center rounded-lg pr-1 transition-colors hover:bg-home-hover'
                 )}
-              />
-              {isExpanded ? (
-                <FolderOpen size={14} className="text-muted-foreground" />
-              ) : (
-                <Folder size={14} className="text-muted-foreground" />
-              )}
-              <span className="truncate">{entry.name}</span>
-            </button>
+              >
+                <button
+                  type="button"
+                  onClick={() => toggleDirectory(entry.path)}
+                  className={cn(
+                    'flex h-full min-w-0 flex-1 items-center gap-1.5 rounded-lg px-2 text-left text-[13px] text-foreground'
+                  )}
+                >
+                  <ChevronRight
+                    size={14}
+                    className={cn(
+                      'text-muted-foreground transition-transform',
+                      isExpanded && 'rotate-90'
+                    )}
+                  />
+                  {isExpanded ? (
+                    <FolderOpen size={14} className="text-muted-foreground" />
+                  ) : (
+                    <Folder size={14} className="text-muted-foreground" />
+                  )}
+                  <span className="truncate">{entry.name}</span>
+                </button>
+                {renderEntryActions({
+                  path: entry.path,
+                  name: entry.name,
+                  type: 'directory',
+                })}
+              </div>
+            </div>
             {isExpanded ? renderDirectory(entry.path, depth + 1) : null}
           </div>
         );
@@ -226,21 +498,37 @@ export default function ArtifactFilesPage() {
 
       const isSelected = selectedFilePath === entry.path;
       return (
-        <button
+        <div
           key={entry.path}
-          type="button"
-          onClick={() => {
-            void openFile(artifactCtx, entry.path);
-          }}
-          className={cn(
-            'flex h-8 w-full items-center gap-1.5 pr-2 text-left text-[13px] hover:bg-home-hover',
-            isSelected ? 'bg-home-hover text-foreground' : 'text-muted-foreground'
-          )}
-          style={{ paddingLeft: `${32 + depth * 14}px` }}
+          className="px-1 py-0.5"
+          style={{ paddingLeft: `${26 + depth * 14}px` }}
         >
-          <FileText size={14} className="shrink-0" />
-          <span className="truncate">{entry.name}</span>
-        </button>
+          <div
+            className={cn(
+              'group flex h-8 items-center rounded-lg pr-1 transition-colors',
+              isSelected ? 'bg-home-hover' : 'hover:bg-home-hover'
+            )}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                void openFile(artifactCtx, entry.path);
+              }}
+              className={cn(
+                'flex h-full min-w-0 flex-1 items-center gap-1.5 rounded-lg px-2 text-left text-[13px]',
+                isSelected ? 'text-foreground' : 'text-muted-foreground'
+              )}
+            >
+              <FileText size={14} className="shrink-0" />
+              <span className="truncate">{entry.name}</span>
+            </button>
+            {renderEntryActions({
+              path: entry.path,
+              name: entry.name,
+              type: 'file',
+            })}
+          </div>
+        </div>
       );
     });
   };
@@ -268,6 +556,9 @@ export default function ArtifactFilesPage() {
           <div className="px-3 py-1.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
             {artifact?.name ?? artifactId}
           </div>
+          {pathActionError ? (
+            <p className="px-3 py-1.5 text-xs text-red-500">{pathActionError}</p>
+          ) : null}
           {isRootLoading && !directories[''] ? (
             <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
               <Loader2 size={14} className="animate-spin" />
@@ -341,6 +632,102 @@ export default function ArtifactFilesPage() {
           </div>
         )}
       </section>
+
+      <Dialog
+        open={renameTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeRenameDialog();
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              Rename {renameTarget?.type === 'directory' ? 'Folder' : 'File'}
+            </DialogTitle>
+            <DialogDescription>
+              Update the name for <span className="font-medium">{renameTarget?.name}</span>.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              void handleRenameSubmit();
+            }}
+            className="space-y-4"
+          >
+            <input
+              value={renameValue}
+              onChange={(event) => setRenameValue(event.target.value)}
+              className="border-home-border bg-home-input text-foreground w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-sky-500/50"
+              placeholder="Enter new name"
+              autoFocus
+              disabled={isPathMutationPending}
+            />
+            {pathActionError ? <p className="text-xs text-red-500">{pathActionError}</p> : null}
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={closeRenameDialog}
+                disabled={isPathMutationPending}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isPathMutationPending}>
+                {isPathMutationPending ? 'Renaming...' : 'Rename'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeDeleteDialog();
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              Delete {deleteTarget?.type === 'directory' ? 'Folder' : 'File'}
+            </DialogTitle>
+            <DialogDescription>
+              This action cannot be undone.{' '}
+              <span className="font-medium">{deleteTarget?.name}</span> will be permanently removed.
+            </DialogDescription>
+          </DialogHeader>
+
+          {pathActionError ? <p className="text-xs text-red-500">{pathActionError}</p> : null}
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={closeDeleteDialog}
+              disabled={isPathMutationPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => {
+                void handleDeleteConfirm();
+              }}
+              disabled={isPathMutationPending}
+            >
+              {isPathMutationPending ? 'Deleting...' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
