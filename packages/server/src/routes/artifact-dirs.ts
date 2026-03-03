@@ -126,6 +126,34 @@ artifactDirRoutes.get(`${BASE}/:artifactDirId/file`, async (c) => {
   }
 });
 
+/** GET /api/projects/:projectId/artifacts/:artifactDirId/file/raw?path=... — Read raw file bytes */
+artifactDirRoutes.get(`${BASE}/:artifactDirId/file/raw`, async (c) => {
+  const { projectId, artifactDirId } = c.req.param();
+  const path = c.req.query('path');
+
+  if (!path || !path.trim()) {
+    return c.json({ error: 'path query parameter is required' }, 400);
+  }
+
+  try {
+    const dir = await ArtifactDir.getById(projectId, artifactDirId);
+    const file = await dir.readArtifactRawFile(path);
+    return new Response(new Uint8Array(file.content), {
+      status: 200,
+      headers: {
+        'Content-Type': inferContentType(file.path),
+        'Content-Length': `${file.size}`,
+        'Cache-Control': 'no-store',
+        'X-Artifact-Path': file.path,
+      },
+    });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Failed to read raw artifact file';
+    const status = classifyFileReadErrorStatus(message);
+    return c.json({ error: message }, status);
+  }
+});
+
 /** PATCH /api/projects/:projectId/artifacts/:artifactDirId/path/rename — Rename a file or directory */
 artifactDirRoutes.patch(`${BASE}/:artifactDirId/path/rename`, async (c) => {
   const { projectId, artifactDirId } = c.req.param();
@@ -246,4 +274,51 @@ function classifyPathMutationErrorStatus(message: string): 400 | 404 | 409 | 500
     return 400;
   }
   return 500;
+}
+
+function inferContentType(path: string): string {
+  const extension = path.split('.').pop()?.toLowerCase() ?? '';
+
+  switch (extension) {
+    case 'png':
+      return 'image/png';
+    case 'jpg':
+    case 'jpeg':
+      return 'image/jpeg';
+    case 'gif':
+      return 'image/gif';
+    case 'webp':
+      return 'image/webp';
+    case 'svg':
+      return 'image/svg+xml';
+    case 'bmp':
+      return 'image/bmp';
+    case 'pdf':
+      return 'application/pdf';
+    case 'csv':
+      return 'text/csv; charset=utf-8';
+    case 'tsv':
+      return 'text/tab-separated-values; charset=utf-8';
+    case 'md':
+      return 'text/markdown; charset=utf-8';
+    case 'json':
+      return 'application/json; charset=utf-8';
+    case 'mp4':
+      return 'video/mp4';
+    case 'webm':
+      return 'video/webm';
+    case 'mov':
+      return 'video/quicktime';
+    case 'mp3':
+      return 'audio/mpeg';
+    case 'wav':
+      return 'audio/wav';
+    case 'ogg':
+      return 'audio/ogg';
+    case 'txt':
+    case 'log':
+      return 'text/plain; charset=utf-8';
+    default:
+      return 'application/octet-stream';
+  }
 }

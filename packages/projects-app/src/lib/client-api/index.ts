@@ -9,6 +9,7 @@ export {
   deleteProject,
   getArtifactExplorer,
   getArtifactFile,
+  getArtifactRawFileUrl,
   getProjectFileIndex,
   getProjectOverview,
   listProjects,

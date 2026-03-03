@@ -12,12 +12,14 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { ArtifactExplorerResult, ArtifactFileResult } from '@/lib/client-api';
 import type { ReactNode } from 'react';
 
+import { Markdown } from '@/components/ai/markdown';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -33,6 +35,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { getArtifactRawFileUrl } from '@/lib/client-api';
 import { cn } from '@/lib/utils';
 import { useArtifactFilesStore, useSidebarStore, useUiStore } from '@/stores';
 
@@ -47,6 +50,63 @@ type ExplorerEntryTarget = {
   name: string;
   type: 'file' | 'directory';
 };
+
+type ViewerKind =
+  | 'code'
+  | 'markdown'
+  | 'csv'
+  | 'image'
+  | 'pdf'
+  | 'audio'
+  | 'video'
+  | 'text'
+  | 'binary';
+
+const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico']);
+const PDF_EXTENSIONS = new Set(['pdf']);
+const AUDIO_EXTENSIONS = new Set(['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac']);
+const VIDEO_EXTENSIONS = new Set(['mp4', 'webm', 'mov', 'mkv']);
+const CSV_EXTENSIONS = new Set(['csv', 'tsv']);
+const MARKDOWN_EXTENSIONS = new Set(['md', 'markdown', 'mdx']);
+const CODE_EXTENSIONS = new Set([
+  'ts',
+  'tsx',
+  'js',
+  'jsx',
+  'json',
+  'py',
+  'go',
+  'rs',
+  'java',
+  'kt',
+  'rb',
+  'php',
+  'swift',
+  'c',
+  'h',
+  'cpp',
+  'hpp',
+  'cs',
+  'sh',
+  'bash',
+  'zsh',
+  'yaml',
+  'yml',
+  'toml',
+  'xml',
+  'html',
+  'css',
+  'scss',
+  'sql',
+  'graphql',
+  'proto',
+  'ini',
+  'env',
+]);
+
+const MAX_TABLE_ROWS = 500;
+const MAX_TABLE_COLUMNS = 50;
+const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
 
 function normalizeRelativePath(path: string): string {
   return path
@@ -71,6 +131,162 @@ function getPathBasename(path: string): string {
   const safePath = normalizeRelativePath(path);
   const segments = safePath.split('/');
   return segments[segments.length - 1] ?? safePath;
+}
+
+function getPathExtension(path: string): string {
+  const base = getPathBasename(path);
+  const dotIndex = base.lastIndexOf('.');
+  if (dotIndex === -1 || dotIndex === base.length - 1) {
+    return '';
+  }
+  return base.slice(dotIndex + 1).toLowerCase();
+}
+
+function getViewerKind(path: string, file: ArtifactFileResult | null): ViewerKind {
+  const extension = getPathExtension(path);
+  if (IMAGE_EXTENSIONS.has(extension)) return 'image';
+  if (PDF_EXTENSIONS.has(extension)) return 'pdf';
+  if (AUDIO_EXTENSIONS.has(extension)) return 'audio';
+  if (VIDEO_EXTENSIONS.has(extension)) return 'video';
+  if (CSV_EXTENSIONS.has(extension)) return 'csv';
+  if (MARKDOWN_EXTENSIONS.has(extension)) return 'markdown';
+  if (CODE_EXTENSIONS.has(extension)) return 'code';
+  if (file?.isBinary) return 'binary';
+  return 'text';
+}
+
+function resolveMonacoLanguage(path: string): string {
+  const extension = getPathExtension(path);
+  if (!extension) return 'plaintext';
+
+  if (extension === 'tsx') return 'tsx';
+  if (extension === 'ts') return 'ts';
+  if (extension === 'jsx') return 'jsx';
+  if (extension === 'js') return 'javascript';
+  if (extension === 'json') return 'json';
+  if (extension === 'md' || extension === 'markdown' || extension === 'mdx') return 'markdown';
+  if (extension === 'yml') return 'yaml';
+  if (extension === 'py') return 'python';
+  if (extension === 'rs') return 'rust';
+  if (extension === 'kt') return 'kotlin';
+  if (extension === 'rb') return 'ruby';
+  if (extension === 'cpp' || extension === 'hpp' || extension === 'h') return 'cpp';
+  if (extension === 'c') return 'c';
+  if (extension === 'cs') return 'csharp';
+  if (extension === 'go') return 'go';
+  if (extension === 'toml') return 'ini';
+  if (extension === 'xml' || extension === 'svg') return 'xml';
+  if (extension === 'sql') return 'sql';
+  if (extension === 'graphql') return 'graphql';
+  if (extension === 'proto') return 'protobuf';
+  if (extension === 'sh' || extension === 'bash' || extension === 'zsh') return 'bash';
+  if (extension === 'env') return 'ini';
+  return extension;
+}
+
+function parseDelimitedLine(line: string, delimiter: string): string[] {
+  const cells: string[] = [];
+  let value = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i];
+    const next = line[i + 1];
+
+    if (char === '"') {
+      if (inQuotes && next === '"') {
+        value += '"';
+        i += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+
+    if (char === delimiter && !inQuotes) {
+      cells.push(value);
+      value = '';
+      continue;
+    }
+
+    value += char;
+  }
+
+  cells.push(value);
+  return cells;
+}
+
+function parseDelimitedTable(
+  content: string,
+  delimiter: string
+): {
+  rows: string[][];
+  truncatedRows: boolean;
+  truncatedColumns: boolean;
+} {
+  const lines = content.replace(/\r\n/g, '\n').split('\n');
+  const rows: string[][] = [];
+  let truncatedColumns = false;
+  const limitedLines = lines.slice(0, MAX_TABLE_ROWS);
+
+  for (const line of limitedLines) {
+    const parsed = parseDelimitedLine(line, delimiter);
+    if (parsed.length > MAX_TABLE_COLUMNS) {
+      truncatedColumns = true;
+    }
+    rows.push(parsed.slice(0, MAX_TABLE_COLUMNS));
+  }
+
+  return {
+    rows,
+    truncatedRows: lines.length > MAX_TABLE_ROWS,
+    truncatedColumns,
+  };
+}
+
+function ArtifactCodeViewer({ path, content }: { path: string; content: string }) {
+  const language = useMemo(() => resolveMonacoLanguage(path), [path]);
+
+  return (
+    <div className="min-h-0 flex-1 overflow-hidden">
+      <MonacoEditor
+        height="100%"
+        language={language}
+        value={content}
+        theme="vs-dark"
+        options={{
+          readOnly: true,
+          minimap: { enabled: false },
+          fontSize: 13,
+          fontFamily:
+            'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+          lineNumbers: 'on',
+          lineDecorationsWidth: 12,
+          wordWrap: 'off',
+          scrollBeyondLastLine: false,
+          smoothScrolling: true,
+          automaticLayout: true,
+          renderWhitespace: 'selection',
+          renderLineHighlight: 'line',
+          guides: {
+            indentation: true,
+            bracketPairs: true,
+          },
+          bracketPairColorization: {
+            enabled: true,
+          },
+          folding: true,
+          glyphMargin: false,
+          contextmenu: false,
+          tabSize: 2,
+          padding: {
+            top: 10,
+            bottom: 20,
+          },
+        }}
+      />
+    </div>
+  );
 }
 
 function uniquePaths(paths: string[]): string[] {
@@ -319,6 +535,19 @@ export default function ArtifactFilesPage() {
   const selectedFileError = selectedFileRequestKey
     ? (fileErrorByKey[selectedFileRequestKey] ?? null)
     : null;
+  const selectedViewerKind = selectedFilePath
+    ? getViewerKind(selectedFilePath, selectedFile)
+    : null;
+  const selectedRawFileUrl = useMemo(() => {
+    if (!selectedFilePath) return null;
+    return getArtifactRawFileUrl(artifactCtx, { path: selectedFilePath });
+  }, [artifactCtx, selectedFilePath]);
+  const selectedTableData = useMemo(() => {
+    if (!selectedFilePath || !selectedFile) return null;
+    if (getViewerKind(selectedFilePath, selectedFile) !== 'csv') return null;
+    const delimiter = getPathExtension(selectedFilePath) === 'tsv' ? '\t' : ',';
+    return parseDelimitedTable(selectedFile.content, delimiter);
+  }, [selectedFile, selectedFilePath]);
 
   const syncOpenTabs = (nextTabs: string[]) => {
     const normalizedTabs = uniquePaths(nextTabs);
@@ -818,23 +1047,134 @@ export default function ArtifactFilesPage() {
           <div className="flex min-h-0 flex-1 items-center justify-center p-6">
             <p className="text-sm text-red-500">{selectedFileError}</p>
           </div>
-        ) : selectedFile?.isBinary ? (
-          <div className="flex min-h-0 flex-1 items-center justify-center p-6">
-            <p className="text-muted-foreground text-sm">
-              This file looks binary and cannot be previewed as text.
-            </p>
-          </div>
         ) : selectedFile ? (
-          <div className="min-h-0 flex-1 overflow-auto">
+          <>
             {selectedFile.truncated ? (
               <div className="bg-home-hover border-home-border border-b px-3 py-1.5 text-xs text-muted-foreground">
                 Preview truncated for large file size.
               </div>
             ) : null}
-            <pre className="min-w-full px-4 py-3 font-mono text-[13px] leading-6 text-foreground">
-              <code>{selectedFile.content}</code>
-            </pre>
-          </div>
+
+            {selectedViewerKind === 'code' ? (
+              <ArtifactCodeViewer path={selectedFilePath ?? ''} content={selectedFile.content} />
+            ) : null}
+
+            {selectedViewerKind === 'markdown' ? (
+              <div className="min-h-0 flex-1 overflow-auto px-4 py-3">
+                <Markdown className="text-foreground leading-6">{selectedFile.content}</Markdown>
+              </div>
+            ) : null}
+
+            {selectedViewerKind === 'csv' ? (
+              <div className="min-h-0 flex-1 overflow-auto">
+                {selectedTableData && selectedTableData.rows.length > 0 ? (
+                  <table className="min-w-full border-separate border-spacing-0">
+                    <thead className="bg-home-panel sticky top-0 z-10">
+                      <tr>
+                        {selectedTableData.rows[0].map((cell, index) => (
+                          <th
+                            key={`header-${index}`}
+                            className="border-home-border border-b px-3 py-2 text-left text-xs font-semibold text-foreground"
+                          >
+                            {cell || `Column ${index + 1}`}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedTableData.rows.slice(1).map((row, rowIndex) => (
+                        <tr key={`row-${rowIndex}`} className="odd:bg-home-hover/35">
+                          {row.map((cell, cellIndex) => (
+                            <td
+                              key={`cell-${rowIndex}-${cellIndex}`}
+                              className="border-home-border border-b px-3 py-2 align-top font-mono text-xs text-foreground"
+                            >
+                              {cell}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="flex min-h-0 flex-1 items-center justify-center p-6">
+                    <p className="text-muted-foreground text-sm">CSV file has no rows.</p>
+                  </div>
+                )}
+                {selectedTableData?.truncatedRows || selectedTableData?.truncatedColumns ? (
+                  <div className="bg-home-panel border-home-border border-t px-3 py-1.5 text-xs text-muted-foreground">
+                    Table preview truncated for performance.
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            {selectedViewerKind === 'image' ? (
+              <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-4">
+                <img
+                  src={selectedRawFileUrl ?? ''}
+                  alt={selectedFilePath ?? ''}
+                  className="max-h-full max-w-full rounded border border-home-border object-contain shadow-sm"
+                />
+              </div>
+            ) : null}
+
+            {selectedViewerKind === 'pdf' ? (
+              <iframe
+                src={selectedRawFileUrl ?? ''}
+                title={selectedFilePath ?? ''}
+                className="min-h-0 w-full flex-1 border-0"
+              />
+            ) : null}
+
+            {selectedViewerKind === 'audio' ? (
+              <div className="flex min-h-0 flex-1 items-center justify-center p-8">
+                <audio controls className="w-full max-w-2xl" src={selectedRawFileUrl ?? ''}>
+                  <track kind="captions" />
+                </audio>
+              </div>
+            ) : null}
+
+            {selectedViewerKind === 'video' ? (
+              <div className="flex min-h-0 flex-1 items-center justify-center p-4">
+                <video
+                  controls
+                  className="max-h-full max-w-full rounded border border-home-border"
+                  src={selectedRawFileUrl ?? ''}
+                />
+              </div>
+            ) : null}
+
+            {selectedViewerKind === 'text' ? (
+              <div className="min-h-0 flex-1 overflow-auto">
+                <pre className="m-0 min-w-full bg-transparent py-3 font-mono text-[13px] leading-[1.65rem] text-foreground">
+                  <code>
+                    {selectedFile.content.split('\n').map((line, index) => (
+                      <div key={`txt-line-${index + 1}`} className="relative block pl-14 pr-4">
+                        <span className="text-muted-foreground pointer-events-none absolute left-3 w-8 text-right text-xs">
+                          {index + 1}
+                        </span>
+                        {line.length > 0 ? line : ' '}
+                      </div>
+                    ))}
+                  </code>
+                </pre>
+              </div>
+            ) : null}
+
+            {selectedViewerKind === 'binary' ? (
+              <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
+                <p className="text-muted-foreground text-sm">
+                  This file is binary and cannot be rendered as text.
+                </p>
+                <Button asChild variant="outline" size="sm">
+                  <a href={selectedRawFileUrl ?? '#'} target="_blank" rel="noreferrer">
+                    Open Raw File
+                  </a>
+                </Button>
+              </div>
+            ) : null}
+          </>
         ) : (
           <div className="flex min-h-0 flex-1 items-center justify-center p-6">
             <p className="text-muted-foreground text-sm">File content unavailable.</p>

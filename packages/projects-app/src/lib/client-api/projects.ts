@@ -186,6 +186,11 @@ export async function getArtifactFile(
   });
 }
 
+export function getArtifactRawFileUrl(ctx: ArtifactContext, input: { path: string }): string {
+  const params = new URLSearchParams({ path: input.path });
+  return `${buildArtifactBase(ctx)}/file/raw?${params.toString()}`;
+}
+
 export async function renameArtifactPath(
   ctx: ArtifactContext,
   input: { path: string; newName: string }

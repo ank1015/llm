@@ -212,6 +212,37 @@ export class ArtifactDir {
     };
   }
 
+  /** Read a raw file payload from the artifact tree for media/binary previews/downloads */
+  async readArtifactRawFile(relativePath: string): Promise<{
+    path: string;
+    content: Buffer;
+    size: number;
+    updatedAt: string;
+  }> {
+    const { absolutePath, relativePath: safePath } = this.resolveArtifactPath(relativePath);
+
+    if (!safePath) {
+      throw new Error('Path is required');
+    }
+
+    const fileStats = await this.statPath(absolutePath);
+    if (!fileStats) {
+      throw new Error(`File "${safePath}" not found`);
+    }
+    if (!fileStats.isFile()) {
+      throw new Error(`Path "${safePath}" is not a file`);
+    }
+
+    const raw = await readFile(absolutePath);
+
+    return {
+      path: safePath,
+      content: raw,
+      size: raw.length,
+      updatedAt: fileStats.mtime.toISOString(),
+    };
+  }
+
   /** Delete a file or directory inside the artifact tree */
   async deleteArtifactPath(
     relativePath: string
