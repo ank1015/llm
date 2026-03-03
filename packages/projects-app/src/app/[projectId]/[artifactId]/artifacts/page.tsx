@@ -10,6 +10,7 @@ import {
   Pencil,
   RefreshCw,
   Trash2,
+  X,
 } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -64,6 +65,28 @@ function getDirectoryRequestKey(artifactKey: string, path: string): string {
 
 function getFileRequestKey(artifactKey: string, path: string): string {
   return `${artifactKey}::file::${path}`;
+}
+
+function getPathBasename(path: string): string {
+  const safePath = normalizeRelativePath(path);
+  const segments = safePath.split('/');
+  return segments[segments.length - 1] ?? safePath;
+}
+
+function uniquePaths(paths: string[]): string[] {
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+
+  for (const path of paths) {
+    const safePath = normalizeRelativePath(path);
+    if (!safePath || seen.has(safePath)) {
+      continue;
+    }
+    seen.add(safePath);
+    normalized.push(safePath);
+  }
+
+  return normalized;
 }
 
 function isSameOrChildPath(path: string, basePath: string): boolean {
@@ -130,6 +153,60 @@ function renameExpandedPath(
   return next;
 }
 
+function dropOpenTabs(paths: string[], removedPath: string): string[] {
+  const safeRemoved = normalizeRelativePath(removedPath);
+  if (!safeRemoved) {
+    return uniquePaths(paths);
+  }
+
+  return uniquePaths(paths).filter((path) => !isSameOrChildPath(path, safeRemoved));
+}
+
+function renameOpenTabs(paths: string[], oldPath: string, newPath: string): string[] {
+  const safeOldPath = normalizeRelativePath(oldPath);
+  if (!safeOldPath) {
+    return uniquePaths(paths);
+  }
+
+  return uniquePaths(paths).map((path) => {
+    if (!isSameOrChildPath(path, safeOldPath)) {
+      return path;
+    }
+    return replacePathPrefix(path, oldPath, newPath);
+  });
+}
+
+function pickFallbackTab(
+  originalPaths: string[],
+  remainingPaths: string[],
+  closedPath: string
+): string | null {
+  const originalTabs = uniquePaths(originalPaths);
+  const remainingTabs = uniquePaths(remainingPaths);
+  const remainingSet = new Set(remainingTabs);
+  const closedIndex = originalTabs.findIndex((path) => path === normalizeRelativePath(closedPath));
+
+  if (closedIndex === -1) {
+    return remainingTabs[0] ?? null;
+  }
+
+  for (let i = closedIndex + 1; i < originalTabs.length; i += 1) {
+    const candidate = originalTabs[i];
+    if (remainingSet.has(candidate)) {
+      return candidate;
+    }
+  }
+
+  for (let i = closedIndex - 1; i >= 0; i -= 1) {
+    const candidate = originalTabs[i];
+    if (remainingSet.has(candidate)) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
 export default function ArtifactFilesPage() {
   const { projectId, artifactId } = useParams<{ projectId: string; artifactId: string }>();
   const artifactCtx = useMemo(() => ({ projectId, artifactId }), [projectId, artifactId]);
@@ -170,6 +247,7 @@ export default function ArtifactFilesPage() {
   const [expandedDirsByArtifact, setExpandedDirsByArtifact] = useState<
     Record<string, Record<string, boolean>>
   >({});
+  const [openTabsByArtifact, setOpenTabsByArtifact] = useState<Record<string, string[]>>({});
   const [explorerWidthPx, setExplorerWidthPx] = useState(320);
   const [isResizing, setIsResizing] = useState(false);
   const [renameTarget, setRenameTarget] = useState<ExplorerEntryTarget | null>(null);
@@ -178,13 +256,25 @@ export default function ArtifactFilesPage() {
   const [isPathMutationPending, setIsPathMutationPending] = useState(false);
   const [pathActionError, setPathActionError] = useState<string | null>(null);
   const expandedDirs = expandedDirsByArtifact[artifactKey] ?? ROOT_EXPANDED;
+  const openTabs = openTabsByArtifact[artifactKey] ?? [];
 
   useEffect(() => {
     setSidebarCollapsed(true);
     clearArtifactCache(artifactCtx);
+    setOpenTabsByArtifact((prev) => ({
+      ...prev,
+      [artifactKey]: [],
+    }));
     setSelectedFile(artifactCtx, null);
     void loadDirectory(artifactCtx, '', true);
-  }, [artifactCtx, clearArtifactCache, loadDirectory, setSelectedFile, setSidebarCollapsed]);
+  }, [
+    artifactCtx,
+    artifactKey,
+    clearArtifactCache,
+    loadDirectory,
+    setSelectedFile,
+    setSidebarCollapsed,
+  ]);
 
   useEffect(() => {
     if (!isResizing) return;
@@ -230,10 +320,74 @@ export default function ArtifactFilesPage() {
     ? (fileErrorByKey[selectedFileRequestKey] ?? null)
     : null;
 
+  const syncOpenTabs = (nextTabs: string[]) => {
+    const normalizedTabs = uniquePaths(nextTabs);
+    setOpenTabsByArtifact((prev) => ({
+      ...prev,
+      [artifactKey]: normalizedTabs,
+    }));
+    return normalizedTabs;
+  };
+
+  const addOpenTab = (path: string) => {
+    const safePath = normalizeRelativePath(path);
+    if (!safePath) {
+      return;
+    }
+
+    setOpenTabsByArtifact((prev) => {
+      const currentTabs = prev[artifactKey] ?? [];
+      return {
+        ...prev,
+        [artifactKey]: uniquePaths([...currentTabs, safePath]),
+      };
+    });
+  };
+
+  const handleOpenFile = (path: string, force = false) => {
+    const safePath = normalizeRelativePath(path);
+    if (!safePath) {
+      return;
+    }
+
+    addOpenTab(safePath);
+    setSelectedFile(artifactCtx, safePath);
+    void openFile(artifactCtx, safePath, force);
+  };
+
+  const handleSelectTab = (path: string) => {
+    const safePath = normalizeRelativePath(path);
+    if (!safePath) return;
+    setSelectedFile(artifactCtx, safePath);
+    void openFile(artifactCtx, safePath);
+  };
+
+  const handleCloseTab = (path: string) => {
+    const safePath = normalizeRelativePath(path);
+    if (!safePath) {
+      return;
+    }
+
+    const nextTabs = uniquePaths(openTabs).filter((tabPath) => tabPath !== safePath);
+    syncOpenTabs(nextTabs);
+
+    if (selectedFilePath !== safePath) {
+      return;
+    }
+
+    const fallbackPath = pickFallbackTab(openTabs, nextTabs, safePath);
+    setSelectedFile(artifactCtx, fallbackPath);
+    if (fallbackPath) {
+      void openFile(artifactCtx, fallbackPath);
+    }
+  };
+
   const reloadExplorerState = async (
     nextExpandedDirs: Record<string, boolean>,
-    nextSelectedFilePath: string | null
+    nextSelectedFilePath: string | null,
+    nextOpenTabs: string[]
   ): Promise<void> => {
+    const normalizedTabs = syncOpenTabs(nextOpenTabs);
     clearArtifactCache(artifactCtx);
     await loadDirectory(artifactCtx, '', true);
 
@@ -261,11 +415,14 @@ export default function ArtifactFilesPage() {
       await openFile(artifactCtx, nextSelectedFilePath, true);
     } catch {
       setSelectedFile(artifactCtx, null);
+      syncOpenTabs(
+        normalizedTabs.filter((path) => path !== normalizeRelativePath(nextSelectedFilePath))
+      );
     }
   };
 
   const handleRefresh = () => {
-    void reloadExplorerState(expandedDirs, selectedFilePath);
+    void reloadExplorerState(expandedDirs, selectedFilePath, openTabs);
   };
 
   const handleOpenRename = (target: ExplorerEntryTarget) => {
@@ -308,13 +465,14 @@ export default function ArtifactFilesPage() {
         [artifactKey]: nextExpandedDirs,
       }));
 
-      const nextSelectedFilePath =
-        selectedFilePath && isSameOrChildPath(selectedFilePath, deleteTarget.path)
-          ? null
-          : selectedFilePath;
+      const nextOpenTabs = dropOpenTabs(openTabs, deleteTarget.path);
+      let nextSelectedFilePath = selectedFilePath;
+      if (selectedFilePath && isSameOrChildPath(selectedFilePath, deleteTarget.path)) {
+        nextSelectedFilePath = pickFallbackTab(openTabs, nextOpenTabs, selectedFilePath);
+      }
 
       setDeleteTarget(null);
-      await reloadExplorerState(nextExpandedDirs, nextSelectedFilePath);
+      await reloadExplorerState(nextExpandedDirs, nextSelectedFilePath, nextOpenTabs);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to delete path.';
       setPathActionError(message);
@@ -351,11 +509,12 @@ export default function ArtifactFilesPage() {
         selectedFilePath && isSameOrChildPath(selectedFilePath, result.oldPath)
           ? replacePathPrefix(selectedFilePath, result.oldPath, result.newPath)
           : selectedFilePath;
+      const nextOpenTabs = renameOpenTabs(openTabs, result.oldPath, result.newPath);
 
       setRenameTarget(null);
       setRenameValue('');
 
-      await reloadExplorerState(nextExpandedDirs, nextSelectedFilePath);
+      await reloadExplorerState(nextExpandedDirs, nextSelectedFilePath, nextOpenTabs);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to rename path.';
       setPathActionError(message);
@@ -512,7 +671,7 @@ export default function ArtifactFilesPage() {
             <button
               type="button"
               onClick={() => {
-                void openFile(artifactCtx, entry.path);
+                handleOpenFile(entry.path);
               }}
               className={cn(
                 'flex h-full min-w-0 flex-1 items-center gap-1.5 rounded-lg px-2 text-left text-[13px]',
@@ -584,12 +743,62 @@ export default function ArtifactFilesPage() {
       />
 
       <section className="bg-home-page flex min-h-0 min-w-0 flex-1 flex-col">
-        <div className="border-home-border bg-home-panel flex h-10 shrink-0 items-center justify-between border-b px-3">
-          <span className="text-foreground truncate font-mono text-xs">
-            {selectedFilePath ?? 'Select a file'}
-          </span>
+        <div className="border-home-border bg-home-panel flex h-10 shrink-0 items-center border-b">
+          <div className="no-scrollbar min-w-0 flex-1 overflow-x-auto">
+            {openTabs.length === 0 ? (
+              <div className="text-muted-foreground flex h-10 items-center px-3 text-xs">
+                Select a file
+              </div>
+            ) : (
+              <div className="flex min-w-max items-center">
+                {openTabs.map((tabPath) => {
+                  const isActive = selectedFilePath === tabPath;
+                  const tabLoading =
+                    fileLoadingByKey[getFileRequestKey(artifactKey, tabPath)] ?? false;
+
+                  return (
+                    <div
+                      key={tabPath}
+                      className={cn(
+                        'group border-home-border flex h-10 max-w-[260px] items-center border-r',
+                        isActive
+                          ? 'bg-home-hover text-foreground'
+                          : 'text-muted-foreground hover:bg-home-hover/70'
+                      )}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleSelectTab(tabPath)}
+                        className="flex h-full min-w-0 items-center gap-1.5 px-3 text-left text-xs"
+                        title={tabPath}
+                      >
+                        <FileText size={12} className="shrink-0" />
+                        <span className="truncate">{getPathBasename(tabPath)}</span>
+                        {tabLoading ? <Loader2 size={11} className="animate-spin" /> : null}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleCloseTab(tabPath);
+                        }}
+                        className={cn(
+                          'hover:bg-home-border mr-1 rounded p-0.5',
+                          isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                        )}
+                        aria-label={`Close ${getPathBasename(tabPath)}`}
+                        title={`Close ${tabPath}`}
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
           {selectedFile ? (
-            <span className="text-muted-foreground text-xs">
+            <span className="text-muted-foreground border-home-border shrink-0 border-l px-3 text-xs">
               {(selectedFile.size / 1024).toFixed(1)} KB
             </span>
           ) : null}
