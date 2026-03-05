@@ -27,8 +27,8 @@ export async function createSession(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       name: input.name ?? 'New chat',
-      modelId: 'gpt-5.2',
-      api: 'openai',
+      modelId: 'gpt-5.3-codex',
+      api: 'codex',
     }),
   });
 }

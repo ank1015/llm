@@ -1,8 +1,6 @@
 import { Hono } from 'hono';
 
-import { ArtifactDir, ARTIFACT_TYPES } from '../core/index.js';
-
-import type { ArtifactType } from '../core/index.js';
+import { ArtifactDir } from '../core/index.js';
 
 const BASE = '/projects/:projectId/artifacts';
 const NOT_FOUND_MSG = 'Artifact directory not found';
@@ -13,29 +11,15 @@ export const artifactDirRoutes = new Hono();
 /** POST /api/projects/:projectId/artifacts — Create a new artifact directory */
 artifactDirRoutes.post(BASE, async (c) => {
   const { projectId } = c.req.param();
-  const body = await c.req.json<{ name: string; description?: string; type?: string }>();
+  const body = await c.req.json<{ name: string; description?: string }>();
 
   if (!body.name) {
     return c.json({ error: 'name is required' }, 400);
   }
 
-  if (body.type && !ARTIFACT_TYPES.includes(body.type as ArtifactType)) {
-    return c.json(
-      {
-        error: `Invalid artifact type "${body.type}". Must be one of: ${ARTIFACT_TYPES.join(', ')}`,
-      },
-      400
-    );
-  }
-
   try {
-    const input = { name: body.name } as {
-      name: string;
-      description?: string;
-      type?: ArtifactType;
-    };
+    const input = { name: body.name } as { name: string; description?: string };
     if (body.description) input.description = body.description;
-    if (body.type) input.type = body.type as ArtifactType;
     const dir = await ArtifactDir.create(projectId, input);
     const metadata = await dir.getMetadata();
     return c.json(metadata, 201);

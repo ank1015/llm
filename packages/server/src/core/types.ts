@@ -3,17 +3,6 @@
  * These represent the shapes stored on disk as metadata.json files.
  */
 
-/**
- * Artifact types determine the system prompt and tools available to sessions.
- * - base: General-purpose assistant (default)
- * - research: Optimized for research and exploration
- * - code: Optimized for coding tasks
- */
-export type ArtifactType = 'base' | 'research' | 'code';
-
-/** All valid artifact types */
-export const ARTIFACT_TYPES: readonly ArtifactType[] = ['base', 'research', 'code'] as const;
-
 /** Metadata stored in each project's metadata.json (lives in dataPath) */
 export interface ProjectMetadata {
   /** Unique identifier (used as directory name in both locations) */
@@ -36,8 +25,6 @@ export interface ArtifactDirMetadata {
   name: string;
   /** Optional description of what this artifact directory contains */
   description: string | null;
-  /** Artifact type that determines session behavior (system prompt, tools) */
-  type: ArtifactType;
   /** ISO 8601 timestamp of creation */
   createdAt: string;
 }
@@ -52,8 +39,6 @@ export interface CreateProjectInput {
 export interface CreateArtifactDirInput {
   name: string;
   description?: string;
-  /** Artifact type (defaults to 'base' if not specified) */
-  type?: ArtifactType;
 }
 
 /** Type of an entry in the artifact file explorer */

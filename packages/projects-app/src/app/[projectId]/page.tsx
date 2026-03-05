@@ -1,20 +1,14 @@
 'use client';
 
-import { BookOpen, Code, Folder, Loader2 } from 'lucide-react';
+import { Folder, Loader2 } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
-import type { ArtifactDirWithSessions, ArtifactType } from '@/lib/client-api';
+import type { ArtifactDirWithSessions } from '@/lib/client-api';
 
 import { Button } from '@/components/ui/button';
 import { getProjectOverview } from '@/lib/client-api';
 import { useSidebarStore } from '@/stores';
-
-const ARTIFACT_TYPE_ICON: Record<ArtifactType, typeof Folder> = {
-  base: Folder,
-  research: BookOpen,
-  code: Code,
-};
 
 export default function ProjectPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -75,10 +69,7 @@ export default function ProjectPage() {
               className="bg-home-panel border-home-border hover:bg-home-hover flex cursor-pointer flex-col items-start gap-1 rounded-xl border p-5 text-left transition-colors"
             >
               <div className="flex items-center gap-2">
-                {(() => {
-                  const Icon = ARTIFACT_TYPE_ICON[dir.type] ?? Folder;
-                  return <Icon size={16} className="text-muted-foreground" />;
-                })()}
+                <Folder size={16} className="text-muted-foreground" />
                 <span className="text-foreground text-sm font-medium">{dir.name}</span>
               </div>
               {dir.description && (

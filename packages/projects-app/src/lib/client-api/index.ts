@@ -1,7 +1,6 @@
 export { getSessionMessages, streamConversation } from './conversation';
 export type { StreamRequest } from './conversation';
 export {
-  ARTIFACT_TYPES,
   createArtifactDir,
   createProject,
   deleteArtifactPath,
@@ -25,7 +24,6 @@ export type {
   ArtifactFileResult,
   ArtifactPathDeleteResult,
   ArtifactPathRenameResult,
-  ArtifactType,
   OverviewSession,
   ProjectFileIndexEntry,
   ProjectFileIndexResult,

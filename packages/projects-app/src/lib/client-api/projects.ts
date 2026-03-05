@@ -10,15 +10,10 @@ export type ProjectMetadata = {
   updatedAt: string | null;
 };
 
-export type ArtifactType = 'base' | 'research' | 'code';
-
-export const ARTIFACT_TYPES: readonly ArtifactType[] = ['base', 'research', 'code'] as const;
-
 export type ArtifactDirMetadata = {
   id: string;
   name: string;
   description: string | null;
-  type: ArtifactType;
   createdAt: string;
 };
 
@@ -130,7 +125,7 @@ export async function getProjectOverview(projectId: string): Promise<ProjectOver
 
 export async function createArtifactDir(
   projectId: string,
-  input: { name: string; description?: string; type?: ArtifactType }
+  input: { name: string; description?: string }
 ): Promise<ArtifactDirMetadata> {
   return apiRequestJson<ArtifactDirMetadata>(
     `${PROJECTS_BASE}/${encodeURIComponent(projectId)}/artifacts`,

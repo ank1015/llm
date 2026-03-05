@@ -3,9 +3,9 @@ import type { Model } from '@ank1015/llm-types';
 const googleBaseUrl = `https://generativelanguage.googleapis.com/v1beta`;
 
 export const googleModels = {
-  'gemini-3-pro-preview': {
-    id: 'gemini-3-pro-preview',
-    name: 'Gemini 3 Pro Preview',
+  'gemini-3.1-pro-preview': {
+    id: 'gemini-3.1-pro-preview',
+    name: 'Gemini 3.1 Pro Preview',
     api: 'google',
     baseUrl: googleBaseUrl,
     reasoning: true,

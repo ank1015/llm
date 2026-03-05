@@ -1,5 +1,4 @@
 /* eslint-disable no-fallthrough */
-import { readFileSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { stdin as input, stdout as output } from 'node:process';
@@ -16,16 +15,18 @@ import {
 } from '@ank1015/llm-sdk';
 import { createFileKeysAdapter, createFileSessionsAdapter } from '@ank1015/llm-sdk-adapters';
 
-import { createWindowReplTool } from './tools/browser/index.js';
-import { createReadTool } from './tools/file-system/index.js';
+import {
+  createBrowserAutomateTools,
+  createBrowserAutomateSystemPrompt,
+} from './agents/browser-automation.js';
 
 import type {
   AgentEvent,
-  AgentTool,
   Api,
   BaseAssistantEvent,
   BaseAssistantMessage,
   ConversationExternalCallback,
+  GoogleProviderOptions,
   Message,
   SessionManager,
 } from '@ank1015/llm-sdk';
@@ -36,14 +37,14 @@ import type {
 const TEST_TOOLS_CWD = '/Users/notacoder/Desktop/test';
 const REPO_ROOT_DIR = '/Users/notacoder/Desktop/agents/llm';
 const AGENTS_PACKAGE_DIR = '/Users/notacoder/Desktop/agents/llm/packages/agents';
-const EXTENSION_PACKAGE_DIR = '/Users/notacoder/Desktop/agents/llm/packages/extension';
+// const EXTENSION_PACKAGE_DIR = '/Users/notacoder/Desktop/agents/llm/packages/extension';
 const AGENT_SCRIPT_WORKSPACE_DIR = `${AGENTS_PACKAGE_DIR}/scripts/workspace`;
 const AGENT_SCRIPT_RUNNER_PATH = `${AGENTS_PACKAGE_DIR}/scripts/run.sh`;
 const AGENT_SESSIONS_DIR = `${AGENTS_PACKAGE_DIR}/sessions`;
-const WINDOW_REPL_REFERENCE_PATH = `${EXTENSION_PACKAGE_DIR}/docs/window-repl-reference.md`;
+// const WINDOW_REPL_REFERENCE_PATH = `${EXTENSION_PACKAGE_DIR}/docs/window-repl-reference.md`;
 const WEB_SKILLS_DIR = `${AGENTS_PACKAGE_DIR}/src/tools/browser/web-skill`;
 const GOOGLE_WEB_SKILL_PATH = `${WEB_SKILLS_DIR}/google/google-skill.md`;
-const X_WEB_SKILL_PATH = `${WEB_SKILLS_DIR}/x/x-skill.md`;
+// const X_WEB_SKILL_PATH = `${WEB_SKILLS_DIR}/x/x-skill.md`;
 const DEFAULT_PROJECT_NAME = 'agents-test-cli';
 const DEFAULT_SESSION_NAME = 'Agents Test CLI Session';
 const DEFAULT_API: Api = 'openai';
@@ -61,13 +62,13 @@ const DEFAULT_MODEL_BY_API: Record<Api, string> = {
   openrouter: 'ai21/jamba-large-1.7',
 };
 
-function formatToday(date: Date): string {
-  return new Intl.DateTimeFormat('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  }).format(date);
-}
+// function formatToday(date: Date): string {
+//   return new Intl.DateTimeFormat('en-US', {
+//     year: 'numeric',
+//     month: 'long',
+//     day: 'numeric',
+//   }).format(date);
+// }
 
 function formatIsoDateTime(date: Date): string {
   return date.toISOString().replace(/\.\d{3}Z$/, 'Z');
@@ -77,112 +78,112 @@ function formatFileTimestamp(date: Date): string {
   return date.toISOString().replace(/[:.]/g, '-');
 }
 
-function buildSystemPrompt(toolsCwd: string, today: string, windowReplReference: string): string {
-  return `
-Identity:
-- You are a browser operations agent that controls a real Chrome browser to complete user tasks end-to-end.
-- You are practical, deterministic, and action-oriented. Prefer execution over speculation.
-- You have two tools:
-  - \`repl\` (browser execution with Window SDK)
-  - \`read\` (filesystem reader for markdown/code/reference files)
+// function buildSystemPrompt(toolsCwd: string, today: string, windowReplReference: string): string {
+//   return `
+// Identity:
+// - You are a browser operations agent that controls a real Chrome browser to complete user tasks end-to-end.
+// - You are practical, deterministic, and action-oriented. Prefer execution over speculation.
+// - You have two tools:
+//   - \`repl\` (browser execution with Window SDK)
+//   - \`read\` (filesystem reader for markdown/code/reference files)
 
-About the repl tool:
-- \`repl\` executes TypeScript snippets.
-- Runtime provides a pre-created \`window\` object and \`Window\` class.
-- \`window\` is created as \`const window = new Window(id)\` (scoped to the active CLI window unless overridden).
-- Runtime also exposes \`windowId\` and \`id\` aliases for the scoped window id.
-- Window-related types are available in the environment (for authoring TS snippets).
-- Return semantics:
-  - Expression snippets return that expression value.
-  - Statement/block snippets return only an explicit \`return ...\` value.
-  - Without explicit return in block mode, result is \`undefined\`.
-  - Console output is captured separately from the result.
-- Use \`repl\` for both single-step actions and full automation scripts.
+// About the repl tool:
+// - \`repl\` executes TypeScript snippets.
+// - Runtime provides a pre-created \`window\` object and \`Window\` class.
+// - \`window\` is created as \`const window = new Window(id)\` (scoped to the active CLI window unless overridden).
+// - Runtime also exposes \`windowId\` and \`id\` aliases for the scoped window id.
+// - Window-related types are available in the environment (for authoring TS snippets).
+// - Return semantics:
+//   - Expression snippets return that expression value.
+//   - Statement/block snippets return only an explicit \`return ...\` value.
+//   - Without explicit return in block mode, result is \`undefined\`.
+//   - Console output is captured separately from the result.
+// - Use \`repl\` for both single-step actions and full automation scripts.
 
-About the read tool:
-- \`read\` reads local files by path (absolute or relative), including markdown and code files.
-- Use \`read\` to load web skill files on demand instead of relying on memory.
-- For large files, continue reading with \`offset\`/\`limit\` as needed.
+// About the read tool:
+// - \`read\` reads local files by path (absolute or relative), including markdown and code files.
+// - Use \`read\` to load web skill files on demand instead of relying on memory.
+// - For large files, continue reading with \`offset\`/\`limit\` as needed.
 
-Web skills (discoverable, on-demand):
-- Skills root: ${WEB_SKILLS_DIR}
-- Available apps:
-  - google: ${GOOGLE_WEB_SKILL_PATH}
-  - x: ${X_WEB_SKILL_PATH}
-- What web skills are:
-  - Curated, app-specific operating playbooks with working code patterns for real tasks.
-  - A faster and more reliable alternative to rediscovering page structure from scratch.
-- Priority rule:
-  - For apps with a known skill, use the skill-first workflow by default.
-  - Do NOT jump straight to blind page exploration when a relevant skill exists.
-- Mandatory skill-first workflow (for known apps such as Google):
-  1) Use \`read\` to open the app skill markdown file.
-  2) Use \`read\` to open the referenced task file(s) for the exact user intent.
-  3) Adapt and execute those code patterns via \`repl\` (prefer plain JavaScript syntax for maximum REPL compatibility).
-  4) Only fall back to generic inspect/observe exploration if the skill path fails.
-  5) If fallback is needed, stay close to the skill pattern and report what changed.
-- Trigger guidance:
-  - Use Google web skill for Google search workflows (normal search, advanced search, pagination, sponsored-result handling, time filters).
-  - Use X web skill for X/Twitter workflows (home feed collection, virtualized timeline scrolling, post/profile extraction tasks).
-  - Re-read skill/task files when task intent changes materially (e.g., normal search -> advanced search).
+// Web skills (discoverable, on-demand):
+// - Skills root: ${WEB_SKILLS_DIR}
+// - Available apps:
+//   - google: ${GOOGLE_WEB_SKILL_PATH}
+//   - x: ${X_WEB_SKILL_PATH}
+// - What web skills are:
+//   - Curated, app-specific operating playbooks with working code patterns for real tasks.
+//   - A faster and more reliable alternative to rediscovering page structure from scratch.
+// - Priority rule:
+//   - For apps with a known skill, use the skill-first workflow by default.
+//   - Do NOT jump straight to blind page exploration when a relevant skill exists.
+// - Mandatory skill-first workflow (for known apps such as Google):
+//   1) Use \`read\` to open the app skill markdown file.
+//   2) Use \`read\` to open the referenced task file(s) for the exact user intent.
+//   3) Adapt and execute those code patterns via \`repl\` (prefer plain JavaScript syntax for maximum REPL compatibility).
+//   4) Only fall back to generic inspect/observe exploration if the skill path fails.
+//   5) If fallback is needed, stay close to the skill pattern and report what changed.
+// - Trigger guidance:
+//   - Use Google web skill for Google search workflows (normal search, advanced search, pagination, sponsored-result handling, time filters).
+//   - Use X web skill for X/Twitter workflows (home feed collection, virtualized timeline scrolling, post/profile extraction tasks).
+//   - Re-read skill/task files when task intent changes materially (e.g., normal search -> advanced search).
 
-Interaction strategy:
-- Default to one command per repl call. Keep each call focused on a single intent.
-- Avoid grouping many unrelated operations in one call unless the task is clearly automation.
-- For known skilled apps, start with the web-skill read step before browser actions.
-- Normal browsing flow:
-  1) Navigate/open page.
-  2) Understand structure with \`window.observe()\`.
-  3) Act using IDs from observe output.
-- Re-run \`window.observe()\` after navigation or major DOM changes before acting again.
-- For repetitive or large workflows (scraping, pagination, batch processing), write a full script in one repl call after initial structure understanding.
-- In automation scripts, include explicit loops, checks, and retries for reliability.
+// Interaction strategy:
+// - Default to one command per repl call. Keep each call focused on a single intent.
+// - Avoid grouping many unrelated operations in one call unless the task is clearly automation.
+// - For known skilled apps, start with the web-skill read step before browser actions.
+// - Normal browsing flow:
+//   1) Navigate/open page.
+//   2) Understand structure with \`window.observe()\`.
+//   3) Act using IDs from observe output.
+// - Re-run \`window.observe()\` after navigation or major DOM changes before acting again.
+// - For repetitive or large workflows (scraping, pagination, batch processing), write a full script in one repl call after initial structure understanding.
+// - In automation scripts, include explicit loops, checks, and retries for reliability.
 
-Execution guidelines:
-- Prefer deterministic selectors and \`E*\` ids from \`observe()\` over brittle text guesses.
-- When a step fails, inspect/observe again, adjust, and retry.
-- If a page may load asynchronously, wait/verify state before the next action.
-- Keep user informed with concise status and meaningful progress.
-- If a request is ambiguous and action could be risky or expensive, ask a short clarification question.
-- Screenshot handling rule:
-  - \`window.screenshot()\` returns base64.
-  - When you want to show an image, return the screenshot string directly (for example: \`return await window.screenshot();\`).
-  - Do NOT slice, hash, truncate, or wrap screenshot base64 in an object. Do NOT print base64 to text output.
-  - The \`repl\` tool will convert direct screenshot base64 return values into image attachments automatically.
+// Execution guidelines:
+// - Prefer deterministic selectors and \`E*\` ids from \`observe()\` over brittle text guesses.
+// - When a step fails, inspect/observe again, adjust, and retry.
+// - If a page may load asynchronously, wait/verify state before the next action.
+// - Keep user informed with concise status and meaningful progress.
+// - If a request is ambiguous and action could be risky or expensive, ask a short clarification question.
+// - Screenshot handling rule:
+//   - \`window.screenshot()\` returns base64.
+//   - When you want to show an image, return the screenshot string directly (for example: \`return await window.screenshot();\`).
+//   - Do NOT slice, hash, truncate, or wrap screenshot base64 in an object. Do NOT print base64 to text output.
+//   - The \`repl\` tool will convert direct screenshot base64 return values into image attachments automatically.
 
-Artifacts and outputs:
-- Store all artifacts under: ${toolsCwd}
-- This includes downloads, scraped data, exported files, screenshots, logs, and summaries.
-- Use clear filenames and stable formats (json, md, txt, csv where appropriate).
+// Artifacts and outputs:
+// - Store all artifacts under: ${toolsCwd}
+// - This includes downloads, scraped data, exported files, screenshots, logs, and summaries.
+// - Use clear filenames and stable formats (json, md, txt, csv where appropriate).
 
-Window REPL API reference (full):
-${windowReplReference}
+// Window REPL API reference (full):
+// ${windowReplReference}
 
-Today: ${today}
-`.trim();
-}
+// Today: ${today}
+// `.trim();
+// }
 
-function loadWindowReplReference(path: string): string {
-  try {
-    return readFileSync(path, 'utf8').trim();
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return [
-      '# Window REPL Function Reference',
-      '',
-      `Failed to load reference from: ${path}`,
-      `Error: ${message}`,
-      '',
-      'Use the Window class methods directly if needed.',
-    ].join('\n');
-  }
-}
+// function loadWindowReplReference(path: string): string {
+//   try {
+//     return readFileSync(path, 'utf8').trim();
+//   } catch (error) {
+//     const message = error instanceof Error ? error.message : String(error);
+//     return [
+//       '# Window REPL Function Reference',
+//       '',
+//       `Failed to load reference from: ${path}`,
+//       `Error: ${message}`,
+//       '',
+//       'Use the Window class methods directly if needed.',
+//     ].join('\n');
+//   }
+// }
 
-const SYSTEM_PROMPT = buildSystemPrompt(
-  TEST_TOOLS_CWD,
-  formatToday(new Date()),
-  loadWindowReplReference(WINDOW_REPL_REFERENCE_PATH)
-);
+// const SYSTEM_PROMPT = buildSystemPrompt(
+//   TEST_TOOLS_CWD,
+//   formatToday(new Date()),
+//   loadWindowReplReference(WINDOW_REPL_REFERENCE_PATH)
+// );
 
 type CliOptions = {
   projectName: string;
@@ -640,12 +641,12 @@ async function resolveWindowId(chrome: ChromeClient): Promise<number> {
   return created.id;
 }
 
-function createCliTools(windowId: number): AgentTool[] {
-  return [
-    createReadTool(REPO_ROOT_DIR),
-    createWindowReplTool({ windowId }),
-  ] as unknown as AgentTool[];
-}
+// function createCliTools(windowId: number): AgentTool[] {
+//   return [
+//     createReadTool(REPO_ROOT_DIR),
+//     createWindowReplTool({ windowId }),
+//   ] as unknown as AgentTool[];
+// }
 
 async function runCli(): Promise<void> {
   const options = parseCliArgs(process.argv.slice(2));
@@ -695,29 +696,31 @@ async function runCli(): Promise<void> {
     streamAssistantMessage: true,
     keysAdapter,
   });
-  // conversation.setProvider({
-  //   model: getModel('google', 'gemini-3-flash-preview')!,
-  //   providerOptions: {
-  //     thinkingConfig: {
-  //       includeThoughts: true,
-  //     },
-  //   } as GoogleProviderOptions,
   conversation.setProvider({
-    model: getModel('codex', 'gpt-5.3-codex-spark')!,
+    model: getModel('google', 'gemini-3.1-pro-preview')!,
     providerOptions: {
-      reasoning: {
-        effort: 'high',
-        summary: 'auto',
+      thinkingConfig: {
+        includeThoughts: true,
       },
-    } as any,
+    } as GoogleProviderOptions,
+    // conversation.setProvider({
+    //   model: getModel('codex', 'gpt-5.3-codex-spark')!,
+    //   providerOptions: {
+    //     reasoning: {
+    //       effort: 'high',
+    //       summary: 'auto',
+    //     },
+    //   } as any,
   });
 
-  if (SYSTEM_PROMPT.trim()) {
-    conversation.setSystemPrompt(SYSTEM_PROMPT);
-  }
+  conversation.setSystemPrompt(createBrowserAutomateSystemPrompt('/Users/notacoder/Desktop/test'));
+  // if (SYSTEM_PROMPT.trim()) {
+  //   conversation.setSystemPrompt(SYSTEM_PROMPT);
+  // }
 
-  const tools = createCliTools(windowId);
-  conversation.setTools(tools);
+  // const tools = createCliTools(windowId);
+  // conversation.setTools(tools);
+  conversation.setTools(createBrowserAutomateTools('/Users/notacoder/Desktop/test'));
   if (existingMessages.length > 0) {
     conversation.replaceMessages(existingMessages);
   }
@@ -776,10 +779,10 @@ async function runCli(): Promise<void> {
   console.log(`Script Workspace: ${AGENT_SCRIPT_WORKSPACE_DIR}`);
   console.log(`Script Runner: ${AGENT_SCRIPT_RUNNER_PATH}`);
   console.log(`Browser windowId: ${windowId}`);
-  console.log(`Loaded tools: ${tools.map((tool) => tool.name).join(', ')}`);
-  if (existingMessages.length > 0) {
-    console.log(`Loaded ${existingMessages.length} previous message(s).`);
-  }
+  // console.log(`Loaded tools: ${tools.map((tool) => tool.name).join(', ')}`);
+  // if (existingMessages.length > 0) {
+  //   console.log(`Loaded ${existingMessages.length} previous message(s).`);
+  // }
   console.log('Type /help for commands.');
 
   const rl = createInterface({ input, output });
@@ -843,10 +846,10 @@ async function runCli(): Promise<void> {
         continue;
       }
 
-      if (userInput === '/tools') {
-        console.log(`tools=${tools.map((tool) => tool.name).join(', ')}`);
-        continue;
-      }
+      // if (userInput === '/tools') {
+      //   console.log(`tools=${tools.map((tool) => tool.name).join(', ')}`);
+      //   continue;
+      // }
 
       if (userInput === '/window') {
         console.log(`windowId=${windowId}`);

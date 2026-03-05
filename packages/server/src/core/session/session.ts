@@ -3,18 +3,12 @@ import { join } from 'node:path';
 import { complete, Conversation, createSessionManager, getModel } from '@ank1015/llm-sdk';
 import { createFileSessionsAdapter, createFileKeysAdapter } from '@ank1015/llm-sdk-adapters';
 
-import { getArtifactTypeConfig } from '../artifact-type/artifact-type.js';
+import { createBaseSystemPrompt, baseTools } from '../artifact-type/base.js';
 import { resolveSkills } from '../artifact-type/utils.js';
 import { getConfig } from '../config.js';
 import { ensureDir, readMetadata, writeMetadata, pathExists, removeDir } from '../storage/fs.js';
 
-import type { ArtifactTypeConfig } from '../artifact-type/artifact-type.js';
-import type {
-  ArtifactDirMetadata,
-  CreateSessionOptions,
-  PromptInput,
-  SessionMetadata,
-} from '../types.js';
+import type { CreateSessionOptions, PromptInput, SessionMetadata } from '../types.js';
 import type {
   AgentEvent,
   AgentTool,
@@ -262,26 +256,27 @@ export class Session {
       (node: MessageNode) => node.message
     );
 
-    // Resolve artifact type config for tools and system prompt
-    const typeConfig = await this.getArtifactTypeConfig();
     const { projectsRoot } = getConfig();
     const artifactDirPath = join(projectsRoot, this.projectId, this.artifactDirId);
     const projectDirPath = join(projectsRoot, this.projectId);
-    const tools = typeConfig.createTools(artifactDirPath);
+    const tools = baseTools(artifactDirPath);
     const skills = resolveSkills(input.skills ?? []);
 
-    const systemPrompt = typeConfig.createSystemPrompt({
-      artifactDirectory: artifactDirPath,
-      projectDirectory: projectDirPath,
-      skills,
-    });
+    const systemPrompt = createBaseSystemPrompt(artifactDirPath, projectDirPath, skills);
 
     // Create conversation and configure
     const conversation = new Conversation({
       keysAdapter,
       streamAssistantMessage: false,
     });
-    conversation.setProvider({ model } as Provider<Api>);
+    conversation.setProvider({
+      model,
+      providerOptions: {
+        reasoning: {
+          effort: 'high',
+        },
+      },
+    } as Provider<Api>);
     conversation.setSystemPrompt(systemPrompt);
     conversation.setTools(Object.values(tools));
 
@@ -331,19 +326,13 @@ export class Session {
       (node: MessageNode) => node.message
     );
 
-    // Resolve artifact type config for tools and system prompt
-    const typeConfig = await this.getArtifactTypeConfig();
     const { projectsRoot } = getConfig();
     const artifactDirPath = join(projectsRoot, this.projectId, this.artifactDirId);
     const projectDirPath = join(projectsRoot, this.projectId);
-    const tools = typeConfig.createTools(artifactDirPath);
+    const tools = baseTools(artifactDirPath);
     const skills = resolveSkills(input.skills ?? []);
 
-    const systemPrompt = typeConfig.createSystemPrompt({
-      artifactDirectory: artifactDirPath,
-      projectDirectory: projectDirPath,
-      skills,
-    });
+    const systemPrompt = createBaseSystemPrompt(artifactDirPath, projectDirPath, skills);
 
     // Create conversation with streaming enabled
     const conversation = new Conversation({
@@ -355,7 +344,14 @@ export class Session {
       },
     });
 
-    conversation.setProvider({ model } as Provider<Api>);
+    conversation.setProvider({
+      model,
+      providerOptions: {
+        reasoning: {
+          effort: 'high',
+        },
+      },
+    } as Provider<Api>);
     conversation.setSystemPrompt(systemPrompt);
 
     // Subscribe to conversation events
@@ -400,17 +396,6 @@ export class Session {
       'main'
     );
     return messageNodes ?? [];
-  }
-
-  /**
-   * Look up the artifact directory's type and return its config
-   * (system prompt + tools factory).
-   */
-  private async getArtifactTypeConfig(): Promise<ArtifactTypeConfig> {
-    const { dataRoot } = getConfig();
-    const artifactMetaPath = join(dataRoot, this.projectId, 'artifacts', this.artifactDirId);
-    const metadata = await readMetadata<ArtifactDirMetadata>(artifactMetaPath);
-    return getArtifactTypeConfig(metadata.type);
   }
 
   /**
