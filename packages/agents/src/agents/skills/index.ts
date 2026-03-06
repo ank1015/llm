@@ -207,7 +207,11 @@ async function writeSkillsRegistry(
 }
 
 async function installWorkspace(rootDir: string): Promise<void> {
-  await runCommand(getPnpmCommand(), ['install'], rootDir);
+  const startedAt = Date.now();
+  process.stderr.write(`[skills] installing workspace dependencies in ${rootDir}\n`);
+  await runCommandWithOptions(getPnpmCommand(), ['install'], rootDir, { streamOutput: true });
+  const elapsedMs = Date.now() - startedAt;
+  process.stderr.write(`[skills] finished pnpm install in ${elapsedMs}ms\n`);
 }
 
 async function writeManagedFile(path: string, content: string): Promise<void> {
@@ -327,7 +331,12 @@ function normalizeFrontmatterValue(value: string): string {
   return value;
 }
 
-async function runCommand(command: string, args: string[], cwd: string): Promise<void> {
+async function runCommandWithOptions(
+  command: string,
+  args: string[],
+  cwd: string,
+  options?: { streamOutput?: boolean }
+): Promise<void> {
   await new Promise<void>((resolvePromise, rejectPromise) => {
     const child = spawn(command, args, {
       cwd,
@@ -337,11 +346,19 @@ async function runCommand(command: string, args: string[], cwd: string): Promise
     let output = '';
 
     child.stdout?.on('data', (chunk: Buffer | string) => {
-      output += chunk.toString();
+      const text = chunk.toString();
+      output += text;
+      if (options?.streamOutput) {
+        process.stderr.write(text);
+      }
     });
 
     child.stderr?.on('data', (chunk: Buffer | string) => {
-      output += chunk.toString();
+      const text = chunk.toString();
+      output += text;
+      if (options?.streamOutput) {
+        process.stderr.write(text);
+      }
     });
 
     child.on('error', rejectPromise);

@@ -232,11 +232,11 @@ pdftoppm -jpeg -r 150 -f N -l N scripts/<artifact-name>/tmp/output.pdf scripts/<
 
 ---
 
-## Dependencies
+## Runtime Assumptions
 
-- `pip install "markitdown[pptx]"` - text extraction
-- `pip install Pillow` - thumbnail grids
-- `pptxgenjs`, `react`, `react-dom`, `react-icons`, `sharp`, and `xlsx` are installed automatically in the generated `max-skills` project
-- If a new JavaScript or TypeScript dependency is genuinely required for this skill, install it in `max-skills` with `pnpm`
-- LibreOffice (`soffice`) - PDF conversion (auto-configured for sandboxed environments via `skills/pptx/scripts/office/soffice.py`)
-- Poppler (`pdftoppm`) - PDF to images
+- Assume `markitdown[pptx]` is available globally for text extraction.
+- Assume `Pillow` is available globally for thumbnail grids.
+- `pptxgenjs`, `react`, `react-dom`, `react-icons`, `sharp`, and `xlsx` are installed automatically in the generated `max-skills` project.
+- If a new JavaScript or TypeScript dependency is genuinely required for this skill, install it in `max-skills` with `pnpm`.
+- Assume LibreOffice (`soffice`) is available globally for PDF conversion. The bundled `skills/pptx/scripts/office/soffice.py` helper handles sandbox-friendly execution details.
+- Assume Poppler (`pdftoppm`) is available globally for PDF-to-image conversion.

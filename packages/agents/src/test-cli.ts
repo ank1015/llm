@@ -519,7 +519,9 @@ async function runCli(): Promise<void> {
 
   await mkdir(AGENT_PROJECT_DIR, { recursive: true });
   await mkdir(AGENT_ARTIFACT_DIR, { recursive: true });
+  console.log('Setting up skills dir');
   const setupResult = await setupSkills(AGENT_PROJECT_DIR);
+  console.log('Skills setup complete');
   const systemPrompt = await createSystemPrompt({
     projectName: AGENT_PROJECT_NAME,
     projectDir: AGENT_PROJECT_DIR,

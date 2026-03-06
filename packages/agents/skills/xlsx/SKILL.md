@@ -83,6 +83,8 @@ A user may ask you to create, edit, or analyze the contents of an .xlsx file. Yo
 
 **Script Workspace**: If Max writes helper scripts or creates intermediate files for an XLSX task, Max should keep them under `max-skills/scripts/<artifact-name>/`. JSON summaries, unpacked workbook folders, debug files, and other temporary outputs should stay there. Only the final spreadsheet deliverable should be written to the artifact directory unless the user says otherwise.
 
+**Global Runtime**: You can assume `pandas`, `openpyxl`, and LibreOffice are installed and available globally for this skill.
+
 **LibreOffice Required for Formula Recalculation**: You can assume LibreOffice is installed for recalculating formula values using the `skills/xlsx/scripts/recalc.py` script. The script automatically configures LibreOffice on first run, including in sandboxed environments where Unix sockets are restricted (handled by `skills/xlsx/scripts/office/soffice.py`).
 
 ## Reading and analyzing data
