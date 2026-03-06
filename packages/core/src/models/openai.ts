@@ -20,6 +20,23 @@ export const openaiModels = {
     maxTokens: 128000,
     tools: ['function_calling'],
   } satisfies Model<'openai'>,
+  'gpt-5.4': {
+    id: 'gpt-5.4',
+    name: 'GPT-5.4',
+    api: 'openai',
+    baseUrl: openaiBaseUrl,
+    reasoning: true,
+    input: ['text', 'image', 'file'],
+    cost: {
+      input: 2.5,
+      output: 15,
+      cacheRead: 0.25,
+      cacheWrite: 0,
+    },
+    contextWindow: 272000,
+    maxTokens: 128000,
+    tools: ['function_calling'],
+  } satisfies Model<'openai'>,
   'gpt-5.3-codex': {
     id: 'gpt-5.3-codex',
     name: 'GPT-5.3 Codex',

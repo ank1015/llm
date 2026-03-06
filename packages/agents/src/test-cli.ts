@@ -4,7 +4,6 @@ import { resolve } from 'node:path';
 import { stdin as input, stdout as output } from 'node:process';
 import { createInterface } from 'node:readline/promises';
 
-import { connect, type ChromeClient } from '@ank1015/llm-extension';
 import {
   Conversation,
   createSessionManager,
@@ -15,20 +14,9 @@ import {
 } from '@ank1015/llm-sdk';
 import { createFileKeysAdapter, createFileSessionsAdapter } from '@ank1015/llm-sdk-adapters';
 
-import {
-  createActTool,
-  createDownloadTool,
-  createExtractTool,
-  createInspectTool,
-  createNavigationTool,
-  createScreenshotTool,
-} from './tools/browser/index.js';
-import {
-  createBashTool,
-  createEditTool,
-  createReadTool,
-  createWriteTool,
-} from './tools/file-system/index.js';
+import { setupSkills } from './agents/skills/index.js';
+import { createSystemPrompt } from './agents/system-prompt.js';
+import { createAllTools } from './agents/tools.js';
 
 import type { CodexProviderOptions } from '../../types/dist/providers/codex.js';
 import type {
@@ -42,12 +30,14 @@ import type {
   SessionManager,
 } from '@ank1015/llm-sdk';
 
-const TEST_TOOLS_CWD = '/Users/notacoder/Desktop/test';
+const AGENT_PROJECT_NAME = 'sales';
+const AGENT_ARTIFACT_NAME = 'product';
+const AGENT_PROJECT_DIR = '/Users/notacoder/Desktop/sales';
+const AGENT_ARTIFACT_DIR = '/Users/notacoder/Desktop/sales/product';
 const AGENTS_PACKAGE_DIR = '/Users/notacoder/Desktop/agents/llm/packages/agents';
-const AGENT_SCRIPT_WORKSPACE_DIR = `${AGENTS_PACKAGE_DIR}/scripts/workspace`;
-const AGENT_SCRIPT_RUNNER_PATH = `${AGENTS_PACKAGE_DIR}/scripts/run.sh`;
 const AGENT_SESSIONS_DIR = `${AGENTS_PACKAGE_DIR}/sessions`;
-const DEFAULT_PROJECT_NAME = 'agents-test-cli';
+const DEFAULT_PROJECT_NAME = AGENT_PROJECT_NAME;
+const DEFAULT_SESSION_PATH = AGENT_ARTIFACT_NAME;
 const DEFAULT_SESSION_NAME = 'Agents Test CLI Session';
 const DEFAULT_API: Api = 'openai';
 const DEFAULT_MODEL_BY_API: Record<Api, string> = {
@@ -64,14 +54,6 @@ const DEFAULT_MODEL_BY_API: Record<Api, string> = {
   openrouter: 'ai21/jamba-large-1.7',
 };
 
-function formatToday(date: Date): string {
-  return new Intl.DateTimeFormat('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  }).format(date);
-}
-
 function formatIsoDateTime(date: Date): string {
   return date.toISOString().replace(/\.\d{3}Z$/, 'Z');
 }
@@ -79,147 +61,6 @@ function formatIsoDateTime(date: Date): string {
 function formatFileTimestamp(date: Date): string {
   return date.toISOString().replace(/[:.]/g, '-');
 }
-
-function buildSystemPrompt(
-  toolsCwd: string,
-  scriptWorkspaceDir: string,
-  scriptRunnerPath: string,
-  today: string
-): string {
-  return `
-You are a practical assistant focused on completing browser-related tasks with reliable execution.
-You also have file-system access for creating notes, scripts, outputs, and intermediate artifacts.
-
-Identity and Scope:
-- You help users perform tasks in a real browser and local files.
-- Prefer direct tool usage over speculation.
-- Be concise, accurate, and action-oriented.
-
-Filesystem Tools:
-- read: Read file contents.
-- write: Create or overwrite files.
-- edit: Surgical edits by replacing exact old text with new text.
-- bash: Run shell commands for validation, discovery, and automation.
-
-Filesystem Guidelines:
-- Read files before editing them.
-- Use edit for targeted changes; use write for new files or full rewrites.
-- Use bash for verification (tests, listing files, quick checks), not for replacing clear text responses.
-- Keep outputs organized and predictable.
-- When gathering web info, save useful notes/artifacts under the working directory.
-
-Browser Tools:
-- navigation: open/switch/list/reload/back/forward/close tabs in a scoped window.
-  Example:
-  {"action":"open_url","url":"https://example.com"}
-  {"action":"list_tabs"}
-- inspect_page: compact page snapshot (interactive elements, key text, forms, alerts).
-  Example:
-  {"tabId":123,"maxInteractive":120,"maxTextBlocks":40}
-- act: perform actions on elements (click, type, clear, pressEnter, select, scroll, hover, focus).
-  Example:
-  {"type":"click","target":{"id":"submit"}}
-  {"type":"type","target":"E1","value":"hello@example.com"}
-  {"type":"select","target":{"id":"country"},"value":"United States"}
-  {"type":"scroll","value":{"to":"bottom"}}
-- screenshot: capture current visible tab image (png/jpeg).
-  Example:
-  {"tabId":123,"format":"png"}
-- download: download URL into browser Downloads (optional directory/filename).
-  Example:
-  {"url":"https://example.com/report.pdf","directory":"research","filename":"report.pdf"}
-- extract: focused extraction without huge snapshots.
-  Modes:
-  1) links (optional filter/limit)
-     {"what":{"type":"links","filter":"pricing","limit":50}}
-  2) main_text
-     {"what":{"type":"main_text","maxChars":12000}}
-  3) selected_text
-     {"what":{"type":"selected_text"}}
-  4) container_html (rare)
-     {"what":{"type":"container_html","selector":"main article","maxChars":20000}}
-
-Browser Guidelines:
-- Start with navigation + inspect_page to understand page state.
-- Use act with inspect element ids (E1, E2, etc.) when possible for reliable targeting.
-- Use extract when you need content (links/text/html) without large inspect snapshots.
-- Use screenshot when visual confirmation is useful.
-- If a step fails, inspect again, adjust target, and retry.
-- If you are confident about the destination URL, open it directly with navigation instead of clicking through intermediate pages. Take deterministic shortcuts when confident.
-- Prefer deterministic steps and short feedback loops.
-- Prefer browser tools first for normal workflows.
-
-Browser SDK Script Environment (TypeScript-first automation):
-- You are allowed and expected to write and run TypeScript browser scripts using @ank1015/llm-extension.
-- Critical rule: for browser automation, do NOT write Python scripts. Use TypeScript scripts in the script workspace and run them with the provided runner.
-- For big or repetitive tasks, default to scripts instead of manual tool-by-tool actions.
-
-Script-first triggers (use scripts proactively):
-- Scraping many pages/doc sections, crawling pagination, or collecting data from many URLs.
-- Repeated multi-step workflows (same sequence across pages/accounts/items).
-- Batch extraction/download tasks where loops, retries, or concurrency are needed.
-- Any task that is slow/unreliable with direct tools after brief retries.
-- Any workflow needing advanced Chrome APIs (debugger sessions, network events, cookies, custom evaluate logic).
-
-Script location and execution:
-- Write scripts in:
-  ${scriptWorkspaceDir}
-- Run scripts from any current working directory with:
-  ${scriptRunnerPath} <script.ts> [args...]
-- Example runs:
-  ${scriptRunnerPath} runner-smoke.ts
-  ${scriptRunnerPath} collect-cookies.ts
-- The runner accepts both relative script names (resolved in the script workspace) and absolute paths.
-- Use filesystem tools (write/edit/read/bash) to create and iterate quickly.
-- Save outputs/artifacts under:
-  ${toolsCwd}
-
-Recommended script workflow:
-1) Create a TypeScript script in the script workspace.
-2) Connect with connect({ launch: true }).
-3) Implement deterministic loops for navigation/extraction.
-4) Persist outputs (json/md/txt) to the working directory.
-5) Run, inspect output, edit, and rerun until complete.
-
-SDK quick reference:
-- Generic call pattern:
-  const result = await chrome.call('tabs.query', { active: true, currentWindow: true });
-- Common calls: tabs.query/create/update/get/remove, windows.create/update/get/remove, downloads.download/search, cookies.getAll.
-- For page evaluation and extraction, prefer debugger.evaluate:
-  const evalResult = await chrome.call('debugger.evaluate', { tabId, code: 'document.title' });
-- For long-lived CDP/network workflows:
-  await chrome.call('debugger.attach', { tabId });
-  await chrome.call('debugger.sendCommand', { tabId, method: 'Network.enable' });
-  const events = await chrome.call('debugger.getEvents', { tabId, filter: 'Network.' });
-  await chrome.call('debugger.detach', { tabId });
-- Always detach debugger sessions in finally blocks.
-- Minimal script template:
-  import { connect } from '@ank1015/llm-extension';
-  const chrome = await connect({ launch: true });
-  const tab = (await chrome.call('tabs.create', { url: 'https://example.com', active: true })) as { id?: number };
-  if (!tab.id) throw new Error('Missing tab id');
-  const title = await chrome.call('debugger.evaluate', { tabId: tab.id, code: 'document.title' });
-  console.log(title);
-
-When to use direct tools vs scripts:
-- Direct tools: short, one-off interactions.
-- Scripts: large, repeated, or reliability-critical automation (especially scraping/crawling tasks).
-
-Working Directory:
-- Filesystem working directory: ${toolsCwd}
-- All the downloads, scrapping data or any artifact generation by be inside our working directory: ${toolsCwd}
-
-Today:
-- ${today}
-`.trim();
-}
-
-const SYSTEM_PROMPT = buildSystemPrompt(
-  TEST_TOOLS_CWD,
-  AGENT_SCRIPT_WORKSPACE_DIR,
-  AGENT_SCRIPT_RUNNER_PATH,
-  formatToday(new Date())
-);
 
 type CliOptions = {
   projectName: string;
@@ -231,10 +72,6 @@ type CliOptions = {
   modelId: string;
 };
 
-interface ChromeWindow {
-  id?: number;
-}
-
 function printUsage(): void {
   const usage = `
 Usage:
@@ -242,7 +79,7 @@ Usage:
 
 Options:
   --project <name>              Session project name (default: ${DEFAULT_PROJECT_NAME})
-  --path <path>                 Session path within project (default: root)
+  --path <path>                 Session path within project (default: ${DEFAULT_SESSION_PATH})
   --session <id>                Existing session ID to continue
   --sessions-dir <dir>          Session storage base directory
   --keys-dir <dir>              Keys storage directory
@@ -253,7 +90,6 @@ Options:
 Commands while running:
   /help                         Show in-chat commands
   /tools                        Show loaded tools
-  /window                       Show scoped browser window id
   /session                      Show current session info
   /exit or /quit                Exit CLI
 `.trim();
@@ -271,7 +107,7 @@ function getFlagValue(args: string[], index: number, flag: string): string {
 
 function parseCliArgs(args: string[]): CliOptions {
   let projectName = DEFAULT_PROJECT_NAME;
-  let path = '';
+  let path = DEFAULT_SESSION_PATH;
   let sessionId: string | undefined;
   let sessionsDir: string | undefined;
   let keysDir: string | undefined;
@@ -665,52 +501,13 @@ async function resolveSessionId(
   return created.sessionId;
 }
 
-async function resolveWindowId(chrome: ChromeClient): Promise<number> {
-  const created = (await chrome.call('windows.create', {
-    url: 'about:blank',
-    focused: true,
-  })) as ChromeWindow;
-  if (typeof created.id !== 'number') {
-    throw new Error('Could not determine an active browser window id');
-  }
-
-  return created.id;
-}
-
-function createCliTools(chrome: ChromeClient, windowId: number): AgentTool[] {
-  const browserOperations = {
-    getClient: async () => chrome,
-  };
-
-  const readTool = createReadTool(TEST_TOOLS_CWD);
-  const writeTool = createWriteTool(TEST_TOOLS_CWD);
-  const editTool = createEditTool(TEST_TOOLS_CWD);
-  const bashTool = createBashTool(TEST_TOOLS_CWD);
-
-  const navigationTool = createNavigationTool({ windowId, operations: browserOperations });
-  const inspectTool = createInspectTool({ windowId, operations: browserOperations });
-  const actTool = createActTool({ windowId, operations: browserOperations });
-  const screenshotTool = createScreenshotTool({ windowId, operations: browserOperations });
-  const downloadTool = createDownloadTool({ windowId, operations: browserOperations });
-  const extractTool = createExtractTool({ windowId, operations: browserOperations });
-
-  return [
-    readTool,
-    writeTool,
-    editTool,
-    bashTool,
-    navigationTool,
-    inspectTool,
-    actTool,
-    screenshotTool,
-    downloadTool,
-    extractTool,
-  ] as unknown as AgentTool[];
+function createCliTools(): AgentTool[] {
+  return Object.values(createAllTools(AGENT_ARTIFACT_DIR)) as unknown as AgentTool[];
 }
 
 async function runCli(): Promise<void> {
   const options = parseCliArgs(process.argv.slice(2));
-  const model = getModels(options.api).find((entry) => entry.id === options.modelId);
+  const model = getModel('codex', 'gpt-5.4');
   if (!model) {
     const availableIds = getModels(options.api)
       .map((entry) => entry.id)
@@ -720,14 +517,15 @@ async function runCli(): Promise<void> {
     );
   }
 
-  const chromePort = process.env.CHROME_RPC_PORT
-    ? Number.parseInt(process.env.CHROME_RPC_PORT, 10)
-    : undefined;
-  const chrome = await connect({ launch: true, ...(chromePort ? { port: chromePort } : {}) });
-  const windowId = await resolveWindowId(chrome);
-
-  await mkdir(TEST_TOOLS_CWD, { recursive: true });
-  await mkdir(AGENT_SCRIPT_WORKSPACE_DIR, { recursive: true });
+  await mkdir(AGENT_PROJECT_DIR, { recursive: true });
+  await mkdir(AGENT_ARTIFACT_DIR, { recursive: true });
+  const setupResult = await setupSkills(AGENT_PROJECT_DIR);
+  const systemPrompt = await createSystemPrompt({
+    projectName: AGENT_PROJECT_NAME,
+    projectDir: AGENT_PROJECT_DIR,
+    artifactName: AGENT_ARTIFACT_NAME,
+    artifactDir: AGENT_ARTIFACT_DIR,
+  });
 
   const keysAdapter = createFileKeysAdapter(options.keysDir);
   const sessionsAdapter = createFileSessionsAdapter(options.sessionsDir);
@@ -756,21 +554,25 @@ async function runCli(): Promise<void> {
     streamAssistantMessage: true,
     keysAdapter,
   });
-  conversation.setProvider({
-    model: getModel('codex', 'gpt-5.3-codex')!,
-    providerOptions: {
-      reasoning: {
-        effort: 'high',
-        summary: 'auto',
-      },
-    } as CodexProviderOptions,
-  });
+  conversation.setProvider(
+    options.api === 'codex'
+      ? {
+          model,
+          providerOptions: {
+            reasoning: {
+              effort: 'high',
+              summary: 'auto',
+            },
+          } as CodexProviderOptions,
+        }
+      : { model }
+  );
 
-  if (SYSTEM_PROMPT.trim()) {
-    conversation.setSystemPrompt(SYSTEM_PROMPT);
+  if (systemPrompt.trim()) {
+    conversation.setSystemPrompt(systemPrompt);
   }
 
-  const tools = createCliTools(chrome, windowId);
+  const tools = createCliTools();
   conversation.setTools(tools);
   if (existingMessages.length > 0) {
     conversation.replaceMessages(existingMessages);
@@ -823,10 +625,12 @@ async function runCli(): Promise<void> {
   console.log(`Session: ${sessionId}`);
   console.log(`Project/Path: ${options.projectName}/${options.path || '(root)'}`);
   console.log(`API/Model: ${options.api}/${options.modelId}`);
-  console.log(`Tool CWD: ${TEST_TOOLS_CWD}`);
-  console.log(`Script Workspace: ${AGENT_SCRIPT_WORKSPACE_DIR}`);
-  console.log(`Script Runner: ${AGENT_SCRIPT_RUNNER_PATH}`);
-  console.log(`Browser windowId: ${windowId}`);
+  console.log(`Agent Project: ${AGENT_PROJECT_NAME}`);
+  console.log(`Agent Artifact: ${AGENT_ARTIFACT_NAME}`);
+  console.log(`Project Dir: ${AGENT_PROJECT_DIR}`);
+  console.log(`Artifact Dir: ${AGENT_ARTIFACT_DIR}`);
+  console.log(`Skills Dir: ${setupResult.skillsDir}`);
+  console.log(`Skills Registry: ${setupResult.registryPath}`);
   console.log(`Loaded tools: ${tools.map((tool) => tool.name).join(', ')}`);
   if (existingMessages.length > 0) {
     console.log(`Loaded ${existingMessages.length} previous message(s).`);
@@ -890,17 +694,12 @@ async function runCli(): Promise<void> {
       }
 
       if (userInput === '/help') {
-        console.log('/help, /tools, /window, /session, /exit, /quit');
+        console.log('/help, /tools, /session, /exit, /quit');
         continue;
       }
 
       if (userInput === '/tools') {
         console.log(`tools=${tools.map((tool) => tool.name).join(', ')}`);
-        continue;
-      }
-
-      if (userInput === '/window') {
-        console.log(`windowId=${windowId}`);
         continue;
       }
 
