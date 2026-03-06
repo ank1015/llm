@@ -129,7 +129,7 @@ async function writeProjectFiles(
       types: ['node'],
       noEmit: true,
     },
-    include: ['scripts/**/*.ts'],
+    include: ['scripts/**/*.ts', 'skills/**/*.ts'],
     exclude: ['node_modules', 'dist'],
   };
 
@@ -144,7 +144,7 @@ Generated TypeScript project for Max skills and artifact-scoped helper scripts.
 
 ## Commands
 
-- \`pnpm typecheck\`: type-check scripts under \`scripts/\`
+- \`pnpm typecheck\`: type-check authored scripts under \`scripts/\` and bundled skill scripts under \`skills/\`
 - \`pnpm exec tsx <file>\`: run any TypeScript file inside this project
 
 ## Notes

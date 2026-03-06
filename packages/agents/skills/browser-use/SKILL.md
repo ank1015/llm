@@ -41,6 +41,7 @@ Read these files directly when the task is site-specific:
 - X: `skills/browser-use/sites/x/INDEX.md`
 
 If the target site is not listed, use this base skill and the reference files above.
+If a site guide includes a bundled task doc and script, prefer running that script with the documented CLI flags before writing a new browser script.
 
 ## Default Execution Flow
 

@@ -7,6 +7,10 @@ Site-specific guides for browser work live inside this skill.
 - Google: `skills/browser-use/sites/google/INDEX.md`
 - X: `skills/browser-use/sites/x/INDEX.md`
 
+Current bundled task docs:
+
+- Google search: `skills/browser-use/sites/google/tasks/getSearch.md`
+
 ## Runtime Paths
 
 When this skill is copied into the generated workspace, site guides live under:
@@ -28,7 +32,7 @@ When a task targets a specific site or domain:
 1. Read `skills/browser-use/SKILL.md`
 2. Read `skills/browser-use/sites/<site>/INDEX.md`
 3. Read any matching task docs under `skills/browser-use/sites/<site>/tasks/`
-4. Reuse bundled site scripts only if that site guide provides them
+4. If the task doc points to a bundled script, run that script with the documented CLI options before writing a new browser script
 
 ## Standard Site Layout
 
@@ -56,11 +60,12 @@ sites/<site>/
 ## What Each Task Doc Should Contain
 
 - task title
+- bundled script path
+- run command and option map
 - scope or URL coverage
 - required inputs
 - expected output shape
 - stable extraction or action patterns
-- SDK-first script outline
 - validation and stop conditions
 
-Keep site task docs script-oriented. They should help the agent write or adapt TypeScript scripts in the `max-skills` workspace.
+Keep site task docs script-oriented. They should help the agent run the right bundled script first and only write new TypeScript when the bundled task does not fit.
