@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import type { Metadata } from 'next';
 
 import { ThemeInit } from '@/components/theme-init';
+import { Toaster } from '@/components/ui/sonner';
 
 import 'katex/dist/katex.min.css';
 import './globals.css';
@@ -31,6 +32,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <ThemeInit />
+        <Toaster />
         {children}
       </body>
     </html>

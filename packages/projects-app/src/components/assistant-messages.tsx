@@ -1,6 +1,6 @@
 'use client';
 
-import { Check, Copy, GitBranch, RefreshCw } from 'lucide-react';
+import { Check, Copy } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 
 import { ActivityDrawerContent } from './activity-drawer';
@@ -163,20 +163,6 @@ export function AssistantMessages({
             aria-label={copied ? 'Copied' : 'Copy message'}
           >
             {copied ? <Check className="size-4 text-blue-500" /> : <Copy className="size-4" />}
-          </button>
-          <button
-            type="button"
-            className="text-muted-foreground hover:text-foreground cursor-pointer rounded p-1.5 transition-colors"
-            aria-label="Branch conversation"
-          >
-            <GitBranch className="size-4" />
-          </button>
-          <button
-            type="button"
-            className="text-muted-foreground hover:text-foreground cursor-pointer rounded p-1.5 transition-colors"
-            aria-label="Regenerate response"
-          >
-            <RefreshCw className="size-4" />
           </button>
         </div>
       )}

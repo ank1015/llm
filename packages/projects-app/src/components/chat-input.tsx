@@ -3,6 +3,7 @@
 import { ArrowUp, ChevronDown, File, Plus, Square } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 
 import {
   PromptInput,
@@ -28,6 +29,7 @@ import {
   useArtifactFilesStore,
   useChatSettingsStore,
   useChatStore,
+  useComposerStore,
   useSessionsStore,
   useSidebarStore,
 } from '@/stores';
@@ -297,8 +299,7 @@ function ComposerDropdownControl({
 /* ------------------------------------------------------------------ */
 
 function PromptInputWithActions() {
-  const [input, setInput] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [localInput, setLocalInput] = useState('');
   const [activeMention, setActiveMention] = useState<MentionRange | null>(null);
   const [mentionResults, setMentionResults] = useState<ProjectFileIndexEntry[]>([]);
   const [mentionLoading, setMentionLoading] = useState(false);
@@ -320,6 +321,15 @@ function PromptInputWithActions() {
   // Use threadId from URL as the source of truth — the store's activeSession
   // can be stale when navigating between artifacts.
   const currentSession: SessionRef | null = threadId ? { sessionId: threadId } : null;
+  const composerInput = useComposerStore((state) => {
+    if (!currentSession) {
+      return '';
+    }
+
+    return state.draftsBySession[currentSession.sessionId] ?? '';
+  });
+  const setDraft = useComposerStore((state) => state.setDraft);
+  const markSubmitted = useComposerStore((state) => state.markSubmitted);
 
   const startStream = useChatStore((state) => state.startStream);
   const abortStream = useChatStore((state) => state.abortStream);
@@ -342,6 +352,7 @@ function PromptInputWithActions() {
   const sidebarRenameSession = useSidebarStore((state) => state.renameSession);
   const loadProjectFileIndex = useArtifactFilesStore((state) => state.loadProjectFileIndex);
   const searchProjectFiles = useArtifactFilesStore((state) => state.searchProjectFiles);
+  const input = currentSession ? composerInput : localInput;
 
   const isMentionOpen = activeMention !== null;
   const selectedModel = getSelectedChatModel({
@@ -447,7 +458,15 @@ function PromptInputWithActions() {
   }, [activeMention, projectId, searchProjectFiles]);
 
   const handleInputChange = (nextValue: string) => {
-    setInput(nextValue);
+    if (currentSession) {
+      setDraft({
+        session: currentSession,
+        draft: nextValue,
+      });
+      return;
+    }
+
+    setLocalInput(nextValue);
   };
 
   const handleMentionSelect = (entry: ProjectFileIndexEntry) => {
@@ -457,7 +476,7 @@ function PromptInputWithActions() {
 
     const mentionToken = `@${entry.artifactPath}`;
     const nextMentionedValue = replaceMentionToken(input, activeMention, mentionToken);
-    setInput(nextMentionedValue.value);
+    handleInputChange(nextMentionedValue.value);
     setMentionState(null);
 
     window.requestAnimationFrame(() => {
@@ -499,7 +518,7 @@ function PromptInputWithActions() {
         const removal = removeMentionBeforeCaret(textarea.value, selectionStart);
         if (removal) {
           event.preventDefault();
-          setInput(removal.value);
+          handleInputChange(removal.value);
           setMentionState(null);
           window.requestAnimationFrame(() => {
             const nextTextarea = textareaElementRef.current;
@@ -555,8 +574,6 @@ function PromptInputWithActions() {
     const trimmed = input.trim();
     if (trimmed === '' || isStreaming) return;
 
-    setError(null);
-
     try {
       let session: SessionRef | undefined = currentSession ?? undefined;
 
@@ -598,7 +615,11 @@ function PromptInputWithActions() {
         throw new Error('Could not create or select a session.');
       }
 
-      setInput('');
+      if (currentSession) {
+        markSubmitted(currentSession);
+      } else {
+        setLocalInput('');
+      }
       setMentionState(null);
 
       await startStream({
@@ -613,7 +634,9 @@ function PromptInputWithActions() {
     } catch (err) {
       if (isAbortError(err)) return;
       const message = err instanceof Error ? err.message : 'Failed to send message.';
-      setError(message);
+      toast.error(message, {
+        id: 'composer-error',
+      });
     }
   };
 
@@ -670,6 +693,7 @@ function PromptInputWithActions() {
 
       <div className="px-1">
         <PromptInputTextarea
+          data-chat-composer-textarea=""
           placeholder="Ask me anything..."
           className="min-h-[30px] px-0 py-2 text-sm"
           onChange={handleTextareaChange}
@@ -726,8 +750,6 @@ function PromptInputWithActions() {
           </Button>
         </PromptInputAction>
       </PromptInputActions>
-
-      {error ? <p className="mt-2 text-xs text-red-500">{error}</p> : null}
     </PromptInput>
   );
 }
