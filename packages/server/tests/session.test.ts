@@ -95,6 +95,7 @@ describe('Session', () => {
       expect(metadata.api).toBe('anthropic');
       expect(metadata.modelId).toBe('claude-sonnet-4-20250514');
       expect(metadata.createdAt).toBeDefined();
+      expect(metadata.activeBranch).toBe('main');
     });
 
     it('should use default name when not provided', async () => {
@@ -105,6 +106,7 @@ describe('Session', () => {
 
       const metadata = await session.getMetadata();
       expect(metadata.name).toBe('Untitled Session');
+      expect(metadata.activeBranch).toBe('main');
     });
 
     it('should store session files in the data path', async () => {

@@ -20,6 +20,15 @@ function buildStreamPath(ctx: ArtifactContext, sessionId: string): string {
   return `${buildSessionsBase(ctx)}/${encodeURIComponent(sessionId)}/stream`;
 }
 
+function buildRewriteStreamPath(
+  ctx: ArtifactContext,
+  sessionId: string,
+  nodeId: string,
+  action: 'retry' | 'edit'
+): string {
+  return `${buildMessagesPath(ctx, sessionId)}/${encodeURIComponent(nodeId)}/${action}/stream`;
+}
+
 type SseParsedEvent = {
   event: StreamEventName | string;
   data: unknown;
@@ -97,26 +106,39 @@ export type StreamRequest = ArtifactContext & {
   skills?: string[];
 } & TurnSettings;
 
+export type StreamRetryRequest = ArtifactContext & {
+  sessionId: string;
+  nodeId: string;
+} & TurnSettings;
+
+export type StreamEditRequest = ArtifactContext & {
+  sessionId: string;
+  nodeId: string;
+  message: string;
+} & TurnSettings;
+
+type StreamRequestBody = {
+  message?: string;
+  skills?: string[];
+  api: TurnSettings['api'];
+  modelId: string;
+  reasoningLevel: TurnSettings['reasoningLevel'];
+};
+
 // eslint-disable-next-line sonarjs/cognitive-complexity
-export async function streamConversation(
-  request: StreamRequest,
+async function streamConversationRequest(
+  url: string,
+  body: StreamRequestBody,
   handlers: StreamHandlers = {},
   signal?: AbortSignal
 ): Promise<void> {
-  const ctx: ArtifactContext = { projectId: request.projectId, artifactId: request.artifactId };
-  const response = await fetch(buildStreamPath(ctx, request.sessionId), {
+  const response = await fetch(url, {
     method: 'POST',
     headers: {
       Accept: 'text/event-stream',
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      message: request.message,
-      skills: request.skills ?? [],
-      api: request.api,
-      modelId: request.modelId,
-      reasoningLevel: request.reasoningLevel,
-    }),
+    body: JSON.stringify(body),
     signal,
   });
 
@@ -184,4 +206,61 @@ export async function streamConversation(
   } finally {
     reader.releaseLock();
   }
+}
+
+export async function streamConversation(
+  request: StreamRequest,
+  handlers: StreamHandlers = {},
+  signal?: AbortSignal
+): Promise<void> {
+  const ctx: ArtifactContext = { projectId: request.projectId, artifactId: request.artifactId };
+  await streamConversationRequest(
+    buildStreamPath(ctx, request.sessionId),
+    {
+      message: request.message,
+      skills: request.skills ?? [],
+      api: request.api,
+      modelId: request.modelId,
+      reasoningLevel: request.reasoningLevel,
+    },
+    handlers,
+    signal
+  );
+}
+
+export async function streamRetryConversation(
+  request: StreamRetryRequest,
+  handlers: StreamHandlers = {},
+  signal?: AbortSignal
+): Promise<void> {
+  const ctx: ArtifactContext = { projectId: request.projectId, artifactId: request.artifactId };
+  await streamConversationRequest(
+    buildRewriteStreamPath(ctx, request.sessionId, request.nodeId, 'retry'),
+    {
+      api: request.api,
+      modelId: request.modelId,
+      reasoningLevel: request.reasoningLevel,
+    },
+    handlers,
+    signal
+  );
+}
+
+export async function streamEditConversation(
+  request: StreamEditRequest,
+  handlers: StreamHandlers = {},
+  signal?: AbortSignal
+): Promise<void> {
+  const ctx: ArtifactContext = { projectId: request.projectId, artifactId: request.artifactId };
+  await streamConversationRequest(
+    buildRewriteStreamPath(ctx, request.sessionId, request.nodeId, 'edit'),
+    {
+      message: request.message,
+      api: request.api,
+      modelId: request.modelId,
+      reasoningLevel: request.reasoningLevel,
+    },
+    handlers,
+    signal
+  );
 }

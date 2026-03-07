@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 
 import { ChatMarkdown } from './markdown-renderer';
 
-import type { UserMessage } from '@ank1015/llm-sdk';
+import type { MessageNode, UserMessage } from '@ank1015/llm-sdk';
 
 import { getTextFromUserMessage } from '@/lib/messages/utils';
 import { useChatSettingsStore, useChatStore, useComposerStore } from '@/stores';
@@ -36,16 +36,17 @@ function focusComposer(): void {
   });
 }
 
-export const UserMessageComponent = ({ userMessage }: { userMessage: UserMessage }) => {
+export const UserMessageComponent = ({ userNode }: { userNode: MessageNode }) => {
   const { projectId, artifactId, threadId } = useParams<{
     projectId: string;
     artifactId: string;
     threadId?: string;
   }>();
+  const userMessage = userNode.message as UserMessage;
   const text = getTextFromUserMessage(userMessage);
   const [copied, setCopied] = useState(false);
-  const setDraft = useComposerStore((state) => state.setDraft);
-  const startStream = useChatStore((state) => state.startStream);
+  const beginEdit = useComposerStore((state) => state.beginEdit);
+  const retryFromNode = useChatStore((state) => state.retryFromNode);
   const isStreaming = useChatStore((state) => {
     if (!threadId) return false;
     return state.isStreamingBySession[threadId] ?? false;
@@ -68,20 +69,21 @@ export const UserMessageComponent = ({ userMessage }: { userMessage: UserMessage
   const handleEdit = useCallback(() => {
     if (!text || !threadId) return;
 
-    setDraft({
+    beginEdit({
       session: { sessionId: threadId },
-      draft: text,
+      targetNodeId: userNode.id,
+      originalText: text,
     });
     focusComposer();
-  }, [setDraft, text, threadId]);
+  }, [beginEdit, text, threadId, userNode.id]);
 
   const handleRetry = useCallback(async () => {
-    if (!text || !threadId || isStreaming) return;
+    if (!threadId || isStreaming) return;
 
     try {
-      await startStream({
+      await retryFromNode({
         sessionId: threadId,
-        prompt: text,
+        nodeId: userNode.id,
         projectId,
         artifactId,
         api: selectedApi,
@@ -102,12 +104,12 @@ export const UserMessageComponent = ({ userMessage }: { userMessage: UserMessage
     artifactId,
     isStreaming,
     projectId,
+    retryFromNode,
     selectedApi,
     selectedModelId,
     selectedReasoning,
-    startStream,
-    text,
     threadId,
+    userNode.id,
   ]);
 
   return (
@@ -131,7 +133,8 @@ export const UserMessageComponent = ({ userMessage }: { userMessage: UserMessage
         <button
           type="button"
           onClick={handleEdit}
-          className="text-muted-foreground hover:text-foreground cursor-pointer rounded p-1.5 transition-colors"
+          disabled={!text || isStreaming}
+          className="text-muted-foreground hover:text-foreground disabled:text-muted-foreground/40 cursor-pointer rounded p-1.5 transition-colors disabled:cursor-default"
           aria-label="Edit message"
         >
           <Pencil className="size-4" />

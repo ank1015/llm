@@ -4,6 +4,7 @@ import { Session } from '../core/index.js';
 
 import type { PromptInput, ReasoningLevel } from '../core/index.js';
 import type { AgentEvent, Api } from '@ank1015/llm-sdk';
+import type { Context } from 'hono';
 
 const BASE = '/projects/:projectId/artifacts/:artifactDirId/sessions';
 
@@ -51,6 +52,38 @@ function resolvePromptInput(
     input: {
       message: body.message,
       skills: body.skills ?? [],
+      ...(hasProviderOverride ? { api: api as Api, modelId } : {}),
+      ...(reasoningLevel ? { reasoningLevel: reasoningLevel as ReasoningLevel } : {}),
+    },
+  };
+}
+
+function resolveTurnSettings(
+  body: SessionTurnBody | undefined
+): { error: string } | { input: Omit<PromptInput, 'message'> } {
+  const api = typeof body?.api === 'string' ? body.api.trim() : '';
+  const modelId = typeof body?.modelId === 'string' ? body.modelId.trim() : '';
+  const hasProviderOverride = api.length > 0 || modelId.length > 0;
+
+  if (hasProviderOverride && (api.length === 0 || modelId.length === 0)) {
+    return { error: 'api and modelId must be provided together' };
+  }
+
+  const rawReasoningLevel =
+    typeof body?.reasoningLevel === 'string'
+      ? body.reasoningLevel
+      : typeof body?.reasoning === 'string'
+        ? body.reasoning
+        : undefined;
+  const reasoningLevel = rawReasoningLevel?.trim().toLowerCase();
+
+  if (reasoningLevel && !REASONING_LEVELS.has(reasoningLevel as ReasoningLevel)) {
+    return { error: 'reasoning must be one of: low, medium, high, xhigh' };
+  }
+
+  return {
+    input: {
+      ...(body?.skills ? { skills: body.skills } : {}),
       ...(hasProviderOverride ? { api: api as Api, modelId } : {}),
       ...(reasoningLevel ? { reasoningLevel: reasoningLevel as ReasoningLevel } : {}),
     },
@@ -202,23 +235,13 @@ function toSseChunk(event: string, data: unknown): Uint8Array {
   return new TextEncoder().encode(payload);
 }
 
-/** POST /api/.../sessions/:sessionId/stream — Stream a conversation turn via SSE */
-sessionRoutes.post(`${BASE}/:sessionId/stream`, async (c) => {
-  const { projectId, artifactDirId, sessionId } = c.req.param();
-  const body = await c.req.json<SessionTurnBody>().catch(() => undefined);
-  const resolvedPromptInput = resolvePromptInput(body);
-  if ('error' in resolvedPromptInput) {
-    return c.json({ error: resolvedPromptInput.error }, 400);
-  }
-
-  let session: Session;
-  try {
-    session = await Session.getById(projectId, artifactDirId, sessionId);
-  } catch (e) {
-    const message = e instanceof Error ? e.message : 'Session not found';
-    return c.json({ error: message }, 404);
-  }
-
+function streamSessionRun(
+  c: Context,
+  sessionId: string,
+  run: (options: { onEvent: (event: AgentEvent) => void; signal?: AbortSignal }) => Promise<{
+    length: number;
+  }>
+) {
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
       let closed = false;
@@ -242,8 +265,8 @@ sessionRoutes.post(`${BASE}/:sessionId/stream`, async (c) => {
         send('ready', { ok: true, sessionId });
 
         try {
-          const newMessages = await session.streamPrompt(resolvedPromptInput.input, {
-            onEvent: (event: AgentEvent) => {
+          const newMessages = await run({
+            onEvent: (event) => {
               send('agent_event', event);
             },
             signal: c.req.raw.signal,
@@ -270,4 +293,81 @@ sessionRoutes.post(`${BASE}/:sessionId/stream`, async (c) => {
   c.header('X-Accel-Buffering', 'no');
 
   return c.body(stream);
+}
+
+/** POST /api/.../sessions/:sessionId/stream — Stream a conversation turn via SSE */
+sessionRoutes.post(`${BASE}/:sessionId/stream`, async (c) => {
+  const { projectId, artifactDirId, sessionId } = c.req.param();
+  const body = await c.req.json<SessionTurnBody>().catch(() => undefined);
+  const resolvedPromptInput = resolvePromptInput(body);
+  if ('error' in resolvedPromptInput) {
+    return c.json({ error: resolvedPromptInput.error }, 400);
+  }
+
+  let session: Session;
+  try {
+    session = await Session.getById(projectId, artifactDirId, sessionId);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Session not found';
+    return c.json({ error: message }, 404);
+  }
+
+  return streamSessionRun(c, sessionId, async (options) => {
+    const newMessages = await session.streamPrompt(resolvedPromptInput.input, options);
+    return { length: newMessages.length };
+  });
+});
+
+/** POST /api/.../sessions/:sessionId/messages/:nodeId/retry/stream — Retry from a user message */
+sessionRoutes.post(`${BASE}/:sessionId/messages/:nodeId/retry/stream`, async (c) => {
+  const { projectId, artifactDirId, sessionId, nodeId } = c.req.param();
+  const body = await c.req.json<SessionTurnBody>().catch(() => undefined);
+  const resolvedTurnSettings = resolveTurnSettings(body);
+  if ('error' in resolvedTurnSettings) {
+    return c.json({ error: resolvedTurnSettings.error }, 400);
+  }
+
+  let session: Session;
+  try {
+    session = await Session.getById(projectId, artifactDirId, sessionId);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Session not found';
+    return c.json({ error: message }, 404);
+  }
+
+  return streamSessionRun(c, sessionId, async (options) => {
+    const newMessages = await session.streamRetryFromUserMessage(
+      nodeId,
+      resolvedTurnSettings.input,
+      options
+    );
+    return { length: newMessages.length };
+  });
+});
+
+/** POST /api/.../sessions/:sessionId/messages/:nodeId/edit/stream — Edit from a user message */
+sessionRoutes.post(`${BASE}/:sessionId/messages/:nodeId/edit/stream`, async (c) => {
+  const { projectId, artifactDirId, sessionId, nodeId } = c.req.param();
+  const body = await c.req.json<SessionTurnBody>().catch(() => undefined);
+  const resolvedPromptInput = resolvePromptInput(body);
+  if ('error' in resolvedPromptInput) {
+    return c.json({ error: resolvedPromptInput.error }, 400);
+  }
+
+  let session: Session;
+  try {
+    session = await Session.getById(projectId, artifactDirId, sessionId);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Session not found';
+    return c.json({ error: message }, 404);
+  }
+
+  return streamSessionRun(c, sessionId, async (options) => {
+    const newMessages = await session.streamEditFromUserMessage(
+      nodeId,
+      resolvedPromptInput.input,
+      options
+    );
+    return { length: newMessages.length };
+  });
 });

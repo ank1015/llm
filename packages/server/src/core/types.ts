@@ -134,6 +134,8 @@ export interface SessionMetadata {
   modelId: string;
   /** ISO 8601 timestamp of creation */
   createdAt: string;
+  /** Currently visible branch for this session */
+  activeBranch: string;
 }
 
 /** Input for creating a new session within an artifact directory */

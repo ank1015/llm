@@ -10,9 +10,15 @@ import type {
   BaseAssistantMessage,
   Message,
   MessageNode,
+  UserMessage,
 } from '@ank1015/llm-sdk';
 
-import { getSessionMessages, streamConversation } from '@/lib/client-api';
+import {
+  getSessionMessages,
+  streamConversation,
+  streamEditConversation,
+  streamRetryConversation,
+} from '@/lib/client-api';
 
 type PendingPrompt = {
   id: string;
@@ -20,6 +26,29 @@ type PendingPrompt = {
   createdAt: number;
   status: 'pending' | 'failed';
   error?: string;
+};
+
+type StreamRequestContext = {
+  sessionId: string;
+  projectId: string;
+  artifactId: string;
+} & TurnSettings;
+
+type RetryStreamInput = StreamRequestContext & {
+  nodeId: string;
+};
+
+type EditStreamInput = StreamRequestContext & {
+  nodeId: string;
+  prompt: string;
+};
+
+type RewritePreparation = {
+  initialParentId: string | null;
+  pendingPromptText: string;
+  placeholderMessageId: string;
+  snapshot: MessageNode[];
+  stagedMessages: MessageNode[];
 };
 
 type ChatStoreState = {
@@ -48,6 +77,8 @@ type ChatStoreState = {
       artifactId: string;
     } & TurnSettings
   ) => Promise<void>;
+  retryFromNode: (input: RetryStreamInput) => Promise<void>;
+  editFromNode: (input: EditStreamInput) => Promise<void>;
   abortStream: (session: SessionRef) => void;
 };
 
@@ -66,6 +97,22 @@ function getErrorMessage(error: unknown): string {
   }
 
   return 'Unexpected chat error.';
+}
+
+function isAbortError(error: unknown): boolean {
+  if (!error) {
+    return false;
+  }
+
+  if (typeof DOMException !== 'undefined' && error instanceof DOMException) {
+    return error.name === 'AbortError';
+  }
+
+  if (error instanceof Error) {
+    return error.name === 'AbortError' || error.message.toLowerCase().includes('abort');
+  }
+
+  return false;
 }
 
 function createPendingPrompt(prompt: string): PendingPrompt {
@@ -95,6 +142,12 @@ function toIsoTimestamp(value: unknown): string {
   return new Date().toISOString();
 }
 
+function sortMessageNodes(messages: MessageNode[]): MessageNode[] {
+  return [...messages].sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  );
+}
+
 function upsertOptimisticMessageNode(
   existing: MessageNode[],
   incoming: MessageNode
@@ -109,8 +162,24 @@ function upsertOptimisticMessageNode(
     next[index] = incoming;
   }
 
-  next.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-  return next;
+  return sortMessageNodes(next);
+}
+
+function replaceOptimisticMessageNode(
+  existing: MessageNode[],
+  placeholderMessageId: string,
+  incoming: MessageNode
+): MessageNode[] {
+  const next = [...existing];
+  const index = next.findIndex((node) => node.message.id === placeholderMessageId);
+
+  if (index === -1) {
+    next.push(incoming);
+  } else {
+    next[index] = incoming;
+  }
+
+  return sortMessageNodes(next);
 }
 
 function createOptimisticNode(input: {
@@ -118,17 +187,95 @@ function createOptimisticNode(input: {
   parentId: string | null;
   api: Api;
   modelId: string;
+  branch?: string;
 }): MessageNode {
   return {
     type: 'message',
     id: `optimistic:${input.message.id}`,
     parentId: input.parentId,
-    branch: 'main',
+    branch: input.branch ?? 'main',
     timestamp: toIsoTimestamp(input.message.timestamp),
     message: input.message,
     api: input.api,
     modelId: input.modelId,
     providerOptions: {},
+  };
+}
+
+function getTextFromUserMessage(message: UserMessage): string {
+  return message.content
+    .filter((block): block is Extract<UserMessage['content'][number], { type: 'text' }> => {
+      return block.type === 'text';
+    })
+    .map((block) => block.content)
+    .join('\n');
+}
+
+function createOptimisticUserMessage(message: UserMessage, textOverride?: string): UserMessage {
+  if (textOverride === undefined) {
+    return {
+      ...message,
+      id: `optimistic:${message.id}`,
+      timestamp: Date.now(),
+    };
+  }
+
+  const nonTextBlocks = message.content.filter((block) => block.type !== 'text');
+  const nextContent =
+    textOverride.length > 0
+      ? [{ type: 'text' as const, content: textOverride }, ...nonTextBlocks]
+      : nonTextBlocks;
+
+  return {
+    ...message,
+    id: `optimistic:${message.id}:edit`,
+    timestamp: Date.now(),
+    content: nextContent,
+  };
+}
+
+function prepareRewriteState(input: {
+  messages: MessageNode[];
+  nodeId: string;
+  api: Api;
+  modelId: string;
+  textOverride?: string;
+}): RewritePreparation {
+  const targetIndex = input.messages.findIndex((node) => node.id === input.nodeId);
+  if (targetIndex === -1) {
+    throw new Error('Message to rewrite was not found in the active thread.');
+  }
+
+  const targetNode = input.messages[targetIndex];
+  if (!targetNode || targetNode.message.role !== 'user') {
+    throw new Error('Only user messages can be edited or retried.');
+  }
+
+  const baseMessages = input.messages.slice(0, targetIndex);
+  const initialParentId = baseMessages.at(-1)?.id ?? null;
+  const placeholderMessage = createOptimisticUserMessage(
+    targetNode.message as UserMessage,
+    input.textOverride
+  );
+  const placeholderNode = createOptimisticNode({
+    message: placeholderMessage,
+    parentId: initialParentId,
+    api: input.api,
+    modelId: input.modelId,
+    branch: targetNode.branch,
+  });
+  const promptText = (
+    input.textOverride ?? getTextFromUserMessage(targetNode.message as UserMessage)
+  )
+    .trim()
+    .replace(/\s+/g, ' ');
+
+  return {
+    initialParentId,
+    pendingPromptText: promptText.length > 0 ? promptText : 'Rewrite message',
+    placeholderMessageId: placeholderMessage.id,
+    snapshot: input.messages,
+    stagedMessages: [...baseMessages, placeholderNode],
   };
 }
 
@@ -560,6 +707,523 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     }
   },
 
+  retryFromNode: async (input) => {
+    const session: SessionRef = { sessionId: input.sessionId };
+    const key = getSessionKey(session);
+
+    if (get().isStreamingBySession[key]) {
+      throw new Error('A stream is already running for this session.');
+    }
+
+    const rewrite = prepareRewriteState({
+      messages: get().messagesBySession[key] ?? [],
+      nodeId: input.nodeId,
+      api: input.api,
+      modelId: input.modelId,
+    });
+
+    streamAbortControllers.get(key)?.abort();
+
+    const pending = createPendingPrompt(rewrite.pendingPromptText);
+    const controller = new AbortController();
+    streamAbortControllers.set(key, controller);
+    let optimisticParentId = rewrite.initialParentId;
+    let placeholderMessageId: string | null = rewrite.placeholderMessageId;
+    let didPersistAnyMessage = false;
+
+    set((state) => ({
+      messagesBySession: {
+        ...state.messagesBySession,
+        [key]: rewrite.stagedMessages,
+      },
+      pendingPromptsBySession: upsertPendingPrompt(state.pendingPromptsBySession, key, pending),
+      agentEventsBySession: {
+        ...state.agentEventsBySession,
+        [key]: [],
+      },
+      streamingAssistantBySession: {
+        ...state.streamingAssistantBySession,
+        [key]: null,
+      },
+      isStreamingBySession: {
+        ...state.isStreamingBySession,
+        [key]: true,
+      },
+      errorsBySession: {
+        ...state.errorsBySession,
+        [key]: null,
+      },
+    }));
+
+    try {
+      await streamRetryConversation(
+        {
+          sessionId: input.sessionId,
+          nodeId: input.nodeId,
+          projectId: input.projectId,
+          artifactId: input.artifactId,
+          api: input.api,
+          modelId: input.modelId,
+          reasoningLevel: input.reasoningLevel,
+        },
+        {
+          onEvent: (eventName, data) => {
+            if (eventName === 'agent_event') {
+              const agentEvent = data as AgentEvent;
+
+              set((state) => {
+                const existingEvents = state.agentEventsBySession[key] ?? [];
+                const nextEvents = [...existingEvents, agentEvent];
+
+                if (nextEvents.length > MAX_AGENT_EVENTS) {
+                  nextEvents.splice(0, nextEvents.length - MAX_AGENT_EVENTS);
+                }
+
+                const nextState: Partial<ChatStoreState> = {
+                  agentEventsBySession: {
+                    ...state.agentEventsBySession,
+                    [key]: nextEvents,
+                  },
+                };
+
+                if (
+                  agentEvent.type === 'message_update' &&
+                  agentEvent.messageType === 'assistant'
+                ) {
+                  const streamingAssistant = getStreamingAssistantMessage(agentEvent.message);
+                  if (streamingAssistant) {
+                    nextState.streamingAssistantBySession = {
+                      ...state.streamingAssistantBySession,
+                      [key]: streamingAssistant,
+                    };
+                  }
+                }
+
+                if (agentEvent.type === 'message_end') {
+                  didPersistAnyMessage = true;
+                  const optimisticNode = createOptimisticNode({
+                    message: agentEvent.message,
+                    parentId: optimisticParentId,
+                    api: input.api,
+                    modelId: input.modelId,
+                  });
+
+                  optimisticParentId = optimisticNode.id;
+
+                  const nextMessages =
+                    placeholderMessageId && agentEvent.messageType === 'user'
+                      ? replaceOptimisticMessageNode(
+                          state.messagesBySession[key] ?? [],
+                          placeholderMessageId,
+                          optimisticNode
+                        )
+                      : upsertOptimisticMessageNode(
+                          state.messagesBySession[key] ?? [],
+                          optimisticNode
+                        );
+
+                  if (agentEvent.messageType === 'user') {
+                    placeholderMessageId = null;
+                  }
+
+                  nextState.messagesBySession = {
+                    ...state.messagesBySession,
+                    [key]: nextMessages,
+                  };
+
+                  if (agentEvent.messageType === 'assistant') {
+                    nextState.streamingAssistantBySession = {
+                      ...state.streamingAssistantBySession,
+                      [key]: null,
+                    };
+                  }
+                }
+
+                return nextState;
+              });
+            }
+
+            if (eventName === 'error') {
+              const message = (data as { message: string }).message;
+              set((state) => ({
+                errorsBySession: {
+                  ...state.errorsBySession,
+                  [key]: message,
+                },
+                streamingAssistantBySession: {
+                  ...state.streamingAssistantBySession,
+                  [key]: null,
+                },
+              }));
+            }
+          },
+        },
+        controller.signal
+      );
+
+      await get().loadMessages({
+        session,
+        projectId: input.projectId,
+        artifactId: input.artifactId,
+        force: true,
+      });
+
+      set((state) => ({
+        pendingPromptsBySession: removePendingPrompt(
+          state.pendingPromptsBySession,
+          key,
+          pending.id
+        ),
+        streamingAssistantBySession: {
+          ...state.streamingAssistantBySession,
+          [key]: null,
+        },
+      }));
+    } catch (error) {
+      const aborted = controller.signal.aborted || isAbortError(error);
+      const message = getErrorMessage(error);
+
+      if (didPersistAnyMessage) {
+        try {
+          await get().loadMessages({
+            session,
+            projectId: input.projectId,
+            artifactId: input.artifactId,
+            force: true,
+          });
+        } catch {
+          // Keep the optimistic thread if reload fails.
+        }
+
+        set((state) => ({
+          pendingPromptsBySession: removePendingPrompt(
+            state.pendingPromptsBySession,
+            key,
+            pending.id
+          ),
+          errorsBySession: {
+            ...state.errorsBySession,
+            [key]: aborted ? null : message,
+          },
+          streamingAssistantBySession: {
+            ...state.streamingAssistantBySession,
+            [key]: null,
+          },
+        }));
+      } else if (aborted) {
+        set((state) => ({
+          messagesBySession: {
+            ...state.messagesBySession,
+            [key]: rewrite.snapshot,
+          },
+          pendingPromptsBySession: removePendingPrompt(
+            state.pendingPromptsBySession,
+            key,
+            pending.id
+          ),
+          streamingAssistantBySession: {
+            ...state.streamingAssistantBySession,
+            [key]: null,
+          },
+        }));
+      } else {
+        set((state) => ({
+          messagesBySession: {
+            ...state.messagesBySession,
+            [key]: rewrite.snapshot,
+          },
+          pendingPromptsBySession: markPendingFailed(
+            state.pendingPromptsBySession,
+            key,
+            pending.id,
+            message
+          ),
+          errorsBySession: {
+            ...state.errorsBySession,
+            [key]: message,
+          },
+          streamingAssistantBySession: {
+            ...state.streamingAssistantBySession,
+            [key]: null,
+          },
+        }));
+      }
+
+      throw error;
+    } finally {
+      streamAbortControllers.delete(key);
+
+      set((state) => ({
+        isStreamingBySession: {
+          ...state.isStreamingBySession,
+          [key]: false,
+        },
+      }));
+    }
+  },
+
+  editFromNode: async (input) => {
+    const session: SessionRef = { sessionId: input.sessionId };
+    const key = getSessionKey(session);
+    const prompt = input.prompt.trim();
+
+    if (prompt.length === 0) {
+      throw new Error('Prompt cannot be empty.');
+    }
+
+    if (get().isStreamingBySession[key]) {
+      throw new Error('A stream is already running for this session.');
+    }
+
+    const rewrite = prepareRewriteState({
+      messages: get().messagesBySession[key] ?? [],
+      nodeId: input.nodeId,
+      api: input.api,
+      modelId: input.modelId,
+      textOverride: prompt,
+    });
+
+    streamAbortControllers.get(key)?.abort();
+
+    const pending = createPendingPrompt(prompt);
+    const controller = new AbortController();
+    streamAbortControllers.set(key, controller);
+    let optimisticParentId = rewrite.initialParentId;
+    let placeholderMessageId: string | null = rewrite.placeholderMessageId;
+    let didPersistAnyMessage = false;
+
+    set((state) => ({
+      messagesBySession: {
+        ...state.messagesBySession,
+        [key]: rewrite.stagedMessages,
+      },
+      pendingPromptsBySession: upsertPendingPrompt(state.pendingPromptsBySession, key, pending),
+      agentEventsBySession: {
+        ...state.agentEventsBySession,
+        [key]: [],
+      },
+      streamingAssistantBySession: {
+        ...state.streamingAssistantBySession,
+        [key]: null,
+      },
+      isStreamingBySession: {
+        ...state.isStreamingBySession,
+        [key]: true,
+      },
+      errorsBySession: {
+        ...state.errorsBySession,
+        [key]: null,
+      },
+    }));
+
+    try {
+      await streamEditConversation(
+        {
+          sessionId: input.sessionId,
+          nodeId: input.nodeId,
+          message: prompt,
+          projectId: input.projectId,
+          artifactId: input.artifactId,
+          api: input.api,
+          modelId: input.modelId,
+          reasoningLevel: input.reasoningLevel,
+        },
+        {
+          onEvent: (eventName, data) => {
+            if (eventName === 'agent_event') {
+              const agentEvent = data as AgentEvent;
+
+              set((state) => {
+                const existingEvents = state.agentEventsBySession[key] ?? [];
+                const nextEvents = [...existingEvents, agentEvent];
+
+                if (nextEvents.length > MAX_AGENT_EVENTS) {
+                  nextEvents.splice(0, nextEvents.length - MAX_AGENT_EVENTS);
+                }
+
+                const nextState: Partial<ChatStoreState> = {
+                  agentEventsBySession: {
+                    ...state.agentEventsBySession,
+                    [key]: nextEvents,
+                  },
+                };
+
+                if (
+                  agentEvent.type === 'message_update' &&
+                  agentEvent.messageType === 'assistant'
+                ) {
+                  const streamingAssistant = getStreamingAssistantMessage(agentEvent.message);
+                  if (streamingAssistant) {
+                    nextState.streamingAssistantBySession = {
+                      ...state.streamingAssistantBySession,
+                      [key]: streamingAssistant,
+                    };
+                  }
+                }
+
+                if (agentEvent.type === 'message_end') {
+                  didPersistAnyMessage = true;
+                  const optimisticNode = createOptimisticNode({
+                    message: agentEvent.message,
+                    parentId: optimisticParentId,
+                    api: input.api,
+                    modelId: input.modelId,
+                  });
+
+                  optimisticParentId = optimisticNode.id;
+
+                  const nextMessages =
+                    placeholderMessageId && agentEvent.messageType === 'user'
+                      ? replaceOptimisticMessageNode(
+                          state.messagesBySession[key] ?? [],
+                          placeholderMessageId,
+                          optimisticNode
+                        )
+                      : upsertOptimisticMessageNode(
+                          state.messagesBySession[key] ?? [],
+                          optimisticNode
+                        );
+
+                  if (agentEvent.messageType === 'user') {
+                    placeholderMessageId = null;
+                  }
+
+                  nextState.messagesBySession = {
+                    ...state.messagesBySession,
+                    [key]: nextMessages,
+                  };
+
+                  if (agentEvent.messageType === 'assistant') {
+                    nextState.streamingAssistantBySession = {
+                      ...state.streamingAssistantBySession,
+                      [key]: null,
+                    };
+                  }
+                }
+
+                return nextState;
+              });
+            }
+
+            if (eventName === 'error') {
+              const message = (data as { message: string }).message;
+              set((state) => ({
+                errorsBySession: {
+                  ...state.errorsBySession,
+                  [key]: message,
+                },
+                streamingAssistantBySession: {
+                  ...state.streamingAssistantBySession,
+                  [key]: null,
+                },
+              }));
+            }
+          },
+        },
+        controller.signal
+      );
+
+      await get().loadMessages({
+        session,
+        projectId: input.projectId,
+        artifactId: input.artifactId,
+        force: true,
+      });
+
+      set((state) => ({
+        pendingPromptsBySession: removePendingPrompt(
+          state.pendingPromptsBySession,
+          key,
+          pending.id
+        ),
+        streamingAssistantBySession: {
+          ...state.streamingAssistantBySession,
+          [key]: null,
+        },
+      }));
+    } catch (error) {
+      const aborted = controller.signal.aborted || isAbortError(error);
+      const message = getErrorMessage(error);
+
+      if (didPersistAnyMessage) {
+        try {
+          await get().loadMessages({
+            session,
+            projectId: input.projectId,
+            artifactId: input.artifactId,
+            force: true,
+          });
+        } catch {
+          // Keep the optimistic thread if reload fails.
+        }
+
+        set((state) => ({
+          pendingPromptsBySession: removePendingPrompt(
+            state.pendingPromptsBySession,
+            key,
+            pending.id
+          ),
+          errorsBySession: {
+            ...state.errorsBySession,
+            [key]: aborted ? null : message,
+          },
+          streamingAssistantBySession: {
+            ...state.streamingAssistantBySession,
+            [key]: null,
+          },
+        }));
+      } else if (aborted) {
+        set((state) => ({
+          messagesBySession: {
+            ...state.messagesBySession,
+            [key]: rewrite.snapshot,
+          },
+          pendingPromptsBySession: removePendingPrompt(
+            state.pendingPromptsBySession,
+            key,
+            pending.id
+          ),
+          streamingAssistantBySession: {
+            ...state.streamingAssistantBySession,
+            [key]: null,
+          },
+        }));
+      } else {
+        set((state) => ({
+          messagesBySession: {
+            ...state.messagesBySession,
+            [key]: rewrite.snapshot,
+          },
+          pendingPromptsBySession: markPendingFailed(
+            state.pendingPromptsBySession,
+            key,
+            pending.id,
+            message
+          ),
+          errorsBySession: {
+            ...state.errorsBySession,
+            [key]: message,
+          },
+          streamingAssistantBySession: {
+            ...state.streamingAssistantBySession,
+            [key]: null,
+          },
+        }));
+      }
+
+      throw error;
+    } finally {
+      streamAbortControllers.delete(key);
+
+      set((state) => ({
+        isStreamingBySession: {
+          ...state.isStreamingBySession,
+          [key]: false,
+        },
+      }));
+    }
+  },
+
   abortStream: (session) => {
     const key = getSessionKey(session);
     const controller = streamAbortControllers.get(key);
@@ -579,4 +1243,4 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
   },
 }));
 
-export type { PendingPrompt, SessionRef };
+export type { EditStreamInput, PendingPrompt, RetryStreamInput, SessionRef };

@@ -12,11 +12,19 @@ type ComposerSnapshot = {
   isDirty: boolean;
 };
 
+type ComposerEditState = {
+  targetNodeId: string;
+  originalText: string;
+  previousDraft: string;
+  previousAttachments: Attachment[];
+};
+
 type ComposerStoreState = {
   activeSession: SessionRef | null;
   draftsBySession: Record<string, string>;
   attachmentsBySession: Record<string, Attachment[]>;
   isDirtyBySession: Record<string, boolean>;
+  editStateBySession: Record<string, ComposerEditState | null>;
   setActiveSession: (session: SessionRef | null) => void;
   setDraft: (input: { session?: SessionRef; draft: string }) => void;
   appendToDraft: (input: { session?: SessionRef; text: string }) => void;
@@ -27,6 +35,9 @@ type ComposerStoreState = {
   clearAttachments: (session?: SessionRef) => void;
   markSubmitted: (session?: SessionRef) => void;
   getSnapshot: (session?: SessionRef) => ComposerSnapshot;
+  beginEdit: (input: { session?: SessionRef; targetNodeId: string; originalText: string }) => void;
+  cancelEdit: (session?: SessionRef) => void;
+  clearEditState: (session?: SessionRef) => void;
   resetSessionComposer: (session: SessionRef) => void;
   reset: () => void;
 };
@@ -36,6 +47,7 @@ const initialState = {
   draftsBySession: {} as Record<string, string>,
   attachmentsBySession: {} as Record<string, Attachment[]>,
   isDirtyBySession: {} as Record<string, boolean>,
+  editStateBySession: {} as Record<string, ComposerEditState | null>,
 };
 
 function getSessionKey(session: SessionRef): string {
@@ -91,6 +103,10 @@ export const useComposerStore = create<ComposerStoreState>()(
           isDirtyBySession: {
             ...state.isDirtyBySession,
             [key]: state.isDirtyBySession[key] ?? false,
+          },
+          editStateBySession: {
+            ...state.editStateBySession,
+            [key]: state.editStateBySession[key] ?? null,
           },
         }));
       },
@@ -299,6 +315,98 @@ export const useComposerStore = create<ComposerStoreState>()(
         };
       },
 
+      beginEdit: ({ session, targetNodeId, originalText }) => {
+        const resolvedSession = resolveSessionRef(session, get().activeSession);
+        if (!resolvedSession) {
+          return;
+        }
+
+        const key = getSessionKey(resolvedSession);
+
+        set((state) => {
+          const existingEditState = state.editStateBySession[key];
+          const previousDraft =
+            existingEditState?.previousDraft ?? state.draftsBySession[key] ?? '';
+          const previousAttachments =
+            existingEditState?.previousAttachments ?? state.attachmentsBySession[key] ?? [];
+
+          return {
+            draftsBySession: {
+              ...state.draftsBySession,
+              [key]: originalText,
+            },
+            attachmentsBySession: {
+              ...state.attachmentsBySession,
+              [key]: [],
+            },
+            isDirtyBySession: {
+              ...state.isDirtyBySession,
+              [key]: originalText.length > 0,
+            },
+            editStateBySession: {
+              ...state.editStateBySession,
+              [key]: {
+                targetNodeId,
+                originalText,
+                previousDraft,
+                previousAttachments,
+              },
+            },
+          };
+        });
+      },
+
+      cancelEdit: (session) => {
+        const resolvedSession = resolveSessionRef(session, get().activeSession);
+        if (!resolvedSession) {
+          return;
+        }
+
+        const key = getSessionKey(resolvedSession);
+
+        set((state) => {
+          const editState = state.editStateBySession[key];
+          if (!editState) {
+            return state;
+          }
+
+          return {
+            draftsBySession: {
+              ...state.draftsBySession,
+              [key]: editState.previousDraft,
+            },
+            attachmentsBySession: {
+              ...state.attachmentsBySession,
+              [key]: editState.previousAttachments,
+            },
+            isDirtyBySession: {
+              ...state.isDirtyBySession,
+              [key]: editState.previousDraft.length > 0 || editState.previousAttachments.length > 0,
+            },
+            editStateBySession: {
+              ...state.editStateBySession,
+              [key]: null,
+            },
+          };
+        });
+      },
+
+      clearEditState: (session) => {
+        const resolvedSession = resolveSessionRef(session, get().activeSession);
+        if (!resolvedSession) {
+          return;
+        }
+
+        const key = getSessionKey(resolvedSession);
+
+        set((state) => ({
+          editStateBySession: {
+            ...state.editStateBySession,
+            [key]: null,
+          },
+        }));
+      },
+
       resetSessionComposer: (session) => {
         const key = getSessionKey(session);
 
@@ -314,6 +422,10 @@ export const useComposerStore = create<ComposerStoreState>()(
           isDirtyBySession: {
             ...state.isDirtyBySession,
             [key]: false,
+          },
+          editStateBySession: {
+            ...state.editStateBySession,
+            [key]: null,
           },
         }));
       },
@@ -335,4 +447,4 @@ export const useComposerStore = create<ComposerStoreState>()(
   )
 );
 
-export type { ComposerSnapshot, SessionRef };
+export type { ComposerEditState, ComposerSnapshot, SessionRef };

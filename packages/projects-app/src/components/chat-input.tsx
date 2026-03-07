@@ -328,10 +328,21 @@ function PromptInputWithActions() {
 
     return state.draftsBySession[currentSession.sessionId] ?? '';
   });
+  const editState = useComposerStore((state) => {
+    if (!currentSession) {
+      return null;
+    }
+
+    return state.editStateBySession[currentSession.sessionId] ?? null;
+  });
   const setDraft = useComposerStore((state) => state.setDraft);
+  const clearAttachments = useComposerStore((state) => state.clearAttachments);
+  const clearEditState = useComposerStore((state) => state.clearEditState);
+  const cancelEdit = useComposerStore((state) => state.cancelEdit);
   const markSubmitted = useComposerStore((state) => state.markSubmitted);
 
   const startStream = useChatStore((state) => state.startStream);
+  const editFromNode = useChatStore((state) => state.editFromNode);
   const abortStream = useChatStore((state) => state.abortStream);
   const loadMessages = useChatStore((state) => state.loadMessages);
   const setActiveSession = useChatStore((state) => state.setActiveSession);
@@ -353,6 +364,7 @@ function PromptInputWithActions() {
   const loadProjectFileIndex = useArtifactFilesStore((state) => state.loadProjectFileIndex);
   const searchProjectFiles = useArtifactFilesStore((state) => state.searchProjectFiles);
   const input = currentSession ? composerInput : localInput;
+  const isEditing = currentSession !== null && editState !== null;
 
   const isMentionOpen = activeMention !== null;
   const selectedModel = getSelectedChatModel({
@@ -575,6 +587,29 @@ function PromptInputWithActions() {
     if (trimmed === '' || isStreaming) return;
 
     try {
+      if (currentSession && editState) {
+        setDraft({
+          session: currentSession,
+          draft: '',
+        });
+        clearAttachments(currentSession);
+        setMentionState(null);
+
+        await editFromNode({
+          sessionId: currentSession.sessionId,
+          nodeId: editState.targetNodeId,
+          prompt: trimmed,
+          projectId,
+          artifactId,
+          api: selectedApi,
+          modelId: selectedModelId,
+          reasoningLevel: selectedReasoning,
+        });
+
+        clearEditState(currentSession);
+        return;
+      }
+
       let session: SessionRef | undefined = currentSession ?? undefined;
 
       if (!session) {
@@ -632,6 +667,18 @@ function PromptInputWithActions() {
         reasoningLevel: selectedReasoning,
       });
     } catch (err) {
+      if (currentSession && editState) {
+        if (isAbortError(err)) {
+          clearEditState(currentSession);
+          return;
+        }
+
+        setDraft({
+          session: currentSession,
+          draft: trimmed,
+        });
+      }
+
       if (isAbortError(err)) return;
       const message = err instanceof Error ? err.message : 'Failed to send message.';
       toast.error(message, {
@@ -654,6 +701,26 @@ function PromptInputWithActions() {
       onSubmit={handleSubmit}
       className="relative w-full max-w-(--breakpoint-md)"
     >
+      {isEditing ? (
+        <div className="text-muted-foreground flex items-center justify-between px-1 pb-1 text-[11px]">
+          <span>Editing earlier message</span>
+          <button
+            type="button"
+            onClick={() => {
+              if (!currentSession || isStreaming) {
+                return;
+              }
+
+              cancelEdit(currentSession);
+              setMentionState(null);
+            }}
+            className="hover:text-foreground cursor-pointer transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      ) : null}
+
       {isMentionOpen ? (
         <div className="absolute inset-x-0 bottom-full z-40 mb-2 rounded-2xl border border-white/15 bg-black/85 p-1.5 shadow-2xl backdrop-blur-md">
           <div className="max-h-64 overflow-y-auto">

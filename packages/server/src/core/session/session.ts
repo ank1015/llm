@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 
 import { createAllTools, createSystemPrompt } from '@ank1015/llm-agents';
@@ -19,14 +20,18 @@ import type {
 import type {
   AgentEvent,
   AgentTool,
+  Attachment,
   Api,
   BaseAssistantMessage,
   ConversationExternalCallback,
   Message,
   MessageNode,
   Provider,
+  Session as StoredSession,
   SessionManager,
+  SessionNode,
   SessionSummary,
+  UserMessage,
 } from '@ank1015/llm-sdk';
 
 /**
@@ -47,6 +52,26 @@ type SessionExecutionConfig = {
   providerOptions: Record<string, unknown>;
 };
 
+type ActivePathContext = {
+  activeBranch: string;
+  leafNodeId: string;
+  messageNodes: MessageNode[];
+  tree: StoredSession;
+};
+
+type PersistenceConfig = {
+  execution: SessionExecutionConfig;
+  branch: string;
+  initialParentId: string;
+  activateBranchOnFirstPersist?: boolean;
+};
+
+type StreamRunOptions = {
+  onEvent: (event: AgentEvent) => void;
+  signal?: AbortSignal;
+};
+
+const DEFAULT_ACTIVE_BRANCH = 'main';
 const DEFAULT_REASONING_LEVEL: ReasoningLevel = 'high';
 
 export class Session {
@@ -103,6 +128,7 @@ export class Session {
       api: options.api,
       modelId: options.modelId,
       createdAt: new Date().toISOString(),
+      activeBranch: DEFAULT_ACTIVE_BRANCH,
     };
     await writeMetadata(metaDir, metadata);
 
@@ -161,7 +187,11 @@ export class Session {
 
   /** Read this session's metadata */
   async getMetadata(): Promise<SessionMetadata> {
-    return readMetadata<SessionMetadata>(this.metaDir);
+    const metadata = await readMetadata<SessionMetadata>(this.metaDir);
+    return {
+      ...metadata,
+      activeBranch: metadata.activeBranch ?? DEFAULT_ACTIVE_BRANCH,
+    };
   }
 
   /**
@@ -254,41 +284,22 @@ export class Session {
    */
   async prompt(input: PromptInput): Promise<Message[]> {
     const execution = this.resolveExecutionConfig(input);
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const model = getModel(execution.api, execution.modelId as any);
-    if (!model) {
-      throw new Error(`Model "${execution.modelId}" not found for API "${execution.api}"`);
-    }
-
-    const keysAdapter = createFileKeysAdapter();
-
-    const [existingMessages, agentConfig] = await Promise.all([
-      this.loadExistingMessages(),
+    const [context, agentConfig] = await Promise.all([
+      this.loadActivePathContext(),
       this.loadAgentConfig(),
     ]);
-
-    // Create conversation and configure
-    const conversation = new Conversation({
-      keysAdapter,
+    const conversation = this.createConversation({
+      execution,
+      existingMessages: context.messageNodes.map((node) => node.message),
+      agentConfig,
       streamAssistantMessage: false,
     });
-    conversation.setProvider({
-      model,
-      providerOptions: execution.providerOptions,
-    } as Provider<Api>);
-    conversation.setSystemPrompt(agentConfig.systemPrompt);
-    conversation.setTools(agentConfig.tools);
-
-    if (existingMessages.length > 0) {
-      conversation.replaceMessages(existingMessages);
-    }
-
-    // Run the prompt
     const newMessages = await conversation.prompt(input.message);
-
-    // Save new messages to session
-    await this.saveMessages(newMessages, execution);
+    await this.saveMessages(newMessages, {
+      execution,
+      branch: context.activeBranch,
+      initialParentId: context.leafNodeId,
+    });
 
     return newMessages;
   }
@@ -301,86 +312,66 @@ export class Session {
    * - Saves messages incrementally via persistence callback
    * - Supports cancellation via AbortSignal
    */
-  async streamPrompt(
-    input: PromptInput,
-    options: {
-      onEvent: (event: AgentEvent) => void;
-      signal?: AbortSignal;
-    }
-  ): Promise<Message[]> {
+  async streamPrompt(input: PromptInput, options: StreamRunOptions): Promise<Message[]> {
     const execution = this.resolveExecutionConfig(input);
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const model = getModel(execution.api, execution.modelId as any);
-    if (!model) {
-      throw new Error(`Model "${execution.modelId}" not found for API "${execution.api}"`);
-    }
-
-    const keysAdapter = createFileKeysAdapter();
-
-    const [existingMessages, agentConfig] = await Promise.all([
-      this.loadExistingMessages(),
+    const [context, agentConfig] = await Promise.all([
+      this.loadActivePathContext(),
       this.loadAgentConfig(),
     ]);
 
-    // Create conversation with streaming enabled
-    const conversation = new Conversation({
-      keysAdapter,
-      streamAssistantMessage: true,
-      initialState: {
-        messages: existingMessages,
-        tools: agentConfig.tools,
+    return this.runStreamingPrompt(
+      {
+        execution,
+        existingMessages: context.messageNodes.map((node) => node.message),
+        agentConfig,
+        promptText: input.message,
+        persistence: {
+          execution,
+          branch: context.activeBranch,
+          initialParentId: context.leafNodeId,
+        },
       },
-    });
-
-    conversation.setProvider({
-      model,
-      providerOptions: execution.providerOptions,
-    } as Provider<Api>);
-    conversation.setSystemPrompt(agentConfig.systemPrompt);
-
-    // Subscribe to conversation events
-    const unsubscribe = conversation.subscribe((event) => options.onEvent(event));
-
-    // Wire abort signal
-    const abortListener = (): void => {
-      conversation.abort();
-    };
-    if (options.signal) {
-      options.signal.addEventListener('abort', abortListener, { once: true });
-    }
-
-    try {
-      // Create persistence callback to save messages incrementally
-      const persistence = this.createPersistenceCallback(execution);
-      const newMessages = await conversation.prompt(input.message, undefined, persistence.callback);
-      return newMessages;
-    } finally {
-      unsubscribe();
-      if (options.signal) {
-        options.signal.removeEventListener('abort', abortListener);
-      }
-    }
+      options
+    );
   }
 
   /** Get the full message history for this session. */
   async getHistory(): Promise<Message[]> {
-    const messageNodes = await this.sessionManager.getMessages(
-      this.projectName,
-      this.sessionId,
-      'main'
-    );
-    return (messageNodes ?? []).map((node: MessageNode) => node.message);
+    const messageNodes = await this.getHistoryNodes();
+    return messageNodes.map((node) => node.message);
   }
 
   /** Get the full message history as MessageNode[] (includes metadata). */
   async getHistoryNodes(): Promise<MessageNode[]> {
-    const messageNodes = await this.sessionManager.getMessages(
-      this.projectName,
-      this.sessionId,
-      'main'
-    );
-    return messageNodes ?? [];
+    const context = await this.loadActivePathContext();
+    return context.messageNodes;
+  }
+
+  async streamRetryFromUserMessage(
+    nodeId: string,
+    input: Omit<PromptInput, 'message'>,
+    options: StreamRunOptions
+  ): Promise<Message[]> {
+    return this.streamRewriteFromUserMessage({
+      nodeId,
+      input,
+      options,
+      branchPrefix: 'retry',
+    });
+  }
+
+  async streamEditFromUserMessage(
+    nodeId: string,
+    input: PromptInput,
+    options: StreamRunOptions
+  ): Promise<Message[]> {
+    return this.streamRewriteFromUserMessage({
+      nodeId,
+      input,
+      options,
+      branchPrefix: 'edit',
+      messageOverride: input.message,
+    });
   }
 
   private async loadAgentConfig(): Promise<{ systemPrompt: string; tools: AgentTool[] }> {
@@ -404,16 +395,9 @@ export class Session {
     };
   }
 
-  private async loadExistingMessages(): Promise<Message[]> {
-    const messageNodes = await this.sessionManager.getMessages(
-      this.projectName,
-      this.sessionId,
-      'main'
-    );
-    return (messageNodes ?? []).map((node: MessageNode) => node.message);
-  }
-
-  private resolveExecutionConfig(input: PromptInput): SessionExecutionConfig {
+  private resolveExecutionConfig(
+    input: Pick<PromptInput, 'api' | 'modelId' | 'reasoningLevel' | 'reasoning'>
+  ): SessionExecutionConfig {
     const api = input.api ?? this.api;
     const modelId = input.modelId ?? this.modelId;
     const reasoningLevel = input.reasoningLevel ?? input.reasoning ?? DEFAULT_REASONING_LEVEL;
@@ -429,19 +413,13 @@ export class Session {
    * Create a persistence callback that saves messages incrementally.
    * Used by streamPrompt() to persist each message as it completes.
    */
-  private createPersistenceCallback(execution: SessionExecutionConfig): {
+  private createPersistenceCallback(config: PersistenceConfig): {
     callback: ConversationExternalCallback;
     nodes: MessageNode[];
   } {
     const nodes: MessageNode[] = [];
-    let parentIdPromise: Promise<string> = this.sessionManager
-      .getLatestNode(this.projectName, this.sessionId, 'main')
-      .then((node) => {
-        if (!node) {
-          throw new Error(`Session "${this.sessionId}" has no nodes — cannot append messages`);
-        }
-        return node.id;
-      });
+    let parentIdPromise = Promise.resolve(config.initialParentId);
+    let didActivateBranch = !config.activateBranchOnFirstPersist;
 
     const callback: ConversationExternalCallback = async (message) => {
       const parentId = await parentIdPromise;
@@ -450,13 +428,19 @@ export class Session {
         path: '',
         sessionId: this.sessionId,
         parentId,
-        branch: 'main',
+        branch: config.branch,
         message,
-        api: execution.api,
-        modelId: execution.modelId,
+        api: config.execution.api,
+        modelId: config.execution.modelId,
+        providerOptions: config.execution.providerOptions,
       });
       nodes.push(result.node);
       parentIdPromise = Promise.resolve(result.node.id);
+
+      if (!didActivateBranch) {
+        didActivateBranch = true;
+        await this.setActiveBranch(config.branch);
+      }
     };
 
     return { callback, nodes };
@@ -466,33 +450,267 @@ export class Session {
    * Save new messages to the session file.
    * Finds the latest node to use as parentId, then appends each message sequentially.
    */
-  private async saveMessages(
-    messages: Message[],
-    execution: Pick<SessionExecutionConfig, 'api' | 'modelId'>
-  ): Promise<void> {
-    let latestNode = await this.sessionManager.getLatestNode(
-      this.projectName,
-      this.sessionId,
-      'main'
-    );
-
-    if (!latestNode) {
-      throw new Error(`Session "${this.sessionId}" has no nodes — cannot append messages`);
-    }
+  private async saveMessages(messages: Message[], config: PersistenceConfig): Promise<void> {
+    let parentId = config.initialParentId;
+    let didActivateBranch = !config.activateBranchOnFirstPersist;
 
     for (const message of messages) {
       const result = await this.sessionManager.appendMessage({
         projectName: this.projectName,
         path: '',
         sessionId: this.sessionId,
-        parentId: latestNode.id,
-        branch: 'main',
+        parentId,
+        branch: config.branch,
         message,
-        api: execution.api,
-        modelId: execution.modelId,
+        api: config.execution.api,
+        modelId: config.execution.modelId,
+        providerOptions: config.execution.providerOptions,
       });
+      parentId = result.node.id;
 
-      latestNode = result.node;
+      if (!didActivateBranch) {
+        didActivateBranch = true;
+        await this.setActiveBranch(config.branch);
+      }
     }
+  }
+
+  private async streamRewriteFromUserMessage(input: {
+    nodeId: string;
+    input: Omit<PromptInput, 'message'>;
+    options: StreamRunOptions;
+    branchPrefix: 'retry' | 'edit';
+    messageOverride?: string;
+  }): Promise<Message[]> {
+    const execution = this.resolveExecutionConfig(input.input);
+    const [context, agentConfig] = await Promise.all([
+      this.loadActivePathContext(),
+      this.loadAgentConfig(),
+    ]);
+
+    const targetNode = context.messageNodes.find((node) => node.id === input.nodeId);
+    if (!targetNode) {
+      throw new Error(`User message "${input.nodeId}" was not found on the active path`);
+    }
+    if (targetNode.message.role !== 'user') {
+      throw new Error('Only user messages can be edited or retried');
+    }
+    if (!targetNode.parentId) {
+      throw new Error('Cannot rewrite the root session node');
+    }
+
+    const payload = this.extractUserPromptPayload(
+      targetNode.message as UserMessage,
+      input.messageOverride
+    );
+    const parentPathNodes = this.getMessagePathNodesToNode(context.tree, targetNode.parentId);
+    const branch = this.createBranchName(input.branchPrefix);
+
+    return this.runStreamingPrompt(
+      {
+        execution,
+        existingMessages: parentPathNodes.map((node) => node.message),
+        agentConfig,
+        promptText: payload.text,
+        attachments: payload.attachments,
+        persistence: {
+          execution,
+          branch,
+          initialParentId: targetNode.parentId,
+          activateBranchOnFirstPersist: true,
+        },
+      },
+      input.options
+    );
+  }
+
+  private runStreamingPrompt(
+    input: {
+      execution: SessionExecutionConfig;
+      existingMessages: Message[];
+      agentConfig: { systemPrompt: string; tools: AgentTool[] };
+      promptText: string;
+      attachments?: Attachment[];
+      persistence: PersistenceConfig;
+    },
+    options: StreamRunOptions
+  ): Promise<Message[]> {
+    const conversation = this.createConversation({
+      execution: input.execution,
+      existingMessages: input.existingMessages,
+      agentConfig: input.agentConfig,
+      streamAssistantMessage: true,
+    });
+
+    const unsubscribe = conversation.subscribe((event) => options.onEvent(event));
+    const abortListener = (): void => {
+      conversation.abort();
+    };
+    if (options.signal) {
+      options.signal.addEventListener('abort', abortListener, { once: true });
+    }
+
+    return conversation
+      .prompt(
+        input.promptText,
+        input.attachments,
+        this.createPersistenceCallback(input.persistence).callback
+      )
+      .finally(() => {
+        unsubscribe();
+        if (options.signal) {
+          options.signal.removeEventListener('abort', abortListener);
+        }
+      });
+  }
+
+  private createConversation(input: {
+    execution: SessionExecutionConfig;
+    existingMessages: Message[];
+    agentConfig: { systemPrompt: string; tools: AgentTool[] };
+    streamAssistantMessage: boolean;
+  }): Conversation {
+    const model = this.resolveModel(input.execution);
+    const keysAdapter = createFileKeysAdapter();
+    const conversation = new Conversation({
+      keysAdapter,
+      streamAssistantMessage: input.streamAssistantMessage,
+      initialState: {
+        messages: input.existingMessages,
+        tools: input.agentConfig.tools,
+      },
+    });
+
+    conversation.setProvider({
+      model,
+      providerOptions: input.execution.providerOptions,
+    } as Provider<Api>);
+    conversation.setSystemPrompt(input.agentConfig.systemPrompt);
+    conversation.setTools(input.agentConfig.tools);
+
+    return conversation;
+  }
+
+  private resolveModel(execution: SessionExecutionConfig) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const model = getModel(execution.api, execution.modelId as any);
+    if (!model) {
+      throw new Error(`Model "${execution.modelId}" not found for API "${execution.api}"`);
+    }
+    return model;
+  }
+
+  private async loadActivePathContext(): Promise<ActivePathContext> {
+    const [metadata, tree] = await Promise.all([this.getMetadata(), this.getSessionTree()]);
+    const activeBranch = tree.nodes.some((node) => node.branch === metadata.activeBranch)
+      ? metadata.activeBranch
+      : DEFAULT_ACTIVE_BRANCH;
+    const branchNodes = tree.nodes.filter((node) => node.branch === activeBranch);
+    const leafNode = branchNodes[branchNodes.length - 1];
+
+    if (!leafNode) {
+      throw new Error(`Session "${this.sessionId}" has no nodes — cannot resolve active path`);
+    }
+
+    return {
+      activeBranch,
+      leafNodeId: leafNode.id,
+      messageNodes: this.getMessagePathNodesToNode(tree, leafNode.id),
+      tree,
+    };
+  }
+
+  private async getSessionTree(): Promise<StoredSession> {
+    const session = await this.sessionManager.getSession(this.projectName, this.sessionId);
+    if (!session) {
+      throw new Error(`Session "${this.sessionId}" not found`);
+    }
+    return session;
+  }
+
+  private getMessagePathNodesToNode(tree: StoredSession, nodeId: string): MessageNode[] {
+    return this.getLineageToNode(tree, nodeId).filter(
+      (node): node is MessageNode => node.type === 'message'
+    );
+  }
+
+  private getLineageToNode(tree: StoredSession, nodeId: string): SessionNode[] {
+    const nodeMap = new Map<string, SessionNode>(tree.nodes.map((node) => [node.id, node]));
+    const lineage: SessionNode[] = [];
+    let current = nodeMap.get(nodeId);
+
+    if (!current) {
+      throw new Error(`Node "${nodeId}" was not found in session "${this.sessionId}"`);
+    }
+
+    while (current) {
+      lineage.push(current);
+      if (current.parentId === null) {
+        break;
+      }
+
+      const parent = nodeMap.get(current.parentId);
+      if (!parent) {
+        throw new Error(`Node "${current.id}" has a missing parent in session "${this.sessionId}"`);
+      }
+      current = parent;
+    }
+
+    return lineage.reverse();
+  }
+
+  private extractUserPromptPayload(
+    message: UserMessage,
+    messageOverride?: string
+  ): { text: string; attachments: Attachment[] } {
+    const textBlocks: string[] = [];
+    const attachments: Attachment[] = [];
+
+    for (const [index, block] of message.content.entries()) {
+      if (block.type === 'text') {
+        textBlocks.push(block.content);
+        continue;
+      }
+
+      if (block.type === 'image') {
+        const size = typeof block.metadata?.size === 'number' ? block.metadata.size : undefined;
+        attachments.push({
+          id: `${message.id}:image:${index}`,
+          type: 'image',
+          fileName: String(block.metadata?.fileName ?? `image-${index}`),
+          mimeType: block.mimeType,
+          content: block.data,
+          ...(size !== undefined ? { size } : {}),
+        });
+        continue;
+      }
+
+      const size = typeof block.metadata?.size === 'number' ? block.metadata.size : undefined;
+      attachments.push({
+        id: `${message.id}:file:${index}`,
+        type: 'file',
+        fileName: block.filename,
+        mimeType: block.mimeType,
+        content: block.data,
+        ...(size !== undefined ? { size } : {}),
+      });
+    }
+
+    return {
+      text: messageOverride ?? textBlocks.join('\n'),
+      attachments,
+    };
+  }
+
+  private createBranchName(prefix: 'retry' | 'edit'): string {
+    return `${prefix}-${Date.now().toString(36)}-${randomUUID().slice(0, 8)}`;
+  }
+
+  private async setActiveBranch(branch: string): Promise<void> {
+    const metadata = await this.getMetadata();
+    await writeMetadata(this.metaDir, {
+      ...metadata,
+      activeBranch: branch,
+    });
   }
 }

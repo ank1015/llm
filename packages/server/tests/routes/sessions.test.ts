@@ -109,6 +109,22 @@ async function createSession(name = 'Test Session') {
   return res.json();
 }
 
+function parseSseEvents(text: string): Array<{ event: string | undefined; data: unknown }> {
+  return text
+    .split('\n\n')
+    .filter((block) => block.trim())
+    .map((block) => {
+      const lines = block.split('\n');
+      const eventLine = lines.find((line) => line.startsWith('event:'));
+      const dataLine = lines.find((line) => line.startsWith('data:'));
+
+      return {
+        event: eventLine?.slice('event:'.length).trim(),
+        data: dataLine ? JSON.parse(dataLine.slice('data:'.length).trim()) : null,
+      };
+    });
+}
+
 describe('Session Routes', () => {
   describe('POST /api/.../sessions', () => {
     it('should create a session and return 201', async () => {
@@ -125,6 +141,7 @@ describe('Session Routes', () => {
       expect(body.api).toBe('anthropic');
       expect(body.modelId).toBe('claude-sonnet-4-5');
       expect(body.createdAt).toBeDefined();
+      expect(body.activeBranch).toBe('main');
     });
 
     it('should return 400 when modelId is missing', async () => {
@@ -175,6 +192,7 @@ describe('Session Routes', () => {
       expect(body.id).toBe(created.id);
       expect(body.name).toBe('Fetch Me');
       expect(body.api).toBe('anthropic');
+      expect(body.activeBranch).toBe('main');
     });
 
     it('should return 404 for nonexistent session', async () => {
@@ -531,6 +549,276 @@ describe('Session Routes', () => {
       expect(history[0].modelId).toBe('claude-sonnet-4-6');
       expect(history[1].api).toBe('claude-code');
       expect(history[1].modelId).toBe('claude-sonnet-4-6');
+    });
+  });
+
+  describe('POST /api/.../sessions/:sessionId/messages/:nodeId/.../stream', () => {
+    it('should retry from a user node and switch the active path to the hidden branch', async () => {
+      const created = await createSession();
+
+      mockPrompt
+        .mockResolvedValueOnce([
+          {
+            role: 'user',
+            id: 'user-1',
+            content: [{ type: 'text', content: 'First prompt' }],
+            timestamp: Date.now(),
+          },
+          {
+            role: 'assistant',
+            id: 'asst-1',
+            api: 'anthropic',
+            model: { id: 'claude-sonnet-4-5', api: 'anthropic' },
+            content: [{ type: 'response', content: [{ type: 'text', content: 'First answer' }] }],
+            usage: {
+              input: 10,
+              output: 5,
+              cacheRead: 0,
+              cacheWrite: 0,
+              totalTokens: 15,
+              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+            },
+            stopReason: 'stop',
+            timestamp: Date.now(),
+            duration: 100,
+            message: {},
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            role: 'user',
+            id: 'user-2',
+            content: [{ type: 'text', content: 'Second prompt' }],
+            timestamp: Date.now(),
+          },
+          {
+            role: 'assistant',
+            id: 'asst-2',
+            api: 'anthropic',
+            model: { id: 'claude-sonnet-4-5', api: 'anthropic' },
+            content: [{ type: 'response', content: [{ type: 'text', content: 'Second answer' }] }],
+            usage: {
+              input: 10,
+              output: 5,
+              cacheRead: 0,
+              cacheWrite: 0,
+              totalTokens: 15,
+              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+            },
+            stopReason: 'stop',
+            timestamp: Date.now(),
+            duration: 100,
+            message: {},
+          },
+        ]);
+
+      await post(`${BASE}/${created.id}/prompt`, { message: 'First prompt' });
+      await post(`${BASE}/${created.id}/prompt`, { message: 'Second prompt' });
+
+      const originalHistoryRes = await get(`${BASE}/${created.id}/messages`);
+      const originalHistory = await originalHistoryRes.json();
+      const firstUserNodeId = originalHistory[0]?.id as string;
+
+      const retriedUserMsg = {
+        role: 'user',
+        id: 'user-1-retry',
+        content: [{ type: 'text', content: 'First prompt' }],
+        timestamp: Date.now(),
+      };
+      const retriedAssistantMsg = {
+        role: 'assistant',
+        id: 'asst-1-retry',
+        api: 'anthropic',
+        model: { id: 'claude-sonnet-4-5', api: 'anthropic' },
+        content: [{ type: 'response', content: [{ type: 'text', content: 'Retried answer' }] }],
+        usage: {
+          input: 10,
+          output: 5,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 15,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        },
+        stopReason: 'stop',
+        timestamp: Date.now(),
+        duration: 100,
+        message: {},
+      };
+      mockPrompt.mockImplementationOnce(
+        async (
+          _prompt: string,
+          _attachments: unknown,
+          callback: (msg: unknown) => Promise<void>
+        ) => {
+          await callback(retriedUserMsg);
+          await callback(retriedAssistantMsg);
+          return [retriedUserMsg, retriedAssistantMsg];
+        }
+      );
+
+      const res = await post(`${BASE}/${created.id}/messages/${firstUserNodeId}/retry/stream`, {});
+
+      expect(res.status).toBe(200);
+      const events = parseSseEvents(await res.text());
+      const doneEvent = events.find((event) => event.event === 'done');
+      expect(doneEvent).toBeDefined();
+
+      const historyRes = await get(`${BASE}/${created.id}/messages`);
+      const history = await historyRes.json();
+      expect(history).toHaveLength(2);
+      expect(history[0]?.message.id).toBe('user-1-retry');
+      expect(history[1]?.message.id).toBe('asst-1-retry');
+
+      const metaRes = await get(`${BASE}/${created.id}`);
+      const metadata = await metaRes.json();
+      expect(metadata.activeBranch).not.toBe('main');
+    });
+
+    it('should edit from a user node and return the rewritten active path', async () => {
+      const created = await createSession();
+
+      mockPrompt.mockResolvedValueOnce([
+        {
+          role: 'user',
+          id: 'user-edit-1',
+          content: [{ type: 'text', content: 'Original prompt' }],
+          timestamp: Date.now(),
+        },
+        {
+          role: 'assistant',
+          id: 'asst-edit-1',
+          api: 'anthropic',
+          model: { id: 'claude-sonnet-4-5', api: 'anthropic' },
+          content: [{ type: 'response', content: [{ type: 'text', content: 'Original answer' }] }],
+          usage: {
+            input: 10,
+            output: 5,
+            cacheRead: 0,
+            cacheWrite: 0,
+            totalTokens: 15,
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+          },
+          stopReason: 'stop',
+          timestamp: Date.now(),
+          duration: 100,
+          message: {},
+        },
+      ]);
+
+      await post(`${BASE}/${created.id}/prompt`, { message: 'Original prompt' });
+      const originalHistoryRes = await get(`${BASE}/${created.id}/messages`);
+      const originalHistory = await originalHistoryRes.json();
+      const userNodeId = originalHistory[0]?.id as string;
+
+      const editedUserMsg = {
+        role: 'user',
+        id: 'user-edit-1-rewrite',
+        content: [{ type: 'text', content: 'Edited prompt' }],
+        timestamp: Date.now(),
+      };
+      const editedAssistantMsg = {
+        role: 'assistant',
+        id: 'asst-edit-1-rewrite',
+        api: 'anthropic',
+        model: { id: 'claude-sonnet-4-5', api: 'anthropic' },
+        content: [{ type: 'response', content: [{ type: 'text', content: 'Edited answer' }] }],
+        usage: {
+          input: 10,
+          output: 5,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 15,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        },
+        stopReason: 'stop',
+        timestamp: Date.now(),
+        duration: 100,
+        message: {},
+      };
+      mockPrompt.mockImplementationOnce(
+        async (
+          _prompt: string,
+          _attachments: unknown,
+          callback: (msg: unknown) => Promise<void>
+        ) => {
+          await callback(editedUserMsg);
+          await callback(editedAssistantMsg);
+          return [editedUserMsg, editedAssistantMsg];
+        }
+      );
+
+      const res = await post(`${BASE}/${created.id}/messages/${userNodeId}/edit/stream`, {
+        message: 'Edited prompt',
+      });
+
+      expect(res.status).toBe(200);
+      const events = parseSseEvents(await res.text());
+      const doneEvent = events.find((event) => event.event === 'done');
+      expect(doneEvent).toBeDefined();
+
+      const historyRes = await get(`${BASE}/${created.id}/messages`);
+      const history = await historyRes.json();
+      expect(history).toHaveLength(2);
+      expect(history[0]?.message.content[0]?.content).toBe('Edited prompt');
+      expect(history[1]?.message.id).toBe('asst-edit-1-rewrite');
+    });
+
+    it('should reject empty edit messages before streaming starts', async () => {
+      const created = await createSession();
+      const res = await post(`${BASE}/${created.id}/messages/missing/edit/stream`, {
+        message: '',
+      });
+
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toBe('message is required');
+    });
+
+    it('should emit an SSE error when retry target is not a user node', async () => {
+      const created = await createSession();
+
+      mockPrompt.mockResolvedValueOnce([
+        {
+          role: 'user',
+          id: 'user-invalid-target',
+          content: [{ type: 'text', content: 'Hello' }],
+          timestamp: Date.now(),
+        },
+        {
+          role: 'assistant',
+          id: 'asst-invalid-target',
+          api: 'anthropic',
+          model: { id: 'claude-sonnet-4-5', api: 'anthropic' },
+          content: [{ type: 'response', content: [{ type: 'text', content: 'Hi' }] }],
+          usage: {
+            input: 10,
+            output: 5,
+            cacheRead: 0,
+            cacheWrite: 0,
+            totalTokens: 15,
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+          },
+          stopReason: 'stop',
+          timestamp: Date.now(),
+          duration: 100,
+          message: {},
+        },
+      ]);
+
+      await post(`${BASE}/${created.id}/prompt`, { message: 'Hello' });
+      const historyRes = await get(`${BASE}/${created.id}/messages`);
+      const history = await historyRes.json();
+      const assistantNodeId = history[1]?.id as string;
+
+      const res = await post(`${BASE}/${created.id}/messages/${assistantNodeId}/retry/stream`, {});
+
+      expect(res.status).toBe(200);
+      const events = parseSseEvents(await res.text());
+      const errorEvent = events.find((event) => event.event === 'error');
+      expect(errorEvent).toBeDefined();
+      expect((errorEvent?.data as { message: string }).message).toBe(
+        'Only user messages can be edited or retried'
+      );
     });
   });
 

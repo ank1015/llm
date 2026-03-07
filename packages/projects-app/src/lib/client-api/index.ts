@@ -1,5 +1,10 @@
-export { getSessionMessages, streamConversation } from './conversation';
-export type { StreamRequest } from './conversation';
+export {
+  getSessionMessages,
+  streamConversation,
+  streamEditConversation,
+  streamRetryConversation,
+} from './conversation';
+export type { StreamEditRequest, StreamRequest, StreamRetryRequest } from './conversation';
 export {
   createArtifactDir,
   createProject,

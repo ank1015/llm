@@ -5,13 +5,7 @@ import { Fragment, memo, useMemo } from 'react';
 import { AssistantMessages } from './assistant-messages';
 import { UserMessageComponent } from './user-message';
 
-import type {
-  Api,
-  BaseAssistantMessage,
-  Message,
-  MessageNode,
-  UserMessage,
-} from '@ank1015/llm-sdk';
+import type { Api, BaseAssistantMessage, Message, MessageNode } from '@ank1015/llm-sdk';
 
 import { useChatStore } from '@/stores/chat-store';
 
@@ -103,7 +97,7 @@ const MessageTurnRow = memo(function MessageTurnRow({
 }) {
   return (
     <Fragment>
-      {turn.userNode && <UserMessageComponent userMessage={turn.userNode.message as UserMessage} />}
+      {turn.userNode && <UserMessageComponent userNode={turn.userNode} />}
       <AssistantMessages
         cotMessages={turn.cotMessages}
         assistantNode={turn.assistantNode}

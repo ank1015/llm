@@ -32,6 +32,7 @@ export type SessionMetadata = {
   api: string;
   modelId: string;
   createdAt: string;
+  activeBranch: string;
 };
 
 export type StreamReadyEventData = {
