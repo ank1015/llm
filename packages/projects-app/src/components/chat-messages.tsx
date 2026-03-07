@@ -93,10 +93,12 @@ function groupIntoTurns(nodes: MessageNode[]): MessageTurn[] {
 const MessageTurnRow = memo(function MessageTurnRow({
   turn,
   sessionKey,
+  isStreamingTurn,
   streamingAssistant,
 }: {
   turn: MessageTurn;
   sessionKey: string | null;
+  isStreamingTurn: boolean;
   streamingAssistant: Omit<BaseAssistantMessage<Api>, 'message'> | null;
 }) {
   return (
@@ -105,7 +107,8 @@ const MessageTurnRow = memo(function MessageTurnRow({
       <AssistantMessages
         cotMessages={turn.cotMessages}
         assistantNode={turn.assistantNode}
-        streamingAssistant={streamingAssistant}
+        isStreamingTurn={isStreamingTurn}
+        streamingAssistant={isStreamingTurn ? streamingAssistant : null}
         api={(turn.assistantNode?.api as Api | undefined) ?? 'openai'}
         userTimestamp={
           typeof turn.userNode?.message.timestamp === 'number'
@@ -138,6 +141,10 @@ export function ChatMessages() {
     if (!activeSessionKey) return EMPTY_STREAMING_ASSISTANT;
     return state.streamingAssistantBySession[activeSessionKey] ?? EMPTY_STREAMING_ASSISTANT;
   });
+  const isSessionStreaming = useChatStore((state) => {
+    if (!activeSessionKey) return false;
+    return state.isStreamingBySession[activeSessionKey] ?? false;
+  });
 
   const turns = useMemo(() => groupIntoTurns(messages), [messages]);
 
@@ -152,6 +159,7 @@ export function ChatMessages() {
           key={turn.userNode?.id ?? `turn-${idx}`}
           turn={turn}
           sessionKey={activeSessionKey}
+          isStreamingTurn={isSessionStreaming && idx === turns.length - 1}
           streamingAssistant={streamingAssistant}
         />
       ))}

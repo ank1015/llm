@@ -6,12 +6,11 @@ import { useCallback, useMemo, useState } from 'react';
 import { ActivityDrawerContent } from './activity-drawer';
 import { ChatMarkdown } from './markdown-renderer';
 
-import type { SessionRef } from '@/lib/contracts';
 import type { Api, BaseAssistantMessage, Message, MessageNode } from '@ank1015/llm-sdk';
 
 import { ThinkingBar } from '@/components/ai/thinking-bar';
 import { getTextFromBaseAssistantMessage } from '@/lib/messages/utils';
-import { useChatStore, useUiStore } from '@/stores';
+import { useUiStore } from '@/stores';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                             */
@@ -26,7 +25,7 @@ type AssistantMessagesProps = {
   /** The final assistant node for this turn (if completed) */
   assistantNode: MessageNode | null;
   /** Whether this is the currently streaming turn */
-  // isStreaming: boolean;
+  isStreamingTurn: boolean;
   /** The streaming assistant message (partial, not yet a node) */
   streamingAssistant: AssistantStreamingMessage | null;
   /** The API provider used for this turn */
@@ -38,60 +37,6 @@ type AssistantMessagesProps = {
   /** Timestamp (ms epoch) of the user message that started this turn */
   userTimestamp: number | null;
 };
-
-/* ------------------------------------------------------------------ */
-/*  Helpers                                                           */
-/* ------------------------------------------------------------------ */
-
-type ReasoningStep = {
-  id: string;
-  title: string;
-  body: string;
-};
-
-// eslint-disable-next-line sonarjs/cognitive-complexity
-function getReasoningSteps(messages: CotRenderableMessage[]): ReasoningStep[] {
-  const steps: ReasoningStep[] = [];
-
-  for (const message of messages) {
-    if (message.role === 'assistant') {
-      for (const content of message.content) {
-        if (content.type === 'thinking') {
-          steps.push({
-            id: `${message.id}-thinking-${steps.length}`,
-            title: 'Thinking',
-            body: content.thinkingText,
-          });
-          continue;
-        }
-        if (content.type === 'toolCall') {
-          steps.push({
-            id: `${message.id}-toolcall-${steps.length}`,
-            title: `Calling ${content.name}`,
-            body: JSON.stringify(content.arguments, null, 2),
-          });
-        }
-      }
-      continue;
-    }
-
-    if (message.role === 'toolResult') {
-      const text = message.content
-        .filter((c) => c.type === 'text')
-        .map((c) => c.content)
-        .join('\n')
-        .trim();
-
-      steps.push({
-        id: `${message.id}-toolresult`,
-        title: `Result: ${message.toolName}`,
-        body: text.length > 0 ? text : '(no textual output)',
-      });
-    }
-  }
-
-  return steps;
-}
 
 function getDurationInSeconds(
   userTimestamp: number | null,
@@ -110,7 +55,7 @@ function getDurationInSeconds(
 export function AssistantMessages({
   cotMessages,
   assistantNode,
-  // isStreaming,
+  isStreamingTurn,
   streamingAssistant,
   api,
   sessionKey,
@@ -121,35 +66,26 @@ export function AssistantMessages({
   const dismissDrawer = useUiStore((state) => state.dismissSideDrawer);
   const isDrawerOpen = useUiStore((state) => state.sideDrawer.open);
 
-  function getSessionKey(session: SessionRef): string {
-    return session.sessionId;
-  }
-  const activeSession = useChatStore((state) => state.activeSession);
-  const isStreaming = useChatStore((state) => {
-    if (!activeSession) return false;
-    const key = getSessionKey(activeSession);
-    return state.isStreamingBySession[key] ?? false;
-  });
-
   const effectiveMessages = useMemo(() => {
-    if (!isStreaming || !streamingAssistant) return cotMessages;
+    if (!isStreamingTurn || !streamingAssistant) return cotMessages;
     return [...cotMessages, streamingAssistant];
-  }, [cotMessages, isStreaming, streamingAssistant]);
+  }, [cotMessages, isStreamingTurn, streamingAssistant]);
 
-  const steps = useMemo(() => getReasoningSteps(effectiveMessages), [effectiveMessages]);
   const duration = useMemo(
     () => getDurationInSeconds(userTimestamp, assistantNode),
     [userTimestamp, assistantNode]
   );
-  const hasReasoning = steps.length > 0;
 
-  const showThinkingBar = isStreaming || hasReasoning;
-
-  const label = isStreaming
+  const label = isStreamingTurn
     ? 'Reasoning'
     : duration !== undefined
       ? `Reasoned for ${duration.toFixed(1)}s`
       : 'Reasoned';
+  const showThinkingBar =
+    isStreamingTurn ||
+    assistantNode !== null ||
+    streamingAssistant !== null ||
+    cotMessages.length > 0;
 
   const toggleActivityDrawer = () => {
     if (isDrawerOpen) {
@@ -161,11 +97,12 @@ export function AssistantMessages({
       title: 'Activity',
       renderContent: () => (
         <ActivityDrawerContent
-          live={isStreaming}
+          live={isStreamingTurn}
           sessionKey={sessionKey}
           turnUserMessageId={turnUserMessageId}
           fallbackMessages={effectiveMessages}
           api={api}
+          statusLabel={label}
         />
       ),
     });
@@ -176,7 +113,9 @@ export function AssistantMessages({
     : null;
 
   const streamingText =
-    isStreaming && streamingAssistant ? getTextFromBaseAssistantMessage(streamingAssistant) : null;
+    isStreamingTurn && streamingAssistant
+      ? getTextFromBaseAssistantMessage(streamingAssistant)
+      : null;
 
   const displayText = assistantText ?? streamingText;
 
@@ -202,20 +141,20 @@ export function AssistantMessages({
             text={label}
             className="cursor-pointer"
             onClick={toggleActivityDrawer}
-            stop={!isStreaming}
+            stop={!isStreamingTurn}
           />
         </div>
       )}
 
       {/* Final assistant response */}
       {displayText && (
-        <div className="max-w-[96%] ml-[2%]" data-streaming={isStreaming ? 'true' : 'false'}>
+        <div className="max-w-[96%] ml-[2%]" data-streaming={isStreamingTurn ? 'true' : 'false'}>
           <ChatMarkdown className="text-foreground">{displayText}</ChatMarkdown>
         </div>
       )}
 
       {/* Action buttons — space always reserved, visible on hover */}
-      {!isStreaming && (
+      {!isStreamingTurn && (
         <div className="flex ml-[2%] mt-1 h-6 items-center gap-1 opacity-0 transition-opacity group-hover/assistant:opacity-100">
           <button
             type="button"

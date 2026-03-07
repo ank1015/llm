@@ -444,12 +444,14 @@ export function ActivityDrawerContent({
   turnUserMessageId,
   fallbackMessages,
   api,
+  statusLabel,
 }: {
   live: boolean;
   sessionKey?: string | null;
   turnUserMessageId: string | null;
   fallbackMessages: CotRenderableMessage[];
   api?: Api | null;
+  statusLabel?: string;
 }) {
   const nodes = useChatStore((state) => {
     if (!live || !sessionKey) return EMPTY_NODES;
@@ -494,7 +496,18 @@ export function ActivityDrawerContent({
   const isComplete = !live || !isSessionStreaming;
 
   if (sections.length === 0) {
-    return <div className="text-muted-foreground text-sm">No activity yet.</div>;
+    return (
+      <div className="flex flex-col gap-2 py-2">
+        <div className="flex gap-3">
+          <div className="flex size-5 shrink-0 items-center justify-center">
+            <div className="bg-foreground size-[7px] rounded-full" />
+          </div>
+          <p className="text-foreground text-[13px] font-medium">
+            {statusLabel ?? (isComplete ? 'Reasoned' : 'Reasoning')}
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -508,7 +521,9 @@ export function ActivityDrawerContent({
             <div className="flex size-5 shrink-0 items-center justify-center">
               <div className="bg-foreground size-[7px] rounded-full" />
             </div>
-            <p className="text-foreground text-[13px] font-medium">Reasoning complete</p>
+            <p className="text-foreground text-[13px] font-medium">
+              {statusLabel ?? 'Reasoning complete'}
+            </p>
           </div>
         </div>
       )}
