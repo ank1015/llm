@@ -5,12 +5,15 @@ import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import { setConfig } from '../../src/core/config.js';
-import { app } from '../../src/index.js';
+import { mockSetupSkills, resetAgentMocks } from '../helpers/mock-agents.js';
+
+const { app } = await import('../../src/index.js');
 
 let projectsRoot: string;
 let dataRoot: string;
 
 beforeEach(async () => {
+  resetAgentMocks();
   projectsRoot = await mkdtemp(join(tmpdir(), 'test-projects-'));
   dataRoot = await mkdtemp(join(tmpdir(), 'test-data-'));
   setConfig({ projectsRoot, dataRoot });
@@ -66,6 +69,16 @@ describe('Project Routes', () => {
       expect(res.status).toBe(409);
       const body = await res.json();
       expect(body.error).toContain('already exists');
+    });
+
+    it('should return 500 when skills setup fails', async () => {
+      mockSetupSkills.mockRejectedValueOnce(new Error('skills setup failed'));
+
+      const res = await post('/api/projects', { name: 'Broken Project' });
+
+      expect(res.status).toBe(500);
+      const body = await res.json();
+      expect(body.error).toContain('skills setup failed');
     });
   });
 

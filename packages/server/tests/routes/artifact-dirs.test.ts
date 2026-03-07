@@ -5,7 +5,9 @@ import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import { setConfig } from '../../src/core/config.js';
-import { app } from '../../src/index.js';
+import { resetAgentMocks } from '../helpers/mock-agents.js';
+
+const { app } = await import('../../src/index.js');
 
 let projectsRoot: string;
 let dataRoot: string;
@@ -14,6 +16,7 @@ const PROJECT = 'test-project';
 const BASE = `/api/projects/${PROJECT}/artifacts`;
 
 beforeEach(async () => {
+  resetAgentMocks();
   projectsRoot = await mkdtemp(join(tmpdir(), 'test-projects-'));
   dataRoot = await mkdtemp(join(tmpdir(), 'test-data-'));
   setConfig({ projectsRoot, dataRoot });

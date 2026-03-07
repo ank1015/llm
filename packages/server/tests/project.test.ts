@@ -5,15 +5,19 @@ import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import { setConfig } from '../src/core/config.js';
-import { Project } from '../src/core/project/project.js';
 import { pathExists, readMetadata } from '../src/core/storage/fs.js';
 
+import { mockSetupSkills, resetAgentMocks } from './helpers/mock-agents.js';
+
 import type { ProjectMetadata } from '../src/core/types.js';
+
+const { Project } = await import('../src/core/project/project.js');
 
 let projectsRoot: string;
 let dataRoot: string;
 
 beforeEach(async () => {
+  resetAgentMocks();
   projectsRoot = await mkdtemp(join(tmpdir(), 'test-projects-'));
   dataRoot = await mkdtemp(join(tmpdir(), 'test-data-'));
   setConfig({ projectsRoot, dataRoot });
@@ -31,6 +35,7 @@ describe('Project', () => {
 
       expect(await pathExists(project.projectPath)).toBe(true);
       expect(await pathExists(project.dataPath)).toBe(true);
+      expect(mockSetupSkills).toHaveBeenCalledWith(project.projectPath);
     });
 
     it('should write metadata.json in data directory', async () => {
@@ -62,6 +67,17 @@ describe('Project', () => {
       await Project.create({ name: 'Duplicate' });
 
       await expect(Project.create({ name: 'Duplicate' })).rejects.toThrow('already exists');
+    });
+
+    it('should roll back directories when skills setup fails', async () => {
+      mockSetupSkills.mockRejectedValueOnce(new Error('skills setup failed'));
+
+      await expect(Project.create({ name: 'Broken Project' })).rejects.toThrow(
+        'skills setup failed'
+      );
+
+      expect(await pathExists(join(projectsRoot, 'broken-project'))).toBe(false);
+      expect(await pathExists(join(dataRoot, 'broken-project'))).toBe(false);
     });
   });
 

@@ -1,11 +1,12 @@
 import { join } from 'node:path';
 
+import { createAllTools, createSystemPrompt } from '@ank1015/llm-agents';
 import { complete, Conversation, createSessionManager, getModel } from '@ank1015/llm-sdk';
 import { createFileSessionsAdapter, createFileKeysAdapter } from '@ank1015/llm-sdk-adapters';
 
-import { createBaseSystemPrompt, baseTools } from '../artifact-type/base.js';
-import { resolveSkills } from '../artifact-type/utils.js';
+import { ArtifactDir } from '../artifact-dir/artifact-dir.js';
 import { getConfig } from '../config.js';
+import { Project } from '../project/project.js';
 import { ensureDir, readMetadata, writeMetadata, pathExists, removeDir } from '../storage/fs.js';
 
 import type { CreateSessionOptions, PromptInput, SessionMetadata } from '../types.js';
@@ -246,23 +247,10 @@ export class Session {
 
     const keysAdapter = createFileKeysAdapter();
 
-    // Load existing messages
-    const messageNodes = await this.sessionManager.getMessages(
-      this.projectName,
-      this.sessionId,
-      'main'
-    );
-    const existingMessages: Message[] = (messageNodes ?? []).map(
-      (node: MessageNode) => node.message
-    );
-
-    const { projectsRoot } = getConfig();
-    const artifactDirPath = join(projectsRoot, this.projectId, this.artifactDirId);
-    const projectDirPath = join(projectsRoot, this.projectId);
-    const tools = baseTools(artifactDirPath);
-    const skills = resolveSkills(input.skills ?? []);
-
-    const systemPrompt = createBaseSystemPrompt(artifactDirPath, projectDirPath, skills);
+    const [existingMessages, agentConfig] = await Promise.all([
+      this.loadExistingMessages(),
+      this.loadAgentConfig(),
+    ]);
 
     // Create conversation and configure
     const conversation = new Conversation({
@@ -277,8 +265,8 @@ export class Session {
         },
       },
     } as Provider<Api>);
-    conversation.setSystemPrompt(systemPrompt);
-    conversation.setTools(Object.values(tools));
+    conversation.setSystemPrompt(agentConfig.systemPrompt);
+    conversation.setTools(agentConfig.tools);
 
     if (existingMessages.length > 0) {
       conversation.replaceMessages(existingMessages);
@@ -316,23 +304,10 @@ export class Session {
 
     const keysAdapter = createFileKeysAdapter();
 
-    // Load existing messages
-    const messageNodes = await this.sessionManager.getMessages(
-      this.projectName,
-      this.sessionId,
-      'main'
-    );
-    const existingMessages: Message[] = (messageNodes ?? []).map(
-      (node: MessageNode) => node.message
-    );
-
-    const { projectsRoot } = getConfig();
-    const artifactDirPath = join(projectsRoot, this.projectId, this.artifactDirId);
-    const projectDirPath = join(projectsRoot, this.projectId);
-    const tools = baseTools(artifactDirPath);
-    const skills = resolveSkills(input.skills ?? []);
-
-    const systemPrompt = createBaseSystemPrompt(artifactDirPath, projectDirPath, skills);
+    const [existingMessages, agentConfig] = await Promise.all([
+      this.loadExistingMessages(),
+      this.loadAgentConfig(),
+    ]);
 
     // Create conversation with streaming enabled
     const conversation = new Conversation({
@@ -340,7 +315,7 @@ export class Session {
       streamAssistantMessage: true,
       initialState: {
         messages: existingMessages,
-        tools: Object.values(tools) as unknown as AgentTool[],
+        tools: agentConfig.tools,
       },
     });
 
@@ -352,7 +327,7 @@ export class Session {
         },
       },
     } as Provider<Api>);
-    conversation.setSystemPrompt(systemPrompt);
+    conversation.setSystemPrompt(agentConfig.systemPrompt);
 
     // Subscribe to conversation events
     const unsubscribe = conversation.subscribe((event) => options.onEvent(event));
@@ -396,6 +371,36 @@ export class Session {
       'main'
     );
     return messageNodes ?? [];
+  }
+
+  private async loadAgentConfig(): Promise<{ systemPrompt: string; tools: AgentTool[] }> {
+    const [project, artifactDir] = await Promise.all([
+      Project.getById(this.projectId),
+      ArtifactDir.getById(this.projectId, this.artifactDirId),
+    ]);
+    const [projectMetadata, artifactMetadata] = await Promise.all([
+      project.getMetadata(),
+      artifactDir.getMetadata(),
+    ]);
+
+    return {
+      systemPrompt: await createSystemPrompt({
+        projectName: projectMetadata.name,
+        projectDir: project.projectPath,
+        artifactName: artifactMetadata.name,
+        artifactDir: artifactDir.dirPath,
+      }),
+      tools: Object.values(createAllTools(artifactDir.dirPath)) as AgentTool[],
+    };
+  }
+
+  private async loadExistingMessages(): Promise<Message[]> {
+    const messageNodes = await this.sessionManager.getMessages(
+      this.projectName,
+      this.sessionId,
+      'main'
+    );
+    return (messageNodes ?? []).map((node: MessageNode) => node.message);
   }
 
   /**

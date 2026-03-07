@@ -1,5 +1,7 @@
 import { join } from 'node:path';
 
+import { setupSkills } from '@ank1015/llm-agents';
+
 import { getConfig } from '../config.js';
 import {
   ensureDir,
@@ -47,17 +49,24 @@ export class Project {
     await ensureDir(projectPath);
     await ensureDir(dataPath);
 
-    const metadata: ProjectMetadata = {
-      id,
-      name: input.name,
-      description: input.description ?? null,
-      projectPath,
-      createdAt: new Date().toISOString(),
-    };
+    try {
+      await setupSkills(projectPath);
 
-    await writeMetadata(dataPath, metadata);
+      const metadata: ProjectMetadata = {
+        id,
+        name: input.name,
+        description: input.description ?? null,
+        projectPath,
+        createdAt: new Date().toISOString(),
+      };
 
-    return new Project(projectPath, dataPath);
+      await writeMetadata(dataPath, metadata);
+
+      return new Project(projectPath, dataPath);
+    } catch (error) {
+      await Promise.allSettled([removeDir(projectPath), removeDir(dataPath)]);
+      throw error;
+    }
   }
 
   /** List all projects by scanning the data root for valid project directories. */

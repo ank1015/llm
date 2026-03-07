@@ -4,11 +4,14 @@ import { join } from 'node:path';
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
-import { ArtifactDir } from '../src/core/artifact-dir/artifact-dir.js';
 import { setConfig } from '../src/core/config.js';
-import { Project } from '../src/core/project/project.js';
-import { Session } from '../src/core/session/session.js';
 import { pathExists } from '../src/core/storage/fs.js';
+
+import {
+  mockCreateAllTools,
+  mockCreateSystemPrompt,
+  resetAgentMocks,
+} from './helpers/mock-agents.js';
 
 import type { SessionMetadata } from '../src/core/types.js';
 
@@ -40,6 +43,10 @@ vi.mock('@ank1015/llm-sdk', async (importOriginal) => {
   };
 });
 
+const { ArtifactDir } = await import('../src/core/artifact-dir/artifact-dir.js');
+const { Project } = await import('../src/core/project/project.js');
+const { Session } = await import('../src/core/session/session.js');
+
 let projectsRoot: string;
 let dataRoot: string;
 
@@ -47,6 +54,7 @@ const PROJECT_NAME = 'test-project';
 const ARTIFACT_DIR_NAME = 'research';
 
 beforeEach(async () => {
+  resetAgentMocks();
   projectsRoot = await mkdtemp(join(tmpdir(), 'test-projects-'));
   dataRoot = await mkdtemp(join(tmpdir(), 'test-data-'));
   setConfig({ projectsRoot, dataRoot });
@@ -248,6 +256,30 @@ describe('Session', () => {
       expect(history).toHaveLength(2);
       expect(history[0]?.role).toBe('user');
       expect(history[1]?.role).toBe('assistant');
+    });
+
+    it('should use the shared agents package prompt and tools', async () => {
+      mockPrompt.mockResolvedValue([]);
+
+      await Project.create({ name: 'My Project' });
+      await ArtifactDir.create('my-project', { name: 'Research Docs' });
+      const session = await Session.create('my-project', 'research-docs', {
+        name: 'Shared Agent Test',
+        api: 'anthropic',
+        modelId: 'claude-sonnet-4-20250514',
+      });
+
+      await session.prompt({ message: 'Inspect the artifact' });
+
+      expect(mockCreateAllTools).toHaveBeenCalledWith(
+        join(projectsRoot, 'my-project', 'research-docs')
+      );
+      expect(mockCreateSystemPrompt).toHaveBeenCalledWith({
+        projectName: 'My Project',
+        projectDir: join(projectsRoot, 'my-project'),
+        artifactName: 'Research Docs',
+        artifactDir: join(projectsRoot, 'my-project', 'research-docs'),
+      });
     });
   });
 

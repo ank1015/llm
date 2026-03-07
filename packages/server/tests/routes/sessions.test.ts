@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 import { setConfig } from '../../src/core/config.js';
+import { resetAgentMocks } from '../helpers/mock-agents.js';
 
 const mockPrompt = vi.fn();
 const mockSubscribe = vi.fn().mockReturnValue(vi.fn()); // returns unsubscribe
@@ -51,6 +52,7 @@ const ARTIFACT = 'research';
 const BASE = `/api/projects/${PROJECT}/artifacts/${ARTIFACT}/sessions`;
 
 beforeEach(async () => {
+  resetAgentMocks();
   projectsRoot = await mkdtemp(join(tmpdir(), 'test-projects-'));
   dataRoot = await mkdtemp(join(tmpdir(), 'test-data-'));
   setConfig({ projectsRoot, dataRoot });

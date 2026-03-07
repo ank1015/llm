@@ -4,17 +4,21 @@ import { join } from 'node:path';
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
-import { ArtifactDir } from '../src/core/artifact-dir/artifact-dir.js';
 import { setConfig } from '../src/core/config.js';
-import { Project } from '../src/core/project/project.js';
 import { pathExists, readMetadata } from '../src/core/storage/fs.js';
 
+import { resetAgentMocks } from './helpers/mock-agents.js';
+
 import type { ArtifactDirMetadata } from '../src/core/types.js';
+
+const { ArtifactDir } = await import('../src/core/artifact-dir/artifact-dir.js');
+const { Project } = await import('../src/core/project/project.js');
 
 let projectsRoot: string;
 let dataRoot: string;
 
 beforeEach(async () => {
+  resetAgentMocks();
   projectsRoot = await mkdtemp(join(tmpdir(), 'test-projects-'));
   dataRoot = await mkdtemp(join(tmpdir(), 'test-data-'));
   setConfig({ projectsRoot, dataRoot });

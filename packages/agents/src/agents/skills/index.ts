@@ -82,6 +82,8 @@ export async function setupSkills(projectDir: string): Promise<SetupSkillsResult
   };
 }
 
+export const setUpSkills = setupSkills;
+
 async function writeProjectFiles(
   rootDir: string,
   scriptsDir: string,

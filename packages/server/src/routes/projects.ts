@@ -22,7 +22,7 @@ projectRoutes.post('/projects', async (c) => {
     return c.json(metadata, 201);
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Failed to create project';
-    return c.json({ error: message }, 409);
+    return c.json({ error: message }, message.includes('already exists') ? 409 : 500);
   }
 });
 
