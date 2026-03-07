@@ -3,15 +3,14 @@
 import { Check, Copy } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 
-import { ActivityDrawerContent } from './activity-drawer';
 import { ContextUsageIndicator } from './context-usage-indicator';
 import { ChatMarkdown } from './markdown-renderer';
+import { WorkingTrace } from './working-trace';
 
-import type { Api, BaseAssistantMessage, Message, MessageNode } from '@ank1015/llm-sdk';
+import type { AgentEvent, Api, BaseAssistantMessage, Message, MessageNode } from '@ank1015/llm-sdk';
 
-import { ThinkingBar } from '@/components/ai/thinking-bar';
-import { getTextFromBaseAssistantMessage } from '@/lib/messages/utils';
-import { useUiStore } from '@/stores';
+import { buildWorkingTraceModel } from '@/lib/messages/working-trace';
+import { useChatStore } from '@/stores/chat-store';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                             */
@@ -19,6 +18,7 @@ import { useUiStore } from '@/stores';
 
 type AssistantStreamingMessage = Omit<BaseAssistantMessage<Api>, 'message'>;
 type CotRenderableMessage = Message | AssistantStreamingMessage;
+const EMPTY_AGENT_EVENTS: AgentEvent[] = [];
 
 type AssistantMessagesProps = {
   /** All message nodes between this turn's user message and the next user message */
@@ -33,20 +33,10 @@ type AssistantMessagesProps = {
   api: Api | null;
   /** Session key for live reasoning drawer updates */
   sessionKey: string | null;
-  /** The user message id that started this turn */
-  turnUserMessageId: string | null;
   /** Timestamp (ms epoch) of the user message that started this turn */
   userTimestamp: number | null;
   /** Whether this is the latest visible assistant turn */
   showPersistentContextUsage: boolean;
-};
-
-type AssistantMessageActionsProps = {
-  copied: boolean;
-  displayText: string | null;
-  isStreamingTurn: boolean;
-  contextUsageTotalTokens: number | null;
-  onCopy: () => void;
 };
 
 function getDurationInSeconds(
@@ -61,9 +51,7 @@ function getDurationInSeconds(
 
 function getContextUsageTotalTokens(input: {
   assistantNode: MessageNode | null;
-  isStreamingTurn: boolean;
   showPersistentContextUsage: boolean;
-  streamingAssistant: AssistantStreamingMessage | null;
 }): number | null {
   if (!input.showPersistentContextUsage) {
     return null;
@@ -76,14 +64,6 @@ function getContextUsageTotalTokens(input: {
     return input.assistantNode.message.usage.totalTokens;
   }
 
-  if (
-    input.isStreamingTurn &&
-    input.streamingAssistant &&
-    input.streamingAssistant.usage.totalTokens > 0
-  ) {
-    return input.streamingAssistant.usage.totalTokens;
-  }
-
   return null;
 }
 
@@ -93,10 +73,20 @@ function AssistantMessageActions({
   isStreamingTurn,
   contextUsageTotalTokens,
   onCopy,
-}: AssistantMessageActionsProps) {
+}: {
+  copied: boolean;
+  displayText: string | null;
+  isStreamingTurn: boolean;
+  contextUsageTotalTokens: number | null;
+  onCopy: () => void;
+}) {
+  if (isStreamingTurn) {
+    return null;
+  }
+
   const showContextUsage = contextUsageTotalTokens !== null;
 
-  if (!showContextUsage && (isStreamingTurn || !displayText)) {
+  if (!showContextUsage && !displayText) {
     return null;
   }
 
@@ -147,18 +137,16 @@ export function AssistantMessages({
   streamingAssistant,
   api,
   sessionKey,
-  turnUserMessageId,
   userTimestamp,
   showPersistentContextUsage,
 }: AssistantMessagesProps) {
-  const openDrawer = useUiStore((state) => state.openSideDrawer);
-  const dismissDrawer = useUiStore((state) => state.dismissSideDrawer);
-  const isDrawerOpen = useUiStore((state) => state.sideDrawer.open);
+  const liveAgentEvents = useChatStore((state) => {
+    if (!sessionKey || !isStreamingTurn) {
+      return EMPTY_AGENT_EVENTS;
+    }
 
-  const effectiveMessages = useMemo(() => {
-    if (!isStreamingTurn || !streamingAssistant) return cotMessages;
-    return [...cotMessages, streamingAssistant];
-  }, [cotMessages, isStreamingTurn, streamingAssistant]);
+    return state.agentEventsBySession[sessionKey] ?? EMPTY_AGENT_EVENTS;
+  });
 
   const duration = useMemo(
     () => getDurationInSeconds(userTimestamp, assistantNode),
@@ -166,56 +154,32 @@ export function AssistantMessages({
   );
 
   const label = isStreamingTurn
-    ? 'Reasoning'
+    ? 'Working'
     : duration !== undefined
-      ? `Reasoned for ${duration.toFixed(1)}s`
-      : 'Reasoned';
-  const showThinkingBar =
-    isStreamingTurn ||
-    assistantNode !== null ||
-    streamingAssistant !== null ||
-    cotMessages.length > 0;
+      ? `Worked for ${duration.toFixed(1)}s`
+      : 'Worked';
 
-  const toggleActivityDrawer = () => {
-    if (isDrawerOpen) {
-      dismissDrawer();
-      return;
-    }
+  const traceModel = useMemo(
+    () =>
+      buildWorkingTraceModel({
+        cotMessages,
+        assistantNode,
+        isStreamingTurn,
+        streamingAssistant,
+        agentEvents: liveAgentEvents,
+        api,
+      }),
+    [api, assistantNode, cotMessages, isStreamingTurn, liveAgentEvents, streamingAssistant]
+  );
 
-    openDrawer({
-      title: 'Activity',
-      renderContent: () => (
-        <ActivityDrawerContent
-          live={isStreamingTurn}
-          sessionKey={sessionKey}
-          turnUserMessageId={turnUserMessageId}
-          fallbackMessages={effectiveMessages}
-          api={api}
-          statusLabel={label}
-        />
-      ),
-    });
-  };
-
-  const assistantText = assistantNode
-    ? getTextFromBaseAssistantMessage(assistantNode.message as BaseAssistantMessage<Api>)
-    : null;
-
-  const streamingText =
-    isStreamingTurn && streamingAssistant
-      ? getTextFromBaseAssistantMessage(streamingAssistant)
-      : null;
-
-  const displayText = assistantText ?? streamingText;
+  const displayText = traceModel.finalResponseText;
   const contextUsageTotalTokens = useMemo(
     () =>
       getContextUsageTotalTokens({
         assistantNode,
-        isStreamingTurn,
         showPersistentContextUsage,
-        streamingAssistant,
       }),
-    [assistantNode, isStreamingTurn, showPersistentContextUsage, streamingAssistant]
+    [assistantNode, showPersistentContextUsage]
   );
 
   const [copied, setCopied] = useState(false);
@@ -232,18 +196,8 @@ export function AssistantMessages({
   }, [displayText]);
 
   return (
-    <div className="group/assistant flex w-full flex-col gap-2">
-      {/* Reasoning / thinking bar */}
-      {showThinkingBar && (
-        <div className="ml-[2%]">
-          <ThinkingBar
-            text={label}
-            className="cursor-pointer"
-            onClick={toggleActivityDrawer}
-            stop={!isStreamingTurn}
-          />
-        </div>
-      )}
+    <div className="group/assistant flex w-full flex-col gap-3">
+      <WorkingTrace model={traceModel} live={isStreamingTurn} label={label} />
 
       {/* Final assistant response */}
       {displayText && (
