@@ -97,11 +97,11 @@ importers:
         specifier: workspace:^
         version: link:../types
       '@anthropic-ai/sdk':
-        specifier: ^0.72.1
-        version: 0.72.1(zod@4.3.6)
+        specifier: ^0.78.0
+        version: 0.78.0(zod@4.3.6)
       '@google/genai':
-        specifier: ^1.39.0
-        version: 1.39.0
+        specifier: ^1.44.0
+        version: 1.44.0
       '@sinclair/typebox':
         specifier: ^0.34.48
         version: 0.34.48
@@ -112,8 +112,8 @@ importers:
         specifier: ^3.0.1
         version: 3.0.1(ajv@8.17.1)
       openai:
-        specifier: ^6.17.0
-        version: 6.17.0(ws@8.19.0)(zod@4.3.6)
+        specifier: ^6.27.0
+        version: 6.27.0(ws@8.19.0)(zod@4.3.6)
       partial-json:
         specifier: ^0.1.7
         version: 0.1.7
@@ -404,17 +404,17 @@ importers:
   packages/types:
     devDependencies:
       '@anthropic-ai/sdk':
-        specifier: ^0.72.1
-        version: 0.72.1(zod@4.3.6)
+        specifier: ^0.78.0
+        version: 0.78.0(zod@4.3.6)
       '@google/genai':
-        specifier: ^1.39.0
-        version: 1.39.0
+        specifier: ^1.44.0
+        version: 1.44.0
       '@sinclair/typebox':
         specifier: ^0.34.48
         version: 0.34.48
       openai:
-        specifier: ^6.17.0
-        version: 6.17.0(ws@8.19.0)(zod@4.3.6)
+        specifier: ^6.27.0
+        version: 6.27.0(ws@8.19.0)(zod@4.3.6)
 
 packages:
 
@@ -428,8 +428,8 @@ packages:
     peerDependencies:
       zod: ^4.0.0
 
-  '@anthropic-ai/sdk@0.72.1':
-    resolution: {integrity: sha512-MiUnue7qN7DvLIoYHgkedN2z05mRf2CutBzjXXY2krzOhG2r/rIfISS2uVkNLikgToB5hYIzw+xp2jdOtRkqYQ==}
+  '@anthropic-ai/sdk@0.78.0':
+    resolution: {integrity: sha512-PzQhR715td/m1UaaN5hHXjYB8Gl2lF9UVhrrGrZeysiF6Rb74Wc9GCB8hzLdzmQtBd1qe89F9OptgB9Za1Ib5w==}
     hasBin: true
     peerDependencies:
       zod: ^3.25.0 || ^4.0.0
@@ -1017,8 +1017,8 @@ packages:
   '@floating-ui/utils@0.2.10':
     resolution: {integrity: sha512-aGTxbpbg8/b5JfU1HXSrbH3wXZuLPJcNEcZQFMxLs3oSzgtVu6nFPkbbGGUvBcUjKV2YyB9Wxxabo+HEH9tcRQ==}
 
-  '@google/genai@1.39.0':
-    resolution: {integrity: sha512-Vz7AQsOdBeiIcxmXIQNy/hzDvyAOE1lSpWA10itUQza7h3aQFF6QSGaQ7o1GYsjMD3XslK4Ee/Ol0eLhRXb7gA==}
+  '@google/genai@1.44.0':
+    resolution: {integrity: sha512-kRt9ZtuXmz+tLlcNntN/VV4LRdpl6ZOu5B1KbfNgfR65db15O6sUQcwnwLka8sT/V6qysD93fWrgJHF2L7dA9A==}
     engines: {node: '>=20.0.0'}
     peerDependencies:
       '@modelcontextprotocol/sdk': ^1.25.2
@@ -2096,6 +2096,9 @@ packages:
 
   '@types/react@19.2.10':
     resolution: {integrity: sha512-WPigyYuGhgZ/cTPRXB2EwUw+XvsRA3GqHlsP4qteqrnnjDrApbS7MxcGr/hke5iUoeB7E/gQtrs9I37zAJ0Vjw==}
+
+  '@types/retry@0.12.0':
+    resolution: {integrity: sha512-wWKOClTTiizcZhXnPY4wikVAwmdYHp8q6DmC+EJUzAMsycb7HB32Kh9RN4+0gExjmPmZSAQjgURXIGATPegAvA==}
 
   '@types/trusted-types@2.0.7':
     resolution: {integrity: sha512-ScaPdn1dQczgbl0QFTeTOmVHFULt394XJgOQNoyVhZ6r2vLnMLJfBPd53SB52T/3G36VI1/g2MZaX0cwDuXsfw==}
@@ -3993,6 +3996,18 @@ packages:
       zod:
         optional: true
 
+  openai@6.27.0:
+    resolution: {integrity: sha512-osTKySlrdYrLYTt0zjhY8yp0JUBmWDCN+Q+QxsV4xMQnnoVFpylgKGgxwN8sSdTNw0G4y+WUXs4eCMWpyDNWZQ==}
+    hasBin: true
+    peerDependencies:
+      ws: ^8.18.0
+      zod: ^3.25 || ^4.0
+    peerDependenciesMeta:
+      ws:
+        optional: true
+      zod:
+        optional: true
+
   optionator@0.9.4:
     resolution: {integrity: sha512-6IpQ7mKUxRcZNLIObR0hz7lxsapSSIYNZJwXPGeF0mTVqGKFIXj1DQcMoT22S3ROcLyY/rz0PWaWZ9ayWmad9g==}
     engines: {node: '>= 0.8.0'}
@@ -4008,6 +4023,10 @@ packages:
   p-locate@5.0.0:
     resolution: {integrity: sha512-LaNjtRWUBY++zB5nE/NwcaoMylSPk+S+ZHNB1TzdbMJMny6dynpAGt7X/tl/QYq3TIeE6nxHppbo2LGymrG5Pw==}
     engines: {node: '>=10'}
+
+  p-retry@4.6.2:
+    resolution: {integrity: sha512-312Id396EbJdvRONlngUx0NydfrIQ5lsYu0znKVUzVvArzEIt08V1qhtyESbGVd1FGX7UKtiFp5uwKZdM8wIuQ==}
+    engines: {node: '>=8'}
 
   package-json-from-dist@1.0.1:
     resolution: {integrity: sha512-UEZIS3/by4OC8vL3P2dTXRETpebLI2NiI5vIrjaD/5UtrkFX/tNbwjTSRAGC/+7CAo2pIcBaRgWmcBBHcsaCIw==}
@@ -4089,6 +4108,7 @@ packages:
   prebuild-install@7.1.3:
     resolution: {integrity: sha512-8Mf2cbV7x1cXPUILADGI3wuhfqWvtiLA1iclTDbFRZkgRQS0NqsPZphna9V+HyTEadheuPmjaJMsbzKQFOzLug==}
     engines: {node: '>=10'}
+    deprecated: No longer maintained. Please contact the author of the relevant native addon; alternatives are available.
     hasBin: true
 
   prelude-ls@1.2.1:
@@ -4262,6 +4282,10 @@ packages:
 
   retry@0.12.0:
     resolution: {integrity: sha512-9LkiTwjUh6rT555DtE9rTX+BKByPfrMzEAtnlEtdEwr3Nkffwiihqe2bWADg+OQRjt9gl6ICdmB/ZFDCGAtSow==}
+    engines: {node: '>= 4'}
+
+  retry@0.13.1:
+    resolution: {integrity: sha512-XQBQ3I8W1Cge0Seh+6gjj03LbmRFWuoszgK9ooCpwYIrhhoO80pfq4cUkU5DkknwfOfFteRwlZ56PYOGYyFWdg==}
     engines: {node: '>= 4'}
 
   reusify@1.1.0:
@@ -4958,7 +4982,7 @@ snapshots:
       '@img/sharp-win32-arm64': 0.34.5
       '@img/sharp-win32-x64': 0.34.5
 
-  '@anthropic-ai/sdk@0.72.1(zod@4.3.6)':
+  '@anthropic-ai/sdk@0.78.0(zod@4.3.6)':
     dependencies:
       json-schema-to-ts: 3.1.1
     optionalDependencies:
@@ -5369,9 +5393,10 @@ snapshots:
 
   '@floating-ui/utils@0.2.10': {}
 
-  '@google/genai@1.39.0':
+  '@google/genai@1.44.0':
     dependencies:
       google-auth-library: 10.5.0
+      p-retry: 4.6.2
       protobufjs: 7.5.4
       ws: 8.19.0
     transitivePeerDependencies:
@@ -6323,6 +6348,8 @@ snapshots:
   '@types/react@19.2.10':
     dependencies:
       csstype: 3.2.3
+
+  '@types/retry@0.12.0': {}
 
   '@types/trusted-types@2.0.7':
     optional: true
@@ -8715,6 +8742,11 @@ snapshots:
       ws: 8.19.0
       zod: 4.3.6
 
+  openai@6.27.0(ws@8.19.0)(zod@4.3.6):
+    optionalDependencies:
+      ws: 8.19.0
+      zod: 4.3.6
+
   optionator@0.9.4:
     dependencies:
       deep-is: 0.1.4
@@ -8737,6 +8769,11 @@ snapshots:
   p-locate@5.0.0:
     dependencies:
       p-limit: 3.1.0
+
+  p-retry@4.6.2:
+    dependencies:
+      '@types/retry': 0.12.0
+      retry: 0.13.1
 
   package-json-from-dist@1.0.1: {}
 
@@ -9060,6 +9097,8 @@ snapshots:
       signal-exit: 4.1.0
 
   retry@0.12.0: {}
+
+  retry@0.13.1: {}
 
   reusify@1.1.0: {}
 
