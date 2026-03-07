@@ -5,10 +5,12 @@ export type {
   ReasoningLevel,
   SessionRef,
   SessionMetadata,
+  SessionTreeResponse,
   StreamReadyEventData,
   StreamDoneEventData,
   StreamErrorEventData,
   StreamEventMap,
   StreamEventName,
   TurnSettings,
+  VisibleLeafSelection,
 } from './api';

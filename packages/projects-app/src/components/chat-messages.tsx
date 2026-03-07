@@ -7,6 +7,7 @@ import { UserMessageComponent } from './user-message';
 
 import type { Api, BaseAssistantMessage, Message, MessageNode } from '@ank1015/llm-sdk';
 
+import { getBranchNavigatorState, type BranchNavigatorState } from '@/lib/messages/session-tree';
 import { useChatStore } from '@/stores/chat-store';
 
 /* ------------------------------------------------------------------ */
@@ -30,6 +31,8 @@ type MessageTurn = {
   cotMessages: Message[];
   assistantNode: MessageNode | null;
 };
+
+type UserBranchStateByNodeId = Record<string, BranchNavigatorState>;
 
 function groupIntoTurns(nodes: MessageNode[]): MessageTurn[] {
   const turns: MessageTurn[] = [];
@@ -89,15 +92,17 @@ const MessageTurnRow = memo(function MessageTurnRow({
   sessionKey,
   isStreamingTurn,
   streamingAssistant,
+  branchState,
 }: {
   turn: MessageTurn;
   sessionKey: string | null;
   isStreamingTurn: boolean;
   streamingAssistant: Omit<BaseAssistantMessage<Api>, 'message'> | null;
+  branchState: BranchNavigatorState | null;
 }) {
   return (
     <Fragment>
-      {turn.userNode && <UserMessageComponent userNode={turn.userNode} />}
+      {turn.userNode && <UserMessageComponent userNode={turn.userNode} branchState={branchState} />}
       <AssistantMessages
         cotMessages={turn.cotMessages}
         assistantNode={turn.assistantNode}
@@ -130,6 +135,10 @@ export function ChatMessages() {
     if (!activeSessionKey) return EMPTY_MESSAGES;
     return state.messagesBySession[activeSessionKey] ?? EMPTY_MESSAGES;
   });
+  const messageTree = useChatStore((state) => {
+    if (!activeSessionKey) return EMPTY_MESSAGES;
+    return state.messageTreesBySession[activeSessionKey] ?? EMPTY_MESSAGES;
+  });
 
   const streamingAssistant = useChatStore((state) => {
     if (!activeSessionKey) return EMPTY_STREAMING_ASSISTANT;
@@ -141,6 +150,24 @@ export function ChatMessages() {
   });
 
   const turns = useMemo(() => groupIntoTurns(messages), [messages]);
+  const branchStateByNodeId = useMemo<UserBranchStateByNodeId>(() => {
+    if (messageTree.length === 0) {
+      return {};
+    }
+
+    return turns.reduce<UserBranchStateByNodeId>((acc, turn) => {
+      if (!turn.userNode) {
+        return acc;
+      }
+
+      const branchState = getBranchNavigatorState(messageTree, turn.userNode);
+      if (branchState) {
+        acc[turn.userNode.id] = branchState;
+      }
+
+      return acc;
+    }, {});
+  }, [messageTree, turns]);
 
   if (turns.length === 0 && !streamingAssistant) {
     return null;
@@ -155,6 +182,7 @@ export function ChatMessages() {
           sessionKey={activeSessionKey}
           isStreamingTurn={isSessionStreaming && idx === turns.length - 1}
           streamingAssistant={streamingAssistant}
+          branchState={turn.userNode ? (branchStateByNodeId[turn.userNode.id] ?? null) : null}
         />
       ))}
     </div>

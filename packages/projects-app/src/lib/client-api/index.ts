@@ -1,5 +1,6 @@
 export {
   getSessionMessages,
+  getSessionTree,
   streamConversation,
   streamEditConversation,
   streamRetryConversation,

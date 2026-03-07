@@ -1,4 +1,4 @@
-import type { AgentEvent, Api } from '@ank1015/llm-sdk';
+import type { MessageNode , AgentEvent, Api } from '@ank1015/llm-sdk';
 
 export type ApiErrorBody = {
   code: string;
@@ -25,6 +25,10 @@ export type TurnSettings = ModelSelection & {
   reasoningLevel: ReasoningLevel;
 };
 
+export type VisibleLeafSelection = {
+  leafNodeId?: string;
+};
+
 /** Metadata returned by the server when creating a session */
 export type SessionMetadata = {
   id: string;
@@ -32,6 +36,12 @@ export type SessionMetadata = {
   api: string;
   modelId: string;
   createdAt: string;
+  activeBranch: string;
+};
+
+export type SessionTreeResponse = {
+  nodes: MessageNode[];
+  persistedLeafNodeId: string | null;
   activeBranch: string;
 };
 

@@ -52,11 +52,12 @@ type SessionExecutionConfig = {
   providerOptions: Record<string, unknown>;
 };
 
-type ActivePathContext = {
-  activeBranch: string;
+type PathContext = {
+  branch: string;
   leafNodeId: string;
   messageNodes: MessageNode[];
   tree: StoredSession;
+  persistedActiveBranch: string;
 };
 
 type PersistenceConfig = {
@@ -285,7 +286,7 @@ export class Session {
   async prompt(input: PromptInput): Promise<Message[]> {
     const execution = this.resolveExecutionConfig(input);
     const [context, agentConfig] = await Promise.all([
-      this.loadActivePathContext(),
+      this.loadPathContext(input.leafNodeId),
       this.loadAgentConfig(),
     ]);
     const conversation = this.createConversation({
@@ -297,8 +298,9 @@ export class Session {
     const newMessages = await conversation.prompt(input.message);
     await this.saveMessages(newMessages, {
       execution,
-      branch: context.activeBranch,
+      branch: context.branch,
       initialParentId: context.leafNodeId,
+      activateBranchOnFirstPersist: context.branch !== context.persistedActiveBranch,
     });
 
     return newMessages;
@@ -315,7 +317,7 @@ export class Session {
   async streamPrompt(input: PromptInput, options: StreamRunOptions): Promise<Message[]> {
     const execution = this.resolveExecutionConfig(input);
     const [context, agentConfig] = await Promise.all([
-      this.loadActivePathContext(),
+      this.loadPathContext(input.leafNodeId),
       this.loadAgentConfig(),
     ]);
 
@@ -327,8 +329,9 @@ export class Session {
         promptText: input.message,
         persistence: {
           execution,
-          branch: context.activeBranch,
+          branch: context.branch,
           initialParentId: context.leafNodeId,
+          activateBranchOnFirstPersist: context.branch !== context.persistedActiveBranch,
         },
       },
       options
@@ -343,8 +346,24 @@ export class Session {
 
   /** Get the full message history as MessageNode[] (includes metadata). */
   async getHistoryNodes(): Promise<MessageNode[]> {
-    const context = await this.loadActivePathContext();
+    const context = await this.loadPersistedPathContext();
     return context.messageNodes;
+  }
+
+  async getMessageTree(): Promise<{
+    nodes: MessageNode[];
+    persistedLeafNodeId: string | null;
+    activeBranch: string;
+  }> {
+    const [metadata, tree] = await Promise.all([this.getMetadata(), this.getSessionTree()]);
+    const persistedActiveBranch = this.resolvePersistedActiveBranch(tree, metadata.activeBranch);
+    const persistedContext = this.resolvePersistedPathContext(tree, persistedActiveBranch);
+
+    return {
+      nodes: tree.nodes.filter((node): node is MessageNode => node.type === 'message'),
+      persistedLeafNodeId: persistedContext.messageNodes.at(-1)?.id ?? null,
+      activeBranch: persistedActiveBranch,
+    };
   }
 
   async streamRetryFromUserMessage(
@@ -484,13 +503,13 @@ export class Session {
   }): Promise<Message[]> {
     const execution = this.resolveExecutionConfig(input.input);
     const [context, agentConfig] = await Promise.all([
-      this.loadActivePathContext(),
+      this.loadPathContext(input.input.leafNodeId),
       this.loadAgentConfig(),
     ]);
 
     const targetNode = context.messageNodes.find((node) => node.id === input.nodeId);
     if (!targetNode) {
-      throw new Error(`User message "${input.nodeId}" was not found on the active path`);
+      throw new Error(`User message "${input.nodeId}" was not found on the selected path`);
     }
     if (targetNode.message.role !== 'user') {
       throw new Error('Only user messages can be edited or retried');
@@ -600,24 +619,19 @@ export class Session {
     return model;
   }
 
-  private async loadActivePathContext(): Promise<ActivePathContext> {
-    const [metadata, tree] = await Promise.all([this.getMetadata(), this.getSessionTree()]);
-    const activeBranch = tree.nodes.some((node) => node.branch === metadata.activeBranch)
-      ? metadata.activeBranch
-      : DEFAULT_ACTIVE_BRANCH;
-    const branchNodes = tree.nodes.filter((node) => node.branch === activeBranch);
-    const leafNode = branchNodes[branchNodes.length - 1];
+  private async loadPersistedPathContext(): Promise<PathContext> {
+    return this.loadPathContext();
+  }
 
-    if (!leafNode) {
-      throw new Error(`Session "${this.sessionId}" has no nodes — cannot resolve active path`);
+  private async loadPathContext(leafNodeId?: string): Promise<PathContext> {
+    const [metadata, tree] = await Promise.all([this.getMetadata(), this.getSessionTree()]);
+    const persistedActiveBranch = this.resolvePersistedActiveBranch(tree, metadata.activeBranch);
+
+    if (leafNodeId) {
+      return this.resolvePathContextFromLeaf(tree, persistedActiveBranch, leafNodeId);
     }
 
-    return {
-      activeBranch,
-      leafNodeId: leafNode.id,
-      messageNodes: this.getMessagePathNodesToNode(tree, leafNode.id),
-      tree,
-    };
+    return this.resolvePersistedPathContext(tree, persistedActiveBranch);
   }
 
   private async getSessionTree(): Promise<StoredSession> {
@@ -628,10 +642,65 @@ export class Session {
     return session;
   }
 
+  private resolvePersistedActiveBranch(tree: StoredSession, activeBranch: string): string {
+    return tree.nodes.some((node) => node.branch === activeBranch)
+      ? activeBranch
+      : DEFAULT_ACTIVE_BRANCH;
+  }
+
+  private resolvePersistedPathContext(
+    tree: StoredSession,
+    persistedActiveBranch: string
+  ): PathContext {
+    const branchNodes = tree.nodes.filter((node) => node.branch === persistedActiveBranch);
+    const leafNode = branchNodes[branchNodes.length - 1];
+
+    if (!leafNode) {
+      throw new Error(`Session "${this.sessionId}" has no nodes — cannot resolve active path`);
+    }
+
+    return {
+      branch: persistedActiveBranch,
+      leafNodeId: leafNode.id,
+      messageNodes: this.getMessagePathNodesToNode(tree, leafNode.id),
+      tree,
+      persistedActiveBranch,
+    };
+  }
+
+  private resolvePathContextFromLeaf(
+    tree: StoredSession,
+    persistedActiveBranch: string,
+    leafNodeId: string
+  ): PathContext {
+    const node = tree.nodes.find((candidate) => candidate.id === leafNodeId);
+    if (!node) {
+      throw new Error(`Leaf node "${leafNodeId}" was not found in session "${this.sessionId}"`);
+    }
+    if (node.type !== 'message') {
+      throw new Error('leafNodeId must reference a message node');
+    }
+    if (!this.isLeafNode(tree, node.id)) {
+      throw new Error(`Leaf node "${leafNodeId}" is not a visible leaf node`);
+    }
+
+    return {
+      branch: node.branch,
+      leafNodeId: node.id,
+      messageNodes: this.getMessagePathNodesToNode(tree, node.id),
+      tree,
+      persistedActiveBranch,
+    };
+  }
+
   private getMessagePathNodesToNode(tree: StoredSession, nodeId: string): MessageNode[] {
     return this.getLineageToNode(tree, nodeId).filter(
       (node): node is MessageNode => node.type === 'message'
     );
+  }
+
+  private isLeafNode(tree: StoredSession, nodeId: string): boolean {
+    return !tree.nodes.some((node) => node.parentId === nodeId);
   }
 
   private getLineageToNode(tree: StoredSession, nodeId: string): SessionNode[] {

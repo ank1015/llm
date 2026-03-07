@@ -219,6 +219,131 @@ describe('Session Routes', () => {
     });
   });
 
+  describe('GET /api/.../sessions/:sessionId/tree', () => {
+    it('should return the full message tree and persisted leaf metadata', async () => {
+      const created = await createSession();
+
+      mockPrompt
+        .mockResolvedValueOnce([
+          {
+            role: 'user',
+            id: 'user-tree-1',
+            content: [{ type: 'text', content: 'Tree prompt 1' }],
+            timestamp: Date.now(),
+          },
+          {
+            role: 'assistant',
+            id: 'asst-tree-1',
+            api: 'anthropic',
+            model: { id: 'claude-sonnet-4-5', api: 'anthropic' },
+            content: [{ type: 'response', content: [{ type: 'text', content: 'Tree answer 1' }] }],
+            usage: {
+              input: 10,
+              output: 5,
+              cacheRead: 0,
+              cacheWrite: 0,
+              totalTokens: 15,
+              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+            },
+            stopReason: 'stop',
+            timestamp: Date.now(),
+            duration: 100,
+            message: {},
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            role: 'user',
+            id: 'user-tree-2',
+            content: [{ type: 'text', content: 'Tree prompt 2' }],
+            timestamp: Date.now(),
+          },
+          {
+            role: 'assistant',
+            id: 'asst-tree-2',
+            api: 'anthropic',
+            model: { id: 'claude-sonnet-4-5', api: 'anthropic' },
+            content: [{ type: 'response', content: [{ type: 'text', content: 'Tree answer 2' }] }],
+            usage: {
+              input: 10,
+              output: 5,
+              cacheRead: 0,
+              cacheWrite: 0,
+              totalTokens: 15,
+              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+            },
+            stopReason: 'stop',
+            timestamp: Date.now(),
+            duration: 100,
+            message: {},
+          },
+        ]);
+
+      await post(`${BASE}/${created.id}/prompt`, { message: 'Tree prompt 1' });
+      await post(`${BASE}/${created.id}/prompt`, { message: 'Tree prompt 2' });
+
+      const historyRes = await get(`${BASE}/${created.id}/messages`);
+      const history = await historyRes.json();
+      const firstUserNodeId = history[0]?.id as string;
+
+      const retriedUserMsg = {
+        role: 'user',
+        id: 'user-tree-branch',
+        content: [{ type: 'text', content: 'Tree prompt 1' }],
+        timestamp: Date.now(),
+      };
+      const retriedAssistantMsg = {
+        role: 'assistant',
+        id: 'asst-tree-branch',
+        api: 'anthropic',
+        model: { id: 'claude-sonnet-4-5', api: 'anthropic' },
+        content: [{ type: 'response', content: [{ type: 'text', content: 'Tree branch answer' }] }],
+        usage: {
+          input: 10,
+          output: 5,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 15,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        },
+        stopReason: 'stop',
+        timestamp: Date.now(),
+        duration: 100,
+        message: {},
+      };
+      mockPrompt.mockImplementationOnce(
+        async (
+          _prompt: string,
+          _attachments: unknown,
+          callback: (msg: unknown) => Promise<void>
+        ) => {
+          await callback(retriedUserMsg);
+          await callback(retriedAssistantMsg);
+          return [retriedUserMsg, retriedAssistantMsg];
+        }
+      );
+
+      const retryRes = await post(
+        `${BASE}/${created.id}/messages/${firstUserNodeId}/retry/stream`,
+        {}
+      );
+      expect(retryRes.status).toBe(200);
+      await retryRes.text();
+
+      const res = await get(`${BASE}/${created.id}/tree`);
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.nodes).toHaveLength(6);
+      expect(body.activeBranch).not.toBe('main');
+
+      const persistedLeafNode = body.nodes.find((node: { id: string }) => {
+        return node.id === body.persistedLeafNodeId;
+      });
+      expect(persistedLeafNode?.message.id).toBe('asst-tree-branch');
+    });
+  });
+
   describe('POST /api/.../sessions/:sessionId/prompt', () => {
     it('should return 400 when message is missing', async () => {
       const created = await createSession();
@@ -370,6 +495,164 @@ describe('Session Routes', () => {
       expect(history[0].modelId).toBe('gemini-3.1-pro-preview');
       expect(history[1].api).toBe('google');
       expect(history[1].modelId).toBe('gemini-3.1-pro-preview');
+    });
+
+    it('should append from the selected leafNodeId instead of the persisted active branch', async () => {
+      const created = await createSession();
+
+      mockPrompt
+        .mockResolvedValueOnce([
+          {
+            role: 'user',
+            id: 'user-main-1',
+            content: [{ type: 'text', content: 'Main prompt 1' }],
+            timestamp: Date.now(),
+          },
+          {
+            role: 'assistant',
+            id: 'asst-main-1',
+            api: 'anthropic',
+            model: { id: 'claude-sonnet-4-5', api: 'anthropic' },
+            content: [{ type: 'response', content: [{ type: 'text', content: 'Main answer 1' }] }],
+            usage: {
+              input: 10,
+              output: 5,
+              cacheRead: 0,
+              cacheWrite: 0,
+              totalTokens: 15,
+              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+            },
+            stopReason: 'stop',
+            timestamp: Date.now(),
+            duration: 100,
+            message: {},
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            role: 'user',
+            id: 'user-main-2',
+            content: [{ type: 'text', content: 'Main prompt 2' }],
+            timestamp: Date.now(),
+          },
+          {
+            role: 'assistant',
+            id: 'asst-main-2',
+            api: 'anthropic',
+            model: { id: 'claude-sonnet-4-5', api: 'anthropic' },
+            content: [{ type: 'response', content: [{ type: 'text', content: 'Main answer 2' }] }],
+            usage: {
+              input: 10,
+              output: 5,
+              cacheRead: 0,
+              cacheWrite: 0,
+              totalTokens: 15,
+              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+            },
+            stopReason: 'stop',
+            timestamp: Date.now(),
+            duration: 100,
+            message: {},
+          },
+        ]);
+
+      await post(`${BASE}/${created.id}/prompt`, { message: 'Main prompt 1' });
+      await post(`${BASE}/${created.id}/prompt`, { message: 'Main prompt 2' });
+
+      const mainHistoryRes = await get(`${BASE}/${created.id}/messages`);
+      const mainHistory = await mainHistoryRes.json();
+      const firstUserNodeId = mainHistory[0]?.id as string;
+      const mainLeafNodeId = mainHistory[3]?.id as string;
+
+      const retryUserMsg = {
+        role: 'user',
+        id: 'user-main-retry',
+        content: [{ type: 'text', content: 'Main prompt 1' }],
+        timestamp: Date.now(),
+      };
+      const retryAssistantMsg = {
+        role: 'assistant',
+        id: 'asst-main-retry',
+        api: 'anthropic',
+        model: { id: 'claude-sonnet-4-5', api: 'anthropic' },
+        content: [{ type: 'response', content: [{ type: 'text', content: 'Retry answer' }] }],
+        usage: {
+          input: 10,
+          output: 5,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 15,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        },
+        stopReason: 'stop',
+        timestamp: Date.now(),
+        duration: 100,
+        message: {},
+      };
+      mockPrompt.mockImplementationOnce(
+        async (
+          _prompt: string,
+          _attachments: unknown,
+          callback: (msg: unknown) => Promise<void>
+        ) => {
+          await callback(retryUserMsg);
+          await callback(retryAssistantMsg);
+          return [retryUserMsg, retryAssistantMsg];
+        }
+      );
+
+      const retryRes = await post(
+        `${BASE}/${created.id}/messages/${firstUserNodeId}/retry/stream`,
+        {}
+      );
+      expect(retryRes.status).toBe(200);
+      await retryRes.text();
+
+      const followUpUserMsg = {
+        role: 'user',
+        id: 'user-main-3',
+        content: [{ type: 'text', content: 'Continue on main branch' }],
+        timestamp: Date.now(),
+      };
+      const followUpAssistantMsg = {
+        role: 'assistant',
+        id: 'asst-main-3',
+        api: 'anthropic',
+        model: { id: 'claude-sonnet-4-5', api: 'anthropic' },
+        content: [
+          { type: 'response', content: [{ type: 'text', content: 'Main branch continued' }] },
+        ],
+        usage: {
+          input: 10,
+          output: 5,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 15,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        },
+        stopReason: 'stop',
+        timestamp: Date.now(),
+        duration: 100,
+        message: {},
+      };
+      mockPrompt.mockResolvedValueOnce([followUpUserMsg, followUpAssistantMsg]);
+
+      const res = await post(`${BASE}/${created.id}/prompt`, {
+        message: 'Continue on main branch',
+        leafNodeId: mainLeafNodeId,
+      });
+
+      expect(res.status).toBe(200);
+
+      const historyRes = await get(`${BASE}/${created.id}/messages`);
+      const history = await historyRes.json();
+      expect(history).toHaveLength(6);
+      expect(history[4]?.message.id).toBe('user-main-3');
+      expect(history[5]?.message.id).toBe('asst-main-3');
+
+      const metaRes = await get(`${BASE}/${created.id}`);
+      const metadata = await metaRes.json();
+      expect(metadata.activeBranch).toBe('main');
     });
   });
 
@@ -761,6 +1044,176 @@ describe('Session Routes', () => {
       expect(history).toHaveLength(2);
       expect(history[0]?.message.content[0]?.content).toBe('Edited prompt');
       expect(history[1]?.message.id).toBe('asst-edit-1-rewrite');
+    });
+
+    it('should validate retry and edit targets against the provided leafNodeId path', async () => {
+      const created = await createSession();
+
+      mockPrompt
+        .mockResolvedValueOnce([
+          {
+            role: 'user',
+            id: 'user-leaf-main-1',
+            content: [{ type: 'text', content: 'Leaf prompt 1' }],
+            timestamp: Date.now(),
+          },
+          {
+            role: 'assistant',
+            id: 'asst-leaf-main-1',
+            api: 'anthropic',
+            model: { id: 'claude-sonnet-4-5', api: 'anthropic' },
+            content: [{ type: 'response', content: [{ type: 'text', content: 'Leaf answer 1' }] }],
+            usage: {
+              input: 10,
+              output: 5,
+              cacheRead: 0,
+              cacheWrite: 0,
+              totalTokens: 15,
+              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+            },
+            stopReason: 'stop',
+            timestamp: Date.now(),
+            duration: 100,
+            message: {},
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            role: 'user',
+            id: 'user-leaf-main-2',
+            content: [{ type: 'text', content: 'Leaf prompt 2' }],
+            timestamp: Date.now(),
+          },
+          {
+            role: 'assistant',
+            id: 'asst-leaf-main-2',
+            api: 'anthropic',
+            model: { id: 'claude-sonnet-4-5', api: 'anthropic' },
+            content: [{ type: 'response', content: [{ type: 'text', content: 'Leaf answer 2' }] }],
+            usage: {
+              input: 10,
+              output: 5,
+              cacheRead: 0,
+              cacheWrite: 0,
+              totalTokens: 15,
+              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+            },
+            stopReason: 'stop',
+            timestamp: Date.now(),
+            duration: 100,
+            message: {},
+          },
+        ]);
+
+      await post(`${BASE}/${created.id}/prompt`, { message: 'Leaf prompt 1' });
+      await post(`${BASE}/${created.id}/prompt`, { message: 'Leaf prompt 2' });
+
+      const mainHistoryRes = await get(`${BASE}/${created.id}/messages`);
+      const mainHistory = await mainHistoryRes.json();
+      const firstUserNodeId = mainHistory[0]?.id as string;
+      const secondUserNodeId = mainHistory[2]?.id as string;
+      const mainLeafNodeId = mainHistory[3]?.id as string;
+
+      const retryUserMsg = {
+        role: 'user',
+        id: 'user-leaf-retry',
+        content: [{ type: 'text', content: 'Leaf prompt 1' }],
+        timestamp: Date.now(),
+      };
+      const retryAssistantMsg = {
+        role: 'assistant',
+        id: 'asst-leaf-retry',
+        api: 'anthropic',
+        model: { id: 'claude-sonnet-4-5', api: 'anthropic' },
+        content: [
+          { type: 'response', content: [{ type: 'text', content: 'Retry branch answer' }] },
+        ],
+        usage: {
+          input: 10,
+          output: 5,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 15,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        },
+        stopReason: 'stop',
+        timestamp: Date.now(),
+        duration: 100,
+        message: {},
+      };
+      mockPrompt.mockImplementationOnce(
+        async (
+          _prompt: string,
+          _attachments: unknown,
+          callback: (msg: unknown) => Promise<void>
+        ) => {
+          await callback(retryUserMsg);
+          await callback(retryAssistantMsg);
+          return [retryUserMsg, retryAssistantMsg];
+        }
+      );
+
+      const retryRes = await post(
+        `${BASE}/${created.id}/messages/${firstUserNodeId}/retry/stream`,
+        {}
+      );
+      expect(retryRes.status).toBe(200);
+      await retryRes.text();
+
+      const editedUserMsg = {
+        role: 'user',
+        id: 'user-leaf-edit',
+        content: [{ type: 'text', content: 'Leaf prompt 2 edited' }],
+        timestamp: Date.now(),
+      };
+      const editedAssistantMsg = {
+        role: 'assistant',
+        id: 'asst-leaf-edit',
+        api: 'anthropic',
+        model: { id: 'claude-sonnet-4-5', api: 'anthropic' },
+        content: [
+          { type: 'response', content: [{ type: 'text', content: 'Edited from main path' }] },
+        ],
+        usage: {
+          input: 10,
+          output: 5,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 15,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        },
+        stopReason: 'stop',
+        timestamp: Date.now(),
+        duration: 100,
+        message: {},
+      };
+      mockPrompt.mockImplementationOnce(
+        async (
+          _prompt: string,
+          _attachments: unknown,
+          callback: (msg: unknown) => Promise<void>
+        ) => {
+          await callback(editedUserMsg);
+          await callback(editedAssistantMsg);
+          return [editedUserMsg, editedAssistantMsg];
+        }
+      );
+
+      const res = await post(`${BASE}/${created.id}/messages/${secondUserNodeId}/edit/stream`, {
+        message: 'Leaf prompt 2 edited',
+        leafNodeId: mainLeafNodeId,
+      });
+
+      expect(res.status).toBe(200);
+      const events = parseSseEvents(await res.text());
+      const doneEvent = events.find((event) => event.event === 'done');
+      expect(doneEvent).toBeDefined();
+
+      const historyRes = await get(`${BASE}/${created.id}/messages`);
+      const history = await historyRes.json();
+      expect(history).toHaveLength(4);
+      expect(history[2]?.message.id).toBe('user-leaf-edit');
+      expect(history[3]?.message.id).toBe('asst-leaf-edit');
     });
 
     it('should reject empty edit messages before streaming starts', async () => {

@@ -1,6 +1,12 @@
 import { apiRequestJson, SERVER_BASE } from './http';
 
-import type { StreamEventMap, StreamEventName, TurnSettings } from '@/lib/contracts';
+import type {
+  SessionTreeResponse,
+  StreamEventMap,
+  StreamEventName,
+  TurnSettings,
+  VisibleLeafSelection,
+} from '@/lib/contracts';
 import type { MessageNode } from '@ank1015/llm-sdk';
 
 type ArtifactContext = {
@@ -14,6 +20,10 @@ function buildSessionsBase(ctx: ArtifactContext): string {
 
 function buildMessagesPath(ctx: ArtifactContext, sessionId: string): string {
   return `${buildSessionsBase(ctx)}/${encodeURIComponent(sessionId)}/messages`;
+}
+
+function buildTreePath(ctx: ArtifactContext, sessionId: string): string {
+  return `${buildSessionsBase(ctx)}/${encodeURIComponent(sessionId)}/tree`;
 }
 
 function buildStreamPath(ctx: ArtifactContext, sessionId: string): string {
@@ -93,6 +103,15 @@ export async function getSessionMessages(
   });
 }
 
+export async function getSessionTree(
+  ctx: ArtifactContext,
+  sessionId: string
+): Promise<SessionTreeResponse> {
+  return apiRequestJson<SessionTreeResponse>(buildTreePath(ctx, sessionId), {
+    method: 'GET',
+  });
+}
+
 export type StreamHandlers = {
   onEvent?: <TEvent extends StreamEventName>(
     eventName: TEvent,
@@ -104,22 +123,26 @@ export type StreamRequest = ArtifactContext & {
   sessionId: string;
   message: string;
   skills?: string[];
-} & TurnSettings;
+} & TurnSettings &
+  VisibleLeafSelection;
 
 export type StreamRetryRequest = ArtifactContext & {
   sessionId: string;
   nodeId: string;
-} & TurnSettings;
+} & TurnSettings &
+  VisibleLeafSelection;
 
 export type StreamEditRequest = ArtifactContext & {
   sessionId: string;
   nodeId: string;
   message: string;
-} & TurnSettings;
+} & TurnSettings &
+  VisibleLeafSelection;
 
 type StreamRequestBody = {
   message?: string;
   skills?: string[];
+  leafNodeId?: string;
   api: TurnSettings['api'];
   modelId: string;
   reasoningLevel: TurnSettings['reasoningLevel'];
@@ -219,6 +242,7 @@ export async function streamConversation(
     {
       message: request.message,
       skills: request.skills ?? [],
+      ...(request.leafNodeId ? { leafNodeId: request.leafNodeId } : {}),
       api: request.api,
       modelId: request.modelId,
       reasoningLevel: request.reasoningLevel,
@@ -237,6 +261,7 @@ export async function streamRetryConversation(
   await streamConversationRequest(
     buildRewriteStreamPath(ctx, request.sessionId, request.nodeId, 'retry'),
     {
+      ...(request.leafNodeId ? { leafNodeId: request.leafNodeId } : {}),
       api: request.api,
       modelId: request.modelId,
       reasoningLevel: request.reasoningLevel,
@@ -256,6 +281,7 @@ export async function streamEditConversation(
     buildRewriteStreamPath(ctx, request.sessionId, request.nodeId, 'edit'),
     {
       message: request.message,
+      ...(request.leafNodeId ? { leafNodeId: request.leafNodeId } : {}),
       api: request.api,
       modelId: request.modelId,
       reasoningLevel: request.reasoningLevel,

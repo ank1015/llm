@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 
-import type { SessionRef, TurnSettings } from '@/lib/contracts';
+import type { SessionRef, SessionTreeResponse, TurnSettings } from '@/lib/contracts';
 import type {
   AgentEvent,
   Api,
@@ -14,11 +14,12 @@ import type {
 } from '@ank1015/llm-sdk';
 
 import {
-  getSessionMessages,
+  getSessionTree,
   streamConversation,
   streamEditConversation,
   streamRetryConversation,
 } from '@/lib/client-api';
+import { getVisiblePathNodes, sortMessageNodesChronologically } from '@/lib/messages/session-tree';
 
 type PendingPrompt = {
   id: string;
@@ -54,6 +55,9 @@ type RewritePreparation = {
 type ChatStoreState = {
   activeSession: SessionRef | null;
   messagesBySession: Record<string, MessageNode[]>;
+  messageTreesBySession: Record<string, MessageNode[]>;
+  persistedLeafNodeIdBySession: Record<string, string | null>;
+  visibleLeafNodeIdBySession: Record<string, string | null>;
   streamingAssistantBySession: Record<string, Omit<BaseAssistantMessage<Api>, 'message'> | null>;
   pendingPromptsBySession: Record<string, PendingPrompt[]>;
   agentEventsBySession: Record<string, AgentEvent[]>;
@@ -63,6 +67,7 @@ type ChatStoreState = {
   setActiveSession: (session: SessionRef | null) => void;
   clearSessionState: (session: SessionRef) => void;
   clearSessionError: (session: SessionRef) => void;
+  setVisibleLeafNode: (input: { session?: SessionRef; leafNodeId: string }) => void;
   loadMessages: (options?: {
     session?: SessionRef;
     projectId?: string;
@@ -142,12 +147,6 @@ function toIsoTimestamp(value: unknown): string {
   return new Date().toISOString();
 }
 
-function sortMessageNodes(messages: MessageNode[]): MessageNode[] {
-  return [...messages].sort(
-    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-  );
-}
-
 function upsertOptimisticMessageNode(
   existing: MessageNode[],
   incoming: MessageNode
@@ -162,7 +161,7 @@ function upsertOptimisticMessageNode(
     next[index] = incoming;
   }
 
-  return sortMessageNodes(next);
+  return sortMessageNodesChronologically(next);
 }
 
 function replaceOptimisticMessageNode(
@@ -179,7 +178,7 @@ function replaceOptimisticMessageNode(
     next[index] = incoming;
   }
 
-  return sortMessageNodes(next);
+  return sortMessageNodesChronologically(next);
 }
 
 function createOptimisticNode(input: {
@@ -243,7 +242,7 @@ function prepareRewriteState(input: {
 }): RewritePreparation {
   const targetIndex = input.messages.findIndex((node) => node.id === input.nodeId);
   if (targetIndex === -1) {
-    throw new Error('Message to rewrite was not found in the active thread.');
+    throw new Error('Message to rewrite was not found in the visible thread.');
   }
 
   const targetNode = input.messages[targetIndex];
@@ -354,9 +353,38 @@ function getStreamingAssistantMessage(
   return candidate;
 }
 
+function getCurrentVisibleLeafNodeId(state: ChatStoreState, key: string): string | null {
+  return state.visibleLeafNodeIdBySession[key] ?? state.persistedLeafNodeIdBySession[key] ?? null;
+}
+
+function deriveVisibleMessages(nodes: MessageNode[], leafNodeId: string | null): MessageNode[] {
+  return getVisiblePathNodes(nodes, leafNodeId);
+}
+
+function applyLoadedTreeState(tree: SessionTreeResponse): {
+  allNodes: MessageNode[];
+  persistedLeafNodeId: string | null;
+  visibleLeafNodeId: string | null;
+  visibleMessages: MessageNode[];
+} {
+  const allNodes = sortMessageNodesChronologically(tree.nodes);
+  const persistedLeafNodeId = tree.persistedLeafNodeId;
+  const visibleLeafNodeId = persistedLeafNodeId;
+
+  return {
+    allNodes,
+    persistedLeafNodeId,
+    visibleLeafNodeId,
+    visibleMessages: deriveVisibleMessages(allNodes, visibleLeafNodeId),
+  };
+}
+
 export const useChatStore = create<ChatStoreState>((set, get) => ({
   activeSession: null,
   messagesBySession: {},
+  messageTreesBySession: {},
+  persistedLeafNodeIdBySession: {},
+  visibleLeafNodeIdBySession: {},
   streamingAssistantBySession: {},
   pendingPromptsBySession: {},
   agentEventsBySession: {},
@@ -377,6 +405,18 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
       messagesBySession: {
         ...state.messagesBySession,
         [key]: state.messagesBySession[key] ?? [],
+      },
+      messageTreesBySession: {
+        ...state.messageTreesBySession,
+        [key]: state.messageTreesBySession[key] ?? [],
+      },
+      persistedLeafNodeIdBySession: {
+        ...state.persistedLeafNodeIdBySession,
+        [key]: state.persistedLeafNodeIdBySession[key] ?? null,
+      },
+      visibleLeafNodeIdBySession: {
+        ...state.visibleLeafNodeIdBySession,
+        [key]: state.visibleLeafNodeIdBySession[key] ?? null,
       },
       pendingPromptsBySession: {
         ...state.pendingPromptsBySession,
@@ -404,14 +444,25 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     streamAbortControllers.delete(key);
 
     set((state) => ({
-      streamingAssistantBySession: (() => {
-        const next = { ...state.streamingAssistantBySession };
-        delete next[key];
-        return next;
-      })(),
+      streamingAssistantBySession: {
+        ...state.streamingAssistantBySession,
+        [key]: null,
+      },
       messagesBySession: {
         ...state.messagesBySession,
         [key]: [],
+      },
+      messageTreesBySession: {
+        ...state.messageTreesBySession,
+        [key]: [],
+      },
+      persistedLeafNodeIdBySession: {
+        ...state.persistedLeafNodeIdBySession,
+        [key]: null,
+      },
+      visibleLeafNodeIdBySession: {
+        ...state.visibleLeafNodeIdBySession,
+        [key]: null,
       },
       pendingPromptsBySession: {
         ...state.pendingPromptsBySession,
@@ -447,6 +498,32 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     }));
   },
 
+  setVisibleLeafNode: ({ session, leafNodeId }) => {
+    const resolvedSession = resolveSession({
+      activeSession: get().activeSession,
+      session,
+    });
+    const key = getSessionKey(resolvedSession);
+
+    set((state) => {
+      const treeNodes = state.messageTreesBySession[key] ?? [];
+      if (!treeNodes.some((node) => node.id === leafNodeId)) {
+        return state;
+      }
+
+      return {
+        visibleLeafNodeIdBySession: {
+          ...state.visibleLeafNodeIdBySession,
+          [key]: leafNodeId,
+        },
+        messagesBySession: {
+          ...state.messagesBySession,
+          [key]: deriveVisibleMessages(treeNodes, leafNodeId),
+        },
+      };
+    });
+  },
+
   loadMessages: async (options) => {
     const session = resolveSession({
       activeSession: get().activeSession,
@@ -476,16 +553,30 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
 
     try {
       const ctx = { projectId: options?.projectId ?? '', artifactId: options?.artifactId ?? '' };
-      const messages = await getSessionMessages(ctx, session.sessionId);
+      const tree = await getSessionTree(ctx, session.sessionId);
 
       if ((messageLoadRequestIds.get(key) ?? 0) !== nextRequestId) {
         return;
       }
 
+      const loadedState = applyLoadedTreeState(tree);
+
       set((state) => ({
+        messageTreesBySession: {
+          ...state.messageTreesBySession,
+          [key]: loadedState.allNodes,
+        },
+        persistedLeafNodeIdBySession: {
+          ...state.persistedLeafNodeIdBySession,
+          [key]: loadedState.persistedLeafNodeId,
+        },
+        visibleLeafNodeIdBySession: {
+          ...state.visibleLeafNodeIdBySession,
+          [key]: loadedState.visibleLeafNodeId,
+        },
         messagesBySession: {
           ...state.messagesBySession,
-          [key]: messages,
+          [key]: loadedState.visibleMessages,
         },
         isLoadingMessagesBySession: {
           ...state.isLoadingMessagesBySession,
@@ -528,6 +619,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     const pending = createPendingPrompt(prompt);
     const controller = new AbortController();
     streamAbortControllers.set(key, controller);
+    const visibleLeafNodeId = getCurrentVisibleLeafNodeId(get(), key) ?? undefined;
     let optimisticParentId = (get().messagesBySession[key] ?? []).at(-1)?.id ?? null;
 
     set((state) => ({
@@ -560,6 +652,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
           api: input.api,
           modelId: input.modelId,
           reasoningLevel: input.reasoningLevel,
+          ...(visibleLeafNodeId ? { leafNodeId: visibleLeafNodeId } : {}),
         },
         {
           onEvent: (eventName, data) => {
@@ -727,6 +820,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     const pending = createPendingPrompt(rewrite.pendingPromptText);
     const controller = new AbortController();
     streamAbortControllers.set(key, controller);
+    const visibleLeafNodeId = getCurrentVisibleLeafNodeId(get(), key) ?? undefined;
     let optimisticParentId = rewrite.initialParentId;
     let placeholderMessageId: string | null = rewrite.placeholderMessageId;
     let didPersistAnyMessage = false;
@@ -765,6 +859,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
           api: input.api,
           modelId: input.modelId,
           reasoningLevel: input.reasoningLevel,
+          ...(visibleLeafNodeId ? { leafNodeId: visibleLeafNodeId } : {}),
         },
         {
           onEvent: (eventName, data) => {
@@ -988,6 +1083,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     const pending = createPendingPrompt(prompt);
     const controller = new AbortController();
     streamAbortControllers.set(key, controller);
+    const visibleLeafNodeId = getCurrentVisibleLeafNodeId(get(), key) ?? undefined;
     let optimisticParentId = rewrite.initialParentId;
     let placeholderMessageId: string | null = rewrite.placeholderMessageId;
     let didPersistAnyMessage = false;
@@ -1027,6 +1123,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
           api: input.api,
           modelId: input.modelId,
           reasoningLevel: input.reasoningLevel,
+          ...(visibleLeafNodeId ? { leafNodeId: visibleLeafNodeId } : {}),
         },
         {
           onEvent: (eventName, data) => {

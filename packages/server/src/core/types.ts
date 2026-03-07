@@ -156,6 +156,8 @@ export interface PromptInput {
   message: string;
   /** Skill names to activate for this prompt (resolved from globalSkills) */
   skills?: string[];
+  /** Optional visible leaf node to continue from instead of persisted active branch */
+  leafNodeId?: string;
   /** Optional per-turn API override */
   api?: Api;
   /** Optional per-turn model override */

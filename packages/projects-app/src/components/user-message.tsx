@@ -1,13 +1,15 @@
 'use client';
 
-import { Check, Copy, Pencil, RefreshCw } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Copy, Pencil, RefreshCw } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 
 import { ChatMarkdown } from './markdown-renderer';
 
+import type { BranchNavigatorState } from '@/lib/messages/session-tree';
 import type { MessageNode, UserMessage } from '@ank1015/llm-sdk';
+
 
 import { getTextFromUserMessage } from '@/lib/messages/utils';
 import { useChatSettingsStore, useChatStore, useComposerStore } from '@/stores';
@@ -36,7 +38,13 @@ function focusComposer(): void {
   });
 }
 
-export const UserMessageComponent = ({ userNode }: { userNode: MessageNode }) => {
+export const UserMessageComponent = ({
+  userNode,
+  branchState,
+}: {
+  userNode: MessageNode;
+  branchState: BranchNavigatorState | null;
+}) => {
   const { projectId, artifactId, threadId } = useParams<{
     projectId: string;
     artifactId: string;
@@ -47,6 +55,7 @@ export const UserMessageComponent = ({ userNode }: { userNode: MessageNode }) =>
   const [copied, setCopied] = useState(false);
   const beginEdit = useComposerStore((state) => state.beginEdit);
   const retryFromNode = useChatStore((state) => state.retryFromNode);
+  const setVisibleLeafNode = useChatStore((state) => state.setVisibleLeafNode);
   const isStreaming = useChatStore((state) => {
     if (!threadId) return false;
     return state.isStreamingBySession[threadId] ?? false;
@@ -112,6 +121,20 @@ export const UserMessageComponent = ({ userNode }: { userNode: MessageNode }) =>
     userNode.id,
   ]);
 
+  const handleSwitchBranch = useCallback(
+    (leafNodeId: string | null) => {
+      if (!threadId || !leafNodeId || isStreaming) {
+        return;
+      }
+
+      setVisibleLeafNode({
+        session: { sessionId: threadId },
+        leafNodeId,
+      });
+    },
+    [isStreaming, setVisibleLeafNode, threadId]
+  );
+
   return (
     <div className="group/user flex w-full flex-col items-end gap-1">
       {text && (
@@ -148,6 +171,31 @@ export const UserMessageComponent = ({ userNode }: { userNode: MessageNode }) =>
         >
           <RefreshCw className="size-4" />
         </button>
+        {branchState ? (
+          <div className="text-muted-foreground flex items-center gap-0.5 pl-1">
+            <button
+              type="button"
+              onClick={() => handleSwitchBranch(branchState.previousLeafNodeId)}
+              disabled={!branchState.previousLeafNodeId || isStreaming}
+              className="hover:text-foreground disabled:text-muted-foreground/40 cursor-pointer rounded p-1 transition-colors disabled:cursor-default"
+              aria-label="Show previous branch version"
+            >
+              <ChevronLeft className="size-4" />
+            </button>
+            <span className="text-[13px] font-medium tabular-nums">
+              {branchState.currentIndex}/{branchState.total}
+            </span>
+            <button
+              type="button"
+              onClick={() => handleSwitchBranch(branchState.nextLeafNodeId)}
+              disabled={!branchState.nextLeafNodeId || isStreaming}
+              className="hover:text-foreground disabled:text-muted-foreground/40 cursor-pointer rounded p-1 transition-colors disabled:cursor-default"
+              aria-label="Show next branch version"
+            >
+              <ChevronRight className="size-4" />
+            </button>
+          </div>
+        ) : null}
       </div>
     </div>
   );

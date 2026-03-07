@@ -15,6 +15,7 @@ const REASONING_LEVELS = new Set<ReasoningLevel>(['low', 'medium', 'high', 'xhig
 type SessionTurnBody = {
   message?: string;
   skills?: string[];
+  leafNodeId?: string;
   api?: string;
   modelId?: string;
   reasoningLevel?: string;
@@ -43,6 +44,7 @@ function resolvePromptInput(
         ? body.reasoning
         : undefined;
   const reasoningLevel = rawReasoningLevel?.trim().toLowerCase();
+  const leafNodeId = typeof body.leafNodeId === 'string' ? body.leafNodeId.trim() : '';
 
   if (reasoningLevel && !REASONING_LEVELS.has(reasoningLevel as ReasoningLevel)) {
     return { error: 'reasoning must be one of: low, medium, high, xhigh' };
@@ -52,6 +54,7 @@ function resolvePromptInput(
     input: {
       message: body.message,
       skills: body.skills ?? [],
+      ...(leafNodeId ? { leafNodeId } : {}),
       ...(hasProviderOverride ? { api: api as Api, modelId } : {}),
       ...(reasoningLevel ? { reasoningLevel: reasoningLevel as ReasoningLevel } : {}),
     },
@@ -76,6 +79,7 @@ function resolveTurnSettings(
         ? body.reasoning
         : undefined;
   const reasoningLevel = rawReasoningLevel?.trim().toLowerCase();
+  const leafNodeId = typeof body?.leafNodeId === 'string' ? body.leafNodeId.trim() : '';
 
   if (reasoningLevel && !REASONING_LEVELS.has(reasoningLevel as ReasoningLevel)) {
     return { error: 'reasoning must be one of: low, medium, high, xhigh' };
@@ -84,6 +88,7 @@ function resolveTurnSettings(
   return {
     input: {
       ...(body?.skills ? { skills: body.skills } : {}),
+      ...(leafNodeId ? { leafNodeId } : {}),
       ...(hasProviderOverride ? { api: api as Api, modelId } : {}),
       ...(reasoningLevel ? { reasoningLevel: reasoningLevel as ReasoningLevel } : {}),
     },
@@ -144,6 +149,20 @@ sessionRoutes.get(`${BASE}/:sessionId/messages`, async (c) => {
     const session = await Session.getById(projectId, artifactDirId, sessionId);
     const nodes = await session.getHistoryNodes();
     return c.json(nodes);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Session not found';
+    return c.json({ error: message }, 404);
+  }
+});
+
+/** GET /api/.../sessions/:sessionId/tree — Get the full message tree for branch navigation */
+sessionRoutes.get(`${BASE}/:sessionId/tree`, async (c) => {
+  const { projectId, artifactDirId, sessionId } = c.req.param();
+
+  try {
+    const session = await Session.getById(projectId, artifactDirId, sessionId);
+    const tree = await session.getMessageTree();
+    return c.json(tree);
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Session not found';
     return c.json({ error: message }, 404);
