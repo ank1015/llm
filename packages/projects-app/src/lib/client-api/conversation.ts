@@ -1,6 +1,7 @@
 import { apiRequestJson, SERVER_BASE } from './http';
 
 import type {
+  LiveRunSummary,
   SessionTreeResponse,
   StreamEventMap,
   StreamEventName,
@@ -37,6 +38,25 @@ function buildRewriteStreamPath(
   action: 'retry' | 'edit'
 ): string {
   return `${buildMessagesPath(ctx, sessionId)}/${encodeURIComponent(nodeId)}/${action}/stream`;
+}
+
+function buildAttachRunStreamPath(
+  ctx: ArtifactContext,
+  sessionId: string,
+  runId: string,
+  afterSeq?: number
+): string {
+  const url = new URL(
+    `${buildSessionsBase(ctx)}/${encodeURIComponent(sessionId)}/runs/${encodeURIComponent(runId)}/stream`
+  );
+  if (afterSeq !== undefined && afterSeq > 0) {
+    url.searchParams.set('afterSeq', String(afterSeq));
+  }
+  return url.toString();
+}
+
+function buildCancelRunPath(ctx: ArtifactContext, sessionId: string, runId: string): string {
+  return `${buildSessionsBase(ctx)}/${encodeURIComponent(sessionId)}/runs/${encodeURIComponent(runId)}/cancel`;
 }
 
 type SseParsedEvent = {
@@ -119,6 +139,16 @@ export type StreamHandlers = {
   ) => void;
 };
 
+export class StreamConflictError extends Error {
+  liveRun: LiveRunSummary;
+
+  constructor(liveRun: LiveRunSummary) {
+    super('A stream is already running for this session.');
+    this.name = 'StreamConflictError';
+    this.liveRun = liveRun;
+  }
+}
+
 export type StreamRequest = ArtifactContext & {
   sessionId: string;
   message: string;
@@ -139,6 +169,17 @@ export type StreamEditRequest = ArtifactContext & {
 } & TurnSettings &
   VisibleLeafSelection;
 
+export type AttachRunRequest = ArtifactContext & {
+  sessionId: string;
+  runId: string;
+  afterSeq?: number;
+};
+
+export type CancelRunRequest = ArtifactContext & {
+  sessionId: string;
+  runId: string;
+};
+
 type StreamRequestBody = {
   message?: string;
   skills?: string[];
@@ -151,24 +192,35 @@ type StreamRequestBody = {
 // eslint-disable-next-line sonarjs/cognitive-complexity
 async function streamConversationRequest(
   url: string,
-  body: StreamRequestBody,
+  request: {
+    method?: 'GET' | 'POST';
+    body?: StreamRequestBody;
+  },
   handlers: StreamHandlers = {},
   signal?: AbortSignal
 ): Promise<void> {
   const response = await fetch(url, {
-    method: 'POST',
+    method: request.method ?? 'POST',
     headers: {
       Accept: 'text/event-stream',
-      'Content-Type': 'application/json',
+      ...(request.body
+        ? {
+            'Content-Type': 'application/json',
+          }
+        : {}),
     },
-    body: JSON.stringify(body),
+    ...(request.body ? { body: JSON.stringify(request.body) } : {}),
     signal,
   });
 
   if (!response.ok) {
     const body = (await response.json().catch(() => ({}))) as {
       error?: string;
+      liveRun?: LiveRunSummary;
     };
+    if (response.status === 409 && body.liveRun) {
+      throw new StreamConflictError(body.liveRun);
+    }
     throw new Error(body.error ?? `Request failed: ${response.status}`);
   }
 
@@ -214,6 +266,11 @@ async function streamConversationRequest(
           continue;
         }
 
+        if (parsed.event === 'node_persisted') {
+          handlers.onEvent?.('node_persisted', parsed.data as StreamEventMap['node_persisted']);
+          continue;
+        }
+
         if (parsed.event === 'done') {
           handlers.onEvent?.('done', parsed.data as StreamEventMap['done']);
           continue;
@@ -240,12 +297,31 @@ export async function streamConversation(
   await streamConversationRequest(
     buildStreamPath(ctx, request.sessionId),
     {
-      message: request.message,
-      skills: request.skills ?? [],
-      ...(request.leafNodeId ? { leafNodeId: request.leafNodeId } : {}),
-      api: request.api,
-      modelId: request.modelId,
-      reasoningLevel: request.reasoningLevel,
+      method: 'POST',
+      body: {
+        message: request.message,
+        skills: request.skills ?? [],
+        ...(request.leafNodeId ? { leafNodeId: request.leafNodeId } : {}),
+        api: request.api,
+        modelId: request.modelId,
+        reasoningLevel: request.reasoningLevel,
+      },
+    },
+    handlers,
+    signal
+  );
+}
+
+export async function attachToSessionRun(
+  request: AttachRunRequest,
+  handlers: StreamHandlers = {},
+  signal?: AbortSignal
+): Promise<void> {
+  const ctx: ArtifactContext = { projectId: request.projectId, artifactId: request.artifactId };
+  await streamConversationRequest(
+    buildAttachRunStreamPath(ctx, request.sessionId, request.runId, request.afterSeq),
+    {
+      method: 'GET',
     },
     handlers,
     signal
@@ -261,14 +337,24 @@ export async function streamRetryConversation(
   await streamConversationRequest(
     buildRewriteStreamPath(ctx, request.sessionId, request.nodeId, 'retry'),
     {
-      ...(request.leafNodeId ? { leafNodeId: request.leafNodeId } : {}),
-      api: request.api,
-      modelId: request.modelId,
-      reasoningLevel: request.reasoningLevel,
+      method: 'POST',
+      body: {
+        ...(request.leafNodeId ? { leafNodeId: request.leafNodeId } : {}),
+        api: request.api,
+        modelId: request.modelId,
+        reasoningLevel: request.reasoningLevel,
+      },
     },
     handlers,
     signal
   );
+}
+
+export async function cancelSessionRun(request: CancelRunRequest): Promise<{ ok: true }> {
+  const ctx: ArtifactContext = { projectId: request.projectId, artifactId: request.artifactId };
+  return apiRequestJson<{ ok: true }>(buildCancelRunPath(ctx, request.sessionId, request.runId), {
+    method: 'POST',
+  });
 }
 
 export async function streamEditConversation(
@@ -280,11 +366,14 @@ export async function streamEditConversation(
   await streamConversationRequest(
     buildRewriteStreamPath(ctx, request.sessionId, request.nodeId, 'edit'),
     {
-      message: request.message,
-      ...(request.leafNodeId ? { leafNodeId: request.leafNodeId } : {}),
-      api: request.api,
-      modelId: request.modelId,
-      reasoningLevel: request.reasoningLevel,
+      method: 'POST',
+      body: {
+        message: request.message,
+        ...(request.leafNodeId ? { leafNodeId: request.leafNodeId } : {}),
+        api: request.api,
+        modelId: request.modelId,
+        reasoningLevel: request.reasoningLevel,
+      },
     },
     handlers,
     signal

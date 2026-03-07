@@ -1,12 +1,14 @@
 import { Hono } from 'hono';
 
 import { Session } from '../core/index.js';
+import { sessionRunRegistry } from '../core/session/run-registry.js';
 
 import type { PromptInput, ReasoningLevel } from '../core/index.js';
-import type { AgentEvent, Api } from '@ank1015/llm-sdk';
+import type { AgentEvent, Api, MessageNode } from '@ank1015/llm-sdk';
 import type { Context } from 'hono';
 
 const BASE = '/projects/:projectId/artifacts/:artifactDirId/sessions';
+const HEARTBEAT_INTERVAL_MS = 15_000;
 
 export const sessionRoutes = new Hono();
 
@@ -162,7 +164,12 @@ sessionRoutes.get(`${BASE}/:sessionId/tree`, async (c) => {
   try {
     const session = await Session.getById(projectId, artifactDirId, sessionId);
     const tree = await session.getMessageTree();
-    return c.json(tree);
+    const sessionKey = getSessionRunKey(projectId, artifactDirId, sessionId);
+    const liveRun = sessionRunRegistry.getLiveRunSummary(sessionKey);
+    return c.json({
+      ...tree,
+      ...(liveRun ? { liveRun } : {}),
+    });
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Session not found';
     return c.json({ error: message }, 404);
@@ -249,29 +256,56 @@ sessionRoutes.patch(`${BASE}/:sessionId/name`, async (c) => {
 // SSE Streaming
 // ---------------------------------------------------------------------------
 
-function toSseChunk(event: string, data: unknown): Uint8Array {
-  const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+function getSessionRunKey(projectId: string, artifactDirId: string, sessionId: string): string {
+  return `${projectId}:${artifactDirId}:${sessionId}`;
+}
+
+function toSseChunk(event: string, data: unknown, id?: number): Uint8Array {
+  const payload = `${id !== undefined ? `id: ${id}\n` : ''}event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
   return new TextEncoder().encode(payload);
 }
 
-function streamSessionRun(
+function toSseComment(comment: string): Uint8Array {
+  return new TextEncoder().encode(`: ${comment}\n\n`);
+}
+
+function streamAttachedRun(
   c: Context,
   sessionId: string,
-  run: (options: { onEvent: (event: AgentEvent) => void; signal?: AbortSignal }) => Promise<{
-    length: number;
-  }>
+  run: NonNullable<ReturnType<typeof sessionRunRegistry.getRun>>,
+  afterSeq = 0
 ) {
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
       let closed = false;
+      let unsubscribe = (): void => undefined;
+      let lastSentSeq = afterSeq;
 
-      const send = (event: string, data: unknown): void => {
+      const send = (event: string, data: unknown, id?: number): void => {
         if (closed) return;
         try {
-          controller.enqueue(toSseChunk(event, data));
+          controller.enqueue(toSseChunk(event, data, id));
         } catch {
           closed = true;
         }
+      };
+
+      const sendComment = (comment: string): void => {
+        if (closed) return;
+        try {
+          controller.enqueue(toSseComment(comment));
+        } catch {
+          closed = true;
+        }
+      };
+
+      const sendReplayEntry = (
+        entry: ReturnType<
+          NonNullable<ReturnType<typeof sessionRunRegistry.getRun>>['getReplayEvents']
+        >[number]
+      ): void => {
+        lastSentSeq = entry.seq;
+        send(entry.event, entry.data, entry.seq);
       };
 
       const close = (): void => {
@@ -280,29 +314,61 @@ function streamSessionRun(
         controller.close();
       };
 
-      void (async (): Promise<void> => {
-        send('ready', { ok: true, sessionId });
+      const cleanup = (): void => {
+        unsubscribe();
+        clearInterval(heartbeat);
+        c.req.raw.signal.removeEventListener('abort', handleAbort);
+        close();
+      };
 
-        try {
-          const newMessages = await run({
-            onEvent: (event) => {
-              send('agent_event', event);
-            },
-            signal: c.req.raw.signal,
-          });
+      const handleAbort = (): void => {
+        cleanup();
+      };
 
-          send('done', {
-            ok: true,
-            sessionId,
-            messageCount: newMessages.length,
-          });
-        } catch (error) {
-          const message = error instanceof Error ? error.message : 'Stream failed';
-          send('error', { ok: false, code: 'STREAM_FAILED', message });
-        } finally {
-          close();
+      const heartbeat = setInterval(() => {
+        sendComment('keep-alive');
+      }, HEARTBEAT_INTERVAL_MS);
+
+      c.req.raw.signal.addEventListener('abort', handleAbort, { once: true });
+
+      send('ready', {
+        ok: true,
+        sessionId,
+        runId: run.summary.runId,
+        status: run.summary.status,
+      });
+
+      for (const entry of run.getReplayEvents(lastSentSeq)) {
+        sendReplayEntry(entry);
+      }
+
+      if (!run.isRunning()) {
+        cleanup();
+        return;
+      }
+
+      unsubscribe = run.subscribe({
+        send: (entry) => {
+          if (entry.seq <= lastSentSeq) {
+            return;
+          }
+          sendReplayEntry(entry);
+        },
+        close: () => {
+          cleanup();
+        },
+      });
+
+      for (const entry of run.getReplayEvents(lastSentSeq)) {
+        if (entry.seq <= lastSentSeq) {
+          continue;
         }
-      })();
+        sendReplayEntry(entry);
+      }
+
+      if (!run.isRunning()) {
+        cleanup();
+      }
     },
   });
 
@@ -312,6 +378,41 @@ function streamSessionRun(
   c.header('X-Accel-Buffering', 'no');
 
   return c.body(stream);
+}
+
+async function startSessionRun(
+  c: Context,
+  input: {
+    projectId: string;
+    artifactDirId: string;
+    sessionId: string;
+    mode: 'prompt' | 'retry' | 'edit';
+    execute: (options: {
+      signal: AbortSignal;
+      onEvent: (event: AgentEvent) => void;
+      onNodePersisted: (node: MessageNode) => void;
+    }) => Promise<{ messageCount: number }>;
+  }
+) {
+  const sessionKey = getSessionRunKey(input.projectId, input.artifactDirId, input.sessionId);
+  const started = sessionRunRegistry.startRun({
+    sessionKey,
+    sessionId: input.sessionId,
+    mode: input.mode,
+    execute: input.execute,
+  });
+
+  if (started.status === 'already_running') {
+    return c.json(
+      {
+        error: 'A stream is already running for this session.',
+        liveRun: started.run.summary,
+      },
+      409
+    );
+  }
+
+  return streamAttachedRun(c, input.sessionId, started.run);
 }
 
 /** POST /api/.../sessions/:sessionId/stream — Stream a conversation turn via SSE */
@@ -331,9 +432,15 @@ sessionRoutes.post(`${BASE}/:sessionId/stream`, async (c) => {
     return c.json({ error: message }, 404);
   }
 
-  return streamSessionRun(c, sessionId, async (options) => {
-    const newMessages = await session.streamPrompt(resolvedPromptInput.input, options);
-    return { length: newMessages.length };
+  return startSessionRun(c, {
+    projectId,
+    artifactDirId,
+    sessionId,
+    mode: 'prompt',
+    execute: async (options) => {
+      const newMessages = await session.streamPrompt(resolvedPromptInput.input, options);
+      return { messageCount: newMessages.length };
+    },
   });
 });
 
@@ -354,13 +461,19 @@ sessionRoutes.post(`${BASE}/:sessionId/messages/:nodeId/retry/stream`, async (c)
     return c.json({ error: message }, 404);
   }
 
-  return streamSessionRun(c, sessionId, async (options) => {
-    const newMessages = await session.streamRetryFromUserMessage(
-      nodeId,
-      resolvedTurnSettings.input,
-      options
-    );
-    return { length: newMessages.length };
+  return startSessionRun(c, {
+    projectId,
+    artifactDirId,
+    sessionId,
+    mode: 'retry',
+    execute: async (options) => {
+      const newMessages = await session.streamRetryFromUserMessage(
+        nodeId,
+        resolvedTurnSettings.input,
+        options
+      );
+      return { messageCount: newMessages.length };
+    },
   });
 });
 
@@ -381,12 +494,62 @@ sessionRoutes.post(`${BASE}/:sessionId/messages/:nodeId/edit/stream`, async (c) 
     return c.json({ error: message }, 404);
   }
 
-  return streamSessionRun(c, sessionId, async (options) => {
-    const newMessages = await session.streamEditFromUserMessage(
-      nodeId,
-      resolvedPromptInput.input,
-      options
+  return startSessionRun(c, {
+    projectId,
+    artifactDirId,
+    sessionId,
+    mode: 'edit',
+    execute: async (options) => {
+      const newMessages = await session.streamEditFromUserMessage(
+        nodeId,
+        resolvedPromptInput.input,
+        options
+      );
+      return { messageCount: newMessages.length };
+    },
+  });
+});
+
+/** GET /api/.../sessions/:sessionId/runs/:runId/stream — Reattach to a live session run */
+sessionRoutes.get(`${BASE}/:sessionId/runs/:runId/stream`, async (c) => {
+  const { projectId, artifactDirId, sessionId, runId } = c.req.param();
+  const sessionKey = getSessionRunKey(projectId, artifactDirId, sessionId);
+  const afterSeq = Number.parseInt(c.req.query('afterSeq') ?? '0', 10);
+  const safeAfterSeq = Number.isFinite(afterSeq) && afterSeq > 0 ? afterSeq : 0;
+  const run = sessionRunRegistry.getRun(sessionKey, runId);
+
+  if (!run) {
+    return c.json({ error: 'Run not found' }, 404);
+  }
+
+  return streamAttachedRun(c, sessionId, run, safeAfterSeq);
+});
+
+/** POST /api/.../sessions/:sessionId/runs/:runId/cancel — Cancel a live session run */
+sessionRoutes.post(`${BASE}/:sessionId/runs/:runId/cancel`, async (c) => {
+  const { projectId, artifactDirId, sessionId, runId } = c.req.param();
+  const sessionKey = getSessionRunKey(projectId, artifactDirId, sessionId);
+  const run = sessionRunRegistry.getRun(sessionKey, runId);
+
+  if (!run) {
+    return c.json({ error: 'Run not found' }, 404);
+  }
+
+  if (!run.isRunning()) {
+    return c.json(
+      {
+        error: 'Run is not active.',
+        liveRun: run.summary,
+      },
+      409
     );
-    return { length: newMessages.length };
+  }
+
+  sessionRunRegistry.cancelRun(sessionKey, runId);
+  return c.json({
+    ok: true,
+    sessionId,
+    runId,
+    cancelled: true,
   });
 });

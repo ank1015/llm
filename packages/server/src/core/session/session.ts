@@ -65,10 +65,12 @@ type PersistenceConfig = {
   branch: string;
   initialParentId: string;
   activateBranchOnFirstPersist?: boolean;
+  onNodePersisted?: (node: MessageNode) => void;
 };
 
 type StreamRunOptions = {
   onEvent: (event: AgentEvent) => void;
+  onNodePersisted?: (node: MessageNode) => void;
   signal?: AbortSignal;
 };
 
@@ -332,6 +334,7 @@ export class Session {
           branch: context.branch,
           initialParentId: context.leafNodeId,
           activateBranchOnFirstPersist: context.branch !== context.persistedActiveBranch,
+          ...(options.onNodePersisted ? { onNodePersisted: options.onNodePersisted } : {}),
         },
       },
       options
@@ -455,6 +458,7 @@ export class Session {
       });
       nodes.push(result.node);
       parentIdPromise = Promise.resolve(result.node.id);
+      config.onNodePersisted?.(result.node);
 
       if (!didActivateBranch) {
         didActivateBranch = true;
@@ -537,6 +541,9 @@ export class Session {
           branch,
           initialParentId: targetNode.parentId,
           activateBranchOnFirstPersist: true,
+          ...(input.options.onNodePersisted
+            ? { onNodePersisted: input.options.onNodePersisted }
+            : {}),
         },
       },
       input.options

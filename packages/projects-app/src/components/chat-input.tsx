@@ -689,7 +689,20 @@ function PromptInputWithActions() {
 
   const handleStop = () => {
     if (currentSession) {
-      abortStream(currentSession);
+      void abortStream({
+        session: currentSession,
+        projectId,
+        artifactId,
+      }).catch((error) => {
+        if (isAbortError(error)) {
+          return;
+        }
+
+        const message = error instanceof Error ? error.message : 'Failed to stop generation.';
+        toast.error(message, {
+          id: 'composer-stop-error',
+        });
+      });
     }
   };
 

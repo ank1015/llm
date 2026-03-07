@@ -1,11 +1,20 @@
 export {
+  attachToSessionRun,
+  cancelSessionRun,
   getSessionMessages,
   getSessionTree,
+  StreamConflictError,
   streamConversation,
   streamEditConversation,
   streamRetryConversation,
 } from './conversation';
-export type { StreamEditRequest, StreamRequest, StreamRetryRequest } from './conversation';
+export type {
+  AttachRunRequest,
+  CancelRunRequest,
+  StreamEditRequest,
+  StreamRequest,
+  StreamRetryRequest,
+} from './conversation';
 export {
   createArtifactDir,
   createProject,

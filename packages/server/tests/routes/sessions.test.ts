@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 import { setConfig } from '../../src/core/config.js';
+import { resetSessionRunRegistry } from '../../src/core/session/run-registry.js';
 import { resetAgentMocks } from '../helpers/mock-agents.js';
 
 const mockPrompt = vi.fn();
@@ -53,6 +54,7 @@ const BASE = `/api/projects/${PROJECT}/artifacts/${ARTIFACT}/sessions`;
 
 beforeEach(async () => {
   resetAgentMocks();
+  resetSessionRunRegistry();
   projectsRoot = await mkdtemp(join(tmpdir(), 'test-projects-'));
   dataRoot = await mkdtemp(join(tmpdir(), 'test-data-'));
   setConfig({ projectsRoot, dataRoot });
@@ -76,6 +78,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  resetSessionRunRegistry();
   await rm(projectsRoot, { recursive: true, force: true });
   await rm(dataRoot, { recursive: true, force: true });
 });
@@ -341,6 +344,49 @@ describe('Session Routes', () => {
         return node.id === body.persistedLeafNodeId;
       });
       expect(persistedLeafNode?.message.id).toBe('asst-tree-branch');
+    });
+
+    it('should include liveRun metadata while a detached stream is active', async () => {
+      const created = await createSession();
+      const mockUserMsg = {
+        role: 'user',
+        id: 'user-live-run',
+        content: [{ type: 'text', content: 'Live run prompt' }],
+        timestamp: Date.now(),
+      };
+      let rejectPrompt: ((error: Error) => void) | undefined;
+
+      mockPrompt.mockImplementationOnce(
+        async (
+          _prompt: string,
+          _attachments: unknown,
+          callback: (msg: unknown) => Promise<void>
+        ) => {
+          await callback(mockUserMsg);
+          return await new Promise<never>((_resolve, reject) => {
+            rejectPrompt = reject;
+          });
+        }
+      );
+      mockAbort.mockImplementationOnce(() => {
+        rejectPrompt?.(new Error('aborted'));
+      });
+
+      const streamRes = await post(`${BASE}/${created.id}/stream`, { message: 'Live run prompt' });
+      const treeRes = await get(`${BASE}/${created.id}/tree`);
+
+      expect(treeRes.status).toBe(200);
+      const treeBody = await treeRes.json();
+      expect(treeBody.liveRun).toBeDefined();
+      expect(treeBody.liveRun.status).toBe('running');
+      expect(treeBody.liveRun.mode).toBe('prompt');
+
+      const cancelRes = await post(
+        `${BASE}/${created.id}/runs/${treeBody.liveRun.runId}/cancel`,
+        {}
+      );
+      expect(cancelRes.status).toBe(200);
+      await streamRes.text();
     });
   });
 
@@ -686,7 +732,7 @@ describe('Session Routes', () => {
       expect(res.status).toBe(404);
     });
 
-    it('should return SSE stream with ready, agent_event, and done events', async () => {
+    it('should return SSE stream with ready, agent_event, node_persisted, and done events', async () => {
       const mockUserMsg = {
         role: 'user',
         id: 'user-stream-1',
@@ -767,12 +813,146 @@ describe('Session Routes', () => {
       expect(events[0]?.event).toBe('ready');
       expect(events[0]?.data.ok).toBe(true);
       expect(events[0]?.data.sessionId).toBe(created.id);
+      expect((events[0]?.data as { runId?: string }).runId).toBeDefined();
+      expect((events[0]?.data as { status?: string }).status).toBe('running');
+
+      const nodePersistedEvents = events.filter((e) => e.event === 'node_persisted');
+      expect(nodePersistedEvents).toHaveLength(2);
 
       // Last event should be 'done'
       const doneEvent = events.find((e) => e.event === 'done');
       expect(doneEvent).toBeDefined();
       expect(doneEvent?.data.ok).toBe(true);
       expect(doneEvent?.data.messageCount).toBe(2);
+      expect((doneEvent?.data as { status?: string }).status).toBe('completed');
+    });
+
+    it('should replay buffered events from the run attach endpoint', async () => {
+      const mockUserMsg = {
+        role: 'user',
+        id: 'user-stream-replay',
+        content: [{ type: 'text', content: 'Replay this run' }],
+        timestamp: Date.now(),
+      };
+      const mockAssistantMsg = {
+        role: 'assistant',
+        id: 'asst-stream-replay',
+        api: 'anthropic',
+        model: { id: 'claude-sonnet-4-5', api: 'anthropic' },
+        content: [{ type: 'response', content: [{ type: 'text', content: 'Replay result' }] }],
+        usage: {
+          input: 10,
+          output: 5,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 15,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        },
+        stopReason: 'stop',
+        timestamp: Date.now(),
+        duration: 100,
+        message: {},
+      };
+
+      mockPrompt.mockImplementationOnce(
+        async (
+          _prompt: string,
+          _attachments: unknown,
+          callback: (msg: unknown) => Promise<void>
+        ) => {
+          await callback(mockUserMsg);
+          await callback(mockAssistantMsg);
+          await new Promise((resolve) => setTimeout(resolve, 20));
+          return [mockUserMsg, mockAssistantMsg];
+        }
+      );
+      mockSubscribe.mockImplementationOnce((handler: (event: unknown) => void) => {
+        setTimeout(() => {
+          handler({ type: 'message_update', messageType: 'assistant', message: mockAssistantMsg });
+        }, 10);
+        return vi.fn();
+      });
+
+      const created = await createSession();
+      const startRes = await post(`${BASE}/${created.id}/stream`, { message: 'Replay this run' });
+      const startEvents = parseSseEvents(await startRes.text());
+      const runId = (startEvents[0]?.data as { runId?: string } | undefined)?.runId;
+
+      expect(runId).toBeDefined();
+
+      const attachRes = await get(`${BASE}/${created.id}/runs/${runId}/stream`);
+      expect(attachRes.status).toBe(200);
+
+      const replayEvents = parseSseEvents(await attachRes.text());
+      expect(replayEvents[0]?.event).toBe('ready');
+      expect(replayEvents.some((event) => event.event === 'agent_event')).toBe(true);
+      expect(replayEvents.filter((event) => event.event === 'node_persisted')).toHaveLength(2);
+      const doneEvent = replayEvents.find((event) => event.event === 'done');
+      expect(doneEvent?.data).toMatchObject({
+        ok: true,
+        sessionId: created.id,
+        runId,
+        status: 'completed',
+        messageCount: 2,
+      });
+    });
+
+    it('should cancel a live run through the cancel endpoint', async () => {
+      const created = await createSession();
+
+      let rejectPrompt: ((error: Error) => void) | undefined;
+      mockPrompt.mockImplementationOnce(
+        async () =>
+          await new Promise<never>((_resolve, reject) => {
+            rejectPrompt = reject;
+          })
+      );
+      mockAbort.mockImplementationOnce(() => {
+        rejectPrompt?.(new Error('aborted'));
+      });
+
+      const streamRes = await post(`${BASE}/${created.id}/stream`, { message: 'Stop this run' });
+      const treeRes = await get(`${BASE}/${created.id}/tree`);
+      const treeBody = await treeRes.json();
+      const runId = treeBody.liveRun?.runId as string | undefined;
+
+      expect(runId).toBeDefined();
+
+      const cancelRes = await post(`${BASE}/${created.id}/runs/${runId}/cancel`, {});
+      expect(cancelRes.status).toBe(200);
+
+      const streamEvents = parseSseEvents(await streamRes.text());
+      const doneEvent = streamEvents.find((event) => event.event === 'done');
+      expect(doneEvent?.data).toMatchObject({
+        ok: true,
+        sessionId: created.id,
+        runId,
+        status: 'cancelled',
+      });
+    });
+
+    it('should return 409 with liveRun metadata when another run is already active', async () => {
+      const created = await createSession();
+
+      mockPrompt.mockImplementationOnce(
+        async () =>
+          await new Promise<unknown[]>((resolve) => {
+            setTimeout(() => {
+              resolve([]);
+            }, 50);
+          })
+      );
+
+      const firstRunRes = await post(`${BASE}/${created.id}/stream`, { message: 'First run' });
+      const duplicateRes = await post(`${BASE}/${created.id}/stream`, { message: 'Second run' });
+
+      expect(duplicateRes.status).toBe(409);
+      const duplicateBody = await duplicateRes.json();
+      expect(duplicateBody.error).toBe('A stream is already running for this session.');
+      expect(duplicateBody.liveRun).toBeDefined();
+      expect(duplicateBody.liveRun.status).toBe('running');
+
+      await firstRunRes.text();
     });
 
     it('should persist stream override api and model metadata', async () => {
