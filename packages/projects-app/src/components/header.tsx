@@ -9,8 +9,11 @@ import type { ProjectOverview } from '@/lib/client-api';
 
 import { Button } from '@/components/ui/button';
 import { getProjectOverview } from '@/lib/client-api';
+import { useTypewriter } from '@/lib/use-typewriter';
 import { cn } from '@/lib/utils';
-import { useUiStore } from '@/stores';
+import { useSidebarStore, useUiStore } from '@/stores';
+
+const EMPTY_ARTIFACT_DIRS: ProjectOverview['artifactDirs'] = [];
 
 function HeaderBreadcrumb() {
   const { projectId, artifactId, threadId } = useParams<{
@@ -21,6 +24,8 @@ function HeaderBreadcrumb() {
   const pathname = usePathname();
 
   const [overview, setOverview] = useState<ProjectOverview | null>(null);
+  const sidebarProjectName = useSidebarStore((state) => state.projectName);
+  const sidebarArtifactDirs = useSidebarStore((state) => state.artifactDirs ?? EMPTY_ARTIFACT_DIRS);
 
   useEffect(() => {
     if (!projectId) return;
@@ -29,14 +34,16 @@ function HeaderBreadcrumb() {
       .catch(() => setOverview(null));
   }, [projectId]);
 
-  const projectName = overview?.project.name ?? projectId;
-  const artifact = artifactId ? overview?.artifactDirs.find((d) => d.id === artifactId) : undefined;
+  const projectName = sidebarProjectName ?? overview?.project.name ?? projectId;
+  const artifact = artifactId
+    ? (sidebarArtifactDirs.find((dir) => dir.id === artifactId) ??
+      overview?.artifactDirs.find((dir) => dir.id === artifactId))
+    : undefined;
   const artifactName = artifact?.name ?? artifactId;
 
-  // Get thread name from the overview data
   const session =
     threadId && artifact ? artifact.sessions.find((s) => s.sessionId === threadId) : undefined;
-  const threadName = session?.sessionName ?? threadId;
+  const threadName = useTypewriter(session?.sessionName ?? 'Session');
   const isArtifactsView = Boolean(artifactId && pathname.endsWith('/artifacts'));
 
   // Determine which segment is the last (active) one

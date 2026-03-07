@@ -2,6 +2,7 @@
 
 import { create } from 'zustand';
 
+import type { ModelSelection } from '@/lib/contracts';
 import type { SessionSummary } from '@ank1015/llm-sdk';
 
 import {
@@ -30,7 +31,7 @@ type SessionsStoreState = {
   refresh: (ctx: ArtifactContext) => Promise<void>;
   createSession: (
     ctx: ArtifactContext,
-    input?: { sessionName?: string }
+    input: { sessionName?: string } & ModelSelection
   ) => Promise<{ sessionId: string }>;
   renameSession: (
     ctx: ArtifactContext,
@@ -143,6 +144,8 @@ export const useSessionsStore = create<SessionsStoreState>((set, get) => ({
     try {
       const metadata = await createSessionApi(ctx, {
         name: input?.sessionName,
+        api: input.api,
+        modelId: input.modelId,
       });
 
       await get().refresh(ctx);

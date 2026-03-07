@@ -3,6 +3,8 @@
  * These represent the shapes stored on disk as metadata.json files.
  */
 
+import type { Api } from '@ank1015/llm-sdk';
+
 /** Metadata stored in each project's metadata.json (lives in dataPath) */
 export interface ProjectMetadata {
   /** Unique identifier (used as directory name in both locations) */
@@ -145,9 +147,19 @@ export interface CreateSessionOptions {
 }
 
 /** Input for sending a message in a session */
+export type ReasoningLevel = 'low' | 'medium' | 'high' | 'xhigh';
+
 export interface PromptInput {
   /** The user's message text */
   message: string;
   /** Skill names to activate for this prompt (resolved from globalSkills) */
   skills?: string[];
+  /** Optional per-turn API override */
+  api?: Api;
+  /** Optional per-turn model override */
+  modelId?: string;
+  /** Optional per-turn reasoning level */
+  reasoningLevel?: ReasoningLevel;
+  /** Backward-compatible alias for per-turn reasoning level */
+  reasoning?: ReasoningLevel;
 }

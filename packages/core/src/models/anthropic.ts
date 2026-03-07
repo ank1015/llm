@@ -71,4 +71,21 @@ export const anthropicModels = {
     maxTokens: 64000,
     tools: ['function_calling'],
   } satisfies Model<'anthropic'>,
+  'claude-sonnet-4-6': {
+    id: 'claude-sonnet-4-6',
+    name: 'Sonnet 4.6',
+    api: 'anthropic',
+    baseUrl: anthropicBaseUrl,
+    reasoning: true,
+    input: ['text', 'image'],
+    cost: {
+      input: 3,
+      output: 15,
+      cacheRead: 0.3,
+      cacheWrite: 3.75,
+    },
+    contextWindow: 200000,
+    maxTokens: 64000,
+    tools: ['function_calling'],
+  } satisfies Model<'anthropic'>,
 };

@@ -13,8 +13,6 @@ import {
   resetAgentMocks,
 } from './helpers/mock-agents.js';
 
-import type { SessionMetadata } from '../src/core/types.js';
-
 // Mock the Conversation class so we don't make real LLM calls
 const mockPrompt = vi.fn();
 vi.mock('@ank1015/llm-sdk', async (importOriginal) => {
@@ -256,6 +254,56 @@ describe('Session', () => {
       expect(history).toHaveLength(2);
       expect(history[0]?.role).toBe('user');
       expect(history[1]?.role).toBe('assistant');
+    });
+
+    it('should persist per-turn api and model overrides on saved nodes', async () => {
+      const mockUserMsg = {
+        role: 'user' as const,
+        id: 'user-override',
+        content: [{ type: 'text' as const, content: 'Switch models' }],
+        timestamp: Date.now(),
+      };
+      const mockAssistantMsg = {
+        role: 'assistant' as const,
+        id: 'asst-override',
+        api: 'claude-code',
+        model: { id: 'claude-opus-4-6', api: 'claude-code' },
+        content: [{ type: 'response', content: [{ type: 'text', content: 'Done' }] }],
+        usage: {
+          input: 10,
+          output: 5,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 15,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        },
+        stopReason: 'stop',
+        timestamp: Date.now(),
+        duration: 100,
+        message: {},
+      };
+
+      mockPrompt.mockResolvedValue([mockUserMsg, mockAssistantMsg]);
+
+      const session = await Session.create(PROJECT_NAME, ARTIFACT_DIR_NAME, {
+        name: 'Override Test',
+        api: 'codex',
+        modelId: 'gpt-5.3-codex',
+      });
+
+      await session.prompt({
+        message: 'Switch models',
+        api: 'claude-code',
+        modelId: 'claude-opus-4-6',
+        reasoningLevel: 'medium',
+      });
+
+      const historyNodes = await session.getHistoryNodes();
+      expect(historyNodes).toHaveLength(2);
+      expect(historyNodes[0]?.api).toBe('claude-code');
+      expect(historyNodes[0]?.modelId).toBe('claude-opus-4-6');
+      expect(historyNodes[1]?.api).toBe('claude-code');
+      expect(historyNodes[1]?.modelId).toBe('claude-opus-4-6');
     });
 
     it('should use the shared agents package prompt and tools', async () => {

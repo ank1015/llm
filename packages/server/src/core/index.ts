@@ -20,4 +20,5 @@ export type {
   CreateArtifactDirInput,
   CreateSessionOptions,
   PromptInput,
+  ReasoningLevel,
 } from './types.js';

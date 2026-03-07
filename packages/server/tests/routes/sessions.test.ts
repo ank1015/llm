@@ -212,6 +212,19 @@ describe('Session Routes', () => {
       expect(body.error).toBe('message is required');
     });
 
+    it('should return 400 when api or modelId override is incomplete', async () => {
+      const created = await createSession();
+
+      const res = await post(`${BASE}/${created.id}/prompt`, {
+        message: 'Hello',
+        api: 'google',
+      });
+
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toBe('api and modelId must be provided together');
+    });
+
     it('should call prompt and return new messages', async () => {
       const mockUserMsg = {
         role: 'user',
@@ -293,6 +306,53 @@ describe('Session Routes', () => {
       expect(body[0].message.role).toBe('user');
       expect(body[1].message.role).toBe('assistant');
     });
+
+    it('should persist prompt override api and model metadata', async () => {
+      const mockUserMsg = {
+        role: 'user',
+        id: 'user-override-route',
+        content: [{ type: 'text', content: 'Override prompt' }],
+        timestamp: Date.now(),
+      };
+      const mockAssistantMsg = {
+        role: 'assistant',
+        id: 'asst-override-route',
+        api: 'google',
+        model: { id: 'gemini-3.1-pro-preview', api: 'google' },
+        content: [{ type: 'response', content: [{ type: 'text', content: 'Done' }] }],
+        usage: {
+          input: 10,
+          output: 5,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 15,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        },
+        stopReason: 'stop',
+        timestamp: Date.now(),
+        duration: 100,
+        message: {},
+      };
+      mockPrompt.mockResolvedValue([mockUserMsg, mockAssistantMsg]);
+
+      const created = await createSession();
+
+      const promptRes = await post(`${BASE}/${created.id}/prompt`, {
+        message: 'Override prompt',
+        api: 'google',
+        modelId: 'gemini-3.1-pro-preview',
+        reasoningLevel: 'high',
+      });
+
+      expect(promptRes.status).toBe(200);
+
+      const historyRes = await get(`${BASE}/${created.id}/messages`);
+      const history = await historyRes.json();
+      expect(history[0].api).toBe('google');
+      expect(history[0].modelId).toBe('gemini-3.1-pro-preview');
+      expect(history[1].api).toBe('google');
+      expect(history[1].modelId).toBe('gemini-3.1-pro-preview');
+    });
   });
 
   describe('POST /api/.../sessions/:sessionId/stream', () => {
@@ -304,6 +364,19 @@ describe('Session Routes', () => {
       expect(res.status).toBe(400);
       const body = await res.json();
       expect(body.error).toBe('message is required');
+    });
+
+    it('should return 400 when api or modelId override is incomplete', async () => {
+      const created = await createSession();
+
+      const res = await post(`${BASE}/${created.id}/stream`, {
+        message: 'Hello',
+        modelId: 'gpt-5.4',
+      });
+
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toBe('api and modelId must be provided together');
     });
 
     it('should return 404 for nonexistent session', async () => {
@@ -399,6 +472,65 @@ describe('Session Routes', () => {
       expect(doneEvent).toBeDefined();
       expect(doneEvent?.data.ok).toBe(true);
       expect(doneEvent?.data.messageCount).toBe(2);
+    });
+
+    it('should persist stream override api and model metadata', async () => {
+      const mockUserMsg = {
+        role: 'user',
+        id: 'user-stream-override',
+        content: [{ type: 'text', content: 'Switch stream model' }],
+        timestamp: Date.now(),
+      };
+      const mockAssistantMsg = {
+        role: 'assistant',
+        id: 'asst-stream-override',
+        api: 'claude-code',
+        model: { id: 'claude-sonnet-4-6', api: 'claude-code' },
+        content: [{ type: 'response', content: [{ type: 'text', content: 'Done' }] }],
+        usage: {
+          input: 10,
+          output: 5,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 15,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        },
+        stopReason: 'stop',
+        timestamp: Date.now(),
+        duration: 100,
+        message: {},
+      };
+
+      mockPrompt.mockImplementation(
+        async (
+          _prompt: string,
+          _attachments: unknown,
+          callback: (msg: unknown) => Promise<void>
+        ) => {
+          await callback(mockUserMsg);
+          await callback(mockAssistantMsg);
+          return [mockUserMsg, mockAssistantMsg];
+        }
+      );
+
+      const created = await createSession();
+
+      const res = await post(`${BASE}/${created.id}/stream`, {
+        message: 'Switch stream model',
+        api: 'claude-code',
+        modelId: 'claude-sonnet-4-6',
+        reasoningLevel: 'xhigh',
+      });
+
+      expect(res.status).toBe(200);
+      await res.text();
+
+      const historyRes = await get(`${BASE}/${created.id}/messages`);
+      const history = await historyRes.json();
+      expect(history[0].api).toBe('claude-code');
+      expect(history[0].modelId).toBe('claude-sonnet-4-6');
+      expect(history[1].api).toBe('claude-code');
+      expect(history[1].modelId).toBe('claude-sonnet-4-6');
     });
   });
 

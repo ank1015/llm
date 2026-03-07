@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 
-import type { SessionRef } from '@/lib/contracts';
+import type { SessionRef, TurnSettings } from '@/lib/contracts';
 import type {
   AgentEvent,
   Api,
@@ -40,12 +40,14 @@ type ChatStoreState = {
     artifactId?: string;
     force?: boolean;
   }) => Promise<void>;
-  startStream: (input: {
-    sessionId: string;
-    prompt: string;
-    projectId: string;
-    artifactId: string;
-  }) => Promise<void>;
+  startStream: (
+    input: {
+      sessionId: string;
+      prompt: string;
+      projectId: string;
+      artifactId: string;
+    } & TurnSettings
+  ) => Promise<void>;
   abortStream: (session: SessionRef) => void;
 };
 
@@ -111,7 +113,12 @@ function upsertOptimisticMessageNode(
   return next;
 }
 
-function createOptimisticNode(input: { message: Message; parentId: string | null }): MessageNode {
+function createOptimisticNode(input: {
+  message: Message;
+  parentId: string | null;
+  api: Api;
+  modelId: string;
+}): MessageNode {
   return {
     type: 'message',
     id: `optimistic:${input.message.id}`,
@@ -119,8 +126,8 @@ function createOptimisticNode(input: { message: Message; parentId: string | null
     branch: 'main',
     timestamp: toIsoTimestamp(input.message.timestamp),
     message: input.message,
-    api: 'openai',
-    modelId: 'gpt-5.2',
+    api: input.api,
+    modelId: input.modelId,
     providerOptions: {},
   };
 }
@@ -403,6 +410,9 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
           message: prompt,
           projectId: input.projectId,
           artifactId: input.artifactId,
+          api: input.api,
+          modelId: input.modelId,
+          reasoningLevel: input.reasoningLevel,
         },
         {
           onEvent: (eventName, data) => {
@@ -441,6 +451,8 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
                   const optimisticNode = createOptimisticNode({
                     message: agentEvent.message,
                     parentId: optimisticParentId,
+                    api: input.api,
+                    modelId: input.modelId,
                   });
 
                   optimisticParentId = optimisticNode.id;

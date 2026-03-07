@@ -1,4 +1,4 @@
-import type { AgentEvent } from '@ank1015/llm-sdk';
+import type { AgentEvent, Api } from '@ank1015/llm-sdk';
 
 export type ApiErrorBody = {
   code: string;
@@ -12,6 +12,17 @@ export type ApiErrorResponse = {
 
 export type SessionRef = {
   sessionId: string;
+};
+
+export type ModelSelection = {
+  api: Api;
+  modelId: string;
+};
+
+export type ReasoningLevel = 'low' | 'medium' | 'high' | 'xhigh';
+
+export type TurnSettings = ModelSelection & {
+  reasoningLevel: ReasoningLevel;
 };
 
 /** Metadata returned by the server when creating a session */

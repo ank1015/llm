@@ -2,11 +2,60 @@ import { Hono } from 'hono';
 
 import { Session } from '../core/index.js';
 
-import type { AgentEvent } from '@ank1015/llm-sdk';
+import type { PromptInput, ReasoningLevel } from '../core/index.js';
+import type { AgentEvent, Api } from '@ank1015/llm-sdk';
 
 const BASE = '/projects/:projectId/artifacts/:artifactDirId/sessions';
 
 export const sessionRoutes = new Hono();
+
+const REASONING_LEVELS = new Set<ReasoningLevel>(['low', 'medium', 'high', 'xhigh']);
+
+type SessionTurnBody = {
+  message?: string;
+  skills?: string[];
+  api?: string;
+  modelId?: string;
+  reasoningLevel?: string;
+  reasoning?: string;
+};
+
+function resolvePromptInput(
+  body: SessionTurnBody | undefined
+): { error: string } | { input: PromptInput } {
+  if (!body?.message) {
+    return { error: 'message is required' };
+  }
+
+  const api = typeof body.api === 'string' ? body.api.trim() : '';
+  const modelId = typeof body.modelId === 'string' ? body.modelId.trim() : '';
+  const hasProviderOverride = api.length > 0 || modelId.length > 0;
+
+  if (hasProviderOverride && (api.length === 0 || modelId.length === 0)) {
+    return { error: 'api and modelId must be provided together' };
+  }
+
+  const rawReasoningLevel =
+    typeof body.reasoningLevel === 'string'
+      ? body.reasoningLevel
+      : typeof body.reasoning === 'string'
+        ? body.reasoning
+        : undefined;
+  const reasoningLevel = rawReasoningLevel?.trim().toLowerCase();
+
+  if (reasoningLevel && !REASONING_LEVELS.has(reasoningLevel as ReasoningLevel)) {
+    return { error: 'reasoning must be one of: low, medium, high, xhigh' };
+  }
+
+  return {
+    input: {
+      message: body.message,
+      skills: body.skills ?? [],
+      ...(hasProviderOverride ? { api: api as Api, modelId } : {}),
+      ...(reasoningLevel ? { reasoningLevel: reasoningLevel as ReasoningLevel } : {}),
+    },
+  };
+}
 
 /** POST /api/.../sessions — Create a new session */
 sessionRoutes.post(BASE, async (c) => {
@@ -71,18 +120,15 @@ sessionRoutes.get(`${BASE}/:sessionId/messages`, async (c) => {
 /** POST /api/.../sessions/:sessionId/prompt — Send a message (non-streaming) */
 sessionRoutes.post(`${BASE}/:sessionId/prompt`, async (c) => {
   const { projectId, artifactDirId, sessionId } = c.req.param();
-  const body = await c.req.json<{ message: string; skills?: string[] }>();
-
-  if (!body.message) {
-    return c.json({ error: 'message is required' }, 400);
+  const body = await c.req.json<SessionTurnBody>().catch(() => undefined);
+  const resolvedPromptInput = resolvePromptInput(body);
+  if ('error' in resolvedPromptInput) {
+    return c.json({ error: resolvedPromptInput.error }, 400);
   }
 
   try {
     const session = await Session.getById(projectId, artifactDirId, sessionId);
-    const newMessages = await session.prompt({
-      message: body.message,
-      skills: body.skills ?? [],
-    });
+    const newMessages = await session.prompt(resolvedPromptInput.input);
     return c.json(newMessages);
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Failed to prompt session';
@@ -159,13 +205,11 @@ function toSseChunk(event: string, data: unknown): Uint8Array {
 /** POST /api/.../sessions/:sessionId/stream — Stream a conversation turn via SSE */
 sessionRoutes.post(`${BASE}/:sessionId/stream`, async (c) => {
   const { projectId, artifactDirId, sessionId } = c.req.param();
-  const body = await c.req.json<{ message: string; skills?: string[] }>().catch(() => undefined);
-
-  if (!body?.message) {
-    return c.json({ error: 'message is required' }, 400);
+  const body = await c.req.json<SessionTurnBody>().catch(() => undefined);
+  const resolvedPromptInput = resolvePromptInput(body);
+  if ('error' in resolvedPromptInput) {
+    return c.json({ error: resolvedPromptInput.error }, 400);
   }
-
-  const promptInput = { message: body.message, skills: body.skills ?? [] };
 
   let session: Session;
   try {
@@ -198,7 +242,7 @@ sessionRoutes.post(`${BASE}/:sessionId/stream`, async (c) => {
         send('ready', { ok: true, sessionId });
 
         try {
-          const newMessages = await session.streamPrompt(promptInput, {
+          const newMessages = await session.streamPrompt(resolvedPromptInput.input, {
             onEvent: (event: AgentEvent) => {
               send('agent_event', event);
             },

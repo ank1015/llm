@@ -1,6 +1,8 @@
 export type {
   ApiErrorBody,
   ApiErrorResponse,
+  ModelSelection,
+  ReasoningLevel,
   SessionRef,
   SessionMetadata,
   StreamReadyEventData,
@@ -8,4 +10,5 @@ export type {
   StreamErrorEventData,
   StreamEventMap,
   StreamEventName,
+  TurnSettings,
 } from './api';

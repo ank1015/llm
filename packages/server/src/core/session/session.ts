@@ -8,8 +8,14 @@ import { ArtifactDir } from '../artifact-dir/artifact-dir.js';
 import { getConfig } from '../config.js';
 import { Project } from '../project/project.js';
 import { ensureDir, readMetadata, writeMetadata, pathExists, removeDir } from '../storage/fs.js';
+import { createProviderOptions } from '../utils.js';
 
-import type { CreateSessionOptions, PromptInput, SessionMetadata } from '../types.js';
+import type {
+  CreateSessionOptions,
+  PromptInput,
+  ReasoningLevel,
+  SessionMetadata,
+} from '../types.js';
 import type {
   AgentEvent,
   AgentTool,
@@ -35,6 +41,14 @@ import type {
  * Uses the SDK's SessionManager + FileSessionsAdapter for persistence
  * and Conversation class for runtime LLM interaction.
  */
+type SessionExecutionConfig = {
+  api: Api;
+  modelId: string;
+  providerOptions: Record<string, unknown>;
+};
+
+const DEFAULT_REASONING_LEVEL: ReasoningLevel = 'high';
+
 export class Session {
   private sessionManager: SessionManager;
   /** projectName used in SessionManager (maps to our projectId) */
@@ -239,10 +253,12 @@ export class Session {
    * 5. Return the new messages
    */
   async prompt(input: PromptInput): Promise<Message[]> {
+    const execution = this.resolveExecutionConfig(input);
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const model = getModel(this.api, this.modelId as any);
+    const model = getModel(execution.api, execution.modelId as any);
     if (!model) {
-      throw new Error(`Model "${this.modelId}" not found for API "${this.api}"`);
+      throw new Error(`Model "${execution.modelId}" not found for API "${execution.api}"`);
     }
 
     const keysAdapter = createFileKeysAdapter();
@@ -259,11 +275,7 @@ export class Session {
     });
     conversation.setProvider({
       model,
-      providerOptions: {
-        reasoning: {
-          effort: 'high',
-        },
-      },
+      providerOptions: execution.providerOptions,
     } as Provider<Api>);
     conversation.setSystemPrompt(agentConfig.systemPrompt);
     conversation.setTools(agentConfig.tools);
@@ -276,7 +288,7 @@ export class Session {
     const newMessages = await conversation.prompt(input.message);
 
     // Save new messages to session
-    await this.saveMessages(newMessages);
+    await this.saveMessages(newMessages, execution);
 
     return newMessages;
   }
@@ -296,10 +308,12 @@ export class Session {
       signal?: AbortSignal;
     }
   ): Promise<Message[]> {
+    const execution = this.resolveExecutionConfig(input);
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const model = getModel(this.api, this.modelId as any);
+    const model = getModel(execution.api, execution.modelId as any);
     if (!model) {
-      throw new Error(`Model "${this.modelId}" not found for API "${this.api}"`);
+      throw new Error(`Model "${execution.modelId}" not found for API "${execution.api}"`);
     }
 
     const keysAdapter = createFileKeysAdapter();
@@ -321,11 +335,7 @@ export class Session {
 
     conversation.setProvider({
       model,
-      providerOptions: {
-        reasoning: {
-          effort: 'high',
-        },
-      },
+      providerOptions: execution.providerOptions,
     } as Provider<Api>);
     conversation.setSystemPrompt(agentConfig.systemPrompt);
 
@@ -342,7 +352,7 @@ export class Session {
 
     try {
       // Create persistence callback to save messages incrementally
-      const persistence = this.createPersistenceCallback();
+      const persistence = this.createPersistenceCallback(execution);
       const newMessages = await conversation.prompt(input.message, undefined, persistence.callback);
       return newMessages;
     } finally {
@@ -403,11 +413,23 @@ export class Session {
     return (messageNodes ?? []).map((node: MessageNode) => node.message);
   }
 
+  private resolveExecutionConfig(input: PromptInput): SessionExecutionConfig {
+    const api = input.api ?? this.api;
+    const modelId = input.modelId ?? this.modelId;
+    const reasoningLevel = input.reasoningLevel ?? input.reasoning ?? DEFAULT_REASONING_LEVEL;
+
+    return {
+      api,
+      modelId,
+      providerOptions: createProviderOptions(api, reasoningLevel),
+    };
+  }
+
   /**
    * Create a persistence callback that saves messages incrementally.
    * Used by streamPrompt() to persist each message as it completes.
    */
-  private createPersistenceCallback(): {
+  private createPersistenceCallback(execution: SessionExecutionConfig): {
     callback: ConversationExternalCallback;
     nodes: MessageNode[];
   } {
@@ -430,8 +452,8 @@ export class Session {
         parentId,
         branch: 'main',
         message,
-        api: this.api,
-        modelId: this.modelId,
+        api: execution.api,
+        modelId: execution.modelId,
       });
       nodes.push(result.node);
       parentIdPromise = Promise.resolve(result.node.id);
@@ -444,7 +466,10 @@ export class Session {
    * Save new messages to the session file.
    * Finds the latest node to use as parentId, then appends each message sequentially.
    */
-  private async saveMessages(messages: Message[]): Promise<void> {
+  private async saveMessages(
+    messages: Message[],
+    execution: Pick<SessionExecutionConfig, 'api' | 'modelId'>
+  ): Promise<void> {
     let latestNode = await this.sessionManager.getLatestNode(
       this.projectName,
       this.sessionId,
@@ -463,8 +488,8 @@ export class Session {
         parentId: latestNode.id,
         branch: 'main',
         message,
-        api: this.api,
-        modelId: this.modelId,
+        api: execution.api,
+        modelId: execution.modelId,
       });
 
       latestNode = result.node;

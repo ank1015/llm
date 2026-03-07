@@ -107,6 +107,8 @@ export type {
   ZaiThinkingConfig,
   ApiNativeResponseMap,
   NativeResponseForApi,
+  CodexProviderOptions,
+  ClaudeCodeProviderOptions,
   ApiOptionsMap,
   OptionsForApi,
   // Model

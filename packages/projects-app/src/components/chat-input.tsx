@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowUp, File, Square } from 'lucide-react';
+import { ArrowUp, ChevronDown, File, Plus, Square } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
@@ -12,16 +12,40 @@ import {
 } from './prompt-input';
 
 import type { ProjectFileIndexEntry } from '@/lib/client-api';
-import type { SessionRef } from '@/lib/contracts';
+import type { ReasoningLevel, SessionRef } from '@/lib/contracts';
 
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { generateSessionName } from '@/lib/client-api';
 import { cn } from '@/lib/utils';
-import { useArtifactFilesStore, useChatStore, useSessionsStore, useSidebarStore } from '@/stores';
+import {
+  useArtifactFilesStore,
+  useChatSettingsStore,
+  useChatStore,
+  useSessionsStore,
+  useSidebarStore,
+} from '@/stores';
+import {
+  CHAT_MODEL_OPTIONS,
+  getReasoningOptions,
+  getSelectedChatModel,
+} from '@/stores/chat-settings-store';
 
 const MENTION_SEARCH_LIMIT = 80;
 const MENTION_DROPDOWN_LIMIT = 20;
 const MENTION_SEARCH_DEBOUNCE_MS = 120;
+
+type ComposerDropdownOption = {
+  value: string;
+  label: string;
+  disabled?: boolean;
+};
 
 type MentionRange = {
   start: number;
@@ -216,6 +240,58 @@ function buildFileLabel(entry: ProjectFileIndexEntry): string {
   return dir.length > 0 ? `${entry.artifactName}/${dir}` : entry.artifactName;
 }
 
+function ComposerDropdownControl({
+  label,
+  value,
+  displayValue,
+  options,
+  onValueChange,
+  className,
+}: {
+  label: string;
+  value: string;
+  displayValue: string;
+  options: readonly ComposerDropdownOption[];
+  onValueChange: (nextValue: string) => void;
+  className?: string;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          onClick={(event) => event.stopPropagation()}
+          className={cn(
+            'text-muted-foreground hover:text-foreground hover:bg-home-hover inline-flex h-7 shrink-0 items-center gap-0.5 rounded-md px-2 text-[13px] font-medium transition-colors',
+            className
+          )}
+          aria-label={label}
+        >
+          <span className="truncate leading-none">{displayValue}</span>
+          <ChevronDown className="size-3.5 opacity-65" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="start"
+        className="bg-home-panel border-home-border text-foreground min-w-40 rounded-xl p-1"
+      >
+        <DropdownMenuRadioGroup value={value} onValueChange={onValueChange}>
+          {options.map((option) => (
+            <DropdownMenuRadioItem
+              key={option.value}
+              value={option.value}
+              disabled={option.disabled}
+              className="rounded-lg text-[13px]"
+            >
+              {option.label}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /*  PromptInputWithActions                                            */
 /* ------------------------------------------------------------------ */
@@ -256,6 +332,11 @@ function PromptInputWithActions() {
   });
 
   const createSession = useSessionsStore((state) => state.createSession);
+  const selectedApi = useChatSettingsStore((state) => state.api);
+  const selectedModelId = useChatSettingsStore((state) => state.modelId);
+  const selectedReasoning = useChatSettingsStore((state) => state.reasoning);
+  const setSelectedModel = useChatSettingsStore((state) => state.setModel);
+  const setSelectedReasoning = useChatSettingsStore((state) => state.setReasoning);
 
   const sidebarAddSession = useSidebarStore((state) => state.addSession);
   const sidebarRenameSession = useSidebarStore((state) => state.renameSession);
@@ -263,6 +344,20 @@ function PromptInputWithActions() {
   const searchProjectFiles = useArtifactFilesStore((state) => state.searchProjectFiles);
 
   const isMentionOpen = activeMention !== null;
+  const selectedModel = getSelectedChatModel({
+    api: selectedApi,
+    modelId: selectedModelId,
+  });
+  const modelOptions = CHAT_MODEL_OPTIONS.map((option) => ({
+    value: option.modelId,
+    label: option.label,
+  }));
+  const reasoningOptions = getReasoningOptions({
+    api: selectedApi,
+    modelId: selectedModelId,
+  });
+  const selectedReasoningLabel =
+    reasoningOptions.find((option) => option.value === selectedReasoning)?.label ?? 'High';
 
   const setMentionState = (next: MentionRange | null) => {
     if (mentionsEqual(activeMentionRef.current, next)) {
@@ -466,7 +561,11 @@ function PromptInputWithActions() {
       let session: SessionRef | undefined = currentSession ?? undefined;
 
       if (!session) {
-        const created = await createSession(ctx, { sessionName: 'New chat' });
+        const created = await createSession(ctx, {
+          sessionName: 'New chat',
+          api: selectedApi,
+          modelId: selectedModelId,
+        });
         const ref: SessionRef = { sessionId: created.sessionId };
         setActiveSession(ref);
 
@@ -507,6 +606,9 @@ function PromptInputWithActions() {
         prompt: trimmed,
         projectId,
         artifactId,
+        api: selectedApi,
+        modelId: selectedModelId,
+        reasoningLevel: selectedReasoning,
       });
     } catch (err) {
       if (isAbortError(err)) return;
@@ -580,7 +682,34 @@ function PromptInputWithActions() {
       </div>
 
       <PromptInputActions className="flex items-center justify-between gap-2 pt-4">
-        <div className="flex items-center gap-2" />
+        <div className="flex items-center gap-0.5">
+          <PromptInputAction tooltip="Add">
+            <button
+              type="button"
+              className="text-muted-foreground hover:text-foreground hover:bg-home-hover inline-flex size-7 items-center justify-center rounded-md transition-colors"
+            >
+              <Plus className="size-4" />
+            </button>
+          </PromptInputAction>
+
+          <ComposerDropdownControl
+            label="Select model"
+            value={selectedModel.modelId}
+            displayValue={selectedModel.label}
+            options={modelOptions}
+            className="w-[126px]"
+            onValueChange={setSelectedModel}
+          />
+
+          <ComposerDropdownControl
+            label="Select reasoning"
+            value={selectedReasoning}
+            displayValue={selectedReasoningLabel}
+            options={reasoningOptions}
+            className="w-[74px]"
+            onValueChange={(value) => setSelectedReasoning(value as ReasoningLevel)}
+          />
+        </div>
 
         <PromptInputAction tooltip={isStreaming ? 'Stop generation' : 'Send message'}>
           <Button

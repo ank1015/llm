@@ -1,6 +1,6 @@
 import { apiRequestJson, SERVER_BASE } from './http';
 
-import type { StreamEventMap, StreamEventName } from '@/lib/contracts';
+import type { StreamEventMap, StreamEventName, TurnSettings } from '@/lib/contracts';
 import type { MessageNode } from '@ank1015/llm-sdk';
 
 type ArtifactContext = {
@@ -95,7 +95,7 @@ export type StreamRequest = ArtifactContext & {
   sessionId: string;
   message: string;
   skills?: string[];
-};
+} & TurnSettings;
 
 // eslint-disable-next-line sonarjs/cognitive-complexity
 export async function streamConversation(
@@ -110,7 +110,13 @@ export async function streamConversation(
       Accept: 'text/event-stream',
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ message: request.message, skills: request.skills ?? [] }),
+    body: JSON.stringify({
+      message: request.message,
+      skills: request.skills ?? [],
+      api: request.api,
+      modelId: request.modelId,
+      reasoningLevel: request.reasoningLevel,
+    }),
     signal,
   });
 

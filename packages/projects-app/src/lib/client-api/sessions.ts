@@ -1,6 +1,6 @@
 import { apiRequestJson, SERVER_BASE } from './http';
 
-import type { SessionMetadata } from '@/lib/contracts';
+import type { ModelSelection, SessionMetadata } from '@/lib/contracts';
 import type { SessionSummary } from '@ank1015/llm-sdk';
 
 type ArtifactContext = {
@@ -20,15 +20,15 @@ export async function listSessions(ctx: ArtifactContext): Promise<SessionSummary
 
 export async function createSession(
   ctx: ArtifactContext,
-  input: { name?: string }
+  input: { name?: string } & ModelSelection
 ): Promise<SessionMetadata> {
   return apiRequestJson<SessionMetadata>(buildSessionsBase(ctx), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       name: input.name ?? 'New chat',
-      modelId: 'gpt-5.3-codex',
-      api: 'codex',
+      modelId: input.modelId,
+      api: input.api,
     }),
   });
 }
