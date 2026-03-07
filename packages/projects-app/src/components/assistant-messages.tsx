@@ -4,6 +4,7 @@ import { Check, Copy } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 
 import { ActivityDrawerContent } from './activity-drawer';
+import { ContextUsageIndicator } from './context-usage-indicator';
 import { ChatMarkdown } from './markdown-renderer';
 
 import type { Api, BaseAssistantMessage, Message, MessageNode } from '@ank1015/llm-sdk';
@@ -36,6 +37,16 @@ type AssistantMessagesProps = {
   turnUserMessageId: string | null;
   /** Timestamp (ms epoch) of the user message that started this turn */
   userTimestamp: number | null;
+  /** Whether this is the latest visible assistant turn */
+  showPersistentContextUsage: boolean;
+};
+
+type AssistantMessageActionsProps = {
+  copied: boolean;
+  displayText: string | null;
+  isStreamingTurn: boolean;
+  contextUsageTotalTokens: number | null;
+  onCopy: () => void;
 };
 
 function getDurationInSeconds(
@@ -46,6 +57,83 @@ function getDurationInSeconds(
   const endTimestamp = assistantNode.message.timestamp;
   if (typeof endTimestamp !== 'number') return undefined;
   return (endTimestamp - userTimestamp) / 1000;
+}
+
+function getContextUsageTotalTokens(input: {
+  assistantNode: MessageNode | null;
+  isStreamingTurn: boolean;
+  showPersistentContextUsage: boolean;
+  streamingAssistant: AssistantStreamingMessage | null;
+}): number | null {
+  if (!input.showPersistentContextUsage) {
+    return null;
+  }
+
+  if (
+    input.assistantNode?.message.role === 'assistant' &&
+    input.assistantNode.message.usage.totalTokens > 0
+  ) {
+    return input.assistantNode.message.usage.totalTokens;
+  }
+
+  if (
+    input.isStreamingTurn &&
+    input.streamingAssistant &&
+    input.streamingAssistant.usage.totalTokens > 0
+  ) {
+    return input.streamingAssistant.usage.totalTokens;
+  }
+
+  return null;
+}
+
+function AssistantMessageActions({
+  copied,
+  displayText,
+  isStreamingTurn,
+  contextUsageTotalTokens,
+  onCopy,
+}: AssistantMessageActionsProps) {
+  const showContextUsage = contextUsageTotalTokens !== null;
+
+  if (!showContextUsage && (isStreamingTurn || !displayText)) {
+    return null;
+  }
+
+  return (
+    <div className="ml-[2%] mt-1 flex h-5 items-center">
+      {showContextUsage ? (
+        <div className="flex h-5 items-center gap-0.5">
+          {!isStreamingTurn && displayText && (
+            <button
+              type="button"
+              onClick={onCopy}
+              className="text-muted-foreground hover:text-foreground cursor-pointer rounded p-1 transition-colors"
+              aria-label={copied ? 'Copied' : 'Copy message'}
+            >
+              {copied ? (
+                <Check className="size-3.5 text-blue-500" />
+              ) : (
+                <Copy className="size-3.5" />
+              )}
+            </button>
+          )}
+          <ContextUsageIndicator totalTokens={contextUsageTotalTokens} />
+        </div>
+      ) : (
+        <div className="flex items-center">
+          <button
+            type="button"
+            onClick={onCopy}
+            className="text-muted-foreground hover:text-foreground cursor-pointer rounded p-1 transition-colors"
+            aria-label={copied ? 'Copied' : 'Copy message'}
+          >
+            {copied ? <Check className="size-3.5 text-blue-500" /> : <Copy className="size-3.5" />}
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -61,6 +149,7 @@ export function AssistantMessages({
   sessionKey,
   turnUserMessageId,
   userTimestamp,
+  showPersistentContextUsage,
 }: AssistantMessagesProps) {
   const openDrawer = useUiStore((state) => state.openSideDrawer);
   const dismissDrawer = useUiStore((state) => state.dismissSideDrawer);
@@ -118,6 +207,16 @@ export function AssistantMessages({
       : null;
 
   const displayText = assistantText ?? streamingText;
+  const contextUsageTotalTokens = useMemo(
+    () =>
+      getContextUsageTotalTokens({
+        assistantNode,
+        isStreamingTurn,
+        showPersistentContextUsage,
+        streamingAssistant,
+      }),
+    [assistantNode, isStreamingTurn, showPersistentContextUsage, streamingAssistant]
+  );
 
   const [copied, setCopied] = useState(false);
 
@@ -153,19 +252,13 @@ export function AssistantMessages({
         </div>
       )}
 
-      {/* Action buttons — space always reserved, visible on hover */}
-      {!isStreamingTurn && (
-        <div className="flex ml-[2%] mt-1 h-6 items-center gap-1 opacity-0 transition-opacity group-hover/assistant:opacity-100">
-          <button
-            type="button"
-            onClick={handleCopy}
-            className="text-muted-foreground hover:text-foreground cursor-pointer rounded p-1.5 transition-colors"
-            aria-label={copied ? 'Copied' : 'Copy message'}
-          >
-            {copied ? <Check className="size-4 text-blue-500" /> : <Copy className="size-4" />}
-          </button>
-        </div>
-      )}
+      <AssistantMessageActions
+        copied={copied}
+        displayText={displayText}
+        isStreamingTurn={isStreamingTurn}
+        contextUsageTotalTokens={contextUsageTotalTokens}
+        onCopy={handleCopy}
+      />
     </div>
   );
 }

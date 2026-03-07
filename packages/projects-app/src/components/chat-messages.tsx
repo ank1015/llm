@@ -93,12 +93,14 @@ const MessageTurnRow = memo(function MessageTurnRow({
   isStreamingTurn,
   streamingAssistant,
   branchState,
+  showPersistentContextUsage,
 }: {
   turn: MessageTurn;
   sessionKey: string | null;
   isStreamingTurn: boolean;
   streamingAssistant: Omit<BaseAssistantMessage<Api>, 'message'> | null;
   branchState: BranchNavigatorState | null;
+  showPersistentContextUsage: boolean;
 }) {
   return (
     <Fragment>
@@ -116,6 +118,7 @@ const MessageTurnRow = memo(function MessageTurnRow({
         }
         sessionKey={sessionKey}
         turnUserMessageId={turn.userMessageId}
+        showPersistentContextUsage={showPersistentContextUsage}
       />
     </Fragment>
   );
@@ -150,6 +153,11 @@ export function ChatMessages() {
   });
 
   const turns = useMemo(() => groupIntoTurns(messages), [messages]);
+  const latestAssistantTurnIndex = useMemo(
+    () =>
+      turns.reduce((latestIndex, turn, index) => (turn.assistantNode ? index : latestIndex), -1),
+    [turns]
+  );
   const branchStateByNodeId = useMemo<UserBranchStateByNodeId>(() => {
     if (messageTree.length === 0) {
       return {};
@@ -183,6 +191,7 @@ export function ChatMessages() {
           isStreamingTurn={isSessionStreaming && idx === turns.length - 1}
           streamingAssistant={streamingAssistant}
           branchState={turn.userNode ? (branchStateByNodeId[turn.userNode.id] ?? null) : null}
+          showPersistentContextUsage={idx === latestAssistantTurnIndex}
         />
       ))}
     </div>

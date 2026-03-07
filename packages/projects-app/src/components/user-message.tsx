@@ -10,7 +10,6 @@ import { ChatMarkdown } from './markdown-renderer';
 import type { BranchNavigatorState } from '@/lib/messages/session-tree';
 import type { MessageNode, UserMessage } from '@ank1015/llm-sdk';
 
-
 import { getTextFromUserMessage } from '@/lib/messages/utils';
 import { useChatSettingsStore, useChatStore, useComposerStore } from '@/stores';
 
@@ -143,56 +142,55 @@ export const UserMessageComponent = ({
         </div>
       )}
 
-      {/* Action buttons — visible on hover */}
-      <div className="mr-1 flex h-6 items-center gap-1 opacity-0 transition-opacity group-hover/user:opacity-100">
+      <div className="mr-1 mt-0.5 flex h-5 items-center gap-0.5 opacity-0 transition-opacity group-hover/user:opacity-100">
         <button
           type="button"
           onClick={handleCopy}
-          className="text-muted-foreground hover:text-foreground cursor-pointer rounded p-1.5 transition-colors"
+          className="text-muted-foreground hover:text-foreground cursor-pointer rounded p-1 transition-colors"
           aria-label={copied ? 'Copied' : 'Copy message'}
         >
-          {copied ? <Check className="size-4 text-blue-500" /> : <Copy className="size-4" />}
+          {copied ? <Check className="size-3.5 text-blue-500" /> : <Copy className="size-3.5" />}
         </button>
         <button
           type="button"
           onClick={handleEdit}
           disabled={!text || isStreaming}
-          className="text-muted-foreground hover:text-foreground disabled:text-muted-foreground/40 cursor-pointer rounded p-1.5 transition-colors disabled:cursor-default"
+          className="text-muted-foreground hover:text-foreground disabled:text-muted-foreground/40 cursor-pointer rounded p-1 transition-colors disabled:cursor-default"
           aria-label="Edit message"
         >
-          <Pencil className="size-4" />
+          <Pencil className="size-3.5" />
         </button>
         <button
           type="button"
           onClick={handleRetry}
           disabled={isStreaming}
-          className="text-muted-foreground hover:text-foreground disabled:text-muted-foreground/40 cursor-pointer rounded p-1.5 transition-colors disabled:cursor-default"
+          className="text-muted-foreground hover:text-foreground disabled:text-muted-foreground/40 cursor-pointer rounded p-1 transition-colors disabled:cursor-default"
           aria-label="Retry message"
         >
-          <RefreshCw className="size-4" />
+          <RefreshCw className="size-3.5" />
         </button>
         {branchState ? (
-          <div className="text-muted-foreground flex items-center gap-0.5 pl-1">
+          <div className="text-muted-foreground flex items-center gap-0.5 pl-0.5">
             <button
               type="button"
               onClick={() => handleSwitchBranch(branchState.previousLeafNodeId)}
               disabled={!branchState.previousLeafNodeId || isStreaming}
-              className="hover:text-foreground disabled:text-muted-foreground/40 cursor-pointer rounded p-1 transition-colors disabled:cursor-default"
+              className="hover:text-foreground disabled:text-muted-foreground/40 cursor-pointer rounded p-0.5 transition-colors disabled:cursor-default"
               aria-label="Show previous branch version"
             >
-              <ChevronLeft className="size-4" />
+              <ChevronLeft className="size-3.5" />
             </button>
-            <span className="text-[13px] font-medium tabular-nums">
+            <span className="text-[12px] font-medium tabular-nums">
               {branchState.currentIndex}/{branchState.total}
             </span>
             <button
               type="button"
               onClick={() => handleSwitchBranch(branchState.nextLeafNodeId)}
               disabled={!branchState.nextLeafNodeId || isStreaming}
-              className="hover:text-foreground disabled:text-muted-foreground/40 cursor-pointer rounded p-1 transition-colors disabled:cursor-default"
+              className="hover:text-foreground disabled:text-muted-foreground/40 cursor-pointer rounded p-0.5 transition-colors disabled:cursor-default"
               aria-label="Show next branch version"
             >
-              <ChevronRight className="size-4" />
+              <ChevronRight className="size-3.5" />
             </button>
           </div>
         ) : null}
