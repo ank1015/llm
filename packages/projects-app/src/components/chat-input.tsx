@@ -262,12 +262,12 @@ function ComposerDropdownControl({
           type="button"
           onClick={(event) => event.stopPropagation()}
           className={cn(
-            'text-muted-foreground hover:text-foreground hover:bg-home-hover inline-flex h-7 shrink-0 items-center gap-0.5 rounded-md px-2 text-[13px] font-medium transition-colors',
+            'text-muted-foreground hover:text-foreground hover:bg-home-hover inline-flex h-7 shrink-0 items-center gap-0.5 rounded-md px-2 text-[13px] leading-[1.15] font-medium transition-colors',
             className
           )}
           aria-label={label}
         >
-          <span className="truncate leading-none">{displayValue}</span>
+          <span className="truncate">{displayValue}</span>
           <ChevronDown className="size-3.5 opacity-65" />
         </button>
       </DropdownMenuTrigger>
@@ -281,7 +281,7 @@ function ComposerDropdownControl({
               key={option.value}
               value={option.value}
               disabled={option.disabled}
-              className="rounded-lg text-[13px]"
+              className="rounded-lg text-[13px] leading-[1.15]"
             >
               {option.label}
             </DropdownMenuRadioItem>
@@ -697,7 +697,7 @@ function PromptInputWithActions() {
             value={selectedModel.modelId}
             displayValue={selectedModel.label}
             options={modelOptions}
-            className="w-[126px]"
+            className="w-[110px]"
             onValueChange={setSelectedModel}
           />
 
@@ -706,7 +706,7 @@ function PromptInputWithActions() {
             value={selectedReasoning}
             displayValue={selectedReasoningLabel}
             options={reasoningOptions}
-            className="w-[74px]"
+            className="w-[94px]"
             onValueChange={(value) => setSelectedReasoning(value as ReasoningLevel)}
           />
         </div>

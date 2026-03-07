@@ -28,7 +28,7 @@ export const CHAT_MODEL_OPTIONS: readonly ChatModelOption[] = [
     modelId: 'gpt-5.4',
   },
   {
-    label: 'GPT-5.3-Codex',
+    label: 'Codex-5.3',
     api: 'codex',
     modelId: 'gpt-5.3-codex',
   },
