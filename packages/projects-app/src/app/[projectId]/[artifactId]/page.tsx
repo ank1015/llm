@@ -1,6 +1,6 @@
 'use client';
 
-import { Folder, Loader2, MessageSquare } from 'lucide-react';
+import { Folder, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 
@@ -38,13 +38,8 @@ export default function ArtifactPage() {
           <Folder size={18} className="text-muted-foreground" />
           <h1 className="text-foreground text-lg font-medium">{artifact.name}</h1>
           <div className="flex-1" />
-          <span className="text-muted-foreground flex items-center gap-1 text-xs">
-            <MessageSquare size={14} />
-            {artifact.sessions.length}
-          </span>
+          <ArtifactSkillsPanel projectId={projectId} artifactId={artifactId} />
         </div>
-
-        <ArtifactSkillsPanel projectId={projectId} artifactId={artifactId} />
 
         {/* Thread list */}
         {artifact.sessions.length > 0 && (

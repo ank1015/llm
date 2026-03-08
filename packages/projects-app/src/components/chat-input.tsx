@@ -2,9 +2,11 @@
 
 import { ArrowUp, ChevronDown, File, Plus, Square } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
+import { ArtifactSkillsPanel } from './artifact-skills-panel';
+import { ContextUsageIndicator } from './context-usage-indicator';
 import {
   PromptInput,
   PromptInputAction,
@@ -14,6 +16,7 @@ import {
 
 import type { ProjectFileIndexEntry } from '@/lib/client-api';
 import type { ReasoningLevel, SessionRef } from '@/lib/contracts';
+import type { MessageNode } from '@ank1015/llm-sdk';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -42,6 +45,7 @@ import {
 const MENTION_SEARCH_LIMIT = 80;
 const MENTION_DROPDOWN_LIMIT = 20;
 const MENTION_SEARCH_DEBOUNCE_MS = 120;
+const EMPTY_MESSAGE_NODES: MessageNode[] = [];
 
 type ComposerDropdownOption = {
   value: string;
@@ -53,6 +57,10 @@ type MentionRange = {
   start: number;
   end: number;
   query: string;
+};
+
+type MessageTurn = {
+  assistantNode: MessageNode | null;
 };
 
 function isAbortError(error: unknown): boolean {
@@ -240,6 +248,117 @@ function removeMentionBeforeCaret(
 function buildFileLabel(entry: ProjectFileIndexEntry): string {
   const dir = getDirname(entry.path);
   return dir.length > 0 ? `${entry.artifactName}/${dir}` : entry.artifactName;
+}
+
+function groupIntoTurns(nodes: MessageNode[]): MessageTurn[] {
+  const turns: MessageTurn[] = [];
+  let index = 0;
+
+  if (index < nodes.length && nodes[index]?.message.role !== 'user') {
+    const betweenNodes: MessageNode[] = [];
+    while (index < nodes.length && nodes[index]?.message.role !== 'user') {
+      const node = nodes[index];
+      if (node) {
+        betweenNodes.push(node);
+      }
+      index += 1;
+    }
+
+    turns.push({
+      assistantNode:
+        betweenNodes.length > 0 &&
+        betweenNodes[betweenNodes.length - 1]?.message.role === 'assistant'
+          ? (betweenNodes[betweenNodes.length - 1] ?? null)
+          : null,
+    });
+  }
+
+  while (index < nodes.length) {
+    index += 1;
+
+    const betweenNodes: MessageNode[] = [];
+    while (index < nodes.length && nodes[index]?.message.role !== 'user') {
+      const node = nodes[index];
+      if (node) {
+        betweenNodes.push(node);
+      }
+      index += 1;
+    }
+
+    turns.push({
+      assistantNode:
+        betweenNodes.length > 0 &&
+        betweenNodes[betweenNodes.length - 1]?.message.role === 'assistant'
+          ? (betweenNodes[betweenNodes.length - 1] ?? null)
+          : null,
+    });
+  }
+
+  return turns;
+}
+
+function getPersistentContextUsageTotalTokens(
+  nodes: MessageNode[],
+  isSessionStreaming: boolean
+): number | null {
+  const turns = groupIntoTurns(nodes);
+  const latestAssistantTurnIndex = turns.reduce(
+    (latestIndex, turn, index) => (turn.assistantNode ? index : latestIndex),
+    -1
+  );
+  const persistentActionTurnIndex =
+    isSessionStreaming && turns.length > 0 ? turns.length - 1 : latestAssistantTurnIndex;
+
+  if (persistentActionTurnIndex < 0) {
+    return null;
+  }
+
+  const assistantNode = turns[persistentActionTurnIndex]?.assistantNode;
+  if (assistantNode?.message.role === 'assistant' && assistantNode.message.usage.totalTokens > 0) {
+    return assistantNode.message.usage.totalTokens;
+  }
+
+  return null;
+}
+
+function ComposerMetaBar() {
+  const { projectId, artifactId, threadId } = useParams<{
+    projectId: string;
+    artifactId: string;
+    threadId?: string;
+  }>();
+  const currentSession: SessionRef | null = threadId ? { sessionId: threadId } : null;
+  const isStreaming = useChatStore((state) => {
+    if (!currentSession) return false;
+    return state.isStreamingBySession[currentSession.sessionId] ?? false;
+  });
+  const visibleMessages = useChatStore((state) => {
+    if (!currentSession) {
+      return EMPTY_MESSAGE_NODES;
+    }
+
+    return state.messagesBySession[currentSession.sessionId] ?? EMPTY_MESSAGE_NODES;
+  });
+  const persistentContextUsageTotalTokens = useMemo(
+    () => getPersistentContextUsageTotalTokens(visibleMessages, isStreaming),
+    [visibleMessages, isStreaming]
+  );
+
+  if (!currentSession) {
+    return null;
+  }
+
+  return (
+    <div className="mb-2 flex w-full items-center justify-between px-1">
+      <div className="flex min-w-0 items-center">
+        {persistentContextUsageTotalTokens !== null ? (
+          <ContextUsageIndicator totalTokens={persistentContextUsageTotalTokens} />
+        ) : null}
+      </div>
+
+      <ArtifactSkillsPanel projectId={projectId} artifactId={artifactId} />
+    </div>
+  );
 }
 
 function ComposerDropdownControl({
@@ -842,6 +961,7 @@ export const ChatInput = () => {
   return (
     <div className="bg-home-page absolute bottom-0 w-full px-8">
       <div className="mx-auto flex w-full max-w-3xl flex-col items-start pb-4">
+        <ComposerMetaBar />
         <PromptInputWithActions />
       </div>
     </div>

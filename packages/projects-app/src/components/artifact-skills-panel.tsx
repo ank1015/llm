@@ -1,13 +1,20 @@
 'use client';
 
-import { Loader2, Plus, Sparkles } from 'lucide-react';
+import {
+  Bot,
+  CircleAlert,
+  FileSpreadsheet,
+  Globe2,
+  Loader2,
+  Plus,
+  Presentation,
+  Sparkles,
+} from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import type { BundledSkillEntry, InstalledArtifactSkill } from '@/lib/client-api';
 
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import {
   CommandDialog,
   CommandEmpty,
@@ -16,14 +23,33 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   installArtifactSkill,
   listBundledSkills,
   listInstalledArtifactSkills,
 } from '@/lib/client-api';
 
+const SKILL_TOOLTIP_CLASS_NAME =
+  'border-border bg-popover text-popover-foreground shadow-xs border [&_svg]:fill-popover [&_svg]:bg-popover';
+
 function sortSkillsByName<T extends { name: string }>(skills: T[]): T[] {
   return [...skills].sort((left, right) => left.name.localeCompare(right.name));
+}
+
+function getSkillIcon(skillName: string): typeof Globe2 {
+  switch (skillName) {
+    case 'browser-use':
+      return Globe2;
+    case 'llm-use':
+      return Bot;
+    case 'pptx':
+      return Presentation;
+    case 'xlsx':
+      return FileSpreadsheet;
+    default:
+      return Sparkles;
+  }
 }
 
 export function ArtifactSkillsPanel({
@@ -185,75 +211,73 @@ export function ArtifactSkillsPanel({
 
   return (
     <>
-      <section className="bg-home-panel border-home-border mb-10 rounded-2xl border px-4 py-4">
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h2 className="text-muted-foreground mb-1 flex items-center gap-2 text-xs font-medium uppercase tracking-wide">
-              <Sparkles className="size-3.5" />
-              Installed skills
-            </h2>
-            <p className="text-muted-foreground text-sm">
-              Installed skills are available to all threads in this artifact.
-            </p>
-          </div>
-
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => handleInstallDialogChange(true)}
-            disabled={isInstalledSkillsLoading || isInstallBusy}
-            className="bg-home-page border-home-border shrink-0 cursor-pointer"
-          >
-            {isInstallBusy ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Plus className="size-4" />
-            )}
-            Install skill
-          </Button>
-        </div>
-
+      <div className="flex items-center gap-1.5">
         {isInstalledSkillsLoading ? (
-          <div className="text-muted-foreground flex items-center gap-2 text-sm">
-            <Loader2 className="size-4 animate-spin" />
-            Loading installed skills...
+          <div className="text-muted-foreground flex size-5 items-center justify-center">
+            <Loader2 className="size-3.5 animate-spin" />
           </div>
         ) : installedSkillsError ? (
-          <div className="flex flex-wrap items-center gap-3">
-            <p className="text-sm text-red-500">{installedSkillsError}</p>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="cursor-pointer"
-              onClick={() => setInstalledSkillsRequestKey((current) => current + 1)}
-            >
-              Retry
-            </Button>
-          </div>
-        ) : installedSkills.length === 0 ? (
-          <p className="text-muted-foreground text-sm">No skills installed yet.</p>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            {installedSkills.map((skill) => (
-              <Badge
-                key={skill.name}
-                variant="outline"
-                className="border-home-border bg-home-page rounded-full px-2.5 py-1 text-[11px]"
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => setInstalledSkillsRequestKey((current) => current + 1)}
+                className="flex size-5 cursor-pointer items-center justify-center text-red-500"
+                aria-label="Retry loading installed skills"
               >
-                {skill.name}
-              </Badge>
-            ))}
-          </div>
+                <CircleAlert className="size-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent sideOffset={8} className={SKILL_TOOLTIP_CLASS_NAME}>
+              {installedSkillsError}
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          installedSkills.map((skill) => {
+            const SkillIcon = getSkillIcon(skill.name);
+
+            return (
+              <Tooltip key={skill.name}>
+                <TooltipTrigger asChild>
+                  <span className="text-muted-foreground flex size-5 items-center justify-center">
+                    <SkillIcon className="size-3.5" />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent sideOffset={8} className={SKILL_TOOLTIP_CLASS_NAME}>
+                  {skill.name}
+                </TooltipContent>
+              </Tooltip>
+            );
+          })
         )}
-      </section>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={() => handleInstallDialogChange(true)}
+              disabled={isInstallBusy}
+              className="text-muted-foreground hover:text-foreground disabled:text-muted-foreground/60 flex size-5 cursor-pointer items-center justify-center transition-colors disabled:cursor-default"
+              aria-label="Add skill"
+            >
+              {isInstallBusy ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <Plus className="size-3.5" />
+              )}
+            </button>
+          </TooltipTrigger>
+          <TooltipContent sideOffset={8} className={SKILL_TOOLTIP_CLASS_NAME}>
+            Add skill
+          </TooltipContent>
+        </Tooltip>
+      </div>
 
       <CommandDialog
         open={isInstallDialogOpen}
         onOpenChange={handleInstallDialogChange}
-        title="Install skill"
-        description="Search and install a skill for this artifact."
+        title="Add skill"
+        description="Search and add a skill for this artifact."
         className="bg-home-page border-home-border sm:max-w-xl"
       >
         <CommandInput
@@ -265,26 +289,31 @@ export function ArtifactSkillsPanel({
           <CommandEmpty>{commandEmptyMessage}</CommandEmpty>
           {installableSkills.length > 0 ? (
             <CommandGroup heading="Available skills">
-              {installableSkills.map((skill) => (
-                <CommandItem
-                  key={skill.name}
-                  value={`${skill.name} ${skill.description}`}
-                  disabled={isInstallBusy}
-                  onSelect={() => void handleInstallSkill(skill.name)}
-                >
-                  {installingSkillName === skill.name ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <Sparkles className="size-4" />
-                  )}
-                  <div className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate font-medium">{skill.name}</span>
-                    <span className="text-muted-foreground line-clamp-2 text-xs">
-                      {skill.description}
-                    </span>
-                  </div>
-                </CommandItem>
-              ))}
+              {installableSkills.map((skill) => {
+                const SkillIcon = getSkillIcon(skill.name);
+
+                return (
+                  <CommandItem
+                    key={skill.name}
+                    value={`${skill.name} ${skill.description}`}
+                    disabled={isInstallBusy}
+                    onSelect={() => void handleInstallSkill(skill.name)}
+                  >
+                    {installingSkillName === skill.name ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : null}
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <span className="flex items-center gap-2 truncate font-medium">
+                        <SkillIcon className="size-4 text-muted-foreground" />
+                        {skill.name}
+                      </span>
+                      <span className="text-muted-foreground line-clamp-2 text-xs">
+                        {skill.description}
+                      </span>
+                    </div>
+                  </CommandItem>
+                );
+              })}
             </CommandGroup>
           ) : null}
         </CommandList>
