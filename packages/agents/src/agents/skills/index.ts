@@ -1,5 +1,5 @@
 import { existsSync } from 'fs';
-import { access, cp, mkdir, readFile, readdir, realpath, rm } from 'node:fs/promises';
+import { access, cp, mkdir, readFile, readdir, realpath, rm, symlink } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -7,6 +7,7 @@ const currentFileDir = dirname(fileURLToPath(import.meta.url));
 const packageRoot = findPackageRoot(currentFileDir);
 const bundledSkillsDir = join(packageRoot, 'skills');
 const bundledRegistryPath = join(bundledSkillsDir, 'registry.json');
+const packageNodeModulesDir = join(packageRoot, 'node_modules');
 
 export const MAX_DIR_NAME = '.max';
 export const INSTALLED_SKILLS_DIR_NAME = 'skills';
@@ -66,6 +67,7 @@ export async function addSkill(skillName: string, artifactDir: string): Promise<
   await mkdir(artifactPaths.maxDir, { recursive: true });
   await mkdir(artifactPaths.skillsDir, { recursive: true });
   await mkdir(artifactPaths.tempDir, { recursive: true });
+  await ensureArtifactNodeModulesLink(artifactPaths.nodeModulesDir);
 
   const targetDirectory = join(artifactPaths.skillsDir, bundledSkill.name);
   await rm(targetDirectory, { recursive: true, force: true });
@@ -125,13 +127,39 @@ function getArtifactPaths(artifactDir: string): {
   maxDir: string;
   skillsDir: string;
   tempDir: string;
+  nodeModulesDir: string;
 } {
   const maxDir = join(artifactDir, MAX_DIR_NAME);
   return {
     maxDir,
     skillsDir: join(maxDir, INSTALLED_SKILLS_DIR_NAME),
     tempDir: join(maxDir, TEMP_DIR_NAME),
+    nodeModulesDir: join(maxDir, 'node_modules'),
   };
+}
+
+async function ensureArtifactNodeModulesLink(nodeModulesDir: string): Promise<void> {
+  if (!(await pathExists(packageNodeModulesDir))) {
+    throw new Error(`Bundled skill runtime dependencies are missing: ${packageNodeModulesDir}`);
+  }
+
+  if (await pathExists(nodeModulesDir)) {
+    const [existingRealPath, packageRealPath] = await Promise.all([
+      realpath(nodeModulesDir),
+      realpath(packageNodeModulesDir),
+    ]);
+    if (existingRealPath === packageRealPath) {
+      return;
+    }
+
+    await rm(nodeModulesDir, { recursive: true, force: true });
+  }
+
+  await symlink(
+    packageNodeModulesDir,
+    nodeModulesDir,
+    process.platform === 'win32' ? 'junction' : 'dir'
+  );
 }
 
 async function getBundledSkill(skillName: string): Promise<BundledSkillEntry> {

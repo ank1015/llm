@@ -10,6 +10,8 @@ const DEFAULT_TIMEOUT_MS = 45_000;
 const DEFAULT_LIMIT = 10;
 const ADVANCED_SEARCH_URL = 'https://www.google.com/advanced_search';
 const MAX_PAGE_VISITS = 20;
+const MANUAL_CHALLENGE_POLL_MS = 1_000;
+const MANUAL_CHALLENGE_HEARTBEAT_MS = 15_000;
 
 const EXTRACT_SERP = String.raw`(() => {
   const clean = (value) => String(value == null ? '' : value).replace(/\s+/g, ' ').trim();
@@ -116,14 +118,26 @@ const EXTRACT_SERP = String.raw`(() => {
   }
 
   const pageUrl = new URL(window.location.href);
-  const bodySample = clean(document.body ? document.body.innerText || '' : '').slice(0, 1000);
+  const fullBodyText = clean(document.body ? document.body.innerText || '' : '');
+  const bodySample = fullBodyText.slice(0, 1000);
   const title = document.title;
   const lowerTitle = title.toLowerCase();
-  const lowerBody = bodySample.toLowerCase();
+  const lowerBody = fullBodyText.toLowerCase();
   let blockReason = '';
   const noResults =
     lowerBody.includes('did not match any documents') ||
     lowerBody.includes('no results found for');
+  const hasRobotCheck =
+    pageUrl.pathname.includes('/sorry/') ||
+    Boolean(
+      document.querySelector(
+        '#captcha-form, form[action*="/sorry/"], iframe[src*="recaptcha"], .g-recaptcha, #recaptcha'
+      )
+    ) ||
+    lowerBody.includes("i'm not a robot") ||
+    lowerBody.includes('i am not a robot') ||
+    lowerBody.includes('verify you are human') ||
+    lowerBody.includes('complete the captcha');
 
   if (
     lowerTitle.includes('403') ||
@@ -131,6 +145,8 @@ const EXTRACT_SERP = String.raw`(() => {
     lowerBody.includes("403. that's an error")
   ) {
     blockReason = '403';
+  } else if (hasRobotCheck) {
+    blockReason = 'robot_check';
   } else if (
     lowerBody.includes('our systems have detected unusual traffic') ||
     lowerBody.includes('unusual traffic from your computer network') ||
@@ -349,14 +365,13 @@ async function extractSearchPage(chrome, tabId, timeoutMs) {
   let lastResult = null;
 
   while (Date.now() < deadline) {
-    const evaluation = await callChrome(chrome, 'debugger.evaluate', {
-      tabId,
-      code: EXTRACT_SERP,
-      awaitPromise: true,
-      userGesture: true,
-    });
-    const result = evaluation.result;
+    let result = await evaluateSearchPage(chrome, tabId);
     if (result && Array.isArray(result.items)) {
+      if (result.page.blockReason) {
+        if (isManualChallengeBlockReason(result.page.blockReason)) {
+          result = await waitForManualChallengeResolution(chrome, tabId, result.page);
+        }
+      }
       if (result.page.blockReason) {
         throw new Error(
           [
@@ -394,6 +409,58 @@ async function extractSearchPage(chrome, tabId, timeoutMs) {
   }
 
   throw new Error(`Timed out extracting Google search results from tab ${tabId}`);
+}
+
+async function evaluateSearchPage(chrome, tabId) {
+  const evaluation = await callChrome(chrome, 'debugger.evaluate', {
+    tabId,
+    code: EXTRACT_SERP,
+    awaitPromise: true,
+    userGesture: true,
+  });
+
+  return evaluation.result;
+}
+
+function isManualChallengeBlockReason(blockReason) {
+  return blockReason === 'robot_check' || blockReason === 'unusual_traffic';
+}
+
+async function waitForManualChallengeResolution(chrome, tabId, initialPage) {
+  log(
+    [
+      `manual verification required on tab ${tabId}`,
+      `reason: ${initialPage.blockReason}`,
+      `url: ${initialPage.url || 'unknown'}`,
+      'Complete the verification in the browser. The script will resume automatically.',
+    ].join('\n')
+  );
+
+  let lastHeartbeatAt = 0;
+
+  while (true) {
+    await sleep(MANUAL_CHALLENGE_POLL_MS);
+
+    const tab = await callChrome(chrome, 'tabs.get', tabId);
+    if (tab.status !== 'complete') {
+      continue;
+    }
+
+    const result = await evaluateSearchPage(chrome, tabId);
+    if (!result || !Array.isArray(result.items)) {
+      continue;
+    }
+
+    if (!isManualChallengeBlockReason(result.page.blockReason)) {
+      log(`manual verification cleared on tab ${tabId}; resuming search extraction`);
+      return result;
+    }
+
+    if (Date.now() - lastHeartbeatAt >= MANUAL_CHALLENGE_HEARTBEAT_MS) {
+      log(`waiting for manual verification to be completed on tab ${tabId}`);
+      lastHeartbeatAt = Date.now();
+    }
+  }
 }
 
 async function submitAdvancedSearchForm(chrome, tabId, options, numPerPage) {

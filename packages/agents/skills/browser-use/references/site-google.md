@@ -15,6 +15,10 @@ The script connects with `connect({ launch: true })`, opens Google Advanced
 Search, fills the real form, submits it, paginates through result pages, and
 prints normalized results to stdout.
 
+If Google shows a manual verification page such as "I'm not a robot", the
+script pauses, waits for the user to complete it in the browser, and then
+continues automatically.
+
 ## Use This Script When
 
 - you need standard Google web search results
@@ -29,11 +33,12 @@ prints normalized results to stdout.
 - the task is not standard Google web search, such as Images, Maps, News,
   Shopping, Gmail, Drive, or account settings
 - the task requires custom interaction on the results page after extraction
-- Google returns a consent page, unusual-traffic page, or other blocked flow
+- Google returns a consent page or hard blocked flow that the script cannot
+  continue past
 - the requested behavior falls outside the supported CLI options
 
 If the script does not fit, fall back to the generic browser modes in
-[modes.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/modes.md).
+[modes.md](modes.md).
 
 ## Required Search Input
 
@@ -102,9 +107,16 @@ Common failure cases:
 
 - missing query input
 - invalid `--time-relative`
-- Google unusual-traffic page
 - Google consent gate
+- hard Google block pages such as `403`
 - result page loaded but no result items were extractable
+
+Manual verification behavior:
+
+- if Google shows a robot-check or unusual-traffic verification page, the
+  script waits for the user to complete it instead of failing immediately
+- when running through a shell tool, use a generous shell timeout because the
+  script may pause while waiting for manual completion
 
 ## Examples
 
@@ -141,7 +153,7 @@ node .max/skills/browser-use/sites/google/scripts/get-search.mjs \
 Run this script first for Google result collection. If it returns a blocked
 page, a consent flow, or the task is outside its CLI surface, stop using the
 Google shortcut and move back to the generic browser guidance in
-[research-and-reading.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/research-and-reading.md),
-[webapp-flows.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/webapp-flows.md),
+[research-and-reading.md](research-and-reading.md),
+[webapp-flows.md](webapp-flows.md),
 or
-[state-and-debugging.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/state-and-debugging.md).
+[state-and-debugging.md](state-and-debugging.md).

@@ -25,21 +25,21 @@ static HTTP fetch. Typical cases:
 ## Choose The First Path
 
 - if a matching site shortcut exists, use it first:
-  [references/site-google.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/site-google.md)
+  [references/site-google.md](references/site-google.md)
 - if you need read-only extraction or page understanding, use:
-  [references/research-and-reading.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/research-and-reading.md)
+  [references/research-and-reading.md](references/research-and-reading.md)
 - if you need interactive UI work with `Window`, use:
-  [references/webapp-flows.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/webapp-flows.md)
+  [references/webapp-flows.md](references/webapp-flows.md)
 - if the task is really about cookies, downloads, storage, network capture, or
   debugger sessions, use:
-  [references/state-and-debugging.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/state-and-debugging.md)
+  [references/state-and-debugging.md](references/state-and-debugging.md)
 - if the work repeats across many items or pages, use:
-  [references/batch-automation.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/batch-automation.md)
+  [references/batch-automation.md](references/batch-automation.md)
 - if behavior is confusing or brittle, check:
-  [references/pitfalls.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/pitfalls.md)
+  [references/pitfalls.md](references/pitfalls.md)
 
 If you need to refresh the core SDK surface before choosing a mode, read:
-[references/sdk-core.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/sdk-core.md)
+[references/sdk-core.md](references/sdk-core.md)
 
 ## Non-Negotiable Rules
 
@@ -57,18 +57,18 @@ If you need to refresh the core SDK surface before choosing a mode, read:
 ## Reference Map
 
 - task mode selection:
-  [references/modes.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/modes.md)
+  [references/modes.md](references/modes.md)
 - core SDK primitives:
-  [references/sdk-core.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/sdk-core.md)
+  [references/sdk-core.md](references/sdk-core.md)
 - read-only page work:
-  [references/research-and-reading.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/research-and-reading.md)
+  [references/research-and-reading.md](references/research-and-reading.md)
 - interactive `Window` flows:
-  [references/webapp-flows.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/webapp-flows.md)
+  [references/webapp-flows.md](references/webapp-flows.md)
 - cookies, downloads, storage, and debugger sessions:
-  [references/state-and-debugging.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/state-and-debugging.md)
+  [references/state-and-debugging.md](references/state-and-debugging.md)
 - repeated browser automation:
-  [references/batch-automation.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/batch-automation.md)
+  [references/batch-automation.md](references/batch-automation.md)
 - failure patterns and expensive mistakes:
-  [references/pitfalls.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/pitfalls.md)
+  [references/pitfalls.md](references/pitfalls.md)
 - Google search shortcut:
-  [references/site-google.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/site-google.md)
+  [references/site-google.md](references/site-google.md)
