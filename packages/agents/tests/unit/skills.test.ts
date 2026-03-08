@@ -133,6 +133,10 @@ describe('skills runtime', () => {
       expect(emptyPrompt).toContain('- none installed');
       expect(emptyPrompt).not.toContain('browser-use');
       expect(emptyPrompt).toContain('.max/temp');
+      expect(emptyPrompt).toContain('scratchpad');
+      expect(emptyPrompt).toContain('install dependencies');
+      expect(emptyPrompt).not.toContain('.max/temp/scripts');
+      expect(emptyPrompt).not.toContain('.max/node_modules');
       expect(emptyPrompt).not.toContain('max-skills');
 
       await addSkill('browser-use', artifactDir);
@@ -149,6 +153,8 @@ describe('skills runtime', () => {
       expect(installedPrompt).toContain('browser-use');
       expect(installedPrompt).not.toContain('llm-use');
       expect(installedPrompt).not.toContain('pnpm exec tsx');
+      expect(installedPrompt).not.toContain('.max/temp/scripts');
+      expect(installedPrompt).not.toContain('.max/node_modules');
       expect(installedPrompt).not.toContain('max-skills');
     } finally {
       await rm(artifactDir, { recursive: true, force: true });
@@ -165,6 +171,17 @@ describe('skills runtime', () => {
     } finally {
       await rm(artifactDir, { recursive: true, force: true });
     }
+  });
+
+  it('documents the required browser-use reading order', async () => {
+    const skillPath = join(packageRoot, 'skills', 'browser-use', 'SKILL.md');
+    const raw = await readFile(skillPath, 'utf-8');
+
+    expect(raw).toContain('## Required Reading Order');
+    expect(raw).toContain('1. read [references/sdk-core.md]');
+    expect(raw).toContain('2. read [references/modes.md]');
+    expect(raw).toContain('3. choose exactly one deeper reference');
+    expect(raw).not.toContain('script-environment.md');
   });
 });
 
@@ -210,6 +227,44 @@ describe('skills regressions', () => {
         ) {
           violations.push(entryPath);
         }
+      }
+    }
+
+    for (const path of filesToCheck) {
+      await scanPath(path);
+    }
+
+    expect(violations).toEqual([]);
+  });
+
+  it('removes the retired repo-global browser-scripts guidance', async () => {
+    const filesToCheck = [
+      join(packageRoot, 'skills', 'browser-use'),
+      resolve(packageRoot, '../extension/src/automation.md'),
+    ];
+
+    const violations: string[] = [];
+    const retiredPatterns = [
+      'packages/browser-scripts',
+      'pnpm exec tsx scripts/',
+      '.max/temp/scripts/browser-use',
+      '.max/node_modules/.bin/tsx',
+      'script-environment.md',
+    ];
+
+    async function scanPath(path: string): Promise<void> {
+      const pathStat = await stat(path);
+      if (pathStat.isFile()) {
+        const content = await readFile(path, 'utf-8');
+        if (retiredPatterns.some((pattern) => content.includes(pattern))) {
+          violations.push(path);
+        }
+        return;
+      }
+
+      const entries = await readdir(path, { withFileTypes: true });
+      for (const entry of entries) {
+        await scanPath(join(path, entry.name));
       }
     }
 

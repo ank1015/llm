@@ -118,6 +118,10 @@ Recommended pattern:
 Keep the collection boundary explicit. Examples: first 3 pages, first 20
 results, all pages until no next link, or all pages in a provided list.
 
+If the task turns into a real crawl across many pages, switch to
+[batch-automation.md](batch-automation.md) once one page of markdown extraction
+is proven.
+
 ## Light Output Contract
 
 Keep research outputs light:
@@ -156,6 +160,8 @@ Default path:
 - define the collection boundary first
 - read one page and confirm the format is useful
 - save one markdown file per page
+- switch to [batch-automation.md](batch-automation.md) if the task becomes a
+  larger crawl
 - stop when the boundary is reached or no next page exists
 
 ### 3) Visual-evidence case

@@ -51,6 +51,9 @@ When you turn a batch workflow into a standalone Node script, explicitly
 `process.exit(0)` or `process.exit(1)` after cleanup. The Chrome connection can
 otherwise keep the process alive after the work is done.
 
+For repeated tasks, use an existing project when one already fits. Otherwise,
+create a small scratch project under `<artifactDir>/.max/temp`.
+
 ## Standard Batch Workflow
 
 Use this order:
@@ -65,6 +68,9 @@ Use this order:
 8. Finish with simple task-relevant outputs.
 
 Do not jump straight to a full run before the probe works.
+
+Do not build the core crawl around `Window` unless a specific interactive step
+cannot be expressed cleanly with low-level SDK calls.
 
 ## Two Common Batch Shapes
 
@@ -117,6 +123,17 @@ In practice, batch work is often:
 - extracting a list of URLs or ids
 - running the same proven snippet repeatedly
 
+## Documentation Crawl Pattern
+
+For docs sites and other link-heavy knowledge bases:
+
+1. start on one representative page
+2. use low-level evaluation to collect in-domain links
+3. normalize and dedupe the URLs
+4. prove one markdown extraction with `chrome.getPageMarkdown(...)`
+5. crawl sequentially and save one output per URL
+6. only switch to custom low-level extraction when markdown is not enough
+
 ## Batching Rules
 
 - dedupe aggressively by stable id or canonical URL
@@ -158,7 +175,7 @@ Default path:
 
 - discover the result unit structure with `debugger.evaluate`
 - extract a deduped list of result URLs
-- prove the detail-page extractor on 1 to 3 URLs
+- prove the markdown or detail-page extractor on 1 to 3 URLs
 - then run the loop over the full list
 
 ### 2) Infinite Scroll Collection

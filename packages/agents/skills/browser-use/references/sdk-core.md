@@ -1,7 +1,9 @@
 # SDK Core
 
-This file is the shortest possible guide to the browser SDK primitives an
-agent should trust first.
+This is the first reference to read after `SKILL.md`.
+
+It is the shortest possible guide to the browser SDK primitives an agent
+should trust first.
 
 It is not a full API reference. It tells you how to start, which primitive to
 pick first, and which lower-level exports are not normal skill-level entry
@@ -18,10 +20,18 @@ import { connect, Window } from '@ank1015/llm-extension';
 Import only what you use. For low-level work, `connect` is enough. For
 interactive `Window` work, read [webapp-flows.md](webapp-flows.md).
 
+If you need to write a custom browser script, you may use the SDK from an
+existing project or create a small scratch project under `<artifactDir>/.max/temp`.
+
+Do not import from `@ank1015/llm-extension/src/...` or
+`@ank1015/llm-extension/dist/...`.
+
 ## Mental Model
 
 - `connect(...)` opens a client connection to the local Chrome bridge.
 - That client is a `ChromeClient`.
+- `connect(...)` already starts the client read loop. Do not call
+  `chrome.run()` manually after `connect()`.
 - `chrome.call(method, ...args)` is the generic primitive. It maps method
   strings like `tabs.query` to `chrome.tabs.query(...)` inside the extension.
 - Some methods are special RPC helpers rather than direct Chrome API methods:
@@ -62,6 +72,8 @@ Use this as the default way to start.
   values.
 - `launchTimeout` is only worth changing when startup timing is part of the
   task.
+- use the exported SDK surface as-is. Do not reach into package internals to
+  find alternate entrypoints.
 - when you write a standalone Node script with `connect(...)`, explicitly
   `process.exit(0)` or `process.exit(1)` after cleanup.
   The Chrome connection can keep the process alive even after the script logic
@@ -116,6 +128,7 @@ Use these when page execution precision matters.
 
 ### Default to
 
+- the exported package root from `@ank1015/llm-extension`
 - `connect({ launch: true })` as the normal entry point.
 - `chrome.call(...)` for exact Chrome API work.
 - `chrome.getPageMarkdown(...)` before custom read-only extraction logic.
@@ -132,6 +145,12 @@ Use these when page execution precision matters.
   utilities as skill-level entry points.
   They are part of the package, but they are not the normal way an agent should
   start browser work.
+- deep imports from `@ank1015/llm-extension/src/...` or
+  `@ank1015/llm-extension/dist/...`.
+  Trust the exported surface first and only inspect internals when the skill
+  docs are insufficient or you are debugging an export or runtime problem.
+- calling `chrome.run()` after `connect()`.
+  `connect()` already creates the client and starts the read loop.
 - full `Window` usage in this file.
   Keep this file focused on core primitives and defer interactive workflow
   details to later references.
@@ -196,6 +215,9 @@ const title = evaluation.result;
 ## Not Covered Here
 
 This file does not teach the full browser skill.
+
+Read [modes.md](modes.md) next, then stop and read only the one deeper file
+for the chosen mode.
 
 Use later files for:
 

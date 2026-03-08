@@ -1,5 +1,7 @@
 # Modes
 
+Read this file immediately after [sdk-core.md](sdk-core.md).
+
 Use this file to choose the mode first.
 
 Once you know the mode, stop here and read the deeper file for that mode.
@@ -90,6 +92,9 @@ It is normal to move between modes:
 ## Do Not Put The Full Workflow Here
 
 This file should stay thin.
+
+Pick one mode and stop. Do not preload multiple mode references unless the task
+later proves that you need to switch modes.
 
 After choosing the mode, read the deeper file:
 

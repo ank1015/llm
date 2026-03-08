@@ -7,6 +7,7 @@ import { createInterface } from 'node:readline/promises';
 import {
   Conversation,
   createSessionManager,
+  getModel,
   getModels,
   isValidApi,
   KnownApis,
@@ -515,7 +516,7 @@ function createCliTools(): AgentTool[] {
 
 async function runCli(): Promise<void> {
   const options = parseCliArgs(process.argv.slice(2));
-  const model = getModels(options.api).find((entry) => entry.id === options.modelId);
+  const model = getModel('codex', 'gpt-5.4');
   if (!model) {
     const availableIds = getModels(options.api)
       .map((entry) => entry.id)

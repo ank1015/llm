@@ -11,6 +11,17 @@ clicking through webapps, inspecting cookies or downloads or network behavior,
 running repeated browser automation, or using site-specific shortcuts such as
 Google search.
 
+## Required Reading Order
+
+After reading this file, always do this exact sequence:
+
+1. read [references/sdk-core.md](references/sdk-core.md)
+2. read [references/modes.md](references/modes.md)
+3. choose exactly one deeper reference for the current task
+
+Do not skip `sdk-core.md` or `modes.md`.
+Do not read multiple mode references up front unless you later switch modes.
+
 ## When To Use This Skill
 
 Use this skill when the task depends on the real browser session rather than a
@@ -38,11 +49,10 @@ static HTTP fetch. Typical cases:
 - if behavior is confusing or brittle, check:
   [references/pitfalls.md](references/pitfalls.md)
 
-If you need to refresh the core SDK surface before choosing a mode, read:
-[references/sdk-core.md](references/sdk-core.md)
-
 ## Non-Negotiable Rules
 
+- the skill docs are the primary source of truth for browser-use tasks
+- always read `sdk-core.md`, then `modes.md`, then one chosen deeper reference
 - prefer the highest-level deterministic path that fits the task
 - use a site script before manual page reasoning when a matching script exists
 - use `chrome.getPageMarkdown(...)` first for read-only work
@@ -53,13 +63,18 @@ If you need to refresh the core SDK surface before choosing a mode, read:
   visual evidence matters
 - probe before scaling batch work
 - detach debugger sessions and clean up artifacts you created
+- keep bundled skill files unchanged unless the user explicitly asks to modify
+  them
+- do not inspect `node_modules`, package `README.md`, `src/`, or `dist/`
+  unless the skill docs are insufficient for the task or you are debugging an
+  export or runtime problem
 
 ## Reference Map
 
-- task mode selection:
-  [references/modes.md](references/modes.md)
 - core SDK primitives:
   [references/sdk-core.md](references/sdk-core.md)
+- task mode selection:
+  [references/modes.md](references/modes.md)
 - read-only page work:
   [references/research-and-reading.md](references/research-and-reading.md)
 - interactive `Window` flows:
