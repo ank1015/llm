@@ -1,6 +1,6 @@
 import { PassThrough } from 'node:stream';
 
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 
 import { readMessage } from '../../../src/native/stdio.js';
 import { LENGTH_PREFIX_BYTES } from '../../../src/protocol/constants.js';
@@ -24,6 +24,11 @@ function createStreams() {
 function pushMessage(stream: PassThrough, message: ChromeMessage): void {
   stream.write(encode(message));
 }
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 // ── call() ──────────────────────────────────────────────────────────
 
@@ -209,6 +214,80 @@ describe('ChromeClient.run', () => {
     input.end();
 
     await expect(runPromise).rejects.toThrow(/Stream ended/);
+  });
+});
+
+// ── getPageMarkdown() ──────────────────────────────────────────────
+
+describe('ChromeClient.getPageMarkdown', () => {
+  it('should read page HTML and convert it to markdown', async () => {
+    const client = new ChromeClient();
+    const callSpy = vi.spyOn(client, 'call').mockImplementation(async (method, ...args) => {
+      if (method === 'tabs.get') {
+        return { status: 'complete' };
+      }
+
+      if (method === 'debugger.evaluate') {
+        expect(args[0]).toMatchObject({
+          tabId: 123,
+          awaitPromise: false,
+          userGesture: false,
+        });
+
+        return {
+          result: '<!DOCTYPE html>\n<html><body><h1>Alpha</h1><p>Beta</p></body></html>',
+        };
+      }
+
+      throw new Error(`Unexpected method: ${method}`);
+    });
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => JSON.stringify({ markdown: '# Alpha\n\nBeta' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const markdown = await client.getPageMarkdown(123);
+
+    expect(markdown).toBe('# Alpha\n\nBeta');
+    expect(callSpy).toHaveBeenCalledWith('tabs.get', 123);
+    expect(callSpy).toHaveBeenCalledWith(
+      'debugger.evaluate',
+      expect.objectContaining({ tabId: 123 })
+    );
+    expect(fetchMock).toHaveBeenCalledWith('http://localhost:8080/convert', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        html: '<!DOCTYPE html>\n<html><body><h1>Alpha</h1><p>Beta</p></body></html>',
+      }),
+    });
+  });
+
+  it('should return the fallback message when the converter is unavailable', async () => {
+    const client = new ChromeClient();
+    vi.spyOn(client, 'call').mockImplementation(async (method) => {
+      if (method === 'tabs.get') {
+        return { status: 'complete' };
+      }
+
+      if (method === 'debugger.evaluate') {
+        return {
+          result: '<!DOCTYPE html>\n<html><body><h1>Alpha</h1></body></html>',
+        };
+      }
+
+      throw new Error(`Unexpected method: ${method}`);
+    });
+
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('connect ECONNREFUSED')));
+
+    const markdown = await client.getPageMarkdown(123);
+
+    expect(markdown).toBe('service not running use observe tool');
   });
 });
 

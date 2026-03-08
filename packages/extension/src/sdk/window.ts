@@ -16,6 +16,7 @@ import {
   readLatestObserveSnapshot,
   renderObserveMarkdown,
 } from './observe/index.js';
+import { getPageMarkdownForTab } from './page-markdown.js';
 
 import type {
   WindowActionScriptPayload,
@@ -26,13 +27,12 @@ import type {
 } from './action/index.js';
 import type { ChromeClient } from './client.js';
 import type { ObserveSnapshot, WindowObserveOptions } from './observe/index.js';
+import type { GetPageMarkdownOptions } from './page-markdown.js';
 
 const DEFAULT_WAIT_TIMEOUT_MS = 30_000;
 const DEFAULT_ACTION_TIMEOUT_MS = 15_000;
 const DEFAULT_DOWNLOAD_TIMEOUT_MS = 120_000;
 const DEFAULT_GET_PAGE_TIMEOUT_MS = 30_000;
-const DEFAULT_HTML_CONVERTER_URL = 'http://localhost:8080/convert';
-const GET_PAGE_SERVICE_ERROR = 'service not running use observe tool';
 const TAB_POLL_INTERVAL_MS = 100;
 const TAB_SETTLE_DELAY_MS = 200;
 
@@ -366,7 +366,6 @@ export class Window {
   async getPage(input?: WindowGetPageOptions | number | string): Promise<string> {
     const normalizedInput = this.normalizeGetPageInput(input);
     const timeoutMs = normalizedInput.timeoutMs ?? DEFAULT_GET_PAGE_TIMEOUT_MS;
-    const converterUrl = normalizedInput.converterUrl ?? DEFAULT_HTML_CONVERTER_URL;
 
     let targetTabId: number;
     let createdTabId: number | null = null;
@@ -391,8 +390,16 @@ export class Window {
     }
 
     try {
-      const html = await this.getCompleteHtml(targetTabId, timeoutMs);
-      return await this.convertHtmlToMarkdown(html, converterUrl);
+      const getPageMarkdownOptions: GetPageMarkdownOptions = { timeoutMs };
+      if (normalizedInput.converterUrl) {
+        getPageMarkdownOptions.converterUrl = normalizedInput.converterUrl;
+      }
+
+      return await getPageMarkdownForTab(
+        await this.getChrome(),
+        targetTabId,
+        getPageMarkdownOptions
+      );
     } finally {
       if (createdTabId !== null) {
         await this.closeTabIfPresent(createdTabId);
@@ -891,78 +898,6 @@ export class Window {
     }
 
     return normalized;
-  }
-
-  private async getCompleteHtml(tabId: number, timeoutMs: number): Promise<string> {
-    const html = await this.evaluate<string>(
-      `
-(() => {
-  const doctype = document.doctype
-    ? "<!DOCTYPE " + document.doctype.name + ">"
-    : "";
-  return doctype + "\\n" + document.documentElement.outerHTML;
-})()
-      `.trim(),
-      { tabId, timeoutMs }
-    );
-
-    if (typeof html !== 'string') {
-      throw new Error('Failed to read page HTML');
-    }
-
-    return html;
-  }
-
-  private async convertHtmlToMarkdown(html: string, converterUrl: string): Promise<string> {
-    try {
-      const response = await fetch(converterUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ html }),
-      });
-
-      if (!response.ok) {
-        return GET_PAGE_SERVICE_ERROR;
-      }
-
-      const raw = await response.text();
-      return this.parseConvertedMarkdown(raw);
-    } catch {
-      return GET_PAGE_SERVICE_ERROR;
-    }
-  }
-
-  private parseConvertedMarkdown(raw: string): string {
-    const trimmed = raw.trim();
-    if (!trimmed) {
-      return '';
-    }
-
-    try {
-      const parsed = JSON.parse(trimmed) as unknown;
-      if (typeof parsed === 'string') {
-        return parsed;
-      }
-
-      if (parsed && typeof parsed === 'object') {
-        const parsedRecord = parsed as Record<string, unknown>;
-        if (typeof parsedRecord.markdown === 'string') {
-          return parsedRecord.markdown;
-        }
-        if (typeof parsedRecord.content === 'string') {
-          return parsedRecord.content;
-        }
-        if (typeof parsedRecord.result === 'string') {
-          return parsedRecord.result;
-        }
-      }
-    } catch {
-      // Converter may return plain text markdown.
-    }
-
-    return raw;
   }
 
   private async closeTabIfPresent(tabId: number): Promise<void> {

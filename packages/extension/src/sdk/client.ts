@@ -3,6 +3,9 @@ import { randomUUID } from 'node:crypto';
 import { readMessageWithOptions, writeMessageWithOptions } from '../native/stdio.js';
 import { MAX_MESSAGE_SIZE_BYTES } from '../protocol/constants.js';
 
+import { getPageMarkdownForTab } from './page-markdown.js';
+
+import type { GetPageMarkdownOptions } from './page-markdown.js';
 import type { HostMessage, ChromeMessage } from '../protocol/types.js';
 import type { Readable, Writable } from 'node:stream';
 
@@ -73,6 +76,18 @@ export class ChromeClient {
       this.send({ id, type: 'unsubscribe' });
       this.eventCallbacks.delete(id);
     };
+  }
+
+  /**
+   * Read a tab's HTML via `debugger.evaluate` and convert it to markdown
+   * using the local converter service.
+   */
+  async getPageMarkdown(tabId: number, options?: GetPageMarkdownOptions): Promise<string> {
+    if (this.closed) {
+      throw new Error('ChromeClient connection is closed');
+    }
+
+    return await getPageMarkdownForTab(this, tabId, options);
   }
 
   /**

@@ -25,6 +25,7 @@ export { ChromeClient, createChromeClient, connect, Window } from './sdk/index.j
 export type {
   ChromeClientOptions,
   ConnectOptions,
+  GetPageMarkdownOptions,
   ObserveFilter,
   WindowActionOptions,
   WindowDownloadOptions,

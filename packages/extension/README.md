@@ -81,6 +81,10 @@ await chrome.call('storage.local.set', { myKey: 'myValue' });
 const data = await chrome.call('storage.local.get', 'myKey');
 console.log(data.myKey); // 'myValue'
 
+// Read a tab as markdown via the local HTML converter service
+const markdown = await chrome.getPageMarkdown(tabs[0].id);
+console.log(markdown);
+
 // Subscribe to events
 const unsubscribe = chrome.subscribe('tabs.onUpdated', (args) => {
   const [tabId, changeInfo, tab] = args;
@@ -173,6 +177,24 @@ const unsub = chrome.subscribe('tabs.onUpdated', (args) => {
 
 // Stop listening
 unsub();
+```
+
+### `ChromeClient.getPageMarkdown(tabId, opts?)`
+
+Read a tab's full HTML via `debugger.evaluate` and convert it to markdown
+using the local converter service.
+
+| Option         | Default                           | Description                                  |
+| -------------- | --------------------------------- | -------------------------------------------- |
+| `timeoutMs`    | `30000`                           | Max ms to wait for the tab to finish loading |
+| `converterUrl` | `'http://localhost:8080/convert'` | HTML-to-markdown service endpoint            |
+
+```ts
+const markdown = await chrome.getPageMarkdown(tabId);
+const markdown = await chrome.getPageMarkdown(tabId, {
+  converterUrl: 'http://localhost:8080/convert',
+  timeoutMs: 15000,
+});
 ```
 
 ## Configuration

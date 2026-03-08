@@ -4,6 +4,7 @@ import type { ChromeClientOptions } from './client.js';
 
 export { ChromeClient } from './client.js';
 export type { ChromeClientOptions } from './client.js';
+export type { GetPageMarkdownOptions } from './page-markdown.js';
 
 export { connect } from './connect.js';
 export type { ConnectOptions } from './connect.js';
