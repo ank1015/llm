@@ -1,54 +1,16 @@
-import { spawn } from 'child_process';
-import { access, readFile, realpath } from 'fs/promises';
-import { cp, mkdir, readdir, rm, writeFile } from 'node:fs/promises';
-import { dirname, join, relative, resolve } from 'node:path';
+import { existsSync } from 'fs';
+import { access, cp, mkdir, readFile, readdir, realpath, rm } from 'node:fs/promises';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const currentFileDir = dirname(fileURLToPath(import.meta.url));
-const repoRoot = resolve(currentFileDir, '../../../../../');
-const sourceSkillsDir = resolve(repoRoot, 'packages/agents/skills');
+const packageRoot = findPackageRoot(currentFileDir);
+const bundledSkillsDir = join(packageRoot, 'skills');
+const bundledRegistryPath = join(bundledSkillsDir, 'registry.json');
 
-const internalPackages = [
-  {
-    name: '@ank1015/llm-types',
-    sourceDir: resolve(repoRoot, 'packages/types'),
-  },
-  {
-    name: '@ank1015/llm-sdk',
-    sourceDir: resolve(repoRoot, 'packages/sdk'),
-  },
-  {
-    name: '@ank1015/llm-sdk-adapters',
-    sourceDir: resolve(repoRoot, 'packages/sdk-adapters'),
-  },
-  {
-    name: '@ank1015/llm-extension',
-    sourceDir: resolve(repoRoot, 'packages/extension'),
-  },
-] as const;
-
-const bundledSkillDependencies = {
-  pptxgenjs: '^4.0.1',
-  react: '^19.2.4',
-  'react-dom': '^19.2.4',
-  'react-icons': '^5.6.0',
-  sharp: '^0.34.5',
-  xlsx: '^0.18.5',
-} as const;
-
-const bundledSkillDevDependencies = {
-  '@types/react': '^19.2.14',
-  '@types/react-dom': '^19.2.3',
-} as const;
-
-export interface SetupSkillsResult {
-  rootDir: string;
-  skillsDir: string;
-  scriptsDir: string;
-  installedPackages: Record<string, string>;
-  registryPath: string;
-  skillsRegistry: SkillRegistryEntry[];
-}
+export const MAX_DIR_NAME = '.max';
+export const INSTALLED_SKILLS_DIR_NAME = 'skills';
+export const TEMP_DIR_NAME = 'temp';
 
 export interface SkillRegistryEntry {
   name: string;
@@ -56,169 +18,269 @@ export interface SkillRegistryEntry {
   path: string;
 }
 
-export async function setupSkills(projectDir: string): Promise<SetupSkillsResult> {
-  const rootDir = resolve(projectDir, 'max-skills');
-
-  await mkdir(rootDir, { recursive: true });
-  const rootDirRealPath = await realpath(rootDir);
-  const skillsDir = join(rootDirRealPath, 'skills');
-  const scriptsDir = join(rootDirRealPath, 'scripts');
-  const installedPackages = await createInstalledPackageMap();
-  await writeProjectFiles(rootDirRealPath, scriptsDir, installedPackages);
-  await syncBundledSkills(skillsDir);
-  await rm(join(rootDirRealPath, 'workspace'), { recursive: true, force: true });
-  await rm(join(rootDirRealPath, 'src'), { recursive: true, force: true });
-  await rm(join(rootDirRealPath, 'tmp'), { recursive: true, force: true });
-  const { registryPath, skillsRegistry } = await writeSkillsRegistry(skillsDir);
-  await installWorkspace(rootDirRealPath);
-
-  return {
-    rootDir: rootDirRealPath,
-    skillsDir,
-    scriptsDir,
-    installedPackages,
-    registryPath,
-    skillsRegistry,
-  };
+export interface BundledSkillEntry extends SkillRegistryEntry {
+  directory: string;
 }
 
-export const setUpSkills = setupSkills;
-
-async function writeProjectFiles(
-  rootDir: string,
-  scriptsDir: string,
-  installedPackages: Record<string, string>
-): Promise<void> {
-  await mkdir(scriptsDir, { recursive: true });
-
-  const packageJson = {
-    name: 'max-skills',
-    version: '0.0.1',
-    private: true,
-    type: 'module',
-    packageManager: 'pnpm@9.15.0',
-    scripts: {
-      typecheck: 'tsc --noEmit',
-      script: 'tsx',
-    },
-    dependencies: installedPackages,
-    devDependencies: {
-      '@types/node': '^25.3.2',
-      ...bundledSkillDevDependencies,
-      tsx: '^4.19.0',
-      typescript: '^5.7.0',
-    },
-    engines: {
-      node: '>=20.0.0',
-    },
-  };
-
-  const tsconfig = {
-    compilerOptions: {
-      target: 'ES2022',
-      module: 'NodeNext',
-      moduleResolution: 'NodeNext',
-      strict: true,
-      noImplicitAny: true,
-      strictNullChecks: true,
-      noUncheckedIndexedAccess: true,
-      noImplicitReturns: true,
-      noFallthroughCasesInSwitch: true,
-      exactOptionalPropertyTypes: true,
-      esModuleInterop: true,
-      resolveJsonModule: true,
-      skipLibCheck: true,
-      types: ['node'],
-      noEmit: true,
-    },
-    include: ['scripts/**/*.ts', 'skills/**/*.ts'],
-    exclude: ['node_modules', 'dist'],
-  };
-
-  const readme = `# max-skills
-
-Generated TypeScript project for Max skills and artifact-scoped helper scripts.
-
-## Layout
-
-- \`skills/\`: bundled skills copied from \`packages/agents/skills/\` plus any project-specific skills you add later
-- \`scripts/\`: helper scripts grouped by artifact, for example \`scripts/product/\`
-
-## Commands
-
-- \`pnpm typecheck\`: type-check authored scripts under \`scripts/\` and bundled skill scripts under \`skills/\`
-- \`pnpm exec tsx <file>\`: run any TypeScript file inside this project
-
-## Notes
-
-- Internal \`@ank1015/*\` packages are installed from npm using the versions configured when this workspace was generated.
-- The generated workspace uses pnpm, TypeScript, and ESM. Prefer \`.ts\` scripts run with \`pnpm exec tsx\`.
-- Bundled skill npm packages such as \`pptxgenjs\`, \`react\`, \`react-dom\`, \`react-icons\`, \`sharp\`, and \`xlsx\` are installed automatically.
-- For each artifact, helper scripts and intermediate files should live under \`scripts/<artifact-name>/\`.
-- Final user-facing outputs should stay in the artifact directory unless the user asks for a different location.
-- If you publish a newer package version and want this workspace to use it, rerun the setup.
-`;
-
-  const gitignore = `node_modules
-dist
-scripts/*/tmp
-`;
-
-  await writeManagedFile(
-    join(rootDir, 'package.json'),
-    `${JSON.stringify(packageJson, null, 2)}\n`
-  );
-  await writeManagedFile(join(rootDir, 'tsconfig.json'), `${JSON.stringify(tsconfig, null, 2)}\n`);
-  await writeManagedFile(join(rootDir, 'README.md'), readme);
-  await writeManagedFile(join(rootDir, '.gitignore'), gitignore);
+export interface InstalledSkillEntry extends SkillRegistryEntry {
+  artifactDir: string;
+  maxDir: string;
+  skillsDir: string;
+  tempDir: string;
+  directory: string;
 }
 
-async function syncBundledSkills(skillsDir: string): Promise<void> {
-  await mkdir(skillsDir, { recursive: true });
+export interface AddSkillResult extends InstalledSkillEntry {
+  sourceDirectory: string;
+  sourcePath: string;
+}
 
-  if (!(await pathExists(sourceSkillsDir))) {
-    return;
+interface RegistryFileEntry {
+  name: string;
+  description: string;
+}
+
+export async function listBundledSkills(): Promise<BundledSkillEntry[]> {
+  const registry = await readBundledRegistry();
+
+  return registry.map((entry) => {
+    const directory = join(bundledSkillsDir, entry.name);
+    const path = join(directory, 'SKILL.md');
+
+    return {
+      name: entry.name,
+      description: entry.description,
+      directory,
+      path,
+    };
+  });
+}
+
+export async function addSkill(skillName: string, artifactDir: string): Promise<AddSkillResult> {
+  const bundledSkill = await getBundledSkill(skillName);
+
+  await mkdir(artifactDir, { recursive: true });
+  const resolvedArtifactDir = await realpath(artifactDir);
+  const artifactPaths = getArtifactPaths(resolvedArtifactDir);
+
+  await mkdir(artifactPaths.maxDir, { recursive: true });
+  await mkdir(artifactPaths.skillsDir, { recursive: true });
+  await mkdir(artifactPaths.tempDir, { recursive: true });
+
+  const targetDirectory = join(artifactPaths.skillsDir, bundledSkill.name);
+  await rm(targetDirectory, { recursive: true, force: true });
+  await cp(bundledSkill.directory, targetDirectory, { recursive: true, force: true });
+
+  const installedMetadata = await readInstalledSkill(targetDirectory, resolvedArtifactDir);
+  if (!installedMetadata) {
+    throw new Error(`Installed skill is missing a valid SKILL.md: ${targetDirectory}`);
   }
 
-  const entries = await readdir(sourceSkillsDir, { withFileTypes: true });
+  return {
+    ...installedMetadata,
+    sourceDirectory: bundledSkill.directory,
+    sourcePath: bundledSkill.path,
+  };
+}
+
+export async function listInstalledSkills(artifactDir: string): Promise<InstalledSkillEntry[]> {
+  const resolvedArtifactDir = resolve(artifactDir);
+  const artifactPaths = getArtifactPaths(resolvedArtifactDir);
+
+  if (!(await pathExists(artifactPaths.skillsDir))) {
+    return [];
+  }
+
+  const entries = await readdir(artifactPaths.skillsDir, { withFileTypes: true });
+  const installedSkills: InstalledSkillEntry[] = [];
 
   for (const entry of entries) {
     if (!entry.isDirectory()) {
       continue;
     }
 
-    const sourceSkillDir = join(sourceSkillsDir, entry.name);
-    const targetSkillDir = join(skillsDir, entry.name);
+    const skillDirectory = join(artifactPaths.skillsDir, entry.name);
+    const installedSkill = await readInstalledSkill(skillDirectory, resolvedArtifactDir);
+    if (!installedSkill) {
+      continue;
+    }
 
-    await rm(targetSkillDir, { recursive: true, force: true });
-    await cp(sourceSkillDir, targetSkillDir, { recursive: true, force: true });
+    installedSkills.push(installedSkill);
   }
+
+  installedSkills.sort((left, right) => left.name.localeCompare(right.name));
+  return installedSkills;
 }
 
-async function writeSkillsRegistry(
-  skillsDir: string
-): Promise<{ registryPath: string; skillsRegistry: SkillRegistryEntry[] }> {
-  const skillsRegistry = await buildSkillsRegistry(skillsDir);
-  const registryPath = join(skillsDir, 'registry.json');
-  await writeManagedFile(registryPath, `${JSON.stringify(skillsRegistry, null, 2)}\n`);
-
+export async function readBundledSkillMetadata(skillName: string): Promise<SkillRegistryEntry> {
+  const bundledSkill = await getBundledSkill(skillName);
   return {
-    registryPath,
-    skillsRegistry,
+    name: bundledSkill.name,
+    description: bundledSkill.description,
+    path: bundledSkill.path,
   };
 }
 
-async function installWorkspace(rootDir: string): Promise<void> {
-  const startedAt = Date.now();
-  process.stderr.write(`[skills] installing workspace dependencies in ${rootDir}\n`);
-  await runCommandWithOptions(getPnpmCommand(), ['install'], rootDir, { streamOutput: true });
-  const elapsedMs = Date.now() - startedAt;
-  process.stderr.write(`[skills] finished pnpm install in ${elapsedMs}ms\n`);
+function getArtifactPaths(artifactDir: string): {
+  maxDir: string;
+  skillsDir: string;
+  tempDir: string;
+} {
+  const maxDir = join(artifactDir, MAX_DIR_NAME);
+  return {
+    maxDir,
+    skillsDir: join(maxDir, INSTALLED_SKILLS_DIR_NAME),
+    tempDir: join(maxDir, TEMP_DIR_NAME),
+  };
 }
 
-async function writeManagedFile(path: string, content: string): Promise<void> {
-  await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, content, 'utf-8');
+async function getBundledSkill(skillName: string): Promise<BundledSkillEntry> {
+  const bundledSkills = await listBundledSkills();
+  const skill = bundledSkills.find((entry) => entry.name === skillName);
+
+  if (!skill) {
+    const availableSkills = bundledSkills.map((entry) => entry.name).join(', ') || '[none]';
+    throw new Error(`Unknown bundled skill "${skillName}". Available skills: ${availableSkills}`);
+  }
+
+  if (!(await pathExists(skill.path))) {
+    throw new Error(`Bundled skill is missing SKILL.md: ${skill.path}`);
+  }
+
+  return skill;
+}
+
+async function readInstalledSkill(
+  skillDirectory: string,
+  artifactDir: string
+): Promise<InstalledSkillEntry | undefined> {
+  const skillPath = join(skillDirectory, 'SKILL.md');
+  if (!(await pathExists(skillPath))) {
+    return undefined;
+  }
+
+  const metadata = await readSkillMetadata(skillPath);
+  const artifactPaths = getArtifactPaths(artifactDir);
+
+  return {
+    ...metadata,
+    path: skillPath,
+    artifactDir,
+    maxDir: artifactPaths.maxDir,
+    skillsDir: artifactPaths.skillsDir,
+    tempDir: artifactPaths.tempDir,
+    directory: skillDirectory,
+  };
+}
+
+async function readBundledRegistry(): Promise<RegistryFileEntry[]> {
+  const raw = await readFile(bundledRegistryPath, 'utf-8');
+  const parsed = JSON.parse(raw) as unknown;
+
+  if (!Array.isArray(parsed)) {
+    throw new Error(`Bundled skill registry must be an array: ${bundledRegistryPath}`);
+  }
+
+  const registry: RegistryFileEntry[] = [];
+  for (const entry of parsed) {
+    if (
+      !entry ||
+      typeof entry !== 'object' ||
+      typeof entry.name !== 'string' ||
+      typeof entry.description !== 'string'
+    ) {
+      throw new Error(`Bundled skill registry contains an invalid entry: ${bundledRegistryPath}`);
+    }
+
+    registry.push({
+      name: entry.name,
+      description: entry.description,
+    });
+  }
+
+  registry.sort((left, right) => left.name.localeCompare(right.name));
+  return registry;
+}
+
+async function readSkillMetadata(skillFilePath: string): Promise<{
+  name: string;
+  description: string;
+}> {
+  const raw = await readFile(skillFilePath, 'utf-8');
+  const frontmatterMatch = raw.match(/^---\s*\r?\n([\s\S]*?)\r?\n---/);
+  if (!frontmatterMatch) {
+    throw new Error(`Skill file is missing YAML frontmatter: ${skillFilePath}`);
+  }
+
+  const frontmatterBody = frontmatterMatch[1] ?? '';
+  const values = parseFrontmatter(frontmatterBody);
+  const name = values.name?.trim() ?? '';
+  const description = values.description?.trim() ?? '';
+
+  if (!name || !description) {
+    throw new Error(`Skill frontmatter must include name and description: ${skillFilePath}`);
+  }
+
+  return { name, description };
+}
+
+function parseFrontmatter(frontmatterBody: string): Record<string, string> {
+  const values: Record<string, string> = {};
+  let pendingKey: string | undefined;
+  let pendingLines: string[] = [];
+
+  const flushPending = (): void => {
+    if (!pendingKey) {
+      return;
+    }
+
+    values[pendingKey] = pendingLines.join('\n').trim();
+    pendingKey = undefined;
+    pendingLines = [];
+  };
+
+  for (const rawLine of frontmatterBody.split(/\r?\n/)) {
+    const line = rawLine.trimEnd();
+    const scalarMatch = line.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
+
+    if (scalarMatch && !rawLine.startsWith('  ')) {
+      flushPending();
+      const key = scalarMatch[1];
+      const rawValue = scalarMatch[2];
+
+      if (!key || rawValue === undefined) {
+        continue;
+      }
+
+      if (rawValue === '|' || rawValue === '>') {
+        pendingKey = key;
+        pendingLines = [];
+        continue;
+      }
+
+      values[key] = normalizeFrontmatterValue(rawValue);
+      continue;
+    }
+
+    if (pendingKey && rawLine.startsWith('  ')) {
+      pendingLines.push(rawLine.slice(2));
+    }
+  }
+
+  flushPending();
+  return values;
+}
+
+function normalizeFrontmatterValue(value: string): string {
+  const trimmed = value.trim();
+  if (
+    (trimmed.startsWith("'") && trimmed.endsWith("'")) ||
+    (trimmed.startsWith('"') && trimmed.endsWith('"'))
+  ) {
+    return trimmed.slice(1, -1);
+  }
+
+  return trimmed;
 }
 
 async function pathExists(path: string): Promise<boolean> {
@@ -230,150 +292,19 @@ async function pathExists(path: string): Promise<boolean> {
   }
 }
 
-function getPnpmCommand(): string {
-  return process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
-}
+function findPackageRoot(startDir: string): string {
+  let dir = startDir;
 
-async function createInstalledPackageMap(): Promise<Record<string, string>> {
-  const installedPackages: Record<string, string> = {
-    ...bundledSkillDependencies,
-  };
-
-  for (const pkg of internalPackages) {
-    installedPackages[pkg.name] = await readPackageVersion(pkg.sourceDir);
-  }
-
-  return installedPackages;
-}
-
-async function readPackageVersion(packageDir: string): Promise<string> {
-  const packageJsonPath = join(packageDir, 'package.json');
-  const raw = await readFile(packageJsonPath, 'utf-8');
-  const parsed = JSON.parse(raw) as { version?: string };
-
-  if (!parsed.version) {
-    throw new Error(`Package version not found in ${packageJsonPath}`);
-  }
-
-  return parsed.version;
-}
-
-async function buildSkillsRegistry(skillsDir: string): Promise<SkillRegistryEntry[]> {
-  const entries = await readdir(skillsDir, { withFileTypes: true });
-  const skillsRegistry: SkillRegistryEntry[] = [];
-
-  for (const entry of entries) {
-    if (!entry.isDirectory()) {
-      continue;
+  while (true) {
+    if (existsSync(join(dir, 'package.json'))) {
+      return dir;
     }
 
-    const skillFilePath = join(skillsDir, entry.name, 'SKILL.md');
-    if (!(await pathExists(skillFilePath))) {
-      continue;
+    const parentDir = dirname(dir);
+    if (parentDir === dir) {
+      throw new Error(`Unable to locate package root from ${startDir}`);
     }
 
-    const { name, description } = await readSkillMetadata(skillFilePath);
-    skillsRegistry.push({
-      name,
-      description,
-      path: skillFilePath,
-    });
+    dir = parentDir;
   }
-
-  skillsRegistry.sort((left, right) => left.name.localeCompare(right.name));
-  return skillsRegistry;
-}
-
-async function readSkillMetadata(skillFilePath: string): Promise<{
-  name: string;
-  description: string;
-}> {
-  const raw = await readFile(skillFilePath, 'utf-8');
-  const frontmatterMatch = raw.match(/^---\s*\r?\n([\s\S]*?)\r?\n---/);
-
-  if (!frontmatterMatch) {
-    throw new Error(`Skill file is missing YAML frontmatter: ${skillFilePath}`);
-  }
-
-  const frontmatterBody = frontmatterMatch[1] ?? '';
-  let name = '';
-  let description = '';
-
-  for (const line of frontmatterBody.split(/\r?\n/)) {
-    const separatorIndex = line.indexOf(':');
-    if (separatorIndex === -1) {
-      continue;
-    }
-
-    const key = line.slice(0, separatorIndex).trim();
-    const value = normalizeFrontmatterValue(line.slice(separatorIndex + 1).trim());
-
-    if (key === 'name') {
-      name = value;
-    } else if (key === 'description') {
-      description = value;
-    }
-  }
-
-  if (!name || !description) {
-    throw new Error(`Skill frontmatter must include name and description: ${skillFilePath}`);
-  }
-
-  return { name, description };
-}
-
-function normalizeFrontmatterValue(value: string): string {
-  if (
-    (value.startsWith("'") && value.endsWith("'")) ||
-    (value.startsWith('"') && value.endsWith('"'))
-  ) {
-    return value.slice(1, -1);
-  }
-
-  return value;
-}
-
-async function runCommandWithOptions(
-  command: string,
-  args: string[],
-  cwd: string,
-  options?: { streamOutput?: boolean }
-): Promise<void> {
-  await new Promise<void>((resolvePromise, rejectPromise) => {
-    const child = spawn(command, args, {
-      cwd,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-
-    let output = '';
-
-    child.stdout?.on('data', (chunk: Buffer | string) => {
-      const text = chunk.toString();
-      output += text;
-      if (options?.streamOutput) {
-        process.stderr.write(text);
-      }
-    });
-
-    child.stderr?.on('data', (chunk: Buffer | string) => {
-      const text = chunk.toString();
-      output += text;
-      if (options?.streamOutput) {
-        process.stderr.write(text);
-      }
-    });
-
-    child.on('error', rejectPromise);
-    child.on('close', (code) => {
-      if (code === 0) {
-        resolvePromise();
-        return;
-      }
-
-      const location = relative(process.cwd(), cwd) || cwd;
-      rejectPromise(
-        new Error(`Command failed in ${location}: ${command} ${args.join(' ')}\n${output.trim()}`)
-      );
-    });
-  });
 }

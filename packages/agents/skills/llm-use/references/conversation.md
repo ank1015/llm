@@ -133,7 +133,7 @@ const tools: AgentTool[] = [
 conversation.setTools(tools);
 ```
 
-`parameters` must be a TypeBox schema. Reuse an existing schema module when the repo already has one. If helper code in `max-skills` truly needs a brand-new tool schema, add `@sinclair/typebox` there first instead of faking the type with a loose cast.
+`parameters` must be a TypeBox schema. Reuse an existing schema module when the repo already has one. If helper code truly needs a brand-new tool schema, add `@sinclair/typebox` in the environment where that helper runs instead of faking the type with a loose cast.
 
 The public tool shape to remember:
 

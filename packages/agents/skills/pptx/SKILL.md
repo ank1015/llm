@@ -1,6 +1,7 @@
 ---
 name: pptx
 description: 'Use this skill any time a .pptx file is involved in any way — as input, output, or both. This includes: creating slide decks, pitch decks, or presentations; reading, parsing, or extracting text from any .pptx file (even if the extracted content will be used elsewhere, like in an email or summary); editing, modifying, or updating existing presentations; combining or splitting slide files; working with templates, layouts, speaker notes, or comments. Trigger whenever the user mentions "deck," "slides," "presentation," or references a .pptx filename, regardless of what they plan to do with the content afterward. If a .pptx file needs to be opened, created, or touched, use this skill.'
+compatibility: Requires Python plus markitdown, Pillow, LibreOffice, and Poppler. PptxGenJS workflows also require a Node environment with pptxgenjs available.
 ---
 
 # PPTX Skill
@@ -17,19 +18,19 @@ description: 'Use this skill any time a .pptx file is involved in any way — as
 
 ## Reading Content
 
-**Bundled Script Paths**: When working from the `max-skills` root, run bundled scripts from `skills/pptx/scripts/...`.
-**Script Workspace**: The generated `max-skills` project is the default script environment. For each task, Max should create and use an artifact-specific folder under `max-skills/scripts/<artifact-name>/`. Put helper scripts, unpacked PPTX folders, JSON summaries, exported PDFs, rendered slide previews, and other temporary files there. Only the final `.pptx` deliverable should go in the artifact directory unless the user says otherwise.
-**Workspace Runtime**: The generated `max-skills` project uses pnpm, TypeScript, and ESM. When Max writes custom JavaScript or TypeScript there, Max should prefer `.ts` files, run them with `pnpm exec tsx`, and use ESM `import` syntax instead of CommonJS `require(...)`.
+**Installed Skill Layout**: This skill is installed inside the artifact at `.max/skills/pptx/`. Relative paths in this skill are relative to the skill directory.
+**Temp Output Location**: Put unpacked decks, thumbnails, rendered previews, PDFs, JSON summaries, and other temporary files under `<artifactDir>/.max/temp/pptx/`.
+**Final Deliverables**: Only the final `.pptx` deliverable should go in the artifact directory unless the user says otherwise.
 
 ```bash
 # Text extraction
 python -m markitdown presentation.pptx
 
 # Visual overview
-python skills/pptx/scripts/thumbnail.py presentation.pptx scripts/<artifact-name>/thumbnails
+python .max/skills/pptx/scripts/thumbnail.py presentation.pptx .max/temp/pptx/thumbnails
 
 # Raw XML
-python skills/pptx/scripts/office/unpack.py presentation.pptx scripts/<artifact-name>/unpacked/
+python .max/skills/pptx/scripts/office/unpack.py presentation.pptx .max/temp/pptx/unpacked/
 ```
 
 ---
@@ -48,7 +49,7 @@ python skills/pptx/scripts/office/unpack.py presentation.pptx scripts/<artifact-
 **Read [pptxgenjs.md](pptxgenjs.md) for full details.**
 
 Use when no template or reference presentation is available.
-Follow the import and instantiation pattern in that guide exactly when using `pptxgenjs` inside `max-skills`.
+Follow the import and instantiation pattern in that guide exactly when using `pptxgenjs` in a Node environment where the package is already available.
 
 Prefer PptxGenJS built-in charts and tables before reaching for external chart-rendering packages such as `chartjs-node-canvas` or `canvas`. Use extra chart/image toolchains only when PptxGenJS cannot produce the needed result.
 
@@ -218,8 +219,8 @@ Report ALL issues found, including minor ones.
 Convert presentations to individual slide images for visual inspection:
 
 ```bash
-python skills/pptx/scripts/office/soffice.py --headless --convert-to pdf --outdir scripts/<artifact-name>/tmp /path/to/output.pptx
-pdftoppm -jpeg -r 150 scripts/<artifact-name>/tmp/output.pdf scripts/<artifact-name>/tmp/slide
+python .max/skills/pptx/scripts/office/soffice.py --headless --convert-to pdf --outdir .max/temp/pptx /path/to/output.pptx
+pdftoppm -jpeg -r 150 .max/temp/pptx/output.pdf .max/temp/pptx/slide
 ```
 
 This creates `slide-01.jpg`, `slide-02.jpg`, etc.
@@ -227,7 +228,7 @@ This creates `slide-01.jpg`, `slide-02.jpg`, etc.
 To re-render specific slides after fixes:
 
 ```bash
-pdftoppm -jpeg -r 150 -f N -l N scripts/<artifact-name>/tmp/output.pdf scripts/<artifact-name>/tmp/slide-fixed
+pdftoppm -jpeg -r 150 -f N -l N .max/temp/pptx/output.pdf .max/temp/pptx/slide-fixed
 ```
 
 ---
@@ -236,7 +237,6 @@ pdftoppm -jpeg -r 150 -f N -l N scripts/<artifact-name>/tmp/output.pdf scripts/<
 
 - Assume `markitdown[pptx]` is available globally for text extraction.
 - Assume `Pillow` is available globally for thumbnail grids.
-- `pptxgenjs`, `react`, `react-dom`, `react-icons`, `sharp`, and `xlsx` are installed automatically in the generated `max-skills` project.
-- If a new JavaScript or TypeScript dependency is genuinely required for this skill, install it in `max-skills` with `pnpm`.
-- Assume LibreOffice (`soffice`) is available globally for PDF conversion. The bundled `skills/pptx/scripts/office/soffice.py` helper handles sandbox-friendly execution details.
+- Assume `pptxgenjs` is available when using the from-scratch JavaScript path in [pptxgenjs.md](pptxgenjs.md).
+- Assume LibreOffice (`soffice`) is available globally for PDF conversion. The bundled `scripts/office/soffice.py` helper handles sandbox-friendly execution details.
 - Assume Poppler (`pdftoppm`) is available globally for PDF-to-image conversion.

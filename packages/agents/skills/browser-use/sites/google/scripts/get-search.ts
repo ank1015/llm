@@ -911,8 +911,8 @@ function buildHelpText(): string {
   return [
     'Google getSearch',
     '',
-    'Run from the max-skills root:',
-    '  pnpm exec tsx skills/browser-use/sites/google/scripts/get-search.ts --query "openai agents"',
+    'Run from the artifact root:',
+    '  node .max/skills/browser-use/sites/google/scripts/get-search.mjs --query "openai agents"',
     '',
     'Core options:',
     '  --query <text>',

@@ -5,7 +5,8 @@ import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import { setConfig } from '../../src/core/config.js';
-import { mockSetupSkills, resetAgentMocks } from '../helpers/mock-agents.js';
+import { pathExists } from '../../src/core/storage/fs.js';
+import { resetAgentMocks } from '../helpers/mock-agents.js';
 
 const { app } = await import('../../src/index.js');
 
@@ -23,6 +24,8 @@ afterEach(async () => {
   await rm(projectsRoot, { recursive: true, force: true });
   await rm(dataRoot, { recursive: true, force: true });
 });
+
+const legacySkillsDirName = ['max', '-skills'].join('');
 
 function post(path: string, body: unknown) {
   return app.request(path, {
@@ -52,6 +55,8 @@ describe('Project Routes', () => {
       expect(body.description).toBe('A test');
       expect(body.projectPath).toBeDefined();
       expect(body.createdAt).toBeDefined();
+      expect(await pathExists(join(projectsRoot, 'my-project', '.max'))).toBe(false);
+      expect(await pathExists(join(projectsRoot, 'my-project', legacySkillsDirName))).toBe(false);
     });
 
     it('should return 400 when name is missing', async () => {
@@ -69,16 +74,6 @@ describe('Project Routes', () => {
       expect(res.status).toBe(409);
       const body = await res.json();
       expect(body.error).toContain('already exists');
-    });
-
-    it('should return 500 when skills setup fails', async () => {
-      mockSetupSkills.mockRejectedValueOnce(new Error('skills setup failed'));
-
-      const res = await post('/api/projects', { name: 'Broken Project' });
-
-      expect(res.status).toBe(500);
-      const body = await res.json();
-      expect(body.error).toContain('skills setup failed');
     });
   });
 

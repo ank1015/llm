@@ -2,7 +2,7 @@
 
 These are reusable TypeScript patterns for `skills/browser-use`.
 
-Assume you are running from the `max-skills` root and storing authored scripts under `scripts/<artifact-name>/`.
+Assume the installed skill lives under `.max/skills/browser-use/` and any extra throwaway helpers for the current artifact live under `<artifactDir>/.max/temp/browser-use/`.
 
 ## Bootstrap
 

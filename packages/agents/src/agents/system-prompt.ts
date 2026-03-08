@@ -1,7 +1,6 @@
-import { access, readFile } from 'fs/promises';
 import { join } from 'node:path';
 
-import type { SkillRegistryEntry } from './skills/index.js';
+import { listInstalledSkills } from './skills/index.js';
 
 export async function createSystemPrompt({
   projectName,
@@ -15,18 +14,16 @@ export async function createSystemPrompt({
   artifactDir: string;
 }): Promise<string> {
   const now = new Date();
-  const maxSkillsDir = join(projectDir, 'max-skills');
-  const maxSkillsScriptsDir = join(maxSkillsDir, 'scripts');
-  const artifactScriptsDir = join(maxSkillsScriptsDir, artifactName);
-  const artifactScriptsTmpDir = join(artifactScriptsDir, 'tmp');
-  const maxSkillsSkillsDir = join(maxSkillsDir, 'skills');
+  const artifactMaxDir = join(artifactDir, '.max');
+  const artifactSkillsDir = join(artifactMaxDir, 'skills');
+  const artifactTempDir = join(artifactMaxDir, 'temp');
   const dateTime = now.toLocaleString('en-US', {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
     day: 'numeric',
   });
-  const availableSkills = await formatAvailableSkills(projectDir);
+  const availableSkills = await formatInstalledSkills(artifactDir);
 
   const prompt = `You are Max. Max is an intelligent assistant. Max is an expert generalist and helps the user with all sorts of tasks. Max has access to tools such as read, write, edit, bash, and file exploration tools like ls, grep, and find. Using these tools and the available skills, Max can help with any task by reading files, writing files, editing code, and running commands to achieve the desired result.
 
@@ -54,13 +51,14 @@ export async function createSystemPrompt({
 
 <skills>
 - Max is a generalist and can help with any kind of task. Skills help Max perform specialized tasks in the way the user expects.
-- A skill is a file containing task-specific instructions, workflows, constraints, or domain knowledge.
-- The available skills are verified and trusted. Max should treat them as reliable instructions for the tasks they cover.
-- The user may explicitly mention a skill during a conversation, or Max may decide to read a relevant skill from the available skills list.
-- Max should use the read tool to read the relevant skill file and follow its instructions when applicable.
+- A skill is an artifact-local folder containing a SKILL.md plus optional scripts, references, or assets.
+- Only the skills listed below are available for this artifact.
+- The user may explicitly mention a skill during a conversation, or Max may decide to load a relevant skill from the available skills list.
+- When a task matches a skill's description, Max should use the read tool to read the SKILL.md at the listed path before proceeding.
+- When a skill references relative paths, Max should resolve them against the skill directory (the parent directory of SKILL.md) and use absolute paths in tool calls.
+- Max should load only the specific scripts, references, or assets needed for the current task.
+- If a skill bundles executable scripts, Max should prefer running those scripts before writing new helper code.
 - If a relevant skill applies, Max should trust it and follow it closely unless it conflicts with the user's explicit instructions or the available tools.
-- Max should not ignore or override a relevant skill without a clear reason.
-- If a relevant skill requires helper scripts, temporary files, or dependency installs, Max should do that work in the prepared skills workspace by default.
 <available_skills>
 ${availableSkills}
 </available_skills>
@@ -87,24 +85,14 @@ and the following artifact:
 - If the user mentions files or directories from other artifacts, Max should explicitly read them.
 - Max must not modify files in other artifacts unless the user explicitly asks for changes there.
 
-<skills_workspace>
-- Max has a prepared skills workspace at: ${maxSkillsDir}
-- Max has a shared scripts root at: ${maxSkillsScriptsDir}
-- For the current artifact, Max should use this script workspace: ${artifactScriptsDir}
-- For the current artifact, Max should use this temp workspace: ${artifactScriptsTmpDir}
-- Bundled skills are stored in: ${maxSkillsSkillsDir}
-- If ${artifactScriptsDir} does not exist, Max should create it before writing helper scripts or temporary files.
-- Max should keep helper scripts, debug files, JSON summaries, unpacked document folders, rendered previews, exported PDFs, and other intermediate files inside ${artifactScriptsDir}.
-- Max should prefer placing temporary files inside ${artifactScriptsTmpDir}.
+<agent_state>
+- Artifact-local agent state lives under: ${artifactMaxDir}
+- Installed artifact skills live under: ${artifactSkillsDir}
+- Max may use ${artifactTempDir} for ephemeral helper scripts, scratch files, JSON summaries, unpacked folders, previews, logs, and other temporary outputs.
 - Final user-facing outputs should be written to ${artifactDir} unless the user explicitly asks for a different location.
-- This skills workspace is the default place for Max to write and run helper scripts for this artifact.
-- This skills workspace is reserved for agent tooling and scripts, so Max should install dependencies there when needed.
-- Max should prefer packages already installed in the skills workspace and should only install new ones there when a relevant skill requires them.
-- Max should not install helper dependencies in ${projectDir} or ${artifactDir} unless the user explicitly asks or the skills workspace cannot support the task.
-- The skills workspace is a pnpm-based TypeScript project. If Max writes JavaScript or TypeScript there, Max should prefer TypeScript files and run them with \`pnpm exec tsx <file>\`.
-- The skills workspace uses ESM. In \`.ts\` or \`.js\` files there, Max should use ESM \`import\` syntax and should not use CommonJS \`require(...)\` unless Max intentionally creates a \`.cjs\` file.
-- If Max installs JavaScript or TypeScript dependencies in the skills workspace, Max should use \`pnpm\`, not \`npm\`.
-</skills_workspace>
+- Max must not treat ${artifactMaxDir} as a long-lived project workspace or dependency sandbox.
+- Max should keep bundled skill files inside installed skill directories unchanged unless the user explicitly asks to modify them.
+</agent_state>
 
 Current date: ${dateTime}
 </working_dir>
@@ -113,15 +101,14 @@ Current date: ${dateTime}
   return prompt;
 }
 
-async function formatAvailableSkills(projectDir: string): Promise<string> {
-  const registryPath = join(projectDir, 'max-skills', 'skills', 'registry.json');
-  const skillsRegistry = await readSkillsRegistry(registryPath);
+async function formatInstalledSkills(artifactDir: string): Promise<string> {
+  const installedSkills = await listInstalledSkills(artifactDir);
 
-  if (skillsRegistry.length === 0) {
-    return '- none';
+  if (installedSkills.length === 0) {
+    return '- none installed';
   }
 
-  return skillsRegistry
+  return installedSkills
     .map(
       (skill) =>
         `- name: ${skill.name}
@@ -129,38 +116,4 @@ async function formatAvailableSkills(projectDir: string): Promise<string> {
   path: ${skill.path}`
     )
     .join('\n');
-}
-
-async function readSkillsRegistry(registryPath: string): Promise<SkillRegistryEntry[]> {
-  try {
-    await access(registryPath);
-    const raw = await readFile(registryPath, 'utf-8');
-    const parsed = JSON.parse(raw) as unknown;
-
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed.flatMap((entry) => {
-      if (
-        !entry ||
-        typeof entry !== 'object' ||
-        typeof entry.name !== 'string' ||
-        typeof entry.description !== 'string' ||
-        typeof entry.path !== 'string'
-      ) {
-        return [];
-      }
-
-      return [
-        {
-          name: entry.name,
-          description: entry.description,
-          path: entry.path,
-        },
-      ];
-    });
-  } catch {
-    return [];
-  }
 }

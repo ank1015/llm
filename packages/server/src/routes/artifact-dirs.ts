@@ -64,6 +64,20 @@ artifactDirRoutes.get(`${BASE}/:artifactDirId/files`, async (c) => {
   }
 });
 
+/** GET /api/projects/:projectId/artifacts/:artifactDirId/skills — List installed artifact skills */
+artifactDirRoutes.get(`${BASE}/:artifactDirId/skills`, async (c) => {
+  const { projectId, artifactDirId } = c.req.param();
+
+  try {
+    const dir = await ArtifactDir.getById(projectId, artifactDirId);
+    const skills = await dir.listInstalledSkills();
+    return c.json(skills);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : NOT_FOUND_MSG;
+    return c.json({ error: message }, 404);
+  }
+});
+
 /** GET /api/projects/:projectId/artifacts/:artifactDirId/explorer — List one directory level */
 artifactDirRoutes.get(`${BASE}/:artifactDirId/explorer`, async (c) => {
   const { projectId, artifactDirId } = c.req.param();
@@ -134,6 +148,27 @@ artifactDirRoutes.get(`${BASE}/:artifactDirId/file/raw`, async (c) => {
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Failed to read raw artifact file';
     const status = classifyFileReadErrorStatus(message);
+    return c.json({ error: message }, status);
+  }
+});
+
+/** POST /api/projects/:projectId/artifacts/:artifactDirId/skills — Install a bundled skill */
+artifactDirRoutes.post(`${BASE}/:artifactDirId/skills`, async (c) => {
+  const { projectId, artifactDirId } = c.req.param();
+  const body = await c.req.json<{ skillName?: string }>().catch(() => undefined);
+  const skillName = body?.skillName?.trim() ?? '';
+
+  if (!skillName) {
+    return c.json({ error: 'skillName is required' }, 400);
+  }
+
+  try {
+    const dir = await ArtifactDir.getById(projectId, artifactDirId);
+    const skill = await dir.installSkill(skillName);
+    return c.json(skill);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Failed to install skill';
+    const status = classifySkillErrorStatus(message);
     return c.json({ error: message }, status);
   }
 });
@@ -255,6 +290,20 @@ function classifyPathMutationErrorStatus(message: string): 400 | 404 | 409 | 500
     message.includes('newName is invalid') ||
     message.includes('not a file or directory')
   ) {
+    return 400;
+  }
+  return 500;
+}
+
+function classifySkillErrorStatus(message: string): 400 | 404 | 500 {
+  if (
+    message === NOT_FOUND_MSG ||
+    message.includes('not found in project') ||
+    message.includes('not found')
+  ) {
+    return 404;
+  }
+  if (message === 'skillName is required' || message.startsWith('Unknown bundled skill')) {
     return 400;
   }
   return 500;

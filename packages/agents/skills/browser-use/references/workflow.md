@@ -1,6 +1,6 @@
 # Workflow
 
-This skill is script-first. Write task-specific TypeScript scripts in the generated `max-skills` workspace.
+This skill is script-first. Prefer bundled scripts first, then write any extra throwaway helpers under `<artifactDir>/.max/temp/browser-use/`.
 
 ## Script Standard
 
@@ -17,8 +17,8 @@ Do not leave browser cleanup or process shutdown implicit.
 
 ## Output Placement
 
-- Helper scripts: `max-skills/scripts/<artifact-name>/`
-- Temp and intermediate files: `max-skills/scripts/<artifact-name>/tmp/`
+- Helper scripts: `<artifactDir>/.max/temp/browser-use/`
+- Temp and intermediate files: `<artifactDir>/.max/temp/browser-use/`
 - Final deliverables: artifact directory unless the user says otherwise
 
 For larger jobs, persist at least:

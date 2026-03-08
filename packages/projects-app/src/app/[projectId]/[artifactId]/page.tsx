@@ -4,6 +4,7 @@ import { Folder, Loader2, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 
+import { ArtifactSkillsPanel } from '@/components/artifact-skills-panel';
 import { useSidebarStore } from '@/stores';
 
 export default function ArtifactPage() {
@@ -42,6 +43,8 @@ export default function ArtifactPage() {
             {artifact.sessions.length}
           </span>
         </div>
+
+        <ArtifactSkillsPanel projectId={projectId} artifactId={artifactId} />
 
         {/* Thread list */}
         {artifact.sessions.length > 0 && (

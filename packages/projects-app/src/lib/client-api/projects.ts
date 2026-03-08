@@ -93,6 +93,29 @@ export type ProjectFileIndexResult = {
   truncated: boolean;
 };
 
+export type BundledSkillEntry = {
+  name: string;
+  description: string;
+  path: string;
+  directory: string;
+};
+
+export type InstalledArtifactSkill = {
+  name: string;
+  description: string;
+  path: string;
+  artifactDir: string;
+  maxDir: string;
+  skillsDir: string;
+  tempDir: string;
+  directory: string;
+};
+
+export type InstallArtifactSkillResult = InstalledArtifactSkill & {
+  sourceDirectory: string;
+  sourcePath: string;
+};
+
 export async function listProjects(): Promise<ProjectMetadata[]> {
   return apiRequestJson<ProjectMetadata[]>(PROJECTS_BASE, {
     method: 'GET',
@@ -113,6 +136,12 @@ export async function createProject(input: {
 export async function deleteProject(projectId: string): Promise<{ deleted: boolean }> {
   return apiRequestJson<{ deleted: boolean }>(`${PROJECTS_BASE}/${encodeURIComponent(projectId)}`, {
     method: 'DELETE',
+  });
+}
+
+export async function listBundledSkills(): Promise<BundledSkillEntry[]> {
+  return apiRequestJson<BundledSkillEntry[]>(`${SERVER_BASE}/api/skills`, {
+    method: 'GET',
   });
 }
 
@@ -151,6 +180,27 @@ export async function deleteArtifactDir(
 
 function buildArtifactBase(ctx: ArtifactContext): string {
   return `${PROJECTS_BASE}/${encodeURIComponent(ctx.projectId)}/artifacts/${encodeURIComponent(ctx.artifactId)}`;
+}
+
+export async function listInstalledArtifactSkills(
+  ctx: ArtifactContext
+): Promise<InstalledArtifactSkill[]> {
+  return apiRequestJson<InstalledArtifactSkill[]>(`${buildArtifactBase(ctx)}/skills`, {
+    method: 'GET',
+  });
+}
+
+export async function installArtifactSkill(
+  ctx: ArtifactContext,
+  input: { skillName: string }
+): Promise<InstallArtifactSkillResult> {
+  return apiRequestJson<InstallArtifactSkillResult>(`${buildArtifactBase(ctx)}/skills`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      skillName: input.skillName,
+    }),
+  });
 }
 
 export async function getArtifactExplorer(

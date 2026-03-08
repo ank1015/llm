@@ -1,7 +1,7 @@
 'use client';
 
 import { Check, ChevronRight, CircleAlert, LoaderCircle } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { CopyButton } from './copy-button';
 import { ChatMarkdown } from './markdown-renderer';
@@ -412,22 +412,10 @@ function TraceItemView({ item }: { item: WorkingTraceItem }) {
 }
 
 export function WorkingTrace({ model, live, label }: WorkingTraceProps) {
-  const [isOpen, setIsOpen] = useState(live);
-  const [userControlled, setUserControlled] = useState(false);
-
-  useEffect(() => {
-    if (!userControlled) {
-      setIsOpen(live);
-    }
-  }, [live, userControlled]);
-
-  const handleOpenChange = (nextOpen: boolean) => {
-    setUserControlled(true);
-    setIsOpen(nextOpen);
-  };
+  const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <Collapsible open={isOpen} onOpenChange={handleOpenChange}>
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <div className="ml-[2%] max-w-[96%]">
         <CollapsibleTrigger asChild>
           <button

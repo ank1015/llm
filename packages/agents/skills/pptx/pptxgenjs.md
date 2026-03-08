@@ -1,16 +1,14 @@
 # PptxGenJS Tutorial
 
-Use this guide when creating presentations from scratch inside the generated `max-skills` TypeScript project. The required npm packages are preinstalled there, so Max should write scripts under `scripts/<artifact-name>/` and run them from there. Keep helper files and temporary outputs in that same artifact-specific folder. Only the final `.pptx` should go in the artifact directory unless the user says otherwise.
+Use this guide when creating presentations from scratch with PptxGenJS in a Node environment where `pptxgenjs` is already available. Keep temporary scripts and outputs under `<artifactDir>/.max/temp/pptx/`. Only the final `.pptx` should go in the artifact directory unless the user says otherwise.
 
-## Workspace Rules
+## Runtime Rules
 
-- `max-skills` is the default place for PPTX helper scripts.
-- The generated project uses pnpm, TypeScript, and ESM.
-- Prefer `.ts` scripts run with `pnpm exec tsx`.
-- Use ESM `import` syntax in `.ts` or `.js` files there. Do not use CommonJS `require(...)` unless Max intentionally creates a `.cjs` file.
-- Prefer the preinstalled packages in `max-skills` before installing anything new.
+- Prefer `.mjs`, `.js`, or `.ts` scripts that can run directly in the available Node environment.
+- Use ESM `import` syntax. Do not use CommonJS `require(...)` unless the environment explicitly calls for it.
+- Keep authored helper scripts ephemeral under `<artifactDir>/.max/temp/pptx/`.
 - Prefer PptxGenJS built-in charts and tables before using external chart-rendering packages such as `chartjs-node-canvas` or `canvas`.
-- In this workspace, `pptxgenjs` may resolve through the module's `default` property. Use the compatibility import pattern below and instantiate it with `new`. Do not call `pptxgenjs()` as a function.
+- `pptxgenjs` may resolve through the module's `default` property. Use the compatibility import pattern below and instantiate it with `new`. Do not call `pptxgenjs()` as a function.
 
 ## Setup & Basic Structure
 
@@ -29,10 +27,10 @@ slide.addText('Hello World!', { x: 0.5, y: 0.5, fontSize: 36, color: '363636' })
 await pres.writeFile({ fileName: 'Presentation.pptx' });
 ```
 
-Run the script from the `max-skills` root:
+Run the script with the local Node runtime:
 
 ```bash
-pnpm exec tsx scripts/<artifact-name>/create-presentation.ts
+node <artifactDir>/.max/temp/pptx/create-presentation.mjs
 ```
 
 If `new PptxGenJS()` throws `TypeError: PptxGenJS is not a constructor`, the import was not normalized correctly. Use the compatibility pattern above instead of switching to `pptxgenjs()` as a function.
@@ -300,7 +298,7 @@ slide.addImage({
 
 ### Icon Libraries
 
-These packages are preinstalled in the generated `max-skills` project.
+These packages must be available in the Node environment you are using for the PptxGenJS workflow.
 
 Popular icon sets in react-icons:
 

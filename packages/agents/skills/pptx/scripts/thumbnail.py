@@ -22,6 +22,10 @@ import tempfile
 import zipfile
 from pathlib import Path
 
+if '--help' in sys.argv[1:] or '-h' in sys.argv[1:]:
+    print(__doc__.strip())
+    sys.exit(0)
+
 import defusedxml.minidom
 from office.soffice import get_soffice_env
 from PIL import Image, ImageDraw, ImageFont

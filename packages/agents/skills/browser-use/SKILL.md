@@ -1,6 +1,7 @@
 ---
 name: browser-use
 description: Use this skill for web-related tasks that involve getting data from websites or doing things on websites in a real browser. This includes browsing pages, searching the web, clicking through flows, filling forms, logging in, handling dynamic JavaScript-rendered content, navigating tabs or windows, downloading files, taking screenshots, and interacting with content that depends on the live browser session.
+compatibility: Requires Node.js, Chrome, and a working @ank1015/llm-extension native-host setup.
 ---
 
 # Browser Use
@@ -19,37 +20,47 @@ Use this skill when the job needs a live Chrome session instead of a static fetc
 
 ## Working Model
 
-- `@ank1015/llm-extension` is already available in the generated `max-skills` workspace.
-- Write authored scripts in `max-skills/scripts/<artifact-name>/`.
-- Put temp and intermediate files in `max-skills/scripts/<artifact-name>/tmp/`.
-- Write final user-facing outputs to the artifact directory unless the user asks for a different location.
-- From the `max-skills` root, run scripts with `pnpm exec tsx scripts/<artifact-name>/<script>.ts`.
-- Always end browser scripts with explicit `process.exit(0)` or `process.exit(1)` because open browser connections can keep Node alive.
+- This skill is installed inside the artifact at `.max/skills/browser-use/`.
+- Relative paths in this skill are relative to the skill directory.
+- Temporary helper files for this artifact should go under `<artifactDir>/.max/temp/browser-use/`.
+- Final user-facing outputs should stay in the artifact directory unless the user asks for a different location.
+- Prefer bundled scripts first. If the task needs an extra throwaway helper, keep it ephemeral under `<artifactDir>/.max/temp/browser-use/`.
+- All browser scripts must be non-interactive and should end with explicit `process.exit(0)` or `process.exit(1)`.
 
 ## Read The Right File For The Task
 
 - Read [references/runtime-model.md](references/runtime-model.md) when you need to understand what the SDK can do, which `chrome.call(...)` methods to use, or whether the task should use normal Chrome APIs or debugger methods.
 - Read [references/workflow.md](references/workflow.md) when you are writing a non-trivial automation script, planning retries, scaling to batches, persisting diagnostics, or deciding how to structure outputs and cleanup.
-- Read [references/cookbook.md](references/cookbook.md) when you want working TypeScript starting points for connect, wait-for-load, debugger attach/detach, runtime evaluate, screenshots, downloads, cookies, storage, subscriptions, retries, JSON output, or cleanup.
-- Read the matching site guide below when the task clearly targets that site.
+- Read [references/cookbook.md](references/cookbook.md) when you want working starting points for connect, wait-for-load, debugger attach/detach, runtime evaluate, screenshots, downloads, cookies, storage, subscriptions, retries, JSON output, or cleanup.
+- Read the matching site guide when the task clearly targets that site.
 
 ## Embedded Site Guides
 
 Read these files directly when the task is site-specific:
 
-- Google: `skills/browser-use/sites/google/INDEX.md`
-- X: `skills/browser-use/sites/x/INDEX.md`
+- Google: `sites/google/INDEX.md`
+- X: `sites/x/INDEX.md`
 
 If the target site is not listed, use this base skill and the reference files above.
-If a site guide includes a bundled task doc and script, prefer running that script with the documented CLI flags before writing a new browser script.
+If a site guide includes a bundled task doc and script, prefer that script before writing a new helper.
+
+## Bundled Executable
+
+Google search extraction is bundled as:
+
+- `sites/google/scripts/get-search.mjs`
+
+Run it from the artifact root:
+
+```bash
+node .max/skills/browser-use/sites/google/scripts/get-search.mjs --help
+node .max/skills/browser-use/sites/google/scripts/get-search.mjs --query "openai agents" --json-output ".max/temp/browser-use/google-search.json"
+```
 
 ## Default Execution Flow
 
-1. Write a small TypeScript script in `scripts/<artifact-name>/`.
-2. Connect with `connect({ launch: true })`.
-3. Use normal `chrome.call(...)` methods for standard browser APIs.
-4. Use `debugger.evaluate` for one-off page reads and a debugger session for multi-step CDP work.
-5. Probe the risky part of the workflow first.
-6. Scale only after the probe works.
-7. Persist outputs and diagnostics.
-8. Clean up and exit explicitly.
+1. Use a bundled script if one already fits the task.
+2. Probe the risky part of the workflow first.
+3. Scale only after the probe works.
+4. Persist outputs and diagnostics.
+5. Clean up tabs or debugger sessions you created.

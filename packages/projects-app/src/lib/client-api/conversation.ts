@@ -152,7 +152,6 @@ export class StreamConflictError extends Error {
 export type StreamRequest = ArtifactContext & {
   sessionId: string;
   message: string;
-  skills?: string[];
 } & TurnSettings &
   VisibleLeafSelection;
 
@@ -182,7 +181,6 @@ export type CancelRunRequest = ArtifactContext & {
 
 type StreamRequestBody = {
   message?: string;
-  skills?: string[];
   leafNodeId?: string;
   api: TurnSettings['api'];
   modelId: string;
@@ -300,7 +298,6 @@ export async function streamConversation(
       method: 'POST',
       body: {
         message: request.message,
-        skills: request.skills ?? [],
         ...(request.leafNodeId ? { leafNodeId: request.leafNodeId } : {}),
         api: request.api,
         modelId: request.modelId,

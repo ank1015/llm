@@ -1,6 +1,7 @@
 ---
 name: llm-use
 description: Use this skill whenever working with LLMs through @ank1015/llm-sdk or @ank1015/llm-sdk-adapters, including one-off calls, streaming, and agent-style conversations with API keys already configured.
+compatibility: Requires Node.js and the @ank1015/llm-sdk packages that ship with @ank1015/llm-agents.
 ---
 
 # LLM SDK Usage
@@ -18,6 +19,25 @@ These packages let you:
 - save and reload conversations with file or memory session adapters
 - work from the public SDK input and response types
 
+## Working Model
+
+- This skill is installed inside the artifact at `.max/skills/llm-use/`.
+- Relative paths in this skill are relative to the skill directory.
+- Temporary helper files for this artifact should go under `<artifactDir>/.max/temp/llm-use/`.
+- Final user-facing outputs should stay in the artifact directory unless the user asks for a different location.
+- Prefer bundled scripts first. If the task needs an extra one-off helper, keep it ephemeral under `<artifactDir>/.max/temp/llm-use/`.
+
+## Bundled Executable
+
+- `scripts/complete-once.mjs` — send a single prompt through the SDK and print normalized text or JSON
+
+Run it from the artifact root:
+
+```bash
+node .max/skills/llm-use/scripts/complete-once.mjs --help
+node .max/skills/llm-use/scripts/complete-once.mjs --prompt "Summarize this diff."
+```
+
 ## Start Here
 
 Pick the reference that matches the task:
@@ -27,13 +47,6 @@ Pick the reference that matches the task:
 - For saving, loading, or replaying conversation history with sessions, read [references/sessions-and-persistence.md](references/sessions-and-persistence.md).
 - For TypeScript shapes such as inputs, messages, assistant responses, events, tools, attachments, and session nodes, read [references/types.md](references/types.md).
 
-## Working Model
-
-- In `max-skills`, write helper code as TypeScript and run it with `pnpm exec tsx scripts/<artifact-name>/<script>.ts`.
-- Use ESM imports.
-- Prefer public imports from `@ank1015/llm-sdk` and `@ank1015/llm-sdk-adapters`.
-- Do not import from `@ank1015/llm-core` or internal package paths for normal task code.
-
 ## Default Rules
 
 - Prefer `createFileKeysAdapter()` as the default credential path.
@@ -42,5 +55,7 @@ Pick the reference that matches the task:
 - Prefer `createFileSessionsAdapter()` for durable session storage.
 - Prefer `InMemorySessionsAdapter` for ephemeral runs and tests.
 - Use `createSessionManager()` instead of inventing ad hoc JSON persistence around `Conversation`.
+- Prefer public imports from `@ank1015/llm-sdk` and `@ank1015/llm-sdk-adapters`.
+- Do not import from `@ank1015/llm-core` or internal package paths for normal task code.
 
 Usage tracking adapters exist, but they are intentionally out of scope for this skill's main workflow.

@@ -1,6 +1,6 @@
 # X Site Guide
 
-Read this file after `skills/browser-use/SKILL.md` when the task clearly targets X.
+Read this file after `SKILL.md` when the task clearly targets X.
 
 ## Trigger Conditions
 
@@ -44,4 +44,4 @@ For post or timeline extraction, prefer normalized fields such as:
 - `promoted`
 - `metrics`
 
-If future X task docs are added, read them from `skills/browser-use/sites/x/tasks/`.
+If future X task docs are added, read them from `sites/x/tasks/`.

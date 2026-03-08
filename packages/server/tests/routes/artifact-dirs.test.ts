@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import { setConfig } from '../../src/core/config.js';
-import { resetAgentMocks } from '../helpers/mock-agents.js';
+import { mockAddSkill, mockListInstalledSkills, resetAgentMocks } from '../helpers/mock-agents.js';
 
 const { app } = await import('../../src/index.js');
 
@@ -147,6 +147,111 @@ describe('Artifact Dir Routes', () => {
 
     it('should return 404 for nonexistent artifact dir', async () => {
       const res = await get(`${BASE}/nonexistent/files`);
+
+      expect(res.status).toBe(404);
+    });
+  });
+
+  describe('artifact skill routes', () => {
+    it('should return an empty installed skill list for a new artifact', async () => {
+      await post(BASE, { name: 'skills' });
+
+      const res = await get(`${BASE}/skills/skills`);
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual([]);
+      expect(mockListInstalledSkills).toHaveBeenCalledWith(join(projectsRoot, PROJECT, 'skills'));
+    });
+
+    it('should return installed skills for an artifact', async () => {
+      await post(BASE, { name: 'skills' });
+      mockListInstalledSkills.mockResolvedValueOnce([
+        {
+          name: 'browser-use',
+          description: 'Browser automation and site-specific helpers.',
+          path: join(projectsRoot, PROJECT, 'skills', '.max', 'skills', 'browser-use', 'SKILL.md'),
+          artifactDir: join(projectsRoot, PROJECT, 'skills'),
+          maxDir: join(projectsRoot, PROJECT, 'skills', '.max'),
+          skillsDir: join(projectsRoot, PROJECT, 'skills', '.max', 'skills'),
+          tempDir: join(projectsRoot, PROJECT, 'skills', '.max', 'temp'),
+          directory: join(projectsRoot, PROJECT, 'skills', '.max', 'skills', 'browser-use'),
+        },
+      ]);
+
+      const res = await get(`${BASE}/skills/skills`);
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toHaveLength(1);
+      expect(body[0].name).toBe('browser-use');
+    });
+
+    it('should install a bundled skill into an artifact and return the installed metadata', async () => {
+      await post(BASE, { name: 'skills' });
+
+      const res = await post(`${BASE}/skills/skills`, { skillName: 'browser-use' });
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.name).toBe('browser-use');
+      expect(body.path).toBe(
+        join(projectsRoot, PROJECT, 'skills', '.max', 'skills', 'browser-use', 'SKILL.md')
+      );
+      expect(mockAddSkill).toHaveBeenCalledWith(
+        'browser-use',
+        join(projectsRoot, PROJECT, 'skills')
+      );
+    });
+
+    it('should allow reinstalling the same skill', async () => {
+      await post(BASE, { name: 'skills' });
+
+      const first = await post(`${BASE}/skills/skills`, { skillName: 'browser-use' });
+      const second = await post(`${BASE}/skills/skills`, { skillName: 'browser-use' });
+
+      expect(first.status).toBe(200);
+      expect(second.status).toBe(200);
+      expect(mockAddSkill).toHaveBeenCalledTimes(2);
+    });
+
+    it('should return 400 when skillName is missing', async () => {
+      await post(BASE, { name: 'skills' });
+
+      const res = await post(`${BASE}/skills/skills`, {});
+
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: 'skillName is required' });
+    });
+
+    it('should return 400 when the skill is unknown', async () => {
+      await post(BASE, { name: 'skills' });
+      mockAddSkill.mockRejectedValueOnce(
+        new Error('Unknown bundled skill "bad-skill". Available skills: browser-use, llm-use')
+      );
+
+      const res = await post(`${BASE}/skills/skills`, { skillName: 'bad-skill' });
+
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toContain('Unknown bundled skill');
+    });
+
+    it('should return 404 when installing into a missing artifact', async () => {
+      const res = await post(`${BASE}/missing/skills`, { skillName: 'browser-use' });
+
+      expect(res.status).toBe(404);
+    });
+
+    it('should return 404 when listing skills for a missing artifact', async () => {
+      const res = await get(`${BASE}/missing/skills`);
+
+      expect(res.status).toBe(404);
+    });
+
+    it('should return 404 when installing into a missing project', async () => {
+      const res = await post('/api/projects/missing-project/artifacts/skills/skills', {
+        skillName: 'browser-use',
+      });
 
       expect(res.status).toBe(404);
     });

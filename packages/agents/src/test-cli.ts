@@ -7,14 +7,13 @@ import { createInterface } from 'node:readline/promises';
 import {
   Conversation,
   createSessionManager,
-  getModel,
   getModels,
   isValidApi,
   KnownApis,
 } from '@ank1015/llm-sdk';
 import { createFileKeysAdapter, createFileSessionsAdapter } from '@ank1015/llm-sdk-adapters';
 
-import { setupSkills } from './agents/skills/index.js';
+import { addSkill, listInstalledSkills } from './agents/skills/index.js';
 import { createSystemPrompt } from './agents/system-prompt.js';
 import { createAllTools } from './agents/tools.js';
 
@@ -70,6 +69,7 @@ type CliOptions = {
   keysDir?: string;
   api: Api;
   modelId: string;
+  skills: string[];
 };
 
 function printUsage(): void {
@@ -85,6 +85,7 @@ Options:
   --keys-dir <dir>              Keys storage directory
   --api <provider>              Provider API (default: ${DEFAULT_API})
   --model <id>                  Model ID (default depends on API)
+  --skill <name>                Install a bundled skill into the artifact (repeatable)
   -h, --help                    Show help
 
 Commands while running:
@@ -114,6 +115,7 @@ function parseCliArgs(args: string[]): CliOptions {
   let apiRaw: string = DEFAULT_API;
   let modelId = DEFAULT_MODEL_BY_API[DEFAULT_API];
   let modelExplicit = false;
+  const skills: string[] = [];
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -160,6 +162,11 @@ function parseCliArgs(args: string[]): CliOptions {
         i++;
         break;
 
+      case '--skill':
+        skills.push(getFlagValue(args, i, arg));
+        i++;
+        break;
+
       default:
         throw new Error(`Unknown option: ${arg}`);
     }
@@ -182,6 +189,7 @@ function parseCliArgs(args: string[]): CliOptions {
     ...(keysDir ? { keysDir } : {}),
     api,
     modelId,
+    skills: Array.from(new Set(skills)),
   };
 }
 
@@ -507,7 +515,7 @@ function createCliTools(): AgentTool[] {
 
 async function runCli(): Promise<void> {
   const options = parseCliArgs(process.argv.slice(2));
-  const model = getModel('codex', 'gpt-5.4');
+  const model = getModels(options.api).find((entry) => entry.id === options.modelId);
   if (!model) {
     const availableIds = getModels(options.api)
       .map((entry) => entry.id)
@@ -519,9 +527,12 @@ async function runCli(): Promise<void> {
 
   await mkdir(AGENT_PROJECT_DIR, { recursive: true });
   await mkdir(AGENT_ARTIFACT_DIR, { recursive: true });
-  console.log('Setting up skills dir');
-  const setupResult = await setupSkills(AGENT_PROJECT_DIR);
-  console.log('Skills setup complete');
+  for (const skillName of options.skills) {
+    console.log(`Installing skill: ${skillName}`);
+    await addSkill(skillName, AGENT_ARTIFACT_DIR);
+  }
+
+  const installedSkills = await listInstalledSkills(AGENT_ARTIFACT_DIR);
   const systemPrompt = await createSystemPrompt({
     projectName: AGENT_PROJECT_NAME,
     projectDir: AGENT_PROJECT_DIR,
@@ -631,8 +642,9 @@ async function runCli(): Promise<void> {
   console.log(`Agent Artifact: ${AGENT_ARTIFACT_NAME}`);
   console.log(`Project Dir: ${AGENT_PROJECT_DIR}`);
   console.log(`Artifact Dir: ${AGENT_ARTIFACT_DIR}`);
-  console.log(`Skills Dir: ${setupResult.skillsDir}`);
-  console.log(`Skills Registry: ${setupResult.registryPath}`);
+  console.log(
+    `Installed skills: ${installedSkills.length > 0 ? installedSkills.map((skill) => skill.name).join(', ') : '[none]'}`
+  );
   console.log(`Loaded tools: ${tools.map((tool) => tool.name).join(', ')}`);
   if (existingMessages.length > 0) {
     console.log(`Loaded ${existingMessages.length} previous message(s).`);

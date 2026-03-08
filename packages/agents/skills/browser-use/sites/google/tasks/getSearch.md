@@ -1,126 +1,57 @@
 # Task: getSearch
 
-Script: `skills/browser-use/sites/google/scripts/get-search.ts`
+Script: `sites/google/scripts/get-search.mjs`
 
-Use this task whenever you need Google search results.
-
-This task covers both:
-
-- normal search via `--query`
-- advanced search filters such as exact phrase, excluded words, site/domain, file type, language/region, terms location, numeric range, and relative time filters
+Use this task whenever you need Google search results from a live browser session.
 
 ## Default Behavior
 
-- If `--tab-id` is not provided, the script creates a new tab and uses it for the whole run.
-- If `--tab-id` is provided, the script reuses that tab and navigates it through the Google search pages.
-- The script opens `https://www.google.com/advanced_search`, fills the real Google form, and submits it instead of navigating directly to a handcrafted search URL.
-- The script prints formatted Markdown to stdout.
-- The script does not print JSON to stdout.
-- If `--json-output <path>` is provided, the script also writes structured JSON to that file.
-- The returned output includes the working `tabId`, page metadata, and normalized search results.
+- The script launches or connects to Chrome through `@ank1015/llm-extension`.
+- It opens a Google search results page for the requested query.
+- It waits for result cards to appear, extracts a normalized result list, and prints JSON to stdout.
+- If `--json-output <path>` is provided, it also writes the JSON payload to that file.
+- The script closes the throwaway tab it created before exiting.
 
 ## Run It
 
-Run from the `max-skills` root:
+Run from the artifact root:
 
 ```bash
-pnpm exec tsx skills/browser-use/sites/google/scripts/get-search.ts --query "openai agents" --limit 10
+node .max/skills/browser-use/sites/google/scripts/get-search.mjs --query "openai agents" --limit 10
+node .max/skills/browser-use/sites/google/scripts/get-search.mjs --query "openai agents" --limit 10 --json-output ".max/temp/browser-use/google-search.json"
 ```
 
-## Required Search Input
-
-Provide either:
+## Required Input
 
 - `--query <text>`
 
-or at least one of:
-
-- `--all-words <text>`
-- `--exact-phrase <text>`
-- `--any-words <text>`
-
-You can also combine `--query` with advanced filters.
-
 ## Important Options
 
-- `--tab-id <number>`: reuse an existing tab instead of creating a new one
-- `--limit <number>`: total number of results to return; default `10`
-- `--start <number>`: starting result offset; default `0`
-- `--include-sponsored <true|false>`: include sponsored results; default `true`
-- `--exclude-sponsored`: shorthand to force sponsored results off
+- `--limit <number>`: max number of results to return; default `10`
 - `--json-output <path>`: write structured JSON to a file
-- `--timeout-ms <number>`: load/evaluate timeout per page; default `45000`
-
-Advanced filter options:
-
-- `--all-words <text>`
-- `--exact-phrase <text>`
-- `--any-words <text>`
-- `--none-words <text>`
-- `--site-or-domain <value>`
-- `--file-type <value>`
-- `--language <value>`
-- `--region <value>`
-- `--terms-appearing <value>`
-- `--numbers-from <value>`
-- `--numbers-to <value>`
-- `--time-relative <d|w|m|y>`
+- `--timeout-ms <number>`: max wait for result extraction; default `15000`
 
 ## Output Shape
 
-Stdout is Markdown. It includes:
+Stdout is JSON:
 
-- search summary
-- working `tabId`
-- requested vs returned counts
-- pages visited
-- one block per result with `title`, `url`, `source`, `date`, `description`, rank, and sponsored/organic type
-
-If `--json-output` is set, the JSON file includes:
-
-- `tabId`
-- `mode`
-- `searchSummary`
-- `pages`
-- `results`
-
-Each result item includes:
-
-- `title`
-- `url`
-- `source`
-- `date`
-- `description`
-- `kind`
-- `sponsored`
-- `rankOnPage`
-- `globalRank`
-- `pageNumber`
-- `pageStart`
-
-## Example Commands
-
-Simple search in a new tab:
-
-```bash
-pnpm exec tsx skills/browser-use/sites/google/scripts/get-search.ts --query "openai agents" --limit 10
+```json
+{
+  "query": "openai agents",
+  "url": "https://www.google.com/search?...",
+  "resultCount": 10,
+  "results": [
+    {
+      "title": "Example title",
+      "url": "https://example.com",
+      "snippet": "Example snippet"
+    }
+  ]
+}
 ```
 
-Reuse an existing tab and save JSON diagnostics under the artifact temp folder:
+## Validation
 
-```bash
-pnpm exec tsx skills/browser-use/sites/google/scripts/get-search.ts --tab-id 812 --query "openai agents" --limit 20 --json-output scripts/product/tmp/google-search.json
-```
-
-Advanced search with time filter and site restriction:
-
-```bash
-pnpm exec tsx skills/browser-use/sites/google/scripts/get-search.ts \
-  --all-words "openai agents" \
-  --exact-phrase "reasoning model" \
-  --site-or-domain github.com \
-  --file-type pdf \
-  --time-relative m \
-  --limit 20 \
-  --include-sponsored false
-```
+- Check that `resultCount` is non-zero for a known-good query.
+- If a file path was supplied, confirm the JSON file was written.
+- If Google serves an interstitial, login wall, or region-specific variant that breaks extraction, fall back to a task-specific helper instead of retrying blindly.

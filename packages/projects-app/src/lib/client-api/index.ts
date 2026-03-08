@@ -26,7 +26,10 @@ export {
   getArtifactRawFileUrl,
   getProjectFileIndex,
   getProjectOverview,
+  installArtifactSkill,
   listProjects,
+  listBundledSkills,
+  listInstalledArtifactSkills,
   renameArtifactPath,
 } from './projects';
 export type {
@@ -39,6 +42,9 @@ export type {
   ArtifactFileResult,
   ArtifactPathDeleteResult,
   ArtifactPathRenameResult,
+  BundledSkillEntry,
+  InstallArtifactSkillResult,
+  InstalledArtifactSkill,
   OverviewSession,
   ProjectFileIndexEntry,
   ProjectFileIndexResult,

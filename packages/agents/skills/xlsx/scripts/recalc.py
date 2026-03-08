@@ -10,6 +10,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+if "--help" in sys.argv[1:] or "-h" in sys.argv[1:]:
+    print(__doc__.strip())
+    print("\nUsage: python .max/skills/xlsx/scripts/recalc.py <excel_file> [timeout_seconds]")
+    sys.exit(0)
+
 from office.soffice import get_soffice_env
 
 from openpyxl import load_workbook

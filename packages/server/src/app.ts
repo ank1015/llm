@@ -4,6 +4,7 @@ import { cors } from 'hono/cors';
 import { artifactDirRoutes } from './routes/artifact-dirs.js';
 import { projectRoutes } from './routes/projects.js';
 import { sessionRoutes } from './routes/sessions.js';
+import { skillRoutes } from './routes/skills.js';
 
 /**
  * Creates and configures the Hono application.
@@ -28,6 +29,7 @@ export function createApp(): Hono {
   app.route('/api', projectRoutes);
   app.route('/api', artifactDirRoutes);
   app.route('/api', sessionRoutes);
+  app.route('/api', skillRoutes);
 
   return app;
 }

@@ -154,8 +154,6 @@ export type ReasoningLevel = 'low' | 'medium' | 'high' | 'xhigh';
 export interface PromptInput {
   /** The user's message text */
   message: string;
-  /** Skill names to activate for this prompt (resolved from globalSkills) */
-  skills?: string[];
   /** Optional visible leaf node to continue from instead of persisted active branch */
   leafNodeId?: string;
   /** Optional per-turn API override */

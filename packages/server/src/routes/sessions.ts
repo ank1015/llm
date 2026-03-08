@@ -16,7 +16,6 @@ const REASONING_LEVELS = new Set<ReasoningLevel>(['low', 'medium', 'high', 'xhig
 
 type SessionTurnBody = {
   message?: string;
-  skills?: string[];
   leafNodeId?: string;
   api?: string;
   modelId?: string;
@@ -55,7 +54,6 @@ function resolvePromptInput(
   return {
     input: {
       message: body.message,
-      skills: body.skills ?? [],
       ...(leafNodeId ? { leafNodeId } : {}),
       ...(hasProviderOverride ? { api: api as Api, modelId } : {}),
       ...(reasoningLevel ? { reasoningLevel: reasoningLevel as ReasoningLevel } : {}),
@@ -89,7 +87,6 @@ function resolveTurnSettings(
 
   return {
     input: {
-      ...(body?.skills ? { skills: body.skills } : {}),
       ...(leafNodeId ? { leafNodeId } : {}),
       ...(hasProviderOverride ? { api: api as Api, modelId } : {}),
       ...(reasoningLevel ? { reasoningLevel: reasoningLevel as ReasoningLevel } : {}),

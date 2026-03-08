@@ -2,6 +2,7 @@ import { readFile, readdir, rename, rm, stat } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 
 import { getConfig } from '../config.js';
+import { addSkill, listInstalledSkills } from '../skills.js';
 import {
   ensureDir,
   pathExists,
@@ -12,6 +13,7 @@ import {
   listFiles,
 } from '../storage/fs.js';
 
+import type { AddSkillResult, InstalledSkillEntry } from '../skills.js';
 import type {
   ArtifactDirMetadata,
   ArtifactExplorerEntry,
@@ -240,6 +242,16 @@ export class ArtifactDir {
       size: raw.length,
       updatedAt: fileStats.mtime.toISOString(),
     };
+  }
+
+  /** Install a bundled agent skill into this artifact's local .max state */
+  async installSkill(skillName: string): Promise<AddSkillResult> {
+    return addSkill(skillName, this.dirPath);
+  }
+
+  /** List bundled agent skills installed for this artifact */
+  async listInstalledSkills(): Promise<InstalledSkillEntry[]> {
+    return listInstalledSkills(this.dirPath);
   }
 
   /** Delete a file or directory inside the artifact tree */

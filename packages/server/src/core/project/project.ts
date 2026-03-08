@@ -1,7 +1,5 @@
 import { join } from 'node:path';
 
-import { setupSkills } from '@ank1015/llm-agents';
-
 import { getConfig } from '../config.js';
 import {
   ensureDir,
@@ -50,8 +48,6 @@ export class Project {
     await ensureDir(dataPath);
 
     try {
-      await setupSkills(projectPath);
-
       const metadata: ProjectMetadata = {
         id,
         name: input.name,

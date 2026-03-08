@@ -4,34 +4,34 @@ Site-specific guides for browser work live inside this skill.
 
 ## Current Site Guide Files
 
-- Google: `skills/browser-use/sites/google/INDEX.md`
-- X: `skills/browser-use/sites/x/INDEX.md`
+- Google: `sites/google/INDEX.md`
+- X: `sites/x/INDEX.md`
 
 Current bundled task docs:
 
-- Google search: `skills/browser-use/sites/google/tasks/getSearch.md`
+- Google search: `sites/google/tasks/getSearch.md`
 
 ## Runtime Paths
 
-When this skill is copied into the generated workspace, site guides live under:
+Inside an installed skill, site guides live under:
 
 ```text
-skills/browser-use/sites/<site>/
+sites/<site>/
 ```
 
 The main site index file should be:
 
 ```text
-skills/browser-use/sites/<site>/INDEX.md
+sites/<site>/INDEX.md
 ```
 
 ## Read Order
 
 When a task targets a specific site or domain:
 
-1. Read `skills/browser-use/SKILL.md`
-2. Read `skills/browser-use/sites/<site>/INDEX.md`
-3. Read any matching task docs under `skills/browser-use/sites/<site>/tasks/`
+1. Read `SKILL.md`
+2. Read `sites/<site>/INDEX.md`
+3. Read any matching task docs under `sites/<site>/tasks/`
 4. If the task doc points to a bundled script, run that script with the documented CLI options before writing a new browser script
 
 ## Standard Site Layout
