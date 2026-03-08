@@ -6,60 +6,69 @@ compatibility: 'Requires Chrome with the @ank1015/llm-extension native host inst
 
 # Browser Use
 
-This skill is intentionally incomplete.
+Use this skill for live-browser tasks in Chrome: reading current pages,
+clicking through webapps, inspecting cookies or downloads or network behavior,
+running repeated browser automation, or using site-specific shortcuts such as
+Google search.
 
-Its purpose right now is to define the final structure of the browser skill and
-to make the remaining implementation work explicit. The real operational
-guidance should only be written after we validate it through hands-on browser
-experiments.
+## When To Use This Skill
 
-## What This File Should Eventually Contain
+Use this skill when the task depends on the real browser session rather than a
+static HTTP fetch. Typical cases:
 
-- A concise trigger rule for when the agent should load this skill.
-- A decision tree for choosing among:
-  - site-specific scripts
-  - `chrome.getPageMarkdown(...)`
-  - `Window`
-  - low-level `connect(...)` + `chrome.call(...)`
-- A short list of non-negotiable operating rules for browser work:
-  - probe before scale
-  - prefer deterministic paths
-  - log enough diagnostics to explain failures
-  - always clean up debugger sessions and long-running scripts
-- A short routing map into the reference files in `references/`.
+- reading the current contents of a live page
+- interacting with a webapp through clicks, typing, scrolling, or form flows
+- inspecting browser state such as cookies, storage, downloads, or requests
+- collecting data across many items or pages
+- using a supported site shortcut instead of manual page reasoning
 
-## What We Need To Learn Before Writing The Real Version
+## Choose The First Path
 
-- Which browser tasks are reliably solved by `chrome.getPageMarkdown(...)`
-  without any `Window` usage.
-- Where `Window.observe()` and action helpers are reliable, and where they need
-  raw debugger or raw Chrome API fallbacks.
-- Which repeated tasks deserve site-specific scripts instead of generic page
-  understanding.
-- What minimum diagnostics are enough for retrying and debugging failed runs.
-- Which rules are universal across sites, and which rules only apply to a
-  narrow subset of tasks.
+- if a matching site shortcut exists, use it first:
+  [references/site-google.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/site-google.md)
+- if you need read-only extraction or page understanding, use:
+  [references/research-and-reading.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/research-and-reading.md)
+- if you need interactive UI work with `Window`, use:
+  [references/webapp-flows.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/webapp-flows.md)
+- if the task is really about cookies, downloads, storage, network capture, or
+  debugger sessions, use:
+  [references/state-and-debugging.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/state-and-debugging.md)
+- if the work repeats across many items or pages, use:
+  [references/batch-automation.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/batch-automation.md)
+- if behavior is confusing or brittle, check:
+  [references/pitfalls.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/pitfalls.md)
 
-## Files To Complete Later
+If you need to refresh the core SDK surface before choosing a mode, read:
+[references/sdk-core.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/sdk-core.md)
 
-- [references/modes.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/modes.md)
-- [references/sdk-core.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/sdk-core.md)
-- [references/research-and-reading.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/research-and-reading.md)
-- [references/webapp-flows.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/webapp-flows.md)
-- [references/batch-automation.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/batch-automation.md)
-- [references/state-and-debugging.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/state-and-debugging.md)
-- [references/diagnostics-and-failures.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/diagnostics-and-failures.md)
-- [references/pitfalls.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/pitfalls.md)
-- [references/site-google.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/site-google.md)
-- [scripts/templates/browser-task.mts](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/scripts/templates/browser-task.mts)
-- [scripts/templates/browser-batch-task.mts](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/scripts/templates/browser-batch-task.mts)
-- [scripts/templates/window-task.mts](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/scripts/templates/window-task.mts)
-- [scripts/lib/browser.mts](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/scripts/lib/browser.mts)
-- [scripts/lib/debugger.mts](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/scripts/lib/debugger.mts)
-- [scripts/lib/output.mts](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/scripts/lib/output.mts)
-- [sites/google/scripts/get-search.mjs](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/sites/google/scripts/get-search.mjs)
-- [completing-browser-skill.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/completing-browser-skill.md)
+## Non-Negotiable Rules
 
-## Completion Order
+- prefer the highest-level deterministic path that fits the task
+- use a site script before manual page reasoning when a matching script exists
+- use `chrome.getPageMarkdown(...)` first for read-only work
+- use `Window` for interactive UI flows, and observe before acting
+- prefer `debugger.evaluate` over `scripting.executeScript` when exact page JS
+  execution matters
+- save screenshots to files and inspect them with the image-reading tool when
+  visual evidence matters
+- probe before scaling batch work
+- detach debugger sessions and clean up artifacts you created
 
-Follow [completing-browser-skill.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/completing-browser-skill.md) when turning this scaffold into a real skill.
+## Reference Map
+
+- task mode selection:
+  [references/modes.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/modes.md)
+- core SDK primitives:
+  [references/sdk-core.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/sdk-core.md)
+- read-only page work:
+  [references/research-and-reading.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/research-and-reading.md)
+- interactive `Window` flows:
+  [references/webapp-flows.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/webapp-flows.md)
+- cookies, downloads, storage, and debugger sessions:
+  [references/state-and-debugging.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/state-and-debugging.md)
+- repeated browser automation:
+  [references/batch-automation.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/batch-automation.md)
+- failure patterns and expensive mistakes:
+  [references/pitfalls.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/pitfalls.md)
+- Google search shortcut:
+  [references/site-google.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/browser-use/references/site-google.md)

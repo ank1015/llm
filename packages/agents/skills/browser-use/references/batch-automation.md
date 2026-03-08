@@ -47,6 +47,10 @@ state visibility in addition to extraction.
 Do not treat `Window` as the normal batch tool in this file. If the task is
 really interactive, switch to [webapp-flows.md](webapp-flows.md).
 
+When you turn a batch workflow into a standalone Node script, explicitly
+`process.exit(0)` or `process.exit(1)` after cleanup. The Chrome connection can
+otherwise keep the process alive after the work is done.
+
 ## Standard Batch Workflow
 
 Use this order:

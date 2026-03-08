@@ -280,8 +280,6 @@ try {
 Use other references when the task stops being state/debugging work:
 
 - [webapp-flows.md](webapp-flows.md) for UI-level interaction
-- [diagnostics-and-failures.md](diagnostics-and-failures.md) for failure
-  reporting and retry policy
 - [pitfalls.md](pitfalls.md) for debugger, session, and focus gotchas
 - [batch-automation.md](batch-automation.md) when these workflows need to
   scale

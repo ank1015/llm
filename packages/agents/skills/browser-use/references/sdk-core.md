@@ -62,6 +62,10 @@ Use this as the default way to start.
   values.
 - `launchTimeout` is only worth changing when startup timing is part of the
   task.
+- when you write a standalone Node script with `connect(...)`, explicitly
+  `process.exit(0)` or `process.exit(1)` after cleanup.
+  The Chrome connection can keep the process alive even after the script logic
+  is finished.
 
 ### `chrome.call(method, ...args)`
 

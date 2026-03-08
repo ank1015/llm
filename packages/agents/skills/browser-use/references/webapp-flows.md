@@ -152,7 +152,6 @@ Move to lower-level methods only when `Window` is no longer a good fit:
 Use the later references instead of overloading this file:
 
 - [state-and-debugging.md](state-and-debugging.md)
-- [diagnostics-and-failures.md](diagnostics-and-failures.md)
 - [pitfalls.md](pitfalls.md)
 
 ## Examples
