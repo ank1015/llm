@@ -19,7 +19,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ArtifactExplorerResult, ArtifactFileResult } from '@/lib/client-api';
 import type { ReactNode } from 'react';
 
-import { Markdown } from '@/components/ai/markdown';
+import { ArtifactMarkdownPreview } from '@/components/artifact-markdown-preview';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -1061,7 +1061,13 @@ export default function ArtifactFilesPage() {
 
             {selectedViewerKind === 'markdown' ? (
               <div className="min-h-0 flex-1 overflow-auto px-4 py-3">
-                <Markdown className="text-foreground leading-6">{selectedFile.content}</Markdown>
+                <ArtifactMarkdownPreview
+                  artifactCtx={artifactCtx}
+                  filePath={selectedFile.path}
+                  className="px-2 py-1"
+                >
+                  {selectedFile.content}
+                </ArtifactMarkdownPreview>
               </div>
             ) : null}
 

@@ -209,3 +209,20 @@
   color: var(--muted-foreground);
   font-weight: 500;
 }
+
+/* ---- Artifact markdown preview ---- */
+.artifact-markdown-preview .katex {
+  color: var(--foreground);
+  font-size: 1em;
+}
+
+.artifact-markdown-preview .katex-display {
+  margin: 1.25rem 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.artifact-markdown-preview ul > li::marker,
+.artifact-markdown-preview ol > li::marker {
+  color: var(--muted-foreground);
+}
