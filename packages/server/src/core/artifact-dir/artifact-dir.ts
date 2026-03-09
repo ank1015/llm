@@ -345,7 +345,7 @@ export class ArtifactDir {
     };
   }
 
-  /** Recursively index files in this artifact directory (for mentions/search). */
+  /** Recursively index files and directories in this artifact directory (for mentions/search). */
   async buildFileIndex(options?: {
     query?: string;
     limit?: number;
@@ -374,8 +374,27 @@ export class ArtifactDir {
 
       for (const entry of entries) {
         const relativePath = relativeDir ? `${relativeDir}/${entry.name}` : entry.name;
+        const matchesQuery =
+          !query ||
+          relativePath.toLowerCase().includes(query) ||
+          entry.name.toLowerCase().includes(query);
 
         if (entry.isDirectory()) {
+          if (matchesQuery) {
+            const entryStats = await stat(join(absolutePath, entry.name));
+            files.push({
+              path: relativePath,
+              type: 'directory',
+              size: 0,
+              updatedAt: entryStats.mtime.toISOString(),
+            });
+
+            if (files.length >= limit) {
+              truncated = true;
+              break;
+            }
+          }
+
           stack.push(relativePath);
           continue;
         }
@@ -384,17 +403,14 @@ export class ArtifactDir {
           continue;
         }
 
-        if (
-          query &&
-          !relativePath.toLowerCase().includes(query) &&
-          !entry.name.toLowerCase().includes(query)
-        ) {
+        if (!matchesQuery) {
           continue;
         }
 
         const entryStats = await stat(join(absolutePath, entry.name));
         files.push({
           path: relativePath,
+          type: 'file',
           size: entryStats.size,
           updatedAt: entryStats.mtime.toISOString(),
         });

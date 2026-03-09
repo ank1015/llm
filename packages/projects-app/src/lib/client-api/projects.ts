@@ -81,6 +81,7 @@ export type ProjectFileIndexEntry = {
   artifactId: string;
   artifactName: string;
   path: string;
+  type: ArtifactExplorerEntryType;
   artifactPath: string;
   size: number;
   updatedAt: string;

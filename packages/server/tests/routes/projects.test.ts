@@ -119,7 +119,7 @@ describe('Project Routes', () => {
   });
 
   describe('GET /api/projects/:projectId/file-index', () => {
-    it('should return files across all artifacts', async () => {
+    it('should return files and directories across all artifacts', async () => {
       await post('/api/projects', { name: 'Index Project' });
       await post('/api/projects/index-project/artifacts', {
         name: 'docs',
@@ -143,11 +143,19 @@ describe('Project Routes', () => {
           expect.objectContaining({
             artifactId: 'docs',
             path: 'README.md',
+            type: 'file',
             artifactPath: 'docs/README.md',
           }),
           expect.objectContaining({
             artifactId: 'code',
+            path: 'src',
+            type: 'directory',
+            artifactPath: 'code/src/',
+          }),
+          expect.objectContaining({
+            artifactId: 'code',
             path: 'src/index.ts',
+            type: 'file',
             artifactPath: 'code/src/index.ts',
           }),
         ])
@@ -169,6 +177,7 @@ describe('Project Routes', () => {
       const body = await res.json();
       expect(body.files).toHaveLength(1);
       expect(body.files[0].path).toBe('README.md');
+      expect(body.files[0].type).toBe('file');
     });
 
     it('should respect limit and set truncated', async () => {

@@ -69,7 +69,7 @@ projectRoutes.get('/projects/:projectId/overview', async (c) => {
   }
 });
 
-/** GET /api/projects/:projectId/file-index — Search files across all artifact directories */
+/** GET /api/projects/:projectId/file-index — Search files and directories across all artifact directories */
 projectRoutes.get('/projects/:projectId/file-index', async (c) => {
   const { projectId } = c.req.param();
   const query = (c.req.query('query') ?? '').trim();
@@ -108,7 +108,8 @@ projectRoutes.get('/projects/:projectId/file-index', async (c) => {
           artifactId: artifact.id,
           artifactName: artifact.name,
           path: file.path,
-          artifactPath: `${artifact.id}/${file.path}`,
+          type: file.type,
+          artifactPath: `${artifact.id}/${file.path}${file.type === 'directory' ? '/' : ''}`,
           size: file.size,
           updatedAt: file.updatedAt,
         }))

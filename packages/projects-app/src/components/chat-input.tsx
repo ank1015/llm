@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowUp, ChevronDown, File, Plus, Square } from 'lucide-react';
+import { ArrowUp, ChevronDown, File, Folder, Plus, Square } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -85,6 +85,46 @@ function getDirname(path: string): string {
   const idx = normalized.lastIndexOf('/');
   if (idx === -1) return '';
   return normalized.slice(0, idx);
+}
+
+function getPathSegments(path: string): string[] {
+  return path
+    .replace(/\\/g, '/')
+    .split('/')
+    .map((segment) => segment.trim())
+    .filter((segment) => segment.length > 0);
+}
+
+function formatIndexedMentionPath(path: string, type: ProjectFileIndexEntry['type']): string {
+  if (type !== 'directory') {
+    return path;
+  }
+
+  return path.endsWith('/') ? path : `${path}/`;
+}
+
+function getRelativeMentionPath(currentArtifactId: string, entry: ProjectFileIndexEntry): string {
+  const fromSegments = getPathSegments(currentArtifactId);
+  const toSegments = getPathSegments(`${entry.artifactId}/${entry.path}`);
+
+  let sharedLength = 0;
+  while (
+    sharedLength < fromSegments.length &&
+    sharedLength < toSegments.length &&
+    fromSegments[sharedLength] === toSegments[sharedLength]
+  ) {
+    sharedLength += 1;
+  }
+
+  const upSegments = Array.from({ length: fromSegments.length - sharedLength }, () => '..');
+  const downSegments = toSegments.slice(sharedLength);
+  const relativePath = [...upSegments, ...downSegments].join('/');
+
+  return formatIndexedMentionPath(relativePath.length > 0 ? relativePath : entry.path, entry.type);
+}
+
+function getIndexedEntryDisplayName(entry: ProjectFileIndexEntry): string {
+  return formatIndexedMentionPath(getBasename(entry.path), entry.type);
 }
 
 function isBoundaryChar(ch: string | undefined): boolean {
@@ -229,7 +269,7 @@ function removeMentionBeforeCaret(
   }
 
   const mentionToken = mentionMatch[1];
-  if (!mentionToken || !/^@[^/\s]+\/[^\s]+$/.test(mentionToken)) {
+  if (!mentionToken || !/^@[a-zA-Z0-9_./-]+$/.test(mentionToken)) {
     return null;
   }
 
@@ -605,7 +645,7 @@ function PromptInputWithActions() {
       return;
     }
 
-    const mentionToken = `@${entry.artifactPath}`;
+    const mentionToken = `@${getRelativeMentionPath(artifactId, entry)}`;
     const nextMentionedValue = replaceMentionToken(input, activeMention, mentionToken);
     handleInputChange(nextMentionedValue.value);
     setMentionState(null);
@@ -876,9 +916,13 @@ function PromptInputWithActions() {
                     index === highlightedMentionIndex ? 'bg-white/12' : 'hover:bg-white/8'
                   )}
                 >
-                  <File className="text-muted-foreground size-3.5 shrink-0" />
+                  {entry.type === 'directory' ? (
+                    <Folder className="text-muted-foreground size-3.5 shrink-0" />
+                  ) : (
+                    <File className="text-muted-foreground size-3.5 shrink-0" />
+                  )}
                   <span className="truncate text-sm font-medium text-white">
-                    {getBasename(entry.path)}
+                    {getIndexedEntryDisplayName(entry)}
                   </span>
                   <span className="text-muted-foreground truncate text-xs">
                     {buildFileLabel(entry)}

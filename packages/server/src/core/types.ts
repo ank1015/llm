@@ -84,11 +84,13 @@ export interface ArtifactFileResult {
   truncated: boolean;
 }
 
-/** A file discovered while indexing one artifact directory */
+/** A path discovered while indexing one artifact directory */
 export interface ArtifactFileIndexEntry {
-  /** Relative file path from artifact root */
+  /** Relative path from artifact root */
   path: string;
-  /** File size in bytes */
+  /** Whether this indexed path is a file or directory */
+  type: ArtifactExplorerEntryType;
+  /** Size in bytes. Directories report 0. */
   size: number;
   /** Last modified timestamp (ISO 8601) */
   updatedAt: string;
@@ -101,13 +103,15 @@ export interface ArtifactFileIndexResult {
   truncated: boolean;
 }
 
-/** Project-level file index entry (for mentions/search across artifacts) */
+/** Project-level indexed path entry (for mentions/search across artifacts) */
 export interface ProjectFileIndexEntry {
   artifactId: string;
   artifactName: string;
   /** Relative path inside the artifact directory */
   path: string;
-  /** Convenience path in form: "{artifactId}/{path}" */
+  /** Whether this indexed path is a file or directory */
+  type: ArtifactExplorerEntryType;
+  /** Convenience path in form: "{artifactId}/{path}", with trailing "/" for directories */
   artifactPath: string;
   size: number;
   updatedAt: string;
