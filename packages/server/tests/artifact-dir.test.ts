@@ -7,7 +7,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { setConfig } from '../src/core/config.js';
 import { pathExists, readMetadata } from '../src/core/storage/fs.js';
 
-import { resetAgentMocks } from './helpers/mock-agents.js';
+import { mockDeleteSkill, resetAgentMocks } from './helpers/mock-agents.js';
 
 import type { ArtifactDirMetadata } from '../src/core/types.js';
 
@@ -156,6 +156,18 @@ describe('ArtifactDir', () => {
 
       expect(await pathExists(dir.dirPath)).toBe(false);
       expect(await pathExists(dir.dataPath)).toBe(false);
+    });
+  });
+
+  describe('skills', () => {
+    it('should delete an installed skill from the artifact working directory', async () => {
+      const dir = await ArtifactDir.create(PROJECT_NAME, { name: 'skills' });
+
+      const result = await dir.deleteSkill('browser-use');
+
+      expect(result.name).toBe('browser-use');
+      expect(result.deleted).toBe(true);
+      expect(mockDeleteSkill).toHaveBeenCalledWith('browser-use', dir.dirPath);
     });
   });
 });

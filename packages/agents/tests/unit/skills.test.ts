@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import {
   addSkill,
   createSystemPrompt,
+  deleteSkill,
   listBundledSkills,
   listInstalledSkills,
 } from '../../src/index.js';
@@ -54,6 +55,7 @@ describe('skills runtime', () => {
     const agents = await import('../../src/index.js');
 
     expect(typeof agents.addSkill).toBe('function');
+    expect(typeof agents.deleteSkill).toBe('function');
     expect(typeof agents.listBundledSkills).toBe('function');
     expect(typeof agents.listInstalledSkills).toBe('function');
     expect('setupSkills' in agents).toBe(false);
@@ -120,6 +122,23 @@ describe('skills runtime', () => {
     }
   });
 
+  it('deletes an installed skill from the current artifact', async () => {
+    const artifactDir = await createArtifactDir();
+
+    try {
+      await addSkill('browser-use', artifactDir);
+      await addSkill('xlsx', artifactDir);
+
+      const deleted = await deleteSkill('browser-use', artifactDir);
+
+      expect(deleted.name).toBe('browser-use');
+      expect(deleted.deleted).toBe(true);
+      expect(await listInstalledSkills(artifactDir)).toMatchObject([{ name: 'xlsx' }]);
+    } finally {
+      await rm(artifactDir, { recursive: true, force: true });
+    }
+  });
+
   it('builds system prompts from installed skills only', async () => {
     const artifactDir = await createArtifactDir();
 
@@ -167,6 +186,18 @@ describe('skills runtime', () => {
     try {
       await expect(addSkill('does-not-exist', artifactDir)).rejects.toThrow(
         /Unknown bundled skill/
+      );
+    } finally {
+      await rm(artifactDir, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects deleting a skill that is not installed', async () => {
+    const artifactDir = await createArtifactDir();
+
+    try {
+      await expect(deleteSkill('browser-use', artifactDir)).rejects.toThrow(
+        /Installed skill "browser-use" not found/
       );
     } finally {
       await rm(artifactDir, { recursive: true, force: true });

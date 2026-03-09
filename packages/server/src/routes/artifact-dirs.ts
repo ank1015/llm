@@ -173,6 +173,26 @@ artifactDirRoutes.post(`${BASE}/:artifactDirId/skills`, async (c) => {
   }
 });
 
+/** DELETE /api/projects/:projectId/artifacts/:artifactDirId/skills/:skillName — Remove an installed skill */
+artifactDirRoutes.delete(`${BASE}/:artifactDirId/skills/:skillName`, async (c) => {
+  const { projectId, artifactDirId, skillName: rawSkillName } = c.req.param();
+  const skillName = rawSkillName?.trim() ?? '';
+
+  if (!skillName) {
+    return c.json({ error: 'skillName is required' }, 400);
+  }
+
+  try {
+    const dir = await ArtifactDir.getById(projectId, artifactDirId);
+    const result = await dir.deleteSkill(skillName);
+    return c.json(result);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Failed to delete skill';
+    const status = classifySkillErrorStatus(message);
+    return c.json({ error: message }, status);
+  }
+});
+
 /** PATCH /api/projects/:projectId/artifacts/:artifactDirId/path/rename — Rename a file or directory */
 artifactDirRoutes.patch(`${BASE}/:artifactDirId/path/rename`, async (c) => {
   const { projectId, artifactDirId } = c.req.param();

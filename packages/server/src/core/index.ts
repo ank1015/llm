@@ -6,6 +6,7 @@ export {
   listBundledAgentSkills,
   type AddSkillResult,
   type BundledSkillEntry,
+  type DeleteSkillResult,
   type InstalledSkillEntry,
 } from './skills.js';
 export type {

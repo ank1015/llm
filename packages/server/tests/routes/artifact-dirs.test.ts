@@ -5,7 +5,12 @@ import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import { setConfig } from '../../src/core/config.js';
-import { mockAddSkill, mockListInstalledSkills, resetAgentMocks } from '../helpers/mock-agents.js';
+import {
+  mockAddSkill,
+  mockDeleteSkill,
+  mockListInstalledSkills,
+  resetAgentMocks,
+} from '../helpers/mock-agents.js';
 
 const { app } = await import('../../src/index.js');
 
@@ -214,6 +219,35 @@ describe('Artifact Dir Routes', () => {
       expect(mockAddSkill).toHaveBeenCalledTimes(2);
     });
 
+    it('should delete an installed skill from an artifact and return the deleted metadata', async () => {
+      await post(BASE, { name: 'skills' });
+
+      const res = await del(`${BASE}/skills/skills/browser-use`);
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.name).toBe('browser-use');
+      expect(body.deleted).toBe(true);
+      expect(mockDeleteSkill).toHaveBeenCalledWith(
+        'browser-use',
+        join(projectsRoot, PROJECT, 'skills')
+      );
+    });
+
+    it('should return 404 when deleting a skill that is not installed', async () => {
+      await post(BASE, { name: 'skills' });
+      mockDeleteSkill.mockRejectedValueOnce(
+        new Error('Installed skill "browser-use" not found in artifact')
+      );
+
+      const res = await del(`${BASE}/skills/skills/browser-use`);
+
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({
+        error: 'Installed skill "browser-use" not found in artifact',
+      });
+    });
+
     it('should return 400 when skillName is missing', async () => {
       await post(BASE, { name: 'skills' });
 
@@ -252,6 +286,12 @@ describe('Artifact Dir Routes', () => {
       const res = await post('/api/projects/missing-project/artifacts/skills/skills', {
         skillName: 'browser-use',
       });
+
+      expect(res.status).toBe(404);
+    });
+
+    it('should return 404 when deleting from a missing artifact', async () => {
+      const res = await del(`${BASE}/missing/skills/browser-use`);
 
       expect(res.status).toBe(404);
     });

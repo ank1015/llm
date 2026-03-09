@@ -36,6 +36,10 @@ export interface AddSkillResult extends InstalledSkillEntry {
   sourcePath: string;
 }
 
+export interface DeleteSkillResult extends InstalledSkillEntry {
+  deleted: true;
+}
+
 interface RegistryFileEntry {
   name: string;
   description: string;
@@ -82,6 +86,27 @@ export async function addSkill(skillName: string, artifactDir: string): Promise<
     ...installedMetadata,
     sourceDirectory: bundledSkill.directory,
     sourcePath: bundledSkill.path,
+  };
+}
+
+export async function deleteSkill(
+  skillName: string,
+  artifactDir: string
+): Promise<DeleteSkillResult> {
+  const resolvedArtifactDir = resolve(artifactDir);
+  const artifactPaths = getArtifactPaths(resolvedArtifactDir);
+  const targetDirectory = join(artifactPaths.skillsDir, skillName);
+  const installedMetadata = await readInstalledSkill(targetDirectory, resolvedArtifactDir);
+
+  if (!installedMetadata) {
+    throw new Error(`Installed skill "${skillName}" not found in artifact`);
+  }
+
+  await rm(targetDirectory, { recursive: true, force: false });
+
+  return {
+    ...installedMetadata,
+    deleted: true,
   };
 }
 

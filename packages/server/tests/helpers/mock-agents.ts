@@ -47,6 +47,13 @@ function createInstalledSkillResult(skillName: string, artifactDir: string) {
   };
 }
 
+function createDeletedSkillResult(skillName: string, artifactDir: string) {
+  return {
+    ...createInstalledSkillResult(skillName, artifactDir),
+    deleted: true as const,
+  };
+}
+
 export const mockListBundledSkills = vi.fn(async () => [
   createBundledSkillResult('browser-use'),
   createBundledSkillResult('llm-use'),
@@ -56,6 +63,9 @@ export const mockListBundledSkills = vi.fn(async () => [
 export const mockListInstalledSkills = vi.fn(async () => []);
 export const mockAddSkill = vi.fn(async (skillName: string, artifactDir: string) =>
   createInstalledSkillResult(skillName, artifactDir)
+);
+export const mockDeleteSkill = vi.fn(async (skillName: string, artifactDir: string) =>
+  createDeletedSkillResult(skillName, artifactDir)
 );
 export const mockCreateSystemPrompt = vi.fn(async () => 'test-system-prompt');
 export const mockCreateAllTools = vi.fn(() => ({}));
@@ -77,6 +87,11 @@ export function resetAgentMocks(): void {
     createInstalledSkillResult(skillName, artifactDir)
   );
 
+  mockDeleteSkill.mockReset();
+  mockDeleteSkill.mockImplementation(async (skillName: string, artifactDir: string) =>
+    createDeletedSkillResult(skillName, artifactDir)
+  );
+
   mockCreateSystemPrompt.mockReset();
   mockCreateSystemPrompt.mockResolvedValue('test-system-prompt');
 
@@ -88,6 +103,7 @@ vi.mock('@ank1015/llm-agents', () => ({
   addSkill: mockAddSkill,
   createAllTools: mockCreateAllTools,
   createSystemPrompt: mockCreateSystemPrompt,
+  deleteSkill: mockDeleteSkill,
   listBundledSkills: mockListBundledSkills,
   listInstalledSkills: mockListInstalledSkills,
 }));
