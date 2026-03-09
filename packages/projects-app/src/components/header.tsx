@@ -61,20 +61,26 @@ function HeaderBreadcrumb() {
       : 'text-muted-foreground hover:text-foreground transition-colors';
 
   return (
-    <div className="flex items-center gap-1.5 text-sm">
-      <Link href="/" className="text-muted-foreground hover:text-foreground transition-colors">
+    <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden text-sm whitespace-nowrap">
+      <Link
+        href="/"
+        className="text-muted-foreground hover:text-foreground shrink-0 transition-colors"
+      >
         Projects
       </Link>
-      <ChevronRight size={14} className="text-muted-foreground" />
-      <Link href={`/${projectId}`} className={linkClass(lastSegment === 'project')}>
+      <ChevronRight size={14} className="text-muted-foreground shrink-0" />
+      <Link
+        href={`/${projectId}`}
+        className={cn(linkClass(lastSegment === 'project'), 'min-w-0 truncate')}
+      >
         {projectName}
       </Link>
       {artifactId && (
         <>
-          <ChevronRight size={14} className="text-muted-foreground" />
+          <ChevronRight size={14} className="text-muted-foreground shrink-0" />
           <Link
             href={`/${projectId}/${artifactId}`}
-            className={linkClass(lastSegment === 'artifact')}
+            className={cn(linkClass(lastSegment === 'artifact'), 'min-w-0 truncate')}
           >
             {artifactName}
           </Link>
@@ -82,10 +88,10 @@ function HeaderBreadcrumb() {
       )}
       {threadId && (
         <>
-          <ChevronRight size={14} className="text-muted-foreground" />
+          <ChevronRight size={14} className="text-muted-foreground shrink-0" />
           <Link
             href={`/${projectId}/${artifactId}/${threadId}`}
-            className={linkClass(lastSegment === 'thread')}
+            className={cn(linkClass(lastSegment === 'thread'), 'min-w-0 truncate')}
           >
             {threadName}
           </Link>
@@ -93,10 +99,10 @@ function HeaderBreadcrumb() {
       )}
       {isArtifactsView && artifactId && (
         <>
-          <ChevronRight size={14} className="text-muted-foreground" />
+          <ChevronRight size={14} className="text-muted-foreground shrink-0" />
           <Link
             href={`/${projectId}/${artifactId}/artifacts`}
-            className={linkClass(lastSegment === 'artifacts')}
+            className={cn(linkClass(lastSegment === 'artifacts'), 'shrink-0')}
           >
             Artifacts
           </Link>
@@ -115,11 +121,11 @@ export function Header() {
   const isArtifactsView = Boolean(artifactId && pathname.endsWith('/artifacts'));
 
   return (
-    <header className="flex h-12 w-full shrink-0 items-center justify-between px-3">
+    <header className="flex h-12 w-full min-w-0 shrink-0 items-center gap-3 px-3">
       <HeaderBreadcrumb />
 
       {/* Right — Actions + Theme toggle */}
-      <div className="flex items-center gap-1">
+      <div className="flex shrink-0 items-center gap-1">
         {artifactId && (
           <Button
             variant="ghost"

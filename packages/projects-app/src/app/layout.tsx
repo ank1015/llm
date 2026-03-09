@@ -29,8 +29,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>): React.ReactElement {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+    <html lang="en" suppressHydrationWarning className="h-full overflow-hidden">
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} h-dvh w-screen overflow-hidden antialiased`}
+      >
         <ThemeInit />
         <Toaster />
         {children}

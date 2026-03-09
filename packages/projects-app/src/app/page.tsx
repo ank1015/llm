@@ -75,7 +75,7 @@ export default function ProjectsPage() {
   };
 
   return (
-    <div className="bg-home-page flex h-dvh w-full flex-col">
+    <div className="bg-home-page flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-home-border px-8 py-4">
         <h1 className="text-foreground text-xl font-semibold">Projects</h1>
@@ -86,7 +86,7 @@ export default function ProjectsPage() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto px-8 py-6">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-8 py-6">
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 size={24} className="text-muted-foreground animate-spin" />

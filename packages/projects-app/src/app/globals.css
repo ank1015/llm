@@ -134,6 +134,14 @@
 }
 
 @layer base {
+  html,
+  body {
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
   * {
     @apply border-border outline-ring/50;
   }

@@ -37,7 +37,7 @@ export default function ConversationPage() {
 
   return (
     <div
-      className="no-scrollbar flex w-full flex-1 flex-col items-center overflow-y-auto px-8"
+      className="no-scrollbar flex h-full min-h-0 w-full min-w-0 flex-1 flex-col items-center overflow-y-auto overflow-x-hidden px-8"
       ref={shouldScroll ? scrollRef : undefined}
     >
       <div className="mx-auto w-full max-w-(--breakpoint-md) pb-[200px] px-2 pt-2" ref={contentRef}>

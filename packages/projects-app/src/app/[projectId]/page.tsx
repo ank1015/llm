@@ -41,7 +41,7 @@ export default function ProjectPage() {
   };
 
   return (
-    <div className="flex h-full w-full flex-col overflow-y-auto px-8 py-6">
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-y-auto overflow-x-hidden px-8 py-6">
       {isLoading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 size={24} className="text-muted-foreground animate-spin" />

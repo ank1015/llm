@@ -922,9 +922,9 @@ export default function ArtifactFilesPage() {
   };
 
   return (
-    <div ref={containerRef} className="flex h-full min-h-0 w-full">
+    <div ref={containerRef} className="flex h-full min-h-0 w-full min-w-0 overflow-hidden">
       <aside
-        className="border-home-border bg-home-panel flex h-full min-w-[220px] max-w-[70%] shrink-0 flex-col border-r"
+        className="border-home-border bg-home-panel flex h-full min-h-0 min-w-[220px] max-w-[70%] shrink-0 flex-col border-r"
         style={{ width: `${explorerWidthPx}px` }}
       >
         <div className="border-home-border flex h-10 shrink-0 items-center justify-between border-b px-3">
@@ -971,7 +971,7 @@ export default function ArtifactFilesPage() {
         className="bg-home-border hover:bg-muted-foreground/40 w-1 cursor-col-resize"
       />
 
-      <section className="bg-home-page flex min-h-0 min-w-0 flex-1 flex-col">
+      <section className="bg-home-page flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <div className="border-home-border bg-home-panel flex h-10 shrink-0 items-center border-b">
           <div className="no-scrollbar min-w-0 flex-1 overflow-x-auto">
             {openTabs.length === 0 ? (

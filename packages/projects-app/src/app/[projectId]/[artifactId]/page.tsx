@@ -31,7 +31,7 @@ export default function ArtifactPage() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pt-6">
+    <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden px-8 pt-6">
       <div className="mx-auto w-full max-w-3xl pb-[200px]">
         {/* Header */}
         <div className="mt-10 mb-6 flex items-center gap-2">
