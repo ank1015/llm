@@ -173,7 +173,7 @@ describe('OpenAI Utils', () => {
         expect((result[0] as any).content).toContainEqual({
           type: 'input_file',
           filename: 'doc.pdf',
-          file_data: 'data:application/pdf;base64,pdfdata',
+          file_data: 'pdfdata',
         });
       });
 
@@ -327,7 +327,7 @@ describe('OpenAI Utils', () => {
         const result = buildOpenAIMessages(mockModel, context);
         expect((result[0] as any).output).toContainEqual({
           type: 'input_file',
-          file_data: 'data:application/pdf;base64,filedata',
+          file_data: 'filedata',
         });
       });
     });

@@ -9,7 +9,7 @@ export const anthropicModels = {
     api: 'anthropic',
     baseUrl: anthropicBaseUrl,
     reasoning: true,
-    input: ['text', 'image'],
+    input: ['text', 'image', 'file'],
     cost: {
       input: 1,
       output: 5,
@@ -26,7 +26,7 @@ export const anthropicModels = {
     api: 'anthropic',
     baseUrl: anthropicBaseUrl,
     reasoning: true,
-    input: ['text', 'image'],
+    input: ['text', 'image', 'file'],
     cost: {
       input: 5,
       output: 25,
@@ -43,7 +43,7 @@ export const anthropicModels = {
     api: 'anthropic',
     baseUrl: anthropicBaseUrl,
     reasoning: true,
-    input: ['text', 'image'],
+    input: ['text', 'image', 'file'],
     cost: {
       input: 5,
       output: 25,
@@ -60,7 +60,7 @@ export const anthropicModels = {
     api: 'anthropic',
     baseUrl: anthropicBaseUrl,
     reasoning: true,
-    input: ['text', 'image'],
+    input: ['text', 'image', 'file'],
     cost: {
       input: 3,
       output: 15,
@@ -77,7 +77,7 @@ export const anthropicModels = {
     api: 'anthropic',
     baseUrl: anthropicBaseUrl,
     reasoning: true,
-    input: ['text', 'image'],
+    input: ['text', 'image', 'file'],
     cost: {
       input: 3,
       output: 15,

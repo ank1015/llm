@@ -98,7 +98,7 @@ export function buildOpenAIMessages(model: Model<'openai'>, context: Context): R
           contents.push({
             type: 'input_file',
             filename: contentItem.filename,
-            file_data: `data:${contentItem.mimeType};base64,${contentItem.data}`,
+            file_data: contentItem.data,
           });
         }
       }
@@ -135,7 +135,7 @@ export function buildOpenAIMessages(model: Model<'openai'>, context: Context): R
         } else if (contentItem.type === 'file' && model.input.includes('file')) {
           toolOutputs.push({
             type: 'input_file',
-            file_data: `data:${contentItem.mimeType};base64,${contentItem.data}`,
+            file_data: contentItem.data,
           });
           hasFile = true;
         }

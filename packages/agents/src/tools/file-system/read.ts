@@ -1,5 +1,6 @@
 import { constants } from 'fs';
 import { access as fsAccess, readFile as fsReadFile } from 'fs/promises';
+import { basename } from 'path';
 
 import { type Static, Type } from '@sinclair/typebox';
 
@@ -12,9 +13,12 @@ import {
   truncateHead,
 } from './truncate.js';
 import { formatDimensionNote, resizeImage } from './utils/image-resize.js';
-import { detectSupportedImageMimeTypeFromFile } from './utils/mime.js';
+import {
+  detectSupportedBinaryMimeTypeFromBuffer,
+  detectSupportedImageMimeTypeFromFile,
+} from './utils/mime.js';
 
-import type { AgentTool, ImageContent, TextContent } from '@ank1015/llm-sdk';
+import type { AgentTool, FileContent, ImageContent, TextContent } from '@ank1015/llm-sdk';
 
 const readSchema = Type.Object({
   path: Type.String({ description: 'Path to the file to read (relative or absolute)' }),
@@ -66,7 +70,7 @@ export function createReadTool(
   return {
     name: 'read',
     label: 'read',
-    description: `Read the contents of a file. Supports text files and images (jpg, png, gif, webp). Images are sent as attachments. For text files, output is truncated to ${DEFAULT_MAX_LINES} lines or ${DEFAULT_MAX_BYTES / 1024}KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.`,
+    description: `Read the contents of a file. Supports text files, images, and PDFs. Images (jpg, png, gif, webp) and PDFs are sent as attachments. For text files, output is truncated to ${DEFAULT_MAX_LINES} lines or ${DEFAULT_MAX_BYTES / 1024}KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.`,
     parameters: readSchema,
     execute: async (
       _toolCallId: string,
@@ -74,9 +78,10 @@ export function createReadTool(
       signal?: AbortSignal
     ) => {
       const absolutePath = resolveReadPath(path, cwd);
+      const filename = basename(absolutePath);
 
       return new Promise<{
-        content: (TextContent | ImageContent)[];
+        content: (TextContent | ImageContent | FileContent)[];
         details: ReadToolDetails | undefined;
       }>((resolve, reject) => {
         // Check if already aborted
@@ -108,17 +113,19 @@ export function createReadTool(
               return;
             }
 
-            const mimeType = ops.detectImageMimeType
+            const buffer = await ops.readFile(absolutePath);
+            const imageMimeType = ops.detectImageMimeType
               ? await ops.detectImageMimeType(absolutePath)
               : undefined;
+            const mimeType =
+              imageMimeType ?? (await detectSupportedBinaryMimeTypeFromBuffer(buffer));
 
             // Read the file based on type
-            let content: (TextContent | ImageContent)[];
+            let content: (TextContent | ImageContent | FileContent)[];
             let details: ReadToolDetails | undefined;
 
-            if (mimeType) {
+            if (mimeType?.startsWith('image/')) {
               // Read as image (binary)
-              const buffer = await ops.readFile(absolutePath);
               const base64 = buffer.toString('base64');
 
               if (autoResizeImages) {
@@ -142,9 +149,13 @@ export function createReadTool(
                   { type: 'image', data: base64, mimeType },
                 ];
               }
+            } else if (mimeType === 'application/pdf') {
+              content = [
+                { type: 'text', content: `Read PDF file [${mimeType}]` },
+                { type: 'file', data: buffer.toString('base64'), mimeType, filename },
+              ];
             } else {
               // Read as text
-              const buffer = await ops.readFile(absolutePath);
               const textContent = buffer.toString('utf-8');
               const allLines = textContent.split('\n');
               const totalFileLines = allLines.length;

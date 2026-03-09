@@ -12,6 +12,7 @@ import type {
   Tool,
 } from '@ank1015/llm-types';
 import type {
+  DocumentBlockParam,
   Message as AnthropicMessage,
   ContentBlock,
   ImageBlockParam,
@@ -21,6 +22,28 @@ import type {
   ToolResultBlockParam,
   ToolUseBlockParam,
 } from '@anthropic-ai/sdk/resources/messages.js';
+
+type AnthropicInputBlockParam = TextBlockParam | ImageBlockParam | DocumentBlockParam;
+
+function buildAnthropicDocumentBlock(
+  filename: string,
+  mimeType: string,
+  data: string
+): DocumentBlockParam | null {
+  if (mimeType !== 'application/pdf') {
+    return null;
+  }
+
+  return {
+    type: 'document',
+    title: sanitizeSurrogates(filename),
+    source: {
+      type: 'base64',
+      media_type: 'application/pdf',
+      data,
+    },
+  };
+}
 
 export function createClient(
   model: Model<'anthropic'>,
@@ -139,7 +162,7 @@ export function buildAnthropicMessages(
   for (const message of context.messages) {
     // Handle user messages
     if (message.role === 'user') {
-      const content: (TextBlockParam | ImageBlockParam)[] = [];
+      const content: AnthropicInputBlockParam[] = [];
 
       for (const contentItem of message.content) {
         if (contentItem.type === 'text') {
@@ -162,8 +185,16 @@ export function buildAnthropicMessages(
             },
           });
         }
-        // Note: Anthropic supports documents via DocumentBlockParam, but our SDK uses 'file' type
-        // We could extend this to support PDF documents if needed
+        if (contentItem.type === 'file' && model.input.includes('file')) {
+          const documentBlock = buildAnthropicDocumentBlock(
+            contentItem.filename,
+            contentItem.mimeType,
+            contentItem.data
+          );
+          if (documentBlock) {
+            content.push(documentBlock);
+          }
+        }
       }
 
       if (content.length > 0) {
@@ -176,18 +207,64 @@ export function buildAnthropicMessages(
 
     // Handle tool results
     if (message.role === 'toolResult') {
-      const textContent = message.content
-        .filter((c) => c.type === 'text')
-        .map((c) => {
-          const text = (c as TextContent).content;
-          return message.isError ? `[TOOL ERROR] ${text}` : text;
-        })
-        .join('\n');
+      const toolResultContentBlocks: AnthropicInputBlockParam[] = [];
+      let hasText = false;
+
+      for (const contentItem of message.content) {
+        if (contentItem.type === 'text') {
+          toolResultContentBlocks.push({
+            type: 'text',
+            text: sanitizeSurrogates(
+              message.isError ? `[TOOL ERROR] ${contentItem.content}` : contentItem.content
+            ),
+          });
+          hasText = true;
+        } else if (contentItem.type === 'image' && model.input.includes('image')) {
+          toolResultContentBlocks.push({
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: contentItem.mimeType as
+                | 'image/jpeg'
+                | 'image/png'
+                | 'image/gif'
+                | 'image/webp',
+              data: contentItem.data,
+            },
+          });
+        } else if (contentItem.type === 'file' && model.input.includes('file')) {
+          const documentBlock = buildAnthropicDocumentBlock(
+            contentItem.filename,
+            contentItem.mimeType,
+            contentItem.data
+          );
+          if (documentBlock) {
+            toolResultContentBlocks.push(documentBlock);
+          }
+        }
+      }
+
+      if (message.isError && !hasText && toolResultContentBlocks.length > 0) {
+        toolResultContentBlocks.unshift({
+          type: 'text',
+          text: '[TOOL ERROR]',
+        });
+      }
+
+      const textOnlyToolResultContent =
+        toolResultContentBlocks.length > 0 &&
+        toolResultContentBlocks.every((block) => block.type === 'text')
+          ? toolResultContentBlocks.map((block) => (block as TextBlockParam).text).join('\n')
+          : null;
 
       const toolResultContent: ToolResultBlockParam = {
         type: 'tool_result',
         tool_use_id: message.toolCallId,
-        content: sanitizeSurrogates(textContent || (message.isError ? '[TOOL ERROR]' : '')),
+        content:
+          textOnlyToolResultContent ??
+          (toolResultContentBlocks.length > 0
+            ? toolResultContentBlocks
+            : sanitizeSurrogates(message.isError ? '[TOOL ERROR]' : '')),
         is_error: message.isError,
       };
 
