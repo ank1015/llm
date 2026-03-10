@@ -1,5 +1,6 @@
 'use client';
 
+import { Appearance } from 'react-native';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
@@ -48,7 +49,7 @@ type UiStoreState = {
 };
 
 const initialState = {
-  theme: 'light' as Theme,
+  theme: (Appearance.getColorScheme() === 'dark' ? 'dark' : 'light') as Theme,
   isSidebarCollapsed: false,
   sideDrawer: { open: false, title: '', renderContent: () => null, badge: undefined },
   isMobileSidebarOpen: false,

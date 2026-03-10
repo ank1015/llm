@@ -1,16 +1,73 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import React from 'react';
-import { useColorScheme } from 'react-native';
+import { Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import AppTabs from '@/components/app-tabs';
+import { useTheme } from '@/hooks/use-theme';
+import { useUiStore } from '@/stores/ui-store';
 
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
+function useSyncWebThemeClass(theme: 'light' | 'dark'): void {
+  useEffect(() => {
+    if (process.env.EXPO_OS !== 'web') {
+      return;
+    }
+
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+  }, [theme]);
+}
+
+export default function RootLayout() {
+  const themeName = useUiStore((state) => state.theme);
+  const theme = useTheme();
+
+  useSyncWebThemeClass(themeName);
+
+  const navigationTheme =
+    themeName === 'dark'
+      ? {
+          ...DarkTheme,
+          colors: {
+            ...DarkTheme.colors,
+            background: theme.homePage,
+            border: theme.homeBorder,
+            card: theme.homePage,
+            notification: theme.primary,
+            primary: theme.primary,
+            text: theme.text,
+          },
+        }
+      : {
+          ...DefaultTheme,
+          colors: {
+            ...DefaultTheme.colors,
+            background: theme.homePage,
+            border: theme.homeBorder,
+            card: theme.homePage,
+            notification: theme.primary,
+            primary: theme.primary,
+            text: theme.text,
+          },
+        };
+
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AnimatedSplashOverlay />
-      <AppTabs />
+    <ThemeProvider value={navigationTheme}>
+      <StatusBar style={themeName === 'dark' ? 'light' : 'dark'} />
+      <Stack
+        screenOptions={{
+          contentStyle: {
+            backgroundColor: theme.homePage,
+          },
+          headerShadowVisible: false,
+          headerStyle: {
+            backgroundColor: theme.homePage,
+          },
+          headerTintColor: theme.text,
+          headerTitleStyle: {
+            color: theme.text,
+            fontWeight: '600',
+          },
+        }}
+      />
     </ThemeProvider>
   );
 }

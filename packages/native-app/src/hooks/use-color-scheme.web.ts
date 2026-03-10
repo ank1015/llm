@@ -1,21 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useColorScheme as useRNColorScheme, type ColorSchemeName } from 'react-native';
+import { useUiStore } from '@/stores/ui-store';
 
-/**
- * To support static rendering, this value needs to be re-calculated on the client side for web
- */
-export function useColorScheme(): ColorSchemeName {
-  const [hasHydrated, setHasHydrated] = useState(false);
-
-  useEffect(() => {
-    setHasHydrated(true);
-  }, []);
-
-  const colorScheme = useRNColorScheme();
-
-  if (hasHydrated) {
-    return colorScheme ?? 'light';
-  }
-
-  return 'light';
+export function useColorScheme(): 'light' | 'dark' {
+  return useUiStore((state) => state.theme);
 }
