@@ -4,21 +4,20 @@ import { useThemeColor, useToast } from 'heroui-native';
 import { useCallback, useEffect, useState } from 'react';
 import { Image, Platform, StyleSheet, View } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
+
 import LogoDark from '../../../assets/logo-dark.png';
 import LogoLight from '../../../assets/logo-light.png';
-import { type UpdateBottomSheetMode } from '../../components/bottom-sheet/update-bottom-sheet';
 import { ThemeToggle } from '../../components/theme-toggle';
 import { useAppTheme } from '../../contexts/app-theme-context';
 import { COMPONENTS } from '../../helpers/data/components';
 import { useOtaUpdate } from '../../helpers/hooks/use-ota-update';
 import { useVersionCheck } from '../../helpers/hooks/use-version-check';
 
+import type { UpdateBottomSheetMode } from '../../components/bottom-sheet/update-bottom-sheet';
+
 export default function Layout() {
   const { isDark } = useAppTheme();
-  const [themeColorForeground, themeColorBackground] = useThemeColor([
-    'foreground',
-    'background',
-  ]);
+  const [themeColorForeground, themeColorBackground] = useThemeColor(['foreground', 'background']);
 
   const reducedMotion = useReducedMotion();
   const { toast } = useToast();
@@ -27,8 +26,7 @@ export default function Layout() {
   const [isVersionChecked, setIsVersionChecked] = useState(false);
   const [isNewVersionAvailable, setIsNewVersionAvailable] = useState(false);
   const [_updateSheetOpen, setUpdateSheetOpen] = useState(false);
-  const [_updateSheetMode, setUpdateSheetMode] =
-    useState<UpdateBottomSheetMode>('new-version');
+  const [_updateSheetMode, setUpdateSheetMode] = useState<UpdateBottomSheetMode>('new-version');
 
   const handleVersionChecked = useCallback((isNew: boolean) => {
     setIsVersionChecked(true);
@@ -64,16 +62,11 @@ export default function Layout() {
         onActionPress: ({ hide }) => hide(),
       });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reducedMotion]);
+  }, [reducedMotion, toast]);
 
   const _renderTitle = () => {
     return (
-      <Image
-        source={isDark ? LogoLight : LogoDark}
-        style={styles.logo}
-        resizeMode="contain"
-      />
+      <Image source={isDark ? LogoLight : LogoDark} style={styles.logo} resizeMode="contain" />
     );
   };
 
@@ -112,10 +105,9 @@ export default function Layout() {
             headerTitle: _renderTitle,
           }}
         />
-        <Stack.Screen
-          name="components/index"
-          options={{ headerTitle: 'Components' }}
-        />
+        <Stack.Screen name="app/index" options={{ headerTitle: 'App' }} />
+        <Stack.Screen name="app/[projectId]" options={{ headerTitle: 'Project' }} />
+        <Stack.Screen name="components/index" options={{ headerTitle: 'Components' }} />
         {COMPONENTS.map((component) => (
           <Stack.Screen
             key={component.path}

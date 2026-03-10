@@ -9,9 +9,10 @@ type SidebarStoreState = {
   artifactDirs: ArtifactDirWithSessions[];
   isLoading: boolean;
 
-  setProjectName: (name: string) => void;
+  setProjectName: (name: string | null) => void;
   setArtifactDirs: (dirs: ArtifactDirWithSessions[]) => void;
   setIsLoading: (loading: boolean) => void;
+  reset: () => void;
 
   /** Optimistically insert a new session into an artifact's session list. */
   addSession: (artifactId: string, session: OverviewSession) => void;
@@ -23,14 +24,19 @@ type SidebarStoreState = {
   removeSession: (artifactId: string, sessionId: string) => void;
 };
 
-export const useSidebarStore = create<SidebarStoreState>((set) => ({
+const initialState = {
   projectName: null,
-  artifactDirs: [],
+  artifactDirs: [] as ArtifactDirWithSessions[],
   isLoading: true,
+};
+
+export const useSidebarStore = create<SidebarStoreState>((set) => ({
+  ...initialState,
 
   setProjectName: (name) => set({ projectName: name }),
   setArtifactDirs: (dirs) => set({ artifactDirs: dirs }),
   setIsLoading: (loading) => set({ isLoading: loading }),
+  reset: () => set(initialState),
 
   addSession: (artifactId, session) =>
     set((state) => ({
