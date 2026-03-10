@@ -1,8 +1,8 @@
 import Feather from '@expo/vector-icons/Feather';
 import { Stack, useRouter } from 'expo-router';
-import { Button, Card, Spinner, cn, useThemeColor, useToast } from 'heroui-native';
+import { Button, Card, Spinner, useThemeColor, useToast } from 'heroui-native';
 import { useEffect, useState } from 'react';
-import { Alert, RefreshControl, Text, View } from 'react-native';
+import { Alert, RefreshControl, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { withUniwind } from 'uniwind';
 
@@ -15,10 +15,18 @@ import { CreateProjectDialog } from '@/components/projects/dialogs/create-projec
 import { ScreenScrollView } from '@/components/screen-scroll-view';
 import { useAppTheme } from '@/contexts/app-theme-context';
 import { useProjectsStore } from '@/stores';
+import {
+  appCardStyles,
+  appColors,
+  appLayout,
+  appSizes,
+  appSpacing,
+  appStateStyles,
+  appTypography,
+  getSurfaceCardClassName,
+} from '@/styles/ui';
 
 const StyledFeather = withUniwind(Feather);
-const darkBorderClassName = 'border-zinc-900';
-const surfaceCardClassName = 'border border-zinc-200 shadow-none';
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message) {
@@ -40,7 +48,7 @@ export function ProjectsScreen() {
   const deleteProject = useProjectsStore((state) => state.deleteProject);
 
   const { isDark } = useAppTheme();
-  const accentColor = useThemeColor('accent');
+  const [accentColor, foregroundColor] = useThemeColor(['accent', 'foreground']);
   const { toast } = useToast();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -114,10 +122,10 @@ export function ProjectsScreen() {
       <Stack.Screen options={{ headerShown: false }} />
 
       <ScreenScrollView
-        contentContainerClassName="gap-4"
+        contentContainerClassName={appLayout.screenContent}
         contentContainerStyle={{
-          paddingTop: insets.top + 34,
-          paddingBottom: insets.bottom + 32,
+          paddingTop: insets.top + appSpacing.screenTopOffset,
+          paddingBottom: insets.bottom + appSpacing.screenBottomOffset,
         }}
         refreshControl={
           <RefreshControl
@@ -130,25 +138,29 @@ export function ProjectsScreen() {
           />
         }
       >
-        <View className="flex-row items-center justify-between gap-4 px-1">
-          <Text className="text-[26px] font-semibold tracking-tight text-foreground">Projects</Text>
+        <View className={appLayout.homeHeaderRow}>
+          <AppText className={appTypography.screenTitle}>Projects</AppText>
           <Button isIconOnly size="sm" variant="secondary" onPress={() => setIsCreateOpen(true)}>
-            <PlusIcon size={16} color={isDark ? '#FFFFFF' : '#000000'} />
+            <PlusIcon color={foregroundColor} size={appSizes.iconXs} />
           </Button>
         </View>
 
         {error ? (
-          <Card className={cn(surfaceCardClassName, isDark && darkBorderClassName)}>
-            <Card.Body className="gap-3 p-4">
-              <View className="flex-row items-start gap-3">
-                <View className="size-10 items-center justify-center rounded-3xl bg-red-500/10">
-                  <StyledFeather className="text-red-500" name="alert-circle" size={18} />
+          <Card className={getSurfaceCardClassName(isDark)}>
+            <Card.Body className={appCardStyles.defaultBody}>
+              <View className={appLayout.statusRow}>
+                <View className={appStateStyles.alertBadge}>
+                  <StyledFeather
+                    className={appColors.dangerForeground}
+                    name="alert-circle"
+                    size={appSizes.iconSm}
+                  />
                 </View>
-                <View className="flex-1 gap-1">
-                  <AppText className="text-sm font-semibold text-foreground">
+                <View className={appLayout.textStack}>
+                  <AppText className={appTypography.bodyStrong}>
                     Couldn&apos;t load projects
                   </AppText>
-                  <AppText selectable className="text-sm leading-5 text-muted">
+                  <AppText selectable className={appTypography.body}>
                     {error}
                   </AppText>
                 </View>
@@ -168,25 +180,27 @@ export function ProjectsScreen() {
         ) : null}
 
         {isLoading && projects.length === 0 ? (
-          <Card className={cn(surfaceCardClassName, isDark && darkBorderClassName)}>
-            <Card.Body className="items-center gap-3 p-6">
+          <Card className={getSurfaceCardClassName(isDark)}>
+            <Card.Body className={appCardStyles.loadingBody}>
               <Spinner size="lg" />
-              <AppText className="text-sm text-muted">Loading projects…</AppText>
+              <AppText className={appTypography.bodyMuted}>Loading projects…</AppText>
             </Card.Body>
           </Card>
         ) : null}
 
         {!isLoading && !error && projects.length === 0 ? (
-          <Card className={cn(surfaceCardClassName, isDark && darkBorderClassName)}>
-            <Card.Body className="items-center gap-4 p-6">
-              <View className="size-14 items-center justify-center rounded-full bg-foreground/5">
-                <StyledFeather className="text-foreground/70" name="folder" size={22} />
+          <Card className={getSurfaceCardClassName(isDark)}>
+            <Card.Body className={appCardStyles.emptyBody}>
+              <View className={appStateStyles.emptyBadge}>
+                <StyledFeather
+                  className={appColors.foregroundMuted}
+                  name="folder"
+                  size={appSizes.iconLg}
+                />
               </View>
-              <View className="items-center gap-1">
-                <AppText className="text-base font-semibold text-foreground">
-                  No projects yet
-                </AppText>
-                <AppText className="text-center text-sm leading-5 text-muted">
+              <View className={appLayout.centeredStack}>
+                <AppText className={appTypography.sectionTitle}>No projects yet</AppText>
+                <AppText className={appTypography.bodyCentered}>
                   Create your first project to start working with the native app.
                 </AppText>
               </View>
@@ -198,7 +212,7 @@ export function ProjectsScreen() {
         ) : null}
 
         {projects.length > 0 ? (
-          <View className="mt-5 gap-4">
+          <View className={appLayout.projectList}>
             {projects.map((project, index) => (
               <ProjectCard
                 key={project.id}
