@@ -51,7 +51,7 @@ export function ProjectsScreen() {
   }, [fetchProjects]);
 
   const handleOpenProject = (project: ProjectMetadata) => {
-    router.push({
+    router.replace({
       pathname: '/[projectId]',
       params: {
         projectId: project.id,
@@ -68,7 +68,7 @@ export function ProjectsScreen() {
       description: `${project.name} is ready.`,
     });
 
-    router.push({
+    router.replace({
       pathname: '/[projectId]',
       params: {
         projectId: project.id,
