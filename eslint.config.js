@@ -9,7 +9,16 @@ import prettier from 'eslint-config-prettier';
 export default [
   // Ignore patterns
   {
-    ignores: ['**/dist/**', '**/node_modules/**', '**/.next/**', '**/coverage/**'],
+    ignores: [
+      '**/dist/**',
+      '**/node_modules/**',
+      '**/.next/**',
+      '**/.expo/**',
+      '**/coverage/**',
+      '**/web-build/**',
+      '**/android/**',
+      '**/ios/**',
+    ],
   },
 
   // Base ESLint recommended rules
@@ -111,6 +120,23 @@ export default [
     rules: {
       'unicorn/filename-case': 'off',
       '@typescript-eslint/explicit-function-return-type': 'off',
+    },
+  },
+
+  // Expo Router route filenames use framework-specific conventions.
+  {
+    files: ['**/src/app/**/_layout.tsx', '**/src/app/**/+*.tsx', '**/src/app/**/[[]*[]].tsx'],
+    rules: {
+      'unicorn/filename-case': 'off',
+    },
+  },
+
+  // React Native's published sources still contain syntax that the import-cycle rule
+  // tries to parse poorly; keep the rest of the import rules enabled.
+  {
+    files: ['packages/native-app/**/*.{ts,tsx}'],
+    rules: {
+      'import/no-cycle': 'off',
     },
   },
 
