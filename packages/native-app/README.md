@@ -16,6 +16,9 @@ This package contains the monorepo's React Native Expo app scaffold, based on [H
    pnpm dev:native-app
    ```
 
+3. If the API server is not reachable at the default local address, set
+   `EXPO_PUBLIC_LLM_SERVER_URL` to your server base URL before starting Expo.
+
 You can start developing by editing the files inside the **src/app** directory. This project uses file-based routing with Expo Router.
 
 ## About HeroUI Native
