@@ -3,12 +3,12 @@ import { useThemeColor } from 'heroui-native';
 import { type FC, useCallback, useEffect, useMemo } from 'react';
 import { View, useWindowDimensions } from 'react-native';
 
-import { ProjectScreenHeader } from '@/components/projects/project-header';
+import { ProjectScreenHeader } from '@/components/projects/layout/project-header';
 import {
   ProjectShellProvider,
   type ProjectOverviewRefreshMode,
-} from '@/components/projects/project-shell-context';
-import { ProjectSidebarDrawer } from '@/components/projects/project-sidebar-drawer';
+} from '@/components/projects/layout/project-shell-context';
+import { ProjectSidebarDrawer } from '@/components/projects/layout/project-sidebar-drawer';
 import { useAppTheme } from '@/contexts/app-theme-context';
 import { useSidebarStore } from '@/stores';
 
@@ -56,13 +56,7 @@ export const ProjectDrawerLayout: FC<ProjectDrawerLayoutProps> = ({ projectId })
   return (
     <ProjectShellProvider value={providerValue}>
       <Drawer
-        drawerContent={(props) => (
-          <ProjectSidebarDrawer
-            {...props}
-            onRefresh={() => refreshOverview('refresh')}
-            projectId={projectId}
-          />
-        )}
+        drawerContent={(props) => <ProjectSidebarDrawer {...props} />}
         screenLayout={({ children }) => (
           <View className="flex-1 bg-background">
             <ProjectScreenHeader />

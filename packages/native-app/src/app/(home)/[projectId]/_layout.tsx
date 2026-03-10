@@ -1,6 +1,6 @@
 import { Slot, useLocalSearchParams } from 'expo-router';
 
-import { ProjectDrawerLayout } from '@/components/projects/project-drawer-layout';
+import { ProjectDrawerLayout } from '@/components/projects/layout/project-drawer-layout';
 
 export default function ProjectLayout() {
   const params = useLocalSearchParams<{ projectId?: string | string[] }>();

@@ -1,7 +1,7 @@
 import Feather from '@expo/vector-icons/Feather';
 import * as Haptics from 'expo-haptics';
 import { useNavigation, useRouter } from 'expo-router';
-import { Platform, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { withUniwind } from 'uniwind';
 
@@ -29,7 +29,7 @@ const HeaderIconButton: FC<HeaderIconButtonProps> = ({ accessibilityLabel, icon,
       hitSlop={12}
       onPress={onPress}
       onPressIn={() => {
-        if (Platform.OS === 'ios') {
+        if (process.env.EXPO_OS === 'ios') {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }
       }}
@@ -66,7 +66,7 @@ export const ProjectHeaderTitle: FC = () => {
         router.replace('/');
       }}
       onPressIn={() => {
-        if (Platform.OS === 'ios') {
+        if (process.env.EXPO_OS === 'ios') {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }
       }}

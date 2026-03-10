@@ -5,8 +5,8 @@ import { useCallback, useEffect } from 'react';
 import { View } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 
-import { ThemeToggle } from '../../components/theme-toggle';
-import { useAppTheme } from '../../contexts/app-theme-context';
+import { ThemeToggle } from '@/components/theme-toggle';
+import { useAppTheme } from '@/contexts/app-theme-context';
 
 export default function Layout() {
   const { isDark } = useAppTheme();

@@ -2,7 +2,7 @@ import Feather from '@expo/vector-icons/Feather';
 import { Stack, useRouter } from 'expo-router';
 import { Button, Card, Spinner, cn, useThemeColor, useToast } from 'heroui-native';
 import { useEffect, useState } from 'react';
-import { Alert, RefreshControl, View } from 'react-native';
+import { Alert, RefreshControl, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { withUniwind } from 'uniwind';
 
@@ -10,8 +10,8 @@ import type { ProjectMetadata } from '@/lib/client-api';
 
 import { AppText } from '@/components/app-text';
 import { PlusIcon } from '@/components/icons/plus';
-import { CreateProjectDialog } from '@/components/projects/create-project-dialog';
-import { ProjectCard } from '@/components/projects/project-card';
+import { ProjectCard } from '@/components/projects/cards/project-card';
+import { CreateProjectDialog } from '@/components/projects/dialogs/create-project-dialog';
 import { ScreenScrollView } from '@/components/screen-scroll-view';
 import { useAppTheme } from '@/contexts/app-theme-context';
 import { useProjectsStore } from '@/stores';
@@ -131,9 +131,7 @@ export function ProjectsScreen() {
         }
       >
         <View className="flex-row items-center justify-between gap-4 px-1">
-          <AppText className="text-[26px] font-semibold tracking-tight text-foreground">
-            Projects
-          </AppText>
+          <Text className="text-[26px] font-semibold tracking-tight text-foreground">Projects</Text>
           <Button isIconOnly size="sm" variant="secondary" onPress={() => setIsCreateOpen(true)}>
             <PlusIcon size={16} color={isDark ? '#FFFFFF' : '#000000'} />
           </Button>

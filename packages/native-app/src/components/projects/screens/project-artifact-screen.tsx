@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { withUniwind } from 'uniwind';
 
 import { AppText } from '@/components/app-text';
-import { useProjectShell } from '@/components/projects/project-shell-context';
+import { useProjectShell } from '@/components/projects/layout/project-shell-context';
 import { ScreenScrollView } from '@/components/screen-scroll-view';
 import { useAppTheme } from '@/contexts/app-theme-context';
 import { useSidebarStore } from '@/stores';

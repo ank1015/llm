@@ -1,10 +1,10 @@
 'use client';
 
-import { Appearance } from 'react-native';
 import { Uniwind } from 'uniwind';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+import { type AppThemeName, getInitialAppTheme, getNextTheme, isAppTheme } from '@/lib/app-theme';
 import { asyncJsonStorage } from '@/lib/state-storage';
 
 type SettingsTab = 'general' | 'model' | 'keys';
@@ -16,14 +16,12 @@ type SideDrawerProps = {
   renderContent: () => React.ReactNode;
 };
 
-type Theme = 'light' | 'dark';
-
 type UiStorePersistedState = {
-  theme: Theme;
+  theme: AppThemeName;
 };
 
 type UiStoreState = {
-  theme: Theme;
+  theme: AppThemeName;
   isSidebarCollapsed: boolean;
   sideDrawer: SideDrawerProps;
   isMobileSidebarOpen: boolean;
@@ -31,7 +29,7 @@ type UiStoreState = {
   activeSettingsTab: SettingsTab;
   renameSessionId: string | null;
   deleteSessionId: string | null;
-  setTheme: (theme: Theme) => void;
+  setTheme: (theme: AppThemeName) => void;
   toggleTheme: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   toggleSidebarCollapsed: () => void;
@@ -52,7 +50,7 @@ type UiStoreState = {
 };
 
 const initialState = {
-  theme: (Appearance.getColorScheme() === 'dark' ? 'dark' : 'light') as Theme,
+  theme: getInitialAppTheme(),
   isSidebarCollapsed: false,
   sideDrawer: { open: false, title: '', renderContent: () => null, badge: undefined },
   isMobileSidebarOpen: false,
@@ -60,11 +58,33 @@ const initialState = {
   activeSettingsTab: 'general' as SettingsTab,
   renameSessionId: null as string | null,
   deleteSessionId: null as string | null,
-};
+} satisfies Omit<
+  UiStoreState,
+  | 'setTheme'
+  | 'toggleTheme'
+  | 'setSidebarCollapsed'
+  | 'toggleSidebarCollapsed'
+  | 'openSideDrawer'
+  | 'updateSideDrawer'
+  | 'dismissSideDrawer'
+  | 'openMobileSidebar'
+  | 'closeMobileSidebar'
+  | 'toggleMobileSidebar'
+  | 'openSettings'
+  | 'closeSettings'
+  | 'setActiveSettingsTab'
+  | 'openRenameSessionDialog'
+  | 'closeRenameSessionDialog'
+  | 'openDeleteSessionDialog'
+  | 'closeDeleteSessionDialog'
+  | 'resetUi'
+>;
 
-function applyTheme(theme: Theme): void {
+function applyTheme(theme: AppThemeName): void {
   Uniwind.setTheme(theme);
 }
+
+applyTheme(initialState.theme);
 
 export const useUiStore = create<UiStoreState>()(
   persist(
@@ -77,7 +97,7 @@ export const useUiStore = create<UiStoreState>()(
       },
       toggleTheme: () => {
         set((state) => {
-          const next = state.theme === 'light' ? 'dark' : 'light';
+          const next = getNextTheme(state.theme);
           applyTheme(next);
           return { theme: next };
         });
@@ -130,7 +150,7 @@ export const useUiStore = create<UiStoreState>()(
         theme: state.theme,
       }),
       onRehydrateStorage: () => (state) => {
-        if (state?.theme) {
+        if (isAppTheme(state?.theme)) {
           applyTheme(state.theme);
         }
       },

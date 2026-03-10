@@ -1,4 +1,4 @@
-import { ProjectsScreen } from '@/components/projects/projects-screen';
+import { ProjectsScreen } from '@/components/projects/screens/projects-screen';
 
 export default function HomeScreen() {
   return <ProjectsScreen />;
