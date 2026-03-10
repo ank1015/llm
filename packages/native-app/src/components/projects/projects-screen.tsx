@@ -135,7 +135,7 @@ export function ProjectsScreen() {
             Projects
           </AppText>
           <Button isIconOnly size="sm" variant="secondary" onPress={() => setIsCreateOpen(true)}>
-            <PlusIcon size={16} colorClassName="accent-accent" />
+            <PlusIcon size={16} color={isDark ? '#FFFFFF' : '#000000'} />
           </Button>
         </View>
 

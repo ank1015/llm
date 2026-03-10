@@ -11,6 +11,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { DialogBlurBackdrop } from '@/components/dialog-blur-backdrop';
+import { useAppTheme } from '@/contexts/app-theme-context';
 
 type CreateProjectDialogProps = {
   isCreating: boolean;
@@ -53,6 +54,7 @@ function CreateProjectDialogForm({
   onCreate,
   onOpenChange,
 }: CreateProjectDialogProps) {
+  const { isDark } = useAppTheme();
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -87,23 +89,25 @@ function CreateProjectDialogForm({
 
   return (
     <Dialog.Content
-      className="bg-surface px-6 pt-6 pb-5"
+      className="bg-white px-6 pt-6 pb-5 dark:bg-[#1B1B1D]"
       animation={{
         entering: FadeInDown.duration(200).easing(Easing.out(Easing.ease)),
         exiting: FadeOutDown.duration(150).easing(Easing.in(Easing.ease)),
       }}
     >
       <View className="gap-6">
-        <Dialog.Title className="text-[18px] font-bold leading-6">Create Project</Dialog.Title>
+        <Dialog.Title className="text-[18px] font-bold leading-6 text-black dark:text-white">
+          Create Project
+        </Dialog.Title>
 
         <View className="gap-2">
           <Input
             autoCapitalize="words"
             autoCorrect={false}
             autoFocus
-            variant='primary'
+            variant="secondary"
             isInvalid={false}
-            className='rounded-lg'
+            className="h-14 rounded-[12px] border-0 bg-zinc-100 px-4 py-0 text-black shadow-none focus:border-0 dark:bg-[#39393D] dark:text-white dark:focus:border-0"
             onChangeText={(text) => {
               setName(text);
               if (error) {
@@ -114,7 +118,10 @@ function CreateProjectDialogForm({
               void handleSubmit();
             }}
             placeholder="Enter project name"
+            placeholderColorClassName="text-zinc-500"
             returnKeyType="done"
+            selectionColorClassName="accent-black dark:accent-white"
+            textAlignVertical="center"
             value={name}
           />
           {error ? <FieldError className="text-[12px]">{error}</FieldError> : null}
@@ -122,18 +129,24 @@ function CreateProjectDialogForm({
 
         <View className="flex-row items-center justify-between gap-4">
           <Button variant="ghost" size="md" isDisabled={isCreating} onPress={handleClose}>
-            <Button.Label className="text-[14px]" maxFontSizeMultiplier={1.2}>
+            <Button.Label
+              className="text-[14px] text-black dark:text-white"
+              maxFontSizeMultiplier={1.2}
+            >
               Cancel
             </Button.Label>
           </Button>
           <Button
-            className="rounded-lg px-4"
+            className="rounded-[12px] bg-black px-4 dark:bg-[#FFFFFF]"
             size="md"
             isDisabled={!name.trim() || isCreating}
             onPress={() => void handleSubmit()}
           >
-            {isCreating ? <Spinner size="sm" /> : null}
-            <Button.Label className="text-[14px]" maxFontSizeMultiplier={1.2}>
+            {isCreating ? <Spinner size="sm" color={isDark ? '#111111' : '#FFFFFF'} /> : null}
+            <Button.Label
+              className="text-[14px] text-white dark:text-black"
+              maxFontSizeMultiplier={1.2}
+            >
               {isCreating ? 'Creating' : 'Create Project'}
             </Button.Label>
           </Button>
