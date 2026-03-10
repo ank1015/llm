@@ -1,19 +1,12 @@
 import { isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Stack } from 'expo-router';
 import { useThemeColor, useToast } from 'heroui-native';
-import { useCallback, useEffect, useState } from 'react';
-import { Image, Platform, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect } from 'react';
+import { Platform, View } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 
-import LogoDark from '../../../assets/logo-dark.png';
-import LogoLight from '../../../assets/logo-light.png';
 import { ThemeToggle } from '../../components/theme-toggle';
 import { useAppTheme } from '../../contexts/app-theme-context';
-import { COMPONENTS } from '../../helpers/data/components';
-import { useOtaUpdate } from '../../helpers/hooks/use-ota-update';
-import { useVersionCheck } from '../../helpers/hooks/use-version-check';
-
-import type { UpdateBottomSheetMode } from '../../components/bottom-sheet/update-bottom-sheet';
 
 export default function Layout() {
   const { isDark } = useAppTheme();
@@ -21,35 +14,6 @@ export default function Layout() {
 
   const reducedMotion = useReducedMotion();
   const { toast } = useToast();
-
-  // -- Update management state --
-  const [isVersionChecked, setIsVersionChecked] = useState(false);
-  const [isNewVersionAvailable, setIsNewVersionAvailable] = useState(false);
-  const [_updateSheetOpen, setUpdateSheetOpen] = useState(false);
-  const [_updateSheetMode, setUpdateSheetMode] = useState<UpdateBottomSheetMode>('new-version');
-
-  const handleVersionChecked = useCallback((isNew: boolean) => {
-    setIsVersionChecked(true);
-    setIsNewVersionAvailable(isNew);
-
-    if (isNew) {
-      setUpdateSheetMode('new-version');
-      setUpdateSheetOpen(true);
-    }
-  }, []);
-
-  const handleOtaUpdateReady = useCallback(() => {
-    setUpdateSheetMode('ota-update');
-    setUpdateSheetOpen(true);
-  }, []);
-
-  useVersionCheck({ onVersionChecked: handleVersionChecked });
-
-  useOtaUpdate({
-    isVersionChecked,
-    isNewVersionAvailable,
-    onUpdateReady: handleOtaUpdateReady,
-  });
 
   useEffect(() => {
     if (reducedMotion) {
@@ -64,13 +28,7 @@ export default function Layout() {
     }
   }, [reducedMotion, toast]);
 
-  const _renderTitle = () => {
-    return (
-      <Image source={isDark ? LogoLight : LogoDark} style={styles.logo} resizeMode="contain" />
-    );
-  };
-
-  const _renderThemeToggle = useCallback(() => <ThemeToggle />, []);
+  const renderThemeToggle = useCallback(() => <ThemeToggle />, []);
 
   return (
     <View className="flex-1 bg-background">
@@ -89,7 +47,7 @@ export default function Layout() {
           headerTitleStyle: {
             fontFamily: 'Inter_600SemiBold',
           },
-          headerRight: _renderThemeToggle,
+          headerRight: renderThemeToggle,
           headerBackButtonDisplayMode: 'generic',
           gestureEnabled: true,
           gestureDirection: 'horizontal',
@@ -99,70 +57,9 @@ export default function Layout() {
           },
         }}
       >
-        <Stack.Screen
-          name="index"
-          options={{
-            headerTitle: _renderTitle,
-          }}
-        />
-        <Stack.Screen name="app/index" options={{ headerTitle: 'App' }} />
-        <Stack.Screen name="app/[projectId]" options={{ headerTitle: 'Project' }} />
-        <Stack.Screen name="components/index" options={{ headerTitle: 'Components' }} />
-        {COMPONENTS.map((component) => (
-          <Stack.Screen
-            key={component.path}
-            name={`components/${component.path}`}
-            options={{ title: component.title }}
-          />
-        ))}
-        <Stack.Screen
-          name="components/bottom-sheet-native-modal"
-          options={{
-            title: 'Bottom Sheet Native Modal',
-            presentation: 'formSheet',
-          }}
-        />
-        <Stack.Screen
-          name="components/dialog-native-modal"
-          options={{ title: 'Dialog Native Modal', presentation: 'formSheet' }}
-        />
-        <Stack.Screen
-          name="components/popover-native-modal"
-          options={{ title: 'Popover Native Modal', presentation: 'formSheet' }}
-        />
-        <Stack.Screen
-          name="components/select-native-modal"
-          options={{ title: 'Select Native Modal', presentation: 'formSheet' }}
-        />
-        <Stack.Screen
-          name="components/toast-native-modal"
-          options={{
-            title: 'Toast From Native Modal',
-            presentation: 'formSheet',
-          }}
-        />
-        <Stack.Screen name="themes/index" options={{ headerTitle: 'Themes' }} />
-        <Stack.Screen
-          name="showcases"
-          options={{
-            headerShown: false,
-            animation: 'slide_from_bottom',
-            animationDuration: 300,
-          }}
-        />
+        <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="[projectId]" options={{ headerTitle: 'Project' }} />
       </Stack>
-      {/* <UpdateBottomSheet
-        isOpen={updateSheetOpen}
-        onOpenChange={setUpdateSheetOpen}
-        mode={updateSheetMode}
-      /> */}
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  logo: {
-    width: 80,
-    height: 24,
-  },
-});

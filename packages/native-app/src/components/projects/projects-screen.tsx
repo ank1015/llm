@@ -52,7 +52,7 @@ export function ProjectsScreen() {
 
   const handleOpenProject = (project: ProjectMetadata) => {
     router.push({
-      pathname: '/app/[projectId]',
+      pathname: '/[projectId]',
       params: {
         projectId: project.id,
       },
@@ -69,7 +69,7 @@ export function ProjectsScreen() {
     });
 
     router.push({
-      pathname: '/app/[projectId]',
+      pathname: '/[projectId]',
       params: {
         projectId: project.id,
       },
