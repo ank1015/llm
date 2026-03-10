@@ -1,11 +1,13 @@
 import Feather from '@expo/vector-icons/Feather';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { Button, Card, Spinner, cn, useThemeColor } from 'heroui-native';
 import { useCallback, useEffect, useState } from 'react';
 import { RefreshControl, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { withUniwind } from 'uniwind';
 
 import { AppText } from '@/components/app-text';
+import { ProjectScreenHeader } from '@/components/projects/project-header';
 import { ScreenScrollView } from '@/components/screen-scroll-view';
 import { useAppTheme } from '@/contexts/app-theme-context';
 import { getProjectOverview } from '@/lib/client-api';
@@ -41,6 +43,7 @@ export function ProjectOverviewScreen() {
 
   const { isDark } = useAppTheme();
   const accentColor = useThemeColor('accent');
+  const insets = useSafeAreaInsets();
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -90,11 +93,14 @@ export function ProjectOverviewScreen() {
   }, [loadOverview, resetSidebar]);
 
   return (
-    <>
-      <Stack.Screen options={{ headerTitle: projectName ?? 'Project' }} />
-
+    <View className="flex-1 bg-background">
+      <ProjectScreenHeader />
       <ScreenScrollView
         contentContainerClassName="gap-4"
+        contentContainerStyle={{
+          paddingTop: 12,
+          paddingBottom: insets.bottom + 32,
+        }}
         refreshControl={
           <RefreshControl
             colors={[accentColor]}
@@ -209,6 +215,6 @@ export function ProjectOverviewScreen() {
           </View>
         ) : null}
       </ScreenScrollView>
-    </>
+    </View>
   );
 }

@@ -1,8 +1,8 @@
-import { isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useThemeColor, useToast } from 'heroui-native';
 import { useCallback, useEffect } from 'react';
-import { Platform, View } from 'react-native';
+import { View } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 
 import { ThemeToggle } from '../../components/theme-toggle';
@@ -32,33 +32,30 @@ export default function Layout() {
 
   return (
     <View className="flex-1 bg-background">
+      <StatusBar animated style={isDark ? 'light' : 'dark'} />
       <Stack
         screenOptions={{
           headerTitleAlign: 'center',
-          headerTransparent: true,
-          headerBlurEffect: isDark ? 'dark' : 'light',
+          headerTransparent: false,
+          headerShadowVisible: false,
           headerTintColor: themeColorForeground,
           headerStyle: {
-            backgroundColor: Platform.select({
-              ios: undefined,
-              android: themeColorBackground,
-            }),
+            backgroundColor: themeColorBackground,
           },
           headerTitleStyle: {
             fontFamily: 'Inter_600SemiBold',
           },
           headerRight: renderThemeToggle,
-          headerBackButtonDisplayMode: 'generic',
           gestureEnabled: true,
           gestureDirection: 'horizontal',
-          fullScreenGestureEnabled: isLiquidGlassAvailable() ? false : true,
+          fullScreenGestureEnabled: true,
           contentStyle: {
             backgroundColor: themeColorBackground,
           },
         }}
       >
         <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen name="[projectId]" options={{ headerTitle: 'Project' }} />
+        <Stack.Screen name="[projectId]" options={{ headerShown: false }} />
       </Stack>
     </View>
   );
