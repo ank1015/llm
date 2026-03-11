@@ -16,14 +16,13 @@ import { ProjectPromptInputShell } from './project-prompt-input-shell';
 import { ProjectPromptMentionList } from './project-prompt-mention-list';
 
 import type { ProjectFileIndexEntry } from '@/lib/client-api';
-import type { SessionRef } from '@/lib/contracts';
+import type { ReasoningLevel, SessionRef } from '@/lib/contracts';
 import type {
   LayoutChangeEvent,
   NativeSyntheticEvent,
   TextInput,
   TextInputSelectionChangeEventData,
 } from 'react-native';
-
 
 import { generateSessionName } from '@/lib/client-api';
 import {
@@ -40,7 +39,6 @@ import {
   getSelectedChatModel,
 } from '@/stores/chat-settings-store';
 import { appLayout, appSpacing } from '@/styles/ui';
-
 
 const MENTION_SEARCH_LIMIT = 80;
 const MENTION_DROPDOWN_LIMIT = 20;
@@ -119,8 +117,8 @@ export function ProjectPromptComposer({
   const selectedApi = useChatSettingsStore((state) => state.api);
   const selectedModelId = useChatSettingsStore((state) => state.modelId);
   const selectedReasoning = useChatSettingsStore((state) => state.reasoning);
-  const _setSelectedModel = useChatSettingsStore((state) => state.setModel);
-  const _setSelectedReasoning = useChatSettingsStore((state) => state.setReasoning);
+  const setSelectedModel = useChatSettingsStore((state) => state.setModel);
+  const setSelectedReasoning = useChatSettingsStore((state) => state.setReasoning);
 
   const loadProjectFileIndex = useArtifactFilesStore((state) => state.loadProjectFileIndex);
   const searchProjectFiles = useArtifactFilesStore((state) => state.searchProjectFiles);
@@ -136,14 +134,14 @@ export function ProjectPromptComposer({
   }>();
 
   const input = currentSession ? composerInput : localInput;
-  const _isEditing = currentSession !== null && editState !== null;
+  const isEditing = currentSession !== null && editState !== null;
   const dockBottomPadding = Math.max(insets.bottom - appSpacing.xs, appSpacing.xxs);
 
-  const _selectedModel = getSelectedChatModel({
+  const selectedModel = getSelectedChatModel({
     api: selectedApi,
     modelId: selectedModelId,
   });
-  const _modelOptions = CHAT_MODEL_OPTIONS.map((option) => ({
+  const modelOptions = CHAT_MODEL_OPTIONS.map((option) => ({
     value: option.modelId,
     label: option.label,
   }));
@@ -151,7 +149,7 @@ export function ProjectPromptComposer({
     api: selectedApi,
     modelId: selectedModelId,
   });
-  const _selectedReasoningLabel =
+  const selectedReasoningLabel =
     reasoningOptions.find((option) => option.value === selectedReasoning)?.label ?? 'High';
 
   const ctx = useMemo(
@@ -309,7 +307,7 @@ export function ProjectPromptComposer({
     });
   };
 
-  const _handleSubmit = async () => {
+  const handleSubmit = async () => {
     const trimmed = input.trim();
     if (trimmed.length === 0 || isStreaming) {
       return;
@@ -436,7 +434,7 @@ export function ProjectPromptComposer({
     }
   };
 
-  const _handleStop = () => {
+  const handleStop = () => {
     if (!currentSession) {
       return;
     }
@@ -458,7 +456,7 @@ export function ProjectPromptComposer({
     });
   };
 
-  const _handleCancelEdit = () => {
+  const handleCancelEdit = () => {
     if (!currentSession || isStreaming) {
       return;
     }
@@ -528,10 +526,26 @@ export function ProjectPromptComposer({
 
         <ProjectPromptInputShell
           inputRef={inputRef}
+          isEditing={isEditing}
+          isStreaming={isStreaming}
+          isSubmitDisabled={input.trim().length === 0}
+          modelLabel={selectedModel.label}
+          modelOptions={modelOptions}
+          modelValue={selectedModel.modelId}
+          onCancelEdit={handleCancelEdit}
           onChangeText={handleInputChange}
+          onModelChange={setSelectedModel}
           onSelectionChange={handleSelectionChange}
+          onStop={handleStop}
+          onSubmit={handleSubmit}
+          onThinkingChange={(value) => {
+            setSelectedReasoning(value as ReasoningLevel);
+          }}
           placeholder={artifactName ? `Message ${artifactName}` : 'Message artifact'}
           selection={pendingSelection}
+          thinkingLabel={selectedReasoningLabel}
+          thinkingOptions={reasoningOptions}
+          thinkingValue={selectedReasoning}
           value={input}
         />
       </View>

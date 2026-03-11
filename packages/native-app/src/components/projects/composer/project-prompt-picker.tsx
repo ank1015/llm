@@ -39,9 +39,13 @@ export function ProjectPromptPicker({
           accessibilityLabel={label}
           android_ripple={{ color: 'transparent' }}
           className={appLayout.composerPickerTrigger}
-          style={{ borderCurve: 'continuous' }}
+          style={{ borderCurve: 'continuous', minWidth: 56 }}
         >
-          <AppText className={appTypography.composerPickerLabel} numberOfLines={1}>
+          <AppText
+            className={appTypography.composerPickerLabel}
+            numberOfLines={1}
+            style={{ flexShrink: 1 }}
+          >
             {valueLabel}
           </AppText>
           <StyledFeather
