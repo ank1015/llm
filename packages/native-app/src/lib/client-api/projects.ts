@@ -6,6 +6,7 @@ export type ProjectMetadata = {
   id: string;
   name: string;
   description?: string;
+  projectImg?: string | null;
   createdAt: string;
   updatedAt: string | null;
 };

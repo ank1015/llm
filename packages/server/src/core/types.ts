@@ -13,6 +13,8 @@ export interface ProjectMetadata {
   name: string;
   /** Optional description of the project */
   description: string | null;
+  /** Optional project image URL */
+  projectImg: string | null;
   /** Absolute path to the actual project directory (~/projects/{id}) */
   projectPath: string;
   /** ISO 8601 timestamp of creation */
@@ -35,6 +37,7 @@ export interface ArtifactDirMetadata {
 export interface CreateProjectInput {
   name: string;
   description?: string;
+  projectImg?: string;
 }
 
 /** Input for creating a new artifact directory */

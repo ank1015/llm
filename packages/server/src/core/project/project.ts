@@ -12,6 +12,11 @@ import {
 
 import type { ProjectMetadata, CreateProjectInput } from '../types.js';
 
+type StoredProjectMetadata = Omit<ProjectMetadata, 'description' | 'projectImg'> & {
+  description?: string | null;
+  projectImg?: string | null;
+};
+
 /**
  * Manages a single project.
  *
@@ -52,6 +57,7 @@ export class Project {
         id,
         name: input.name,
         description: input.description ?? null,
+        projectImg: input.projectImg ?? null,
         projectPath,
         createdAt: new Date().toISOString(),
       };
@@ -73,7 +79,7 @@ export class Project {
 
     for (const dir of dirs) {
       try {
-        const metadata = await readMetadata<ProjectMetadata>(join(dataRoot, dir));
+        const metadata = await readProjectMetadata(join(dataRoot, dir));
         projects.push(metadata);
       } catch {
         // Skip directories without valid metadata
@@ -92,13 +98,36 @@ export class Project {
       throw new Error(`Project "${projectId}" not found`);
     }
 
-    const metadata = await readMetadata<ProjectMetadata>(dataPath);
+    const metadata = await readProjectMetadata(dataPath);
     return new Project(metadata.projectPath, dataPath);
+  }
+
+  /** Load an existing project by its human-readable name. */
+  static async getByName(projectName: string): Promise<Project> {
+    const projectId = slugify(projectName);
+
+    if (!projectId) {
+      throw new Error(`Project "${projectName}" not found`);
+    }
+
+    return Project.getById(projectId);
   }
 
   /** Read this project's metadata */
   async getMetadata(): Promise<ProjectMetadata> {
-    return readMetadata<ProjectMetadata>(this.dataPath);
+    return readProjectMetadata(this.dataPath);
+  }
+
+  /** Update this project's image URL. */
+  async updateProjectImg(projectImg: string | null): Promise<ProjectMetadata> {
+    const metadata = await this.getMetadata();
+    const nextMetadata: ProjectMetadata = {
+      ...metadata,
+      projectImg: projectImg ?? null,
+    };
+
+    await writeMetadata(this.dataPath, nextMetadata);
+    return nextMetadata;
   }
 
   /** Check if both project directory and metadata directory exist */
@@ -129,4 +158,13 @@ function slugify(name: string): string {
     .trim()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
+}
+
+async function readProjectMetadata(dirPath: string): Promise<ProjectMetadata> {
+  const metadata = await readMetadata<StoredProjectMetadata>(dirPath);
+  return {
+    ...metadata,
+    description: metadata.description ?? null,
+    projectImg: metadata.projectImg ?? null,
+  };
 }

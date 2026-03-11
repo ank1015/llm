@@ -35,6 +35,14 @@ function post(path: string, body: unknown) {
   });
 }
 
+function patch(path: string, body: unknown) {
+  return app.request(path, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
 function get(path: string) {
   return app.request(path);
 }
@@ -46,13 +54,18 @@ function del(path: string) {
 describe('Project Routes', () => {
   describe('POST /api/projects', () => {
     it('should create a project and return 201', async () => {
-      const res = await post('/api/projects', { name: 'My Project', description: 'A test' });
+      const res = await post('/api/projects', {
+        name: 'My Project',
+        description: 'A test',
+        projectImg: 'https://example.com/project.png',
+      });
 
       expect(res.status).toBe(201);
       const body = await res.json();
       expect(body.id).toBe('my-project');
       expect(body.name).toBe('My Project');
       expect(body.description).toBe('A test');
+      expect(body.projectImg).toBe('https://example.com/project.png');
       expect(body.projectPath).toBeDefined();
       expect(body.createdAt).toBeDefined();
       expect(await pathExists(join(projectsRoot, 'my-project', '.max'))).toBe(false);
@@ -86,7 +99,7 @@ describe('Project Routes', () => {
     });
 
     it('should return all projects', async () => {
-      await post('/api/projects', { name: 'Alpha' });
+      await post('/api/projects', { name: 'Alpha', projectImg: 'https://example.com/alpha.png' });
       await post('/api/projects', { name: 'Beta' });
 
       const res = await get('/api/projects');
@@ -94,6 +107,76 @@ describe('Project Routes', () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body).toHaveLength(2);
+      expect(body).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: 'alpha',
+            projectImg: 'https://example.com/alpha.png',
+          }),
+          expect.objectContaining({
+            id: 'beta',
+            projectImg: null,
+          }),
+        ])
+      );
+    });
+  });
+
+  describe('PATCH /api/projects/project-img', () => {
+    it('should update projectImg using the project name', async () => {
+      await post('/api/projects', { name: 'Image Project' });
+
+      const res = await patch('/api/projects/project-img', {
+        projectName: 'Image Project',
+        projectImg: 'https://example.com/image-project.png',
+      });
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.id).toBe('image-project');
+      expect(body.projectImg).toBe('https://example.com/image-project.png');
+
+      const listRes = await get('/api/projects');
+      const projects = await listRes.json();
+      expect(projects).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: 'image-project',
+            projectImg: 'https://example.com/image-project.png',
+          }),
+        ])
+      );
+    });
+
+    it('should return 400 when projectName is missing', async () => {
+      const res = await patch('/api/projects/project-img', {
+        projectImg: 'https://example.com/project.png',
+      });
+
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toBe('projectName is required');
+    });
+
+    it('should return 400 when projectImg is missing', async () => {
+      const res = await patch('/api/projects/project-img', {
+        projectName: 'Image Project',
+      });
+
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toBe('projectImg is required');
+    });
+
+    it('should return 404 when the project does not exist', async () => {
+      const res = await patch('/api/projects/project-img', {
+        projectName: 'Missing Project',
+        projectImg: 'https://example.com/project.png',
+      });
+
+      expect(res.status).toBe(404);
+      const body = await res.json();
+      expect(body.error).toContain('not found');
     });
   });
 

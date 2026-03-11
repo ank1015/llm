@@ -42,12 +42,17 @@ describe('Project', () => {
     });
 
     it('should write metadata.json in data directory', async () => {
-      const project = await Project.create({ name: 'My Project', description: 'Test desc' });
+      const project = await Project.create({
+        name: 'My Project',
+        description: 'Test desc',
+        projectImg: 'https://example.com/project.png',
+      });
       const metadata = await readMetadata<ProjectMetadata>(project.dataPath);
 
       expect(metadata.id).toBe('my-project');
       expect(metadata.name).toBe('My Project');
       expect(metadata.description).toBe('Test desc');
+      expect(metadata.projectImg).toBe('https://example.com/project.png');
       expect(metadata.projectPath).toBe(project.projectPath);
       expect(metadata.createdAt).toBeDefined();
     });
@@ -64,6 +69,7 @@ describe('Project', () => {
       const metadata = await project.getMetadata();
 
       expect(metadata.description).toBeNull();
+      expect(metadata.projectImg).toBeNull();
     });
 
     it('should throw if project already exists', async () => {
@@ -105,6 +111,16 @@ describe('Project', () => {
     });
   });
 
+  describe('getByName', () => {
+    it('should load project by name', async () => {
+      await Project.create({ name: 'Load By Name' });
+      const loaded = await Project.getByName('Load By Name');
+
+      expect(loaded.projectPath).toBe(join(projectsRoot, 'load-by-name'));
+      expect(loaded.dataPath).toBe(join(dataRoot, 'load-by-name'));
+    });
+  });
+
   describe('getMetadata', () => {
     it('should return project metadata', async () => {
       const project = await Project.create({ name: 'Meta Test', description: 'desc' });
@@ -126,6 +142,18 @@ describe('Project', () => {
       const project = await Project.create({ name: 'To Delete' });
       await project.delete();
       expect(await project.exists()).toBe(false);
+    });
+  });
+
+  describe('updateProjectImg', () => {
+    it('should persist the updated project image URL', async () => {
+      const project = await Project.create({ name: 'Image Me' });
+      const metadata = await project.updateProjectImg('https://example.com/updated.png');
+
+      expect(metadata.projectImg).toBe('https://example.com/updated.png');
+      await expect(project.getMetadata()).resolves.toMatchObject({
+        projectImg: 'https://example.com/updated.png',
+      });
     });
   });
 

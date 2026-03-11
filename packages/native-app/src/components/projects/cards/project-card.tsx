@@ -44,6 +44,10 @@ function getProjectDescription(project: ProjectMetadata): string {
 
 export function ProjectCard({ index, onOpenPress, onLongPress, project }: ProjectCardProps) {
   const mockImageUri = mockProjectImages[index % mockProjectImages.length];
+  const projectImageUri =
+    typeof project.projectImg === 'string' && project.projectImg.trim().length > 0
+      ? project.projectImg
+      : mockImageUri;
 
   return (
     <AnimatedPressable
@@ -56,7 +60,7 @@ export function ProjectCard({ index, onOpenPress, onLongPress, project }: Projec
     >
       <Card className="w-full flex-row items-start gap-4 p-4" variant="tertiary">
         <StyledImage
-          source={{ uri: mockImageUri }}
+          source={{ uri: projectImageUri }}
           className="h-24 w-24 rounded-2xl"
           resizeMode="cover"
         />

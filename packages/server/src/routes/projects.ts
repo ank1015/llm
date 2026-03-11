@@ -10,7 +10,7 @@ const MAX_FILE_INDEX_LIMIT = 10000;
 
 /** POST /api/projects — Create a new project */
 projectRoutes.post('/projects', async (c) => {
-  const body = await c.req.json<{ name: string; description?: string }>();
+  const body = await c.req.json<{ name: string; description?: string; projectImg?: string }>();
 
   if (!body.name) {
     return c.json({ error: 'name is required' }, 400);
@@ -30,6 +30,28 @@ projectRoutes.post('/projects', async (c) => {
 projectRoutes.get('/projects', async (c) => {
   const projects = await Project.list();
   return c.json(projects);
+});
+
+/** PATCH /api/projects/project-img — Set a project's image URL using the project name */
+projectRoutes.patch('/projects/project-img', async (c) => {
+  const body = await c.req.json<{ projectName?: string; projectImg?: string }>();
+
+  if (!body.projectName) {
+    return c.json({ error: 'projectName is required' }, 400);
+  }
+
+  if (!body.projectImg) {
+    return c.json({ error: 'projectImg is required' }, 400);
+  }
+
+  try {
+    const project = await Project.getByName(body.projectName);
+    const metadata = await project.updateProjectImg(body.projectImg);
+    return c.json(metadata);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Failed to update project image';
+    return c.json({ error: message }, message.includes('not found') ? 404 : 500);
+  }
 });
 
 /** GET /api/projects/:projectId — Get a single project */
