@@ -22,6 +22,7 @@ export {
   deleteArtifactDir,
   deleteProject,
   getArtifactExplorer,
+  getArtifactFileBaseUrl,
   getArtifactFile,
   getArtifactRawFileUrl,
   getProjectFileIndex,

@@ -1,73 +1,30 @@
 import Feather from '@expo/vector-icons/Feather';
 import { FlashList } from '@shopify/flash-list';
-import { Image } from 'expo-image';
 import { Button, Spinner, useThemeColor } from 'heroui-native';
 import { useEffect, useState } from 'react';
-import {
-  Linking,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  View,
-  useWindowDimensions,
-} from 'react-native';
+import { Pressable, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { withUniwind } from 'uniwind';
 
-import type { ArtifactExplorerEntry, ArtifactFileResult } from '@/lib/client-api';
+import type { ArtifactExplorerEntry } from '@/lib/client-api';
 
 import { AppText } from '@/components/app-text';
-import { ArtifactMarkdownPreview } from '@/components/projects/artifacts/artifact-markdown-preview';
-import { ThreadCodeBlock } from '@/components/projects/thread/thread-code-block';
-import { getArtifactRawFileUrl } from '@/lib/client-api';
+import { ArtifactFileViewer } from '@/components/projects/artifacts/artifact-file-viewer';
+import {
+  getPathExtension,
+  getViewerKind,
+  normalizeRelativePath,
+} from '@/components/projects/artifacts/artifact-file-viewer-shared';
 import { cn } from '@/lib/utils';
 import { useArtifactFilesStore, useSidebarStore } from '@/stores';
 import { appColors, appListStyles, appSizes, appSpacing, appTypography } from '@/styles/ui';
 
 const StyledFeather = withUniwind(Feather);
 
-const MARKDOWN_EXTENSIONS = new Set(['markdown', 'md', 'mdown', 'mdx']);
-const IMAGE_EXTENSIONS = new Set([
-  'apng',
-  'avif',
-  'bmp',
-  'gif',
-  'heic',
-  'heif',
-  'ico',
-  'jpeg',
-  'jpg',
-  'png',
-  'svg',
-  'tif',
-  'tiff',
-  'webp',
-]);
-const UNSUPPORTED_EXTENSIONS = new Set([
-  '3gp',
-  'aac',
-  'avi',
-  'flac',
-  'm4a',
-  'mkv',
-  'mov',
-  'mp3',
-  'mp4',
-  'mpeg',
-  'mpg',
-  'ogg',
-  'ogv',
-  'pdf',
-  'wav',
-  'webm',
-]);
-
 type ProjectArtifactExplorerProps = {
   artifactId: string;
   projectId: string;
 };
-
-type ViewerKind = 'image' | 'markdown' | 'text' | 'unsupported';
 
 type BreadcrumbItem = {
   label: string;
@@ -85,125 +42,12 @@ function getArtifactKey(projectId: string, artifactId: string): string {
   return `${projectId}::${artifactId}`;
 }
 
-function normalizeRelativePath(path: string): string {
-  return path
-    .replace(/\\/g, '/')
-    .replace(/^\/+|\/+$/g, '')
-    .trim();
-}
-
 function getDirectoryRequestKey(artifactKey: string, path: string): string {
   return `${artifactKey}::dir::${path}`;
 }
 
 function getFileRequestKey(artifactKey: string, path: string): string {
   return `${artifactKey}::file::${path}`;
-}
-
-function getPathBasename(path: string): string {
-  const safePath = normalizeRelativePath(path);
-  const lastSlashIndex = safePath.lastIndexOf('/');
-
-  if (lastSlashIndex === -1) {
-    return safePath;
-  }
-
-  return safePath.slice(lastSlashIndex + 1);
-}
-
-function getPathExtension(path: string): string {
-  const basename = getPathBasename(path);
-  const lastDotIndex = basename.lastIndexOf('.');
-
-  if (lastDotIndex <= 0) {
-    return '';
-  }
-
-  return basename.slice(lastDotIndex + 1).toLowerCase();
-}
-
-function getViewerKind(path: string, isBinary: boolean): ViewerKind {
-  const extension = getPathExtension(path);
-
-  if (MARKDOWN_EXTENSIONS.has(extension)) {
-    return 'markdown';
-  }
-
-  if (IMAGE_EXTENSIONS.has(extension)) {
-    return 'image';
-  }
-
-  if (UNSUPPORTED_EXTENSIONS.has(extension)) {
-    return 'unsupported';
-  }
-
-  return isBinary ? 'unsupported' : 'text';
-}
-
-function getFileLanguage(path: string): string {
-  const extension = getPathExtension(path);
-
-  if (!extension) {
-    return 'plaintext';
-  }
-
-  switch (extension) {
-    case 'js':
-    case 'jsx':
-    case 'mjs':
-    case 'cjs':
-      return 'javascript';
-    case 'ts':
-    case 'tsx':
-    case 'mts':
-    case 'cts':
-      return 'typescript';
-    case 'md':
-    case 'markdown':
-    case 'mdx':
-      return 'markdown';
-    case 'json':
-      return 'json';
-    case 'yml':
-      return 'yaml';
-    case 'sh':
-      return 'bash';
-    default:
-      return extension;
-  }
-}
-
-function formatFileSize(size: number | null | undefined): string {
-  if (typeof size !== 'number' || !Number.isFinite(size) || size < 0) {
-    return 'Unknown size';
-  }
-
-  if (size < 1024) {
-    return `${size} B`;
-  }
-
-  if (size < 1024 * 1024) {
-    return `${(size / 1024).toFixed(size < 10 * 1024 ? 1 : 0)} KB`;
-  }
-
-  return `${(size / (1024 * 1024)).toFixed(size < 10 * 1024 * 1024 ? 1 : 0)} MB`;
-}
-
-function formatUpdatedAt(value: string | null | undefined): string {
-  if (!value) {
-    return 'Unknown date';
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return 'Unknown date';
-  }
-
-  return date.toLocaleDateString(undefined, {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
 }
 
 function buildBreadcrumbs(rootLabel: string, path: string): BreadcrumbItem[] {
@@ -308,22 +152,14 @@ function getEntryIcon(entry: ArtifactExplorerEntry): keyof typeof Feather.glyphM
   }
 
   const extension = getPathExtension(entry.path);
-  if (MARKDOWN_EXTENSIONS.has(extension)) {
+  if (extension === 'md' || extension === 'markdown' || extension === 'mdx') {
     return 'file-text';
   }
-  if (IMAGE_EXTENSIONS.has(extension)) {
+  if (getViewerKind(entry.path, false) === 'image') {
     return 'image';
   }
 
   return 'file';
-}
-
-function FileMetadataChip({ label }: { label: string }) {
-  return (
-    <View className="rounded-full bg-foreground/5 px-3 py-1.5">
-      <AppText className="text-[12px] font-medium text-foreground">{label}</AppText>
-    </View>
-  );
 }
 
 export function ProjectArtifactExplorer({ artifactId, projectId }: ProjectArtifactExplorerProps) {
@@ -368,10 +204,9 @@ export function ProjectArtifactExplorer({ artifactId, projectId }: ProjectArtifa
   const directoryError = directoryErrorByKey[directoryRequestKey] ?? null;
   const fileError = fileRequestKey ? (fileErrorByKey[fileRequestKey] ?? null) : null;
   const navigationHistory = navigationHistoryByArtifact[artifactKey] ?? null;
-  const fileViewerKind = selectedFilePath
-    ? getViewerKind(selectedFilePath, selectedFile?.isBinary ?? false)
+  const fileViewerKind = selectedFile
+    ? getViewerKind(selectedFile.path, selectedFile.isBinary)
     : null;
-  const imagePreviewHeight = Math.min(Math.max(width - appSpacing.xl * 2, 220), 360);
   const navigationPath = selectedFilePath ?? currentDirectoryPath;
   const breadcrumbItems = buildBreadcrumbs(rootLabel, navigationPath);
   const breadcrumbAvailableWidth = Math.max(
@@ -484,14 +319,6 @@ export function ProjectArtifactExplorer({ artifactId, projectId }: ProjectArtifa
     }
 
     void loadDirectory(artifactCtx, nextLocation.directoryPath).catch(() => undefined);
-  };
-
-  const handleOpenExternal = (filePath: string) => {
-    if (!artifactId) {
-      return;
-    }
-
-    void Linking.openURL(getArtifactRawFileUrl(artifactCtx, { path: filePath }));
   };
 
   const renderDirectoryEmptyState = () => {
@@ -690,10 +517,6 @@ export function ProjectArtifactExplorer({ artifactId, projectId }: ProjectArtifa
     </View>
   );
 
-  const renderTextPreview = (file: ArtifactFileResult) => (
-    <ThreadCodeBlock code={file.content} compact={false} language={getFileLanguage(file.path)} />
-  );
-
   const renderFilePreview = () => {
     if (selectedFilePath && isFileLoading && !selectedFile) {
       return (
@@ -729,74 +552,13 @@ export function ProjectArtifactExplorer({ artifactId, projectId }: ProjectArtifa
       return null;
     }
 
-    switch (fileViewerKind) {
-      case 'markdown':
-        return (
-          <View
-            className="rounded-[26px] border border-foreground/10 bg-default px-4 py-4"
-            style={{ borderCurve: 'continuous' }}
-          >
-            <ArtifactMarkdownPreview artifactCtx={artifactCtx} filePath={selectedFile.path}>
-              {selectedFile.content}
-            </ArtifactMarkdownPreview>
-          </View>
-        );
-      case 'image':
-        return (
-          <View
-            className="overflow-hidden rounded-[26px] border border-foreground/10 bg-default"
-            style={{ borderCurve: 'continuous' }}
-          >
-            <Image
-              accessibilityLabel={getPathBasename(selectedFile.path)}
-              contentFit="contain"
-              source={{ uri: getArtifactRawFileUrl(artifactCtx, { path: selectedFile.path }) }}
-              style={{ height: imagePreviewHeight, width: '100%' }}
-            />
-          </View>
-        );
-      case 'unsupported':
-        return (
-          <View
-            className="gap-4 rounded-[26px] border border-foreground/10 bg-default px-4 py-4"
-            style={{ borderCurve: 'continuous' }}
-          >
-            <View className="flex-row items-start gap-3">
-              <View className="size-10 items-center justify-center rounded-full bg-foreground/5">
-                <StyledFeather
-                  className={appColors.foregroundMuted}
-                  name="file"
-                  size={appSizes.iconMd}
-                />
-              </View>
-              <View className="flex-1 gap-1">
-                <AppText className="text-[16px] font-semibold text-foreground">
-                  Preview not available on mobile
-                </AppText>
-                <AppText className={appTypography.body}>
-                  This file type isn&apos;t rendered inline yet. You can still open the raw file
-                  externally.
-                </AppText>
-              </View>
-            </View>
-            <View className="flex-row flex-wrap gap-2">
-              <FileMetadataChip label={formatFileSize(selectedFile.size)} />
-              <FileMetadataChip label={formatUpdatedAt(selectedFile.updatedAt)} />
-              <FileMetadataChip label={getPathExtension(selectedFile.path) || 'binary'} />
-            </View>
-            <Button
-              className="self-start"
-              variant="secondary"
-              onPress={() => handleOpenExternal(selectedFile.path)}
-            >
-              <Button.Label>Open externally</Button.Label>
-            </Button>
-          </View>
-        );
-      case 'text':
-      default:
-        return renderTextPreview(selectedFile);
-    }
+    return (
+      <ArtifactFileViewer
+        artifactCtx={artifactCtx}
+        file={selectedFile}
+        viewerKind={fileViewerKind ?? 'text'}
+      />
+    );
   };
 
   if (!artifactId) {
@@ -814,48 +576,12 @@ export function ProjectArtifactExplorer({ artifactId, projectId }: ProjectArtifa
       {selectedFilePath ? (
         <View className="flex-1 gap-3">
           {renderNavigationRow()}
-
-          <ScrollView
-            className="flex-1"
-            contentContainerStyle={{
-              gap: appSpacing.md,
-              paddingBottom: insets.bottom + appSpacing.sm,
-            }}
-            keyboardShouldPersistTaps="handled"
-            refreshControl={
-              <RefreshControl
-                colors={[foregroundColor]}
-                onRefresh={() => void handleRefresh()}
-                refreshing={isRefreshing}
-                tintColor={foregroundColor}
-              />
-            }
-            showsVerticalScrollIndicator={false}
+          <View
+            className="min-h-0 flex-1 overflow-hidden"
+            style={{ marginBottom: insets.bottom + appSpacing.sm }}
           >
-            {selectedFile?.truncated ? (
-              <View
-                className="flex-row items-start gap-3 rounded-[22px] border border-amber-500/20 bg-amber-500/10 px-4 py-3"
-                style={{ borderCurve: 'continuous' }}
-              >
-                <StyledFeather
-                  className="mt-0.5 text-amber-600"
-                  name="alert-triangle"
-                  size={appSizes.iconSm}
-                />
-                <View className="flex-1 gap-1">
-                  <AppText className="text-[14px] font-semibold text-foreground">
-                    Preview truncated
-                  </AppText>
-                  <AppText className="text-[13px] leading-5 text-muted">
-                    Only part of this file is loaded on mobile. Open the raw file externally if you
-                    need the full contents.
-                  </AppText>
-                </View>
-              </View>
-            ) : null}
-
             {renderFilePreview()}
-          </ScrollView>
+          </View>
         </View>
       ) : (
         renderDirectoryView()

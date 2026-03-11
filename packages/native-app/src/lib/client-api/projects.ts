@@ -183,6 +183,10 @@ function buildArtifactBase(ctx: ArtifactContext): string {
   return `${PROJECTS_BASE}/${encodeURIComponent(ctx.projectId)}/artifacts/${encodeURIComponent(ctx.artifactId)}`;
 }
 
+export function getArtifactFileBaseUrl(ctx: ArtifactContext): string {
+  return `${buildArtifactBase(ctx)}/file/raw`;
+}
+
 export async function listInstalledArtifactSkills(
   ctx: ArtifactContext
 ): Promise<InstalledArtifactSkill[]> {
@@ -234,7 +238,7 @@ export async function getArtifactFile(
 
 export function getArtifactRawFileUrl(ctx: ArtifactContext, input: { path: string }): string {
   const params = new URLSearchParams({ path: input.path });
-  return `${buildArtifactBase(ctx)}/file/raw?${params.toString()}`;
+  return `${getArtifactFileBaseUrl(ctx)}?${params.toString()}`;
 }
 
 export async function renameArtifactPath(
