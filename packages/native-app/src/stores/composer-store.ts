@@ -27,6 +27,7 @@ type ComposerStoreState = {
   attachmentsBySession: Record<string, Attachment[]>;
   isDirtyBySession: Record<string, boolean>;
   editStateBySession: Record<string, ComposerEditState | null>;
+  focusRequestTokenBySession: Record<string, number>;
   setActiveSession: (session: SessionRef | null) => void;
   setDraft: (input: { session?: SessionRef; draft: string }) => void;
   appendToDraft: (input: { session?: SessionRef; text: string }) => void;
@@ -38,6 +39,7 @@ type ComposerStoreState = {
   markSubmitted: (session?: SessionRef) => void;
   getSnapshot: (session?: SessionRef) => ComposerSnapshot;
   beginEdit: (input: { session?: SessionRef; targetNodeId: string; originalText: string }) => void;
+  requestFocus: (session?: SessionRef) => void;
   cancelEdit: (session?: SessionRef) => void;
   clearEditState: (session?: SessionRef) => void;
   resetSessionComposer: (session: SessionRef) => void;
@@ -50,6 +52,7 @@ const initialState = {
   attachmentsBySession: {} as Record<string, Attachment[]>,
   isDirtyBySession: {} as Record<string, boolean>,
   editStateBySession: {} as Record<string, ComposerEditState | null>,
+  focusRequestTokenBySession: {} as Record<string, number>,
 };
 
 function getSessionKey(session: SessionRef): string {
@@ -109,6 +112,10 @@ export const useComposerStore = create<ComposerStoreState>()(
           editStateBySession: {
             ...state.editStateBySession,
             [key]: state.editStateBySession[key] ?? null,
+          },
+          focusRequestTokenBySession: {
+            ...state.focusRequestTokenBySession,
+            [key]: state.focusRequestTokenBySession[key] ?? 0,
           },
         }));
       },
@@ -358,6 +365,22 @@ export const useComposerStore = create<ComposerStoreState>()(
         });
       },
 
+      requestFocus: (session) => {
+        const resolvedSession = resolveSessionRef(session, get().activeSession);
+        if (!resolvedSession) {
+          return;
+        }
+
+        const key = getSessionKey(resolvedSession);
+
+        set((state) => ({
+          focusRequestTokenBySession: {
+            ...state.focusRequestTokenBySession,
+            [key]: (state.focusRequestTokenBySession[key] ?? 0) + 1,
+          },
+        }));
+      },
+
       cancelEdit: (session) => {
         const resolvedSession = resolveSessionRef(session, get().activeSession);
         if (!resolvedSession) {
@@ -406,6 +429,10 @@ export const useComposerStore = create<ComposerStoreState>()(
             ...state.editStateBySession,
             [key]: null,
           },
+          focusRequestTokenBySession: {
+            ...state.focusRequestTokenBySession,
+            [key]: state.focusRequestTokenBySession[key] ?? 0,
+          },
         }));
       },
 
@@ -428,6 +455,10 @@ export const useComposerStore = create<ComposerStoreState>()(
           editStateBySession: {
             ...state.editStateBySession,
             [key]: null,
+          },
+          focusRequestTokenBySession: {
+            ...state.focusRequestTokenBySession,
+            [key]: 0,
           },
         }));
       },

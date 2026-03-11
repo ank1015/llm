@@ -81,7 +81,10 @@ export function ProjectPromptComposer({
   const mentionRequestIdRef = useRef(0);
   const previousThreadIdRef = useRef<string | undefined>(undefined);
   const selectionRef = useRef({ start: 0, end: 0 });
-  const currentSession: SessionRef | null = threadId ? { sessionId: threadId } : null;
+  const currentSession = useMemo<SessionRef | null>(
+    () => (threadId ? { sessionId: threadId } : null),
+    [threadId]
+  );
 
   const artifactName = useSidebarStore(
     (state) => state.artifactDirs.find((entry) => entry.id === artifactId)?.name ?? null
@@ -89,6 +92,9 @@ export function ProjectPromptComposer({
 
   const composerInput = useComposerStore((state) =>
     threadId ? (state.draftsBySession[threadId] ?? '') : ''
+  );
+  const focusRequestToken = useComposerStore((state) =>
+    threadId ? (state.focusRequestTokenBySession[threadId] ?? 0) : 0
   );
   const editState = useComposerStore((state) =>
     threadId ? (state.editStateBySession[threadId] ?? null) : null
@@ -173,6 +179,23 @@ export function ProjectPromptComposer({
       onHeightChange(0);
     }
   }, [onHeightChange, visible]);
+
+  useEffect(() => {
+    if (!visible || !currentSession || focusRequestToken === 0) {
+      return;
+    }
+
+    const nextSelection = {
+      start: input.length,
+      end: input.length,
+    };
+    selectionRef.current = nextSelection;
+    setPendingSelection(nextSelection);
+
+    requestAnimationFrame(() => {
+      inputRef.current?.focus();
+    });
+  }, [currentSession, focusRequestToken, input.length, visible]);
 
   useEffect(() => {
     if (!threadId) {
@@ -305,6 +328,7 @@ export function ProjectPromptComposer({
     });
   };
 
+  // eslint-disable-next-line sonarjs/cognitive-complexity
   const handleSubmit = async () => {
     const trimmed = input.trim();
     if (trimmed.length === 0 || isStreaming) {
