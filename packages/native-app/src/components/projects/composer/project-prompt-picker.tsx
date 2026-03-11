@@ -17,6 +17,7 @@ type PickerOption = {
 
 type ProjectPromptPickerProps = {
   label: string;
+  onTriggerPress?: () => void;
   onValueChange: (value: string) => void;
   options: readonly PickerOption[];
   value: string;
@@ -25,6 +26,7 @@ type ProjectPromptPickerProps = {
 
 export function ProjectPromptPicker({
   label,
+  onTriggerPress,
   onValueChange,
   options,
   value,
@@ -34,7 +36,7 @@ export function ProjectPromptPicker({
 
   return (
     <Menu presentation="bottom-sheet">
-      <Menu.Trigger asChild>
+      <Menu.Trigger asChild onPress={onTriggerPress}>
         <Pressable
           accessibilityLabel={label}
           android_ripple={{ color: 'transparent' }}

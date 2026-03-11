@@ -2,8 +2,7 @@ import { useRouter } from 'expo-router';
 import { useToast } from 'heroui-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
-import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
-import Animated, { useAnimatedStyle } from 'react-native-reanimated';
+import { KeyboardStickyView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
@@ -78,7 +77,6 @@ export function ProjectPromptComposer({
   const router = useRouter();
   const { toast } = useToast();
   const insets = useSafeAreaInsets();
-  const { height, progress } = useReanimatedKeyboardAnimation();
   const inputRef = useRef<TextInput>(null);
   const mentionRequestIdRef = useRef(0);
   const previousThreadIdRef = useRef<string | undefined>(undefined);
@@ -473,35 +471,24 @@ export function ProjectPromptComposer({
     onHeightChange(Math.ceil(event.nativeEvent.layout.height));
   };
 
-  const animatedDockStyle = useAnimatedStyle(() => {
-    const keyboardProgress = typeof progress.get === 'function' ? progress.get() : progress.value;
-    const keyboardHeight = typeof height.get === 'function' ? height.get() : height.value;
-
-    return {
-      paddingBottom: dockBottomPadding - (dockBottomPadding - appSpacing.xxs) * keyboardProgress,
-      transform: [
-        {
-          translateY: -keyboardHeight,
-        },
-      ],
-    };
-  }, [dockBottomPadding]);
-
   return (
-    <Animated.View
+    <KeyboardStickyView
+      enabled={visible}
+      offset={{
+        closed: 10,
+        opened: 36 - dockBottomPadding,
+      }}
       pointerEvents={visible ? 'box-none' : 'none'}
-      style={[
-        {
-          bottom: 0,
-          display: visible ? 'flex' : 'none',
-          left: 0,
-          paddingHorizontal: appSpacing.screenHorizontalPadding,
-          position: 'absolute',
-          right: 0,
-          zIndex: 20,
-        },
-        animatedDockStyle,
-      ]}
+      style={{
+        bottom: 0,
+        display: visible ? 'flex' : 'none',
+        left: 0,
+        paddingBottom: dockBottomPadding,
+        paddingHorizontal: appSpacing.screenHorizontalPadding,
+        position: 'absolute',
+        right: 0,
+        zIndex: 20,
+      }}
       onLayout={handleLayout}
     >
       <View className={appLayout.composerDock}>
@@ -549,6 +536,6 @@ export function ProjectPromptComposer({
           value={input}
         />
       </View>
-    </Animated.View>
+    </KeyboardStickyView>
   );
 }

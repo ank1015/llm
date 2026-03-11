@@ -11,7 +11,6 @@ import type { NativeSyntheticEvent, TextInputSelectionChangeEventData } from 're
 import { AppText } from '@/components/app-text';
 import { appInputStyles, appLayout, appSizes, appTypography } from '@/styles/ui';
 
-
 const StyledFeather = withUniwind(Feather);
 const StyledTextInput = withUniwind(TextInput);
 
@@ -74,6 +73,9 @@ export function ProjectPromptInputShell({
     'muted',
     'accent',
   ]);
+  const handlePickerPress = () => {
+    inputRef.current?.blur();
+  };
 
   return (
     <View
@@ -138,6 +140,7 @@ export function ProjectPromptInputShell({
 
           <ProjectPromptPicker
             label="Select model"
+            onTriggerPress={handlePickerPress}
             onValueChange={onModelChange}
             options={modelOptions}
             value={modelValue}
@@ -146,6 +149,7 @@ export function ProjectPromptInputShell({
 
           <ProjectPromptPicker
             label="Select reasoning level"
+            onTriggerPress={handlePickerPress}
             onValueChange={onThinkingChange}
             options={thinkingOptions}
             value={thinkingValue}

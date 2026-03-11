@@ -94,7 +94,7 @@ export const appLayout = {
   compactList: 'gap-2',
   composerDock: 'relative',
   composerSurface: 'gap-3 rounded-[32px] border border-foreground/10 bg-default px-4 pb-3 pt-4',
-  composerInputRegion: 'min-h-[72px] px-1',
+  composerInputRegion: 'min-h-[64px] px-1',
   composerEditRow: 'flex-row items-center justify-between gap-3 px-1',
   composerFooter: 'flex-row items-center justify-between gap-3',
   composerFooterActions: 'flex-1 flex-row items-center gap-3',
