@@ -15,6 +15,8 @@ export const appColors = {
 
 export const appTypography = {
   screenTitle: 'text-[26px] font-semibold tracking-tight text-foreground',
+  sidebarSectionLabel: 'px-1 py-4 text-lg font-medium text-muted',
+  sidebarChatTitle: 'text-[17px] font-normal text-foreground',
   sectionLabel: 'px-1 text-base font-semibold text-foreground',
   sectionTitle: 'text-base font-semibold text-foreground',
   title: 'text-lg font-semibold text-foreground',
@@ -66,6 +68,9 @@ export const appLayout = {
   statusRow: 'flex-row items-start gap-3',
   sectionBlock: 'gap-3',
   compactList: 'gap-2',
+  sidebarSection: 'gap-1',
+  sidebarSectionHeader: 'flex-row items-center justify-between px-3 pb-1 pt-3',
+  sidebarNestedList: 'gap-5 px-3 pb-3 pl-7 pt-2',
   textStack: 'flex-1 gap-1',
   centeredStack: 'items-center gap-1',
   projectList: 'mt-5 gap-4',
@@ -87,6 +92,9 @@ export const appListStyles = {
   filesystemRow: 'flex-row items-center gap-3 px-1 py-3',
   rowContent: 'flex-1',
   rowRight: 'flex-row items-center gap-2',
+  sidebarPrimaryRow: 'gap-3 px-3 py-3',
+  sidebarItemSurface: 'rounded-[22px]',
+  sidebarThreadItem: 'rounded-[22px] px-3 py-2.5',
 } as const;
 
 export const appInputStyles = {
