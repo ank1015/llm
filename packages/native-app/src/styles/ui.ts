@@ -15,6 +15,11 @@ export const appColors = {
 
 export const appTypography = {
   screenTitle: 'text-[26px] font-semibold tracking-tight text-foreground',
+  artifactTitle: 'text-[28px] font-semibold tracking-tight text-foreground',
+  artifactTabActiveLabel: 'text-[17px] font-semibold text-foreground',
+  artifactTabInactiveLabel: 'text-[17px] font-semibold text-muted',
+  artifactChatTitle: 'text-[19px] font-medium text-foreground',
+  artifactChatMeta: 'text-[15px] leading-6 text-muted',
   sidebarSectionLabel: 'px-1 py-4 text-lg font-medium text-muted',
   sidebarChatTitle: 'text-[17px] font-normal text-foreground',
   sectionLabel: 'px-1 text-base font-semibold text-foreground',
@@ -28,6 +33,16 @@ export const appTypography = {
   bodyCentered: 'text-center text-sm leading-5 text-muted',
   bodyMuted: 'text-sm text-muted',
   caption: 'text-xs text-muted',
+  composerInputText: 'text-[17px] leading-6 text-foreground',
+  composerPickerLabel: 'text-[14px] font-medium text-foreground',
+  composerEditLabel: 'text-[11px] text-muted',
+  composerEditAction: 'text-[11px] font-medium text-foreground',
+  composerMenuLabel: 'px-2 pb-2 text-sm font-semibold text-muted',
+  composerMenuItemTitle: 'text-[15px] text-foreground',
+  composerMentionTitle: 'text-sm font-medium text-foreground',
+  composerMentionMeta: 'text-xs text-muted',
+  composerMentionEmpty: 'px-4 py-3 text-sm text-muted',
+  composerMentionError: 'px-4 py-3 text-sm text-red-500',
   dialogTitle: 'text-[18px] font-bold leading-6 text-black dark:text-white',
   buttonLabel: 'text-[14px]',
   fieldError: 'text-[12px]',
@@ -54,23 +69,45 @@ export const appSizes = {
   iconSm: 18,
   iconMd: 20,
   iconLg: 22,
+  iconXl: 36,
   statusBadge: 40,
   emptyStateBadge: 56,
   projectPreview: 96,
   fieldHeight: 56,
   searchFieldHeight: 48,
+  composerInputMinHeight: 30,
+  composerInputMaxHeight: 144,
+  composerDockBaseHeight: 56,
 } as const;
 
 export const appLayout = {
+  artifactChatList: 'gap-7',
+  artifactChatRow: 'gap-1 px-1 py-1',
+  artifactHeroRow: 'flex-row items-center gap-4 px-1',
+  artifactScreen: 'gap-8',
+  artifactTabsSection: 'gap-6',
   screenContent: 'gap-4',
   screenHorizontalPadding: 'px-5',
   homeHeaderRow: 'flex-row items-center justify-between gap-4 px-1',
   statusRow: 'flex-row items-start gap-3',
   sectionBlock: 'gap-3',
   compactList: 'gap-2',
+  composerDock: 'relative',
+  composerSurface: 'gap-4 rounded-[30px] border border-foreground/10 bg-default px-4 pb-4 pt-3',
+  composerEditRow: 'flex-row items-center justify-between gap-3 px-1',
+  composerFooter: 'flex-row items-center justify-between gap-3',
+  composerFooterActions: 'flex-1 flex-row items-center gap-2',
+  composerIconButton: 'size-10 items-center justify-center rounded-full',
+  composerPickerTrigger: 'flex-row items-center gap-1 px-1 py-2',
+  composerSendButton: 'size-11 rounded-full bg-foreground',
+  composerMenuContent: 'px-4 pb-8 pt-3',
+  composerMentionSurface:
+    'overflow-hidden rounded-[22px] border border-foreground/10 bg-default py-2 shadow-none',
+  composerMentionList: 'gap-1',
+  composerMentionRow: 'flex-row items-center gap-3 px-4 py-3',
   sidebarSection: 'gap-1',
   sidebarSectionHeader: 'flex-row items-center justify-between px-3 pb-1 pt-3',
-  sidebarNestedList: 'gap-5 px-3 pb-3 pl-7 pt-2',
+  sidebarNestedList: 'gap-4 px-2 pb-3 pl-6 pt-2',
   textStack: 'flex-1 gap-1',
   centeredStack: 'items-center gap-1',
   projectList: 'mt-5 gap-4',
@@ -94,7 +131,7 @@ export const appListStyles = {
   rowRight: 'flex-row items-center gap-2',
   sidebarPrimaryRow: 'gap-3 px-3 py-3',
   sidebarItemSurface: 'rounded-[22px]',
-  sidebarThreadItem: 'rounded-[22px] px-3 py-2.5',
+  sidebarThreadItem: 'rounded-[20px] px-3 py-2',
 } as const;
 
 export const appInputStyles = {
@@ -102,8 +139,17 @@ export const appInputStyles = {
     'h-[48px] rounded-full border-0 bg-default py-0 text-[17px] text-foreground shadow-none focus:border-0',
   dialogField:
     'h-14 rounded-[12px] border-0 bg-zinc-100 px-4 py-0 text-black shadow-none focus:border-0 dark:bg-[#39393D] dark:text-white dark:focus:border-0',
+  composerField:
+    'rounded-none border-0 bg-transparent px-1 py-1 text-[17px] leading-6 text-foreground shadow-none focus:border-0 ios:shadow-none android:shadow-none',
   placeholder: 'text-muted',
   icon: 'text-muted',
+} as const;
+
+export const appTabsStyles = {
+  artifactContent: 'pt-2',
+  artifactIndicator: 'rounded-full bg-default shadow-none',
+  artifactList: 'gap-3 self-start bg-transparent p-0',
+  artifactTrigger: 'px-6 py-3',
 } as const;
 
 export const appDialogStyles = {

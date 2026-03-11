@@ -26,10 +26,9 @@ import {
 import { Slot } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { HeroUINativeProvider } from 'heroui-native';
-import { useCallback } from 'react';
 import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { KeyboardAvoidingView, KeyboardProvider } from 'react-native-keyboard-controller';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 
 import '@/stores';
 import '../../global.css';
@@ -40,34 +39,13 @@ SplashScreen.setOptions({
   fade: true,
 });
 
-/**
- * Component that wraps app content inside KeyboardProvider
- * Contains the contentWrapper and HeroUINativeProvider configuration
- */
 function AppContent() {
-  const contentWrapper = useCallback(
-    (children: React.ReactNode) => (
-      <KeyboardAvoidingView
-        pointerEvents="box-none"
-        behavior="padding"
-        keyboardVerticalOffset={12}
-        className="flex-1"
-      >
-        {children}
-      </KeyboardAvoidingView>
-    ),
-    []
-  );
-
   return (
     <AppThemeProvider>
       <HeroUINativeProvider
         config={{
           textProps: {
             maxFontSizeMultiplier: 2,
-          },
-          toast: {
-            contentWrapper,
           },
           devInfo: {
             stylingPrinciples: false,
