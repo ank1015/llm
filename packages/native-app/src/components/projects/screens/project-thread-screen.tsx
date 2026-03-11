@@ -74,8 +74,17 @@ export function ProjectThreadScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const shouldStickToBottomRef = useRef(true);
   const hasScrolledInitiallyRef = useRef(false);
+  const pendingInitialScrollRef = useRef(false);
   const autoScrollRequestedRef = useRef(false);
   const autoScrollAnimatedRef = useRef(true);
+
+  useEffect(() => {
+    hasScrolledInitiallyRef.current = false;
+    pendingInitialScrollRef.current = Boolean(threadId);
+    shouldStickToBottomRef.current = true;
+    autoScrollRequestedRef.current = false;
+    autoScrollAnimatedRef.current = false;
+  }, [threadId]);
 
   useEffect(() => {
     if (!threadId || !artifactId) {
@@ -95,6 +104,15 @@ export function ProjectThreadScreen() {
   const scrollToBottom = useCallback((animated: boolean) => {
     autoScrollRequestedRef.current = true;
     autoScrollAnimatedRef.current = animated;
+
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollToEnd({ animated });
+    });
+  }, []);
+  const flushPendingScroll = useCallback((animated: boolean) => {
+    autoScrollRequestedRef.current = false;
+    pendingInitialScrollRef.current = false;
+    hasScrolledInitiallyRef.current = true;
 
     requestAnimationFrame(() => {
       scrollRef.current?.scrollToEnd({ animated });
@@ -176,7 +194,7 @@ export function ProjectThreadScreen() {
 
   const isInitialLoading = isThreadLoading && threadMessages.length === 0 && !streamingAssistant;
   const composerReserveHeight = Math.max(composerHeight, 132);
-  const endSpacerHeight = Math.round(windowHeight * 0.22);
+  const endSpacerHeight = Math.round(windowHeight * 0.4);
   const composerMaskHeight = composerReserveHeight + appSpacing.sm;
 
   if (isInitialLoading) {
@@ -209,14 +227,13 @@ export function ProjectThreadScreen() {
         }
         scrollEventThrottle={16}
         onContentSizeChange={() => {
-          if (!autoScrollRequestedRef.current) {
+          if (!autoScrollRequestedRef.current && !pendingInitialScrollRef.current) {
             return;
           }
 
-          autoScrollRequestedRef.current = false;
-          requestAnimationFrame(() => {
-            scrollRef.current?.scrollToEnd({ animated: autoScrollAnimatedRef.current });
-          });
+          flushPendingScroll(
+            autoScrollRequestedRef.current ? autoScrollAnimatedRef.current : false
+          );
         }}
         onScroll={handleScroll}
       >
@@ -289,7 +306,16 @@ export function ProjectThreadScreen() {
               sessionId={threadId}
               streamingAssistant={streamingAssistant}
             />
-            <View style={{ height: composerReserveHeight + endSpacerHeight }} />
+            <View
+              onLayout={() => {
+                if (!pendingInitialScrollRef.current) {
+                  return;
+                }
+
+                flushPendingScroll(false);
+              }}
+              style={{ height: composerReserveHeight + endSpacerHeight }}
+            />
           </>
         ) : null}
       </ScreenScrollView>

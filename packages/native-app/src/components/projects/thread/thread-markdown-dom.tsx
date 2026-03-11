@@ -10,9 +10,13 @@ import remarkMath from 'remark-math';
 
 import type { DOMProps } from 'expo/dom';
 
+import { isInlineFilePath } from '@/lib/messages/markdown';
+
 type ThreadMarkdownDomProps = {
   compact?: boolean;
   markdown: string;
+  resolveImageSource?: (source: string) => string | null;
+  resolveLinkHref?: (href: string) => string | null;
   theme: {
     background: string;
     blockquoteBackground: string;
@@ -28,6 +32,8 @@ type ThreadMarkdownDomProps = {
 export default function ThreadMarkdownDom({
   compact = false,
   markdown,
+  resolveImageSource,
+  resolveLinkHref,
   theme,
 }: ThreadMarkdownDomProps) {
   const fontSize = compact ? 13 : 15;
@@ -50,16 +56,28 @@ export default function ThreadMarkdownDom({
         rehypePlugins={[rehypeKatex]}
         remarkPlugins={[remarkGfm, remarkBreaks, remarkMath]}
         components={{
-          a: ({ href, children }) => (
-            <a
-              href={href}
-              rel="noreferrer"
-              style={{ color: theme.link, textDecoration: 'none' }}
-              target="_blank"
-            >
-              {children}
-            </a>
-          ),
+          a: ({ href, children }) =>
+            (() => {
+              const resolvedHref =
+                typeof href === 'string'
+                  ? (resolveLinkHref?.(href) ?? (resolveLinkHref ? null : href))
+                  : null;
+
+              if (!resolvedHref) {
+                return <span>{children}</span>;
+              }
+
+              return (
+                <a
+                  href={resolvedHref}
+                  rel="noreferrer"
+                  style={{ color: theme.link, textDecoration: 'none' }}
+                  target="_blank"
+                >
+                  {children}
+                </a>
+              );
+            })(),
           blockquote: ({ children }) => (
             <blockquote
               style={{
@@ -75,8 +93,15 @@ export default function ThreadMarkdownDom({
           ),
           code: ({ children, className }) => {
             const isInline = !className;
+            const inlineText = Array.isArray(children)
+              ? children.map((child) => String(child ?? '')).join('')
+              : String(children ?? '');
 
             if (isInline) {
+              if (isInlineFilePath(inlineText)) {
+                return <strong>{children}</strong>;
+              }
+
               return (
                 <code
                   style={{
@@ -131,13 +156,24 @@ export default function ThreadMarkdownDom({
               {children}
             </h3>
           ),
-          img: ({ alt, src }) => (
-            <img
-              alt={alt ?? ''}
-              src={src ?? ''}
-              style={{ borderRadius: 14, margin: '12px 0', maxWidth: '100%' }}
-            />
-          ),
+          img: ({ alt, src }) => {
+            const resolvedSource =
+              typeof src === 'string'
+                ? (resolveImageSource?.(src) ?? (resolveImageSource ? null : src))
+                : null;
+
+            if (!resolvedSource) {
+              return null;
+            }
+
+            return (
+              <img
+                alt={alt ?? ''}
+                src={resolvedSource}
+                style={{ borderRadius: 14, margin: '12px 0', maxWidth: '100%' }}
+              />
+            );
+          },
           ol: ({ children }) => <ol style={{ margin: '12px 0', paddingLeft: 20 }}>{children}</ol>,
           p: ({ children }) => <p style={{ margin: '0 0 12px' }}>{children}</p>,
           table: ({ children }) => (

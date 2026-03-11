@@ -22,10 +22,22 @@ import {
 const DEFAULT_PROJECT_FILE_INDEX_LIMIT = 10_000;
 const DEFAULT_PROJECT_FILE_SEARCH_LIMIT = 50;
 
+type ArtifactNavigationLocation = {
+  directoryPath: string;
+  filePath: string | null;
+};
+
+type ArtifactNavigationHistory = {
+  entries: ArtifactNavigationLocation[];
+  index: number;
+};
+
 type ArtifactFilesStoreState = {
   directoriesByArtifact: Record<string, Record<string, ArtifactExplorerResult>>;
   filesByArtifact: Record<string, Record<string, ArtifactFileResult>>;
+  currentDirectoryPathByArtifact: Record<string, string>;
   selectedFileByArtifact: Record<string, string | null>;
+  navigationHistoryByArtifact: Record<string, ArtifactNavigationHistory>;
   directoryLoadingByKey: Record<string, boolean>;
   fileLoadingByKey: Record<string, boolean>;
   directoryErrorByKey: Record<string, string | null>;
@@ -34,7 +46,16 @@ type ArtifactFilesStoreState = {
   projectFileIndexTruncatedByProject: Record<string, boolean>;
   projectFileIndexLoadingByProject: Record<string, boolean>;
   projectFileIndexErrorByProject: Record<string, string | null>;
+  setCurrentDirectory: (ctx: ArtifactContext, path: string) => void;
   setSelectedFile: (ctx: ArtifactContext, path: string | null) => void;
+  pushNavigationState: (
+    ctx: ArtifactContext,
+    input: { directoryPath: string; filePath?: string | null }
+  ) => void;
+  navigateHistory: (
+    ctx: ArtifactContext,
+    direction: 'back' | 'forward'
+  ) => ArtifactNavigationLocation | null;
   loadDirectory: (
     ctx: ArtifactContext,
     path?: string,
@@ -75,6 +96,23 @@ function getFileRequestKey(artifactKey: string, path: string): string {
   return `${artifactKey}::file::${path}`;
 }
 
+function normalizeNavigationLocation(input: {
+  directoryPath: string;
+  filePath?: string | null;
+}): ArtifactNavigationLocation {
+  return {
+    directoryPath: normalizeRelativePath(input.directoryPath),
+    filePath: input.filePath ? normalizeRelativePath(input.filePath) : null,
+  };
+}
+
+function isSameNavigationLocation(
+  left: ArtifactNavigationLocation | undefined,
+  right: ArtifactNavigationLocation
+): boolean {
+  return left?.directoryPath === right.directoryPath && left?.filePath === right.filePath;
+}
+
 function toErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Unexpected error';
 }
@@ -102,7 +140,9 @@ function filterProjectFiles(
 export const useArtifactFilesStore = create<ArtifactFilesStoreState>((set, get) => ({
   directoriesByArtifact: {},
   filesByArtifact: {},
+  currentDirectoryPathByArtifact: {},
   selectedFileByArtifact: {},
+  navigationHistoryByArtifact: {},
   directoryLoadingByKey: {},
   fileLoadingByKey: {},
   directoryErrorByKey: {},
@@ -111,6 +151,17 @@ export const useArtifactFilesStore = create<ArtifactFilesStoreState>((set, get) 
   projectFileIndexTruncatedByProject: {},
   projectFileIndexLoadingByProject: {},
   projectFileIndexErrorByProject: {},
+
+  setCurrentDirectory: (ctx, path) => {
+    const artifactKey = getArtifactKey(ctx);
+    const normalized = normalizeRelativePath(path);
+    set((state) => ({
+      currentDirectoryPathByArtifact: {
+        ...state.currentDirectoryPathByArtifact,
+        [artifactKey]: normalized,
+      },
+    }));
+  },
 
   setSelectedFile: (ctx, path) => {
     const artifactKey = getArtifactKey(ctx);
@@ -121,6 +172,88 @@ export const useArtifactFilesStore = create<ArtifactFilesStoreState>((set, get) 
         [artifactKey]: normalized,
       },
     }));
+  },
+
+  pushNavigationState: (ctx, input) => {
+    const artifactKey = getArtifactKey(ctx);
+    const nextLocation = normalizeNavigationLocation(input);
+
+    set((state) => {
+      const currentHistory = state.navigationHistoryByArtifact[artifactKey];
+      const currentLocation = currentHistory?.entries[currentHistory.index];
+
+      if (isSameNavigationLocation(currentLocation, nextLocation)) {
+        return {
+          currentDirectoryPathByArtifact: {
+            ...state.currentDirectoryPathByArtifact,
+            [artifactKey]: nextLocation.directoryPath,
+          },
+          selectedFileByArtifact: {
+            ...state.selectedFileByArtifact,
+            [artifactKey]: nextLocation.filePath,
+          },
+        };
+      }
+
+      const nextEntries = currentHistory
+        ? [...currentHistory.entries.slice(0, currentHistory.index + 1), nextLocation]
+        : [nextLocation];
+
+      return {
+        currentDirectoryPathByArtifact: {
+          ...state.currentDirectoryPathByArtifact,
+          [artifactKey]: nextLocation.directoryPath,
+        },
+        selectedFileByArtifact: {
+          ...state.selectedFileByArtifact,
+          [artifactKey]: nextLocation.filePath,
+        },
+        navigationHistoryByArtifact: {
+          ...state.navigationHistoryByArtifact,
+          [artifactKey]: {
+            entries: nextEntries,
+            index: nextEntries.length - 1,
+          },
+        },
+      };
+    });
+  },
+
+  navigateHistory: (ctx, direction) => {
+    const artifactKey = getArtifactKey(ctx);
+    const currentHistory = get().navigationHistoryByArtifact[artifactKey];
+
+    if (!currentHistory) {
+      return null;
+    }
+
+    const nextIndex = direction === 'back' ? currentHistory.index - 1 : currentHistory.index + 1;
+
+    if (nextIndex < 0 || nextIndex >= currentHistory.entries.length) {
+      return null;
+    }
+
+    const nextLocation = currentHistory.entries[nextIndex];
+
+    set((state) => ({
+      currentDirectoryPathByArtifact: {
+        ...state.currentDirectoryPathByArtifact,
+        [artifactKey]: nextLocation.directoryPath,
+      },
+      selectedFileByArtifact: {
+        ...state.selectedFileByArtifact,
+        [artifactKey]: nextLocation.filePath,
+      },
+      navigationHistoryByArtifact: {
+        ...state.navigationHistoryByArtifact,
+        [artifactKey]: {
+          ...currentHistory,
+          index: nextIndex,
+        },
+      },
+    }));
+
+    return nextLocation;
   },
 
   loadDirectory: async (ctx, path = '', force = false) => {
@@ -267,15 +400,18 @@ export const useArtifactFilesStore = create<ArtifactFilesStoreState>((set, get) 
     set((state) => {
       const nextDirectories = { ...state.directoriesByArtifact };
       const nextFiles = { ...state.filesByArtifact };
+      const nextHistory = { ...state.navigationHistoryByArtifact };
       const nextSelected = { ...state.selectedFileByArtifact };
 
       delete nextDirectories[artifactKey];
       delete nextFiles[artifactKey];
+      delete nextHistory[artifactKey];
       delete nextSelected[artifactKey];
 
       return {
         directoriesByArtifact: nextDirectories,
         filesByArtifact: nextFiles,
+        navigationHistoryByArtifact: nextHistory,
         selectedFileByArtifact: nextSelected,
       };
     });

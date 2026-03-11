@@ -6,6 +6,7 @@ import { Pressable, View } from 'react-native';
 import type { OverviewSession } from '@/lib/client-api';
 
 import { AppText } from '@/components/app-text';
+import { ProjectArtifactExplorer } from '@/components/projects/artifacts/project-artifact-explorer';
 import { ProjectPromptComposer } from '@/components/projects/composer/project-prompt-composer';
 import { useProjectShell } from '@/components/projects/layout/project-shell-context';
 import { ScreenScrollView } from '@/components/screen-scroll-view';
@@ -48,58 +49,55 @@ export function ProjectArtifactScreen() {
       return rightTimestamp - leftTimestamp;
     });
   }, [artifact]);
-
   return (
     <View className="flex-1 bg-background">
-      <ScreenScrollView
-        className="flex-1"
-        contentContainerClassName={appLayout.artifactScreen}
-        contentContainerStyle={{
-          paddingTop: appSpacing.lg,
-          paddingBottom: composerHeight + appSpacing.xl,
-        }}
-        contentInsetAdjustmentBehavior="automatic"
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* Artifact header intentionally remains commented out for now. */}
+      <Tabs className="flex-1" onValueChange={setActiveTab} value={activeTab} variant="primary">
+        <View className="px-5" style={{ paddingTop: appSpacing.lg, paddingBottom: appSpacing.sm }}>
+          {/* Artifact header intentionally remains commented out for now. */}
+          <View className={appLayout.artifactTabsSection}>
+            <Tabs.List className={appTabsStyles.artifactList}>
+              <Tabs.Indicator className={appTabsStyles.artifactIndicator} />
+              <Tabs.Trigger className={appTabsStyles.artifactTrigger} value="chats">
+                {({ isSelected }) => (
+                  <Tabs.Label
+                    className={
+                      isSelected
+                        ? appTypography.artifactTabActiveLabel
+                        : appTypography.artifactTabInactiveLabel
+                    }
+                  >
+                    Chats
+                  </Tabs.Label>
+                )}
+              </Tabs.Trigger>
+              <Tabs.Trigger className={appTabsStyles.artifactTrigger} value="artifacts">
+                {({ isSelected }) => (
+                  <Tabs.Label
+                    className={
+                      isSelected
+                        ? appTypography.artifactTabActiveLabel
+                        : appTypography.artifactTabInactiveLabel
+                    }
+                  >
+                    Artifacts
+                  </Tabs.Label>
+                )}
+              </Tabs.Trigger>
+            </Tabs.List>
+          </View>
+        </View>
 
-        <Tabs
-          className={appLayout.artifactTabsSection}
-          onValueChange={setActiveTab}
-          value={activeTab}
-          variant="primary"
-        >
-          <Tabs.List className={appTabsStyles.artifactList}>
-            <Tabs.Indicator className={appTabsStyles.artifactIndicator} />
-            <Tabs.Trigger className={appTabsStyles.artifactTrigger} value="chats">
-              {({ isSelected }) => (
-                <Tabs.Label
-                  className={
-                    isSelected
-                      ? appTypography.artifactTabActiveLabel
-                      : appTypography.artifactTabInactiveLabel
-                  }
-                >
-                  Chats
-                </Tabs.Label>
-              )}
-            </Tabs.Trigger>
-            <Tabs.Trigger className={appTabsStyles.artifactTrigger} value="artifacts">
-              {({ isSelected }) => (
-                <Tabs.Label
-                  className={
-                    isSelected
-                      ? appTypography.artifactTabActiveLabel
-                      : appTypography.artifactTabInactiveLabel
-                  }
-                >
-                  Artifacts
-                </Tabs.Label>
-              )}
-            </Tabs.Trigger>
-          </Tabs.List>
-
-          <Tabs.Content className={appTabsStyles.artifactContent} value="chats">
+        <Tabs.Content className="flex-1" value="chats">
+          <ScreenScrollView
+            className="flex-1"
+            contentContainerClassName={appLayout.artifactScreen}
+            contentContainerStyle={{
+              paddingTop: appSpacing.sm,
+              paddingBottom: composerHeight + appSpacing.xl,
+            }}
+            contentInsetAdjustmentBehavior="never"
+            keyboardShouldPersistTaps="handled"
+          >
             <View className={appLayout.artifactChatList}>
               {error && !artifact ? (
                 <AppText className={appTypography.body}>{error}</AppText>
@@ -148,13 +146,13 @@ export function ProjectArtifactScreen() {
                   ))
                 : null}
             </View>
-          </Tabs.Content>
+          </ScreenScrollView>
+        </Tabs.Content>
 
-          <Tabs.Content value="artifacts">
-            <View />
-          </Tabs.Content>
-        </Tabs>
-      </ScreenScrollView>
+        <Tabs.Content className="flex-1" value="artifacts">
+          <ProjectArtifactExplorer artifactId={artifactId ?? ''} projectId={projectId} />
+        </Tabs.Content>
+      </Tabs>
 
       <ProjectPromptComposer
         artifactId={artifactId ?? ''}

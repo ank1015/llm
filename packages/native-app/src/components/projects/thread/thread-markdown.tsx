@@ -12,11 +12,13 @@ import { Linking, Pressable, ScrollView, View } from 'react-native';
 import { AppText } from '@/components/app-text';
 import { ThreadCodeBlock } from '@/components/projects/thread/thread-code-block';
 import ThreadMarkdownDom from '@/components/projects/thread/thread-markdown-dom';
-import { shouldUseDomFallback } from '@/lib/messages/markdown';
+import { isInlineFilePath, shouldUseDomFallback } from '@/lib/messages/markdown';
 
 type ThreadMarkdownProps = {
   children: string;
   compact?: boolean;
+  resolveImageSource?: (source: string) => string | null;
+  resolveLinkHref?: (href: string) => string | null;
 };
 
 function getCodeLanguage(node: ASTNode): string {
@@ -24,7 +26,12 @@ function getCodeLanguage(node: ASTNode): string {
   return language && language.length > 0 ? language : 'plaintext';
 }
 
-export function ThreadMarkdown({ children, compact = false }: ThreadMarkdownProps) {
+export function ThreadMarkdown({
+  children,
+  compact = false,
+  resolveImageSource,
+  resolveLinkHref,
+}: ThreadMarkdownProps) {
   const [foregroundColor, mutedColor, surfaceColor, backgroundColor, borderColor] = useThemeColor([
     'foreground',
     'muted',
@@ -34,6 +41,29 @@ export function ThreadMarkdown({ children, compact = false }: ThreadMarkdownProp
   ]);
   const linkColor = '#2563EB';
   const subtleSurface = compact ? 'rgba(15, 23, 42, 0.04)' : 'rgba(15, 23, 42, 0.05)';
+  const inlineCodeStyle = useMemo(
+    () => ({
+      backgroundColor: surfaceColor,
+      borderColor,
+      borderRadius: 8,
+      borderWidth: 1,
+      color: foregroundColor,
+      fontFamily: process.env.EXPO_OS === 'ios' ? 'Menlo' : 'monospace',
+      fontSize: compact ? 12 : 13,
+      overflow: 'hidden' as const,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+    }),
+    [borderColor, compact, foregroundColor, surfaceColor]
+  );
+  const inlineFilePathStyle = useMemo(
+    () => ({
+      color: foregroundColor,
+      fontSize: compact ? 13 : 15,
+      fontWeight: '700' as const,
+    }),
+    [compact, foregroundColor]
+  );
 
   const markdownIt = useMemo(
     () =>
@@ -57,8 +87,24 @@ export function ThreadMarkdown({ children, compact = false }: ThreadMarkdownProp
           <ThreadCodeBlock code={node.content} compact={compact} />
         </View>
       ),
+      code_inline: (node) => {
+        const content = node.content.trim();
+
+        return (
+          <AppText
+            key={node.key}
+            style={isInlineFilePath(content) ? inlineFilePathStyle : inlineCodeStyle}
+          >
+            {content}
+          </AppText>
+        );
+      },
       image: (node) => {
-        const source = node.attributes.src;
+        const rawSource = node.attributes.src;
+        const source =
+          typeof rawSource === 'string'
+            ? (resolveImageSource?.(rawSource) ?? (resolveImageSource ? null : rawSource))
+            : null;
 
         if (typeof source !== 'string' || source.length === 0) {
           return null;
@@ -81,9 +127,18 @@ export function ThreadMarkdown({ children, compact = false }: ThreadMarkdownProp
           accessibilityRole="link"
           key={node.key}
           onPress={() => {
-            const result = onLinkPress?.(node.attributes.href);
-            if (result === true && typeof node.attributes.href === 'string') {
-              void Linking.openURL(node.attributes.href);
+            const rawHref = node.attributes.href;
+            const href =
+              typeof rawHref === 'string'
+                ? (resolveLinkHref?.(rawHref) ?? (resolveLinkHref ? null : rawHref))
+                : null;
+            if (!href) {
+              return;
+            }
+
+            const result = onLinkPress?.(href);
+            if (result === true) {
+              void Linking.openURL(href);
             }
           }}
         >
@@ -97,9 +152,18 @@ export function ThreadMarkdown({ children, compact = false }: ThreadMarkdownProp
           accessibilityRole="link"
           key={node.key}
           onPress={() => {
-            const result = onLinkPress?.(node.attributes.href);
-            if (result === true && typeof node.attributes.href === 'string') {
-              void Linking.openURL(node.attributes.href);
+            const rawHref = node.attributes.href;
+            const href =
+              typeof rawHref === 'string'
+                ? (resolveLinkHref?.(rawHref) ?? (resolveLinkHref ? null : rawHref))
+                : null;
+            if (!href) {
+              return;
+            }
+
+            const result = onLinkPress?.(href);
+            if (result === true) {
+              void Linking.openURL(href);
             }
           }}
         >
@@ -117,7 +181,7 @@ export function ThreadMarkdown({ children, compact = false }: ThreadMarkdownProp
         </ScrollView>
       ),
     }),
-    [compact, linkColor]
+    [compact, inlineCodeStyle, inlineFilePathStyle, linkColor, resolveImageSource, resolveLinkHref]
   );
 
   const markdownStyle = useMemo(
@@ -278,6 +342,8 @@ export function ThreadMarkdown({ children, compact = false }: ThreadMarkdownProp
           },
         }}
         markdown={children}
+        resolveImageSource={resolveImageSource}
+        resolveLinkHref={resolveLinkHref}
         theme={{
           background: backgroundColor,
           blockquoteBackground: subtleSurface,
