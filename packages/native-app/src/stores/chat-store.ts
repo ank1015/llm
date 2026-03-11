@@ -737,7 +737,13 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
       }));
 
       if (!loadedState.liveRun || loadedState.liveRun.status !== 'running') {
-        clearStreamAttachment(key);
+        const activeConnection = streamAbortControllers.get(key);
+
+        // Navigating from the artifact screen to a new thread can trigger a tree reload
+        // before the just-started stream is reflected in persisted session state.
+        if (!activeConnection) {
+          clearStreamAttachment(key);
+        }
         return;
       }
 
