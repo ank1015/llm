@@ -2,10 +2,13 @@
 
 import { create } from 'zustand';
 
-import type { ArtifactDirWithSessions, OverviewSession } from '@/lib/client-api';
+import type {
+  ArtifactDirMetadata,
+  ArtifactDirWithSessions,
+  OverviewSession,
+} from '@/lib/client-api';
 
 import { getProjectOverview } from '@/lib/client-api';
-
 
 type SidebarStoreState = {
   projectName: string | null;
@@ -24,6 +27,9 @@ type SidebarStoreState = {
     }
   ) => Promise<void>;
   reset: () => void;
+
+  /** Optimistically insert a new artifact into the current project. */
+  addArtifactDir: (artifact: ArtifactDirMetadata) => void;
 
   /** Optimistically insert a new session into an artifact's session list. */
   addSession: (artifactId: string, session: OverviewSession) => void;
@@ -103,6 +109,15 @@ export const useSidebarStore = create<SidebarStoreState>((set) => ({
     latestOverviewRequestId += 1;
     set(initialState);
   },
+
+  addArtifactDir: (artifact) =>
+    set((state) => ({
+      error: null,
+      artifactDirs: [
+        { ...artifact, sessions: [] },
+        ...state.artifactDirs.filter((dir) => dir.id !== artifact.id),
+      ],
+    })),
 
   addSession: (artifactId, session) =>
     set((state) => ({
