@@ -1,8 +1,14 @@
 import { fetch as expoFetch } from 'expo/fetch';
 import Constants from 'expo-constants';
-import { Platform } from 'react-native';
+import { NativeModules, Platform } from 'react-native';
 
 const DEFAULT_SERVER_PORT = '8001';
+
+type SourceCodeModule = {
+  getConstants?: () => {
+    scriptURL?: string | null;
+  };
+};
 
 function normalizeBaseUrl(url: string): string {
   return url.trim().replace(/\/+$/g, '');
@@ -29,6 +35,25 @@ function parseHost(candidate: string | null | undefined): string | null {
   return host?.trim().length ? host.trim() : null;
 }
 
+function parseUrlHost(candidate: string | null | undefined): string | null {
+  if (typeof candidate !== 'string' || candidate.trim().length === 0) {
+    return null;
+  }
+
+  try {
+    const url = new URL(candidate);
+    return url.hostname || null;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeNativeHost(host: string): string {
+  return Platform.OS === 'android' && (host === 'localhost' || host === '127.0.0.1')
+    ? '10.0.2.2'
+    : host;
+}
+
 function getWebServerBase(): string | null {
   if (typeof window === 'undefined') {
     return null;
@@ -43,23 +68,40 @@ function getWebServerBase(): string | null {
   return `${protocol}://${host}:${DEFAULT_SERVER_PORT}`;
 }
 
-function getExpoDevServerBase(): string | null {
-  const host =
-    parseHost(Constants.expoConfig?.hostUri) ?? parseHost(Constants.expoGoConfig?.debuggerHost);
+function getReactNativeBundleServerBase(): string | null {
+  if (Platform.OS === 'web') {
+    return null;
+  }
+
+  const sourceCodeModule = NativeModules.SourceCode as SourceCodeModule | undefined;
+  const scriptUrl = sourceCodeModule?.getConstants?.().scriptURL;
+  const host = parseUrlHost(scriptUrl);
 
   if (!host) {
     return null;
   }
 
-  const normalizedHost =
-    Platform.OS === 'android' && (host === 'localhost' || host === '127.0.0.1') ? '10.0.2.2' : host;
+  return `http://${normalizeNativeHost(host)}:${DEFAULT_SERVER_PORT}`;
+}
 
-  return `http://${normalizedHost}:${DEFAULT_SERVER_PORT}`;
+function getExpoDevServerBase(): string | null {
+  const expoGoConfig = Constants.expoGoConfig as { debuggerHost?: string; logUrl?: string } | null;
+  const host =
+    parseHost(Constants.expoConfig?.hostUri) ??
+    parseHost(expoGoConfig?.debuggerHost) ??
+    parseUrlHost(expoGoConfig?.logUrl);
+
+  if (!host) {
+    return null;
+  }
+
+  return `http://${normalizeNativeHost(host)}:${DEFAULT_SERVER_PORT}`;
 }
 
 function resolveServerBase(): string {
   return (
     getConfiguredServerBase() ??
+    getReactNativeBundleServerBase() ??
     getExpoDevServerBase() ??
     getWebServerBase() ??
     (Platform.OS === 'android'

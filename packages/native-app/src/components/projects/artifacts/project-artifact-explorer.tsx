@@ -318,10 +318,6 @@ function getEntryIcon(entry: ArtifactExplorerEntry): keyof typeof Feather.glyphM
   return 'file';
 }
 
-function getFileModeTitle(rootLabel: string, filePath: string): string {
-  return getPathBasename(filePath) || rootLabel;
-}
-
 function FileMetadataChip({ label }: { label: string }) {
   return (
     <View className="rounded-full bg-foreground/5 px-3 py-1.5">
@@ -371,12 +367,13 @@ export function ProjectArtifactExplorer({ artifactId, projectId }: ProjectArtifa
   const isFileLoading = fileRequestKey ? (fileLoadingByKey[fileRequestKey] ?? false) : false;
   const directoryError = directoryErrorByKey[directoryRequestKey] ?? null;
   const fileError = fileRequestKey ? (fileErrorByKey[fileRequestKey] ?? null) : null;
-  const breadcrumbItems = buildBreadcrumbs(rootLabel, currentDirectoryPath);
   const navigationHistory = navigationHistoryByArtifact[artifactKey] ?? null;
   const fileViewerKind = selectedFilePath
     ? getViewerKind(selectedFilePath, selectedFile?.isBinary ?? false)
     : null;
   const imagePreviewHeight = Math.min(Math.max(width - appSpacing.xl * 2, 220), 360);
+  const navigationPath = selectedFilePath ?? currentDirectoryPath;
+  const breadcrumbItems = buildBreadcrumbs(rootLabel, navigationPath);
   const breadcrumbAvailableWidth = Math.max(
     width - appSpacing.screenHorizontalPadding * 2 - 112,
     120
@@ -549,96 +546,100 @@ export function ProjectArtifactExplorer({ artifactId, projectId }: ProjectArtifa
     );
   };
 
+  const renderNavigationRow = () => (
+    <View className="flex-row items-center gap-2 mt-[-10px] mx-[-8px]">
+      <Button
+        accessibilityLabel="Go back"
+        className="size-8 rounded-full"
+        isDisabled={!canGoBack}
+        isIconOnly
+        size="sm"
+        variant="ghost"
+        onPress={() => handleHistoryNavigation('back')}
+      >
+        <StyledFeather className="text-foreground" name="chevron-left" size={appSizes.iconXs} />
+      </Button>
+
+      <View className="flex-1 flex-row items-center overflow-hidden">
+        {visibleBreadcrumbItems.map((item, index) => {
+          const isCurrent =
+            item.kind === 'crumb' &&
+            item.path === breadcrumbItems[breadcrumbItems.length - 1]?.path;
+
+          return (
+            <View
+              key={item.kind === 'crumb' ? item.path || 'root' : item.key}
+              className="flex-row items-center"
+            >
+              {index > 0 ? (
+                <StyledFeather
+                  className={appColors.foregroundSoft}
+                  name="chevron-right"
+                  size={appSizes.iconXs}
+                />
+              ) : null}
+
+              {item.kind === 'ellipsis' ? (
+                <AppText className="mx-1 text-[13px] text-muted">…</AppText>
+              ) : (
+                <Pressable
+                  android_ripple={{ color: 'transparent' }}
+                  disabled={isCurrent}
+                  hitSlop={6}
+                  style={{ borderCurve: 'continuous' }}
+                  onPress={() => handleDirectoryPress(item.path)}
+                >
+                  <AppText
+                    className={cn(
+                      'mx-1 text-[13px]',
+                      isCurrent ? 'font-medium text-foreground' : 'text-muted'
+                    )}
+                    ellipsizeMode="tail"
+                    numberOfLines={1}
+                    style={{
+                      flexShrink: 1,
+                      maxWidth: isCurrent
+                        ? breadcrumbAvailableWidth * 0.52
+                        : breadcrumbAvailableWidth * 0.24,
+                    }}
+                  >
+                    {item.label}
+                  </AppText>
+                </Pressable>
+              )}
+            </View>
+          );
+        })}
+      </View>
+
+      <Button
+        accessibilityLabel={selectedFilePath ? 'Refresh file' : 'Refresh folder'}
+        className="size-8 rounded-full"
+        isIconOnly
+        size="sm"
+        variant="ghost"
+        onPress={() => void handleRefresh()}
+      >
+        <StyledFeather className="text-foreground" name="refresh-cw" size={appSizes.iconXs} />
+      </Button>
+
+      <Button
+        accessibilityLabel="Go forward"
+        className="size-8 rounded-full"
+        isDisabled={!canGoForward}
+        isIconOnly
+        size="sm"
+        variant="ghost"
+        onPress={() => handleHistoryNavigation('forward')}
+      >
+        <StyledFeather className="text-foreground" name="chevron-right" size={appSizes.iconXs} />
+      </Button>
+    </View>
+  );
+
   const renderDirectoryView = () => (
     <View className="flex-1 gap-4">
-      <View className="flex-row items-center gap-2 mt-[-10px] mx-[-8px]">
-        <Button
-          accessibilityLabel="Go back"
-          className="size-8 rounded-full"
-          isDisabled={!canGoBack}
-          isIconOnly
-          size="sm"
-          variant="ghost"
-          onPress={() => handleHistoryNavigation('back')}
-        >
-          <StyledFeather className="text-foreground" name="chevron-left" size={appSizes.iconXs} />
-        </Button>
-
-        <View className="flex-1 flex-row items-center overflow-hidden">
-          {visibleBreadcrumbItems.map((item, index) => {
-            const isCurrent =
-              item.kind === 'crumb' &&
-              item.path === breadcrumbItems[breadcrumbItems.length - 1]?.path;
-
-            return (
-              <View
-                key={item.kind === 'crumb' ? item.path || 'root' : item.key}
-                className="flex-row items-center"
-              >
-                {index > 0 ? (
-                  <StyledFeather
-                    className={appColors.foregroundSoft}
-                    name="chevron-right"
-                    size={appSizes.iconXs}
-                  />
-                ) : null}
-
-                {item.kind === 'ellipsis' ? (
-                  <AppText className="mx-1 text-[13px] text-muted">…</AppText>
-                ) : (
-                  <Pressable
-                    android_ripple={{ color: 'transparent' }}
-                    disabled={isCurrent}
-                    hitSlop={6}
-                    style={{ borderCurve: 'continuous' }}
-                    onPress={() => handleDirectoryPress(item.path)}
-                  >
-                    <AppText
-                      className={cn(
-                        'mx-1 text-[13px]',
-                        isCurrent ? 'font-medium text-foreground' : 'text-muted'
-                      )}
-                      ellipsizeMode="tail"
-                      numberOfLines={1}
-                      style={{
-                        flexShrink: 1,
-                        maxWidth: isCurrent
-                          ? breadcrumbAvailableWidth * 0.52
-                          : breadcrumbAvailableWidth * 0.24,
-                      }}
-                    >
-                      {item.label}
-                    </AppText>
-                  </Pressable>
-                )}
-              </View>
-            );
-          })}
-        </View>
-
-        <Button
-          accessibilityLabel="Refresh folder"
-          className="size-8 rounded-full"
-          isIconOnly
-          size="sm"
-          variant="ghost"
-          onPress={() => void handleRefresh()}
-        >
-          <StyledFeather className="text-foreground" name="refresh-cw" size={appSizes.iconXs} />
-        </Button>
-
-        <Button
-          accessibilityLabel="Go forward"
-          className="size-8 rounded-full"
-          isDisabled={!canGoForward}
-          isIconOnly
-          size="sm"
-          variant="ghost"
-          onPress={() => handleHistoryNavigation('forward')}
-        >
-          <StyledFeather className="text-foreground" name="chevron-right" size={appSizes.iconXs} />
-        </Button>
-      </View>
+      {renderNavigationRow()}
 
       <FlashList
         data={currentDirectory?.entries ?? []}
@@ -811,112 +812,51 @@ export function ProjectArtifactExplorer({ artifactId, projectId }: ProjectArtifa
   return (
     <View className="flex-1 px-5 pt-4">
       {selectedFilePath ? (
-        <ScrollView
-          className="flex-1"
-          contentContainerStyle={{
-            gap: appSpacing.md,
-            paddingBottom: insets.bottom + appSpacing.xl,
-          }}
-          keyboardShouldPersistTaps="handled"
-          refreshControl={
-            <RefreshControl
-              colors={[foregroundColor]}
-              onRefresh={() => void handleRefresh()}
-              refreshing={isRefreshing}
-              tintColor={foregroundColor}
-            />
-          }
-          showsVerticalScrollIndicator={false}
-        >
-          <View
-            className="gap-4 rounded-[30px] border border-foreground/10 bg-default px-4 py-4"
-            style={{ borderCurve: 'continuous' }}
+        <View className="flex-1 gap-3">
+          {renderNavigationRow()}
+
+          <ScrollView
+            className="flex-1"
+            contentContainerStyle={{
+              gap: appSpacing.md,
+              paddingBottom: insets.bottom + appSpacing.sm,
+            }}
+            keyboardShouldPersistTaps="handled"
+            refreshControl={
+              <RefreshControl
+                colors={[foregroundColor]}
+                onRefresh={() => void handleRefresh()}
+                refreshing={isRefreshing}
+                tintColor={foregroundColor}
+              />
+            }
+            showsVerticalScrollIndicator={false}
           >
-            <View className="flex-row items-center gap-3">
-              <Button
-                accessibilityLabel="Back to files"
-                className="rounded-full"
-                isIconOnly
-                size="sm"
-                variant="ghost"
-                onPress={() =>
-                  pushNavigationState(artifactCtx, {
-                    directoryPath: currentDirectoryPath,
-                    filePath: null,
-                  })
-                }
+            {selectedFile?.truncated ? (
+              <View
+                className="flex-row items-start gap-3 rounded-[22px] border border-amber-500/20 bg-amber-500/10 px-4 py-3"
+                style={{ borderCurve: 'continuous' }}
               >
                 <StyledFeather
-                  className="text-foreground"
-                  name="arrow-left"
+                  className="mt-0.5 text-amber-600"
+                  name="alert-triangle"
                   size={appSizes.iconSm}
                 />
-              </Button>
-              <View className="flex-1 gap-1">
-                <AppText className="text-[12px] font-medium uppercase tracking-[0.18em] text-muted">
-                  File
-                </AppText>
-                <AppText
-                  className="text-[20px] font-semibold tracking-tight text-foreground"
-                  numberOfLines={1}
-                >
-                  {getFileModeTitle(rootLabel, selectedFilePath)}
-                </AppText>
-                <AppText className="text-[13px] text-muted" numberOfLines={1}>
-                  {selectedFilePath}
-                </AppText>
-              </View>
-              <Button
-                accessibilityLabel="Refresh file"
-                className="size-8 rounded-full"
-                isIconOnly
-                size="sm"
-                variant="ghost"
-                onPress={() => void handleRefresh()}
-              >
-                <StyledFeather
-                  className="text-foreground"
-                  name="refresh-cw"
-                  size={appSizes.iconXs}
-                />
-              </Button>
-            </View>
-
-            {selectedFile ? (
-              <View className="flex-row flex-wrap gap-2">
-                <FileMetadataChip label={formatFileSize(selectedFile.size)} />
-                <FileMetadataChip label={formatUpdatedAt(selectedFile.updatedAt)} />
-                <FileMetadataChip
-                  label={fileViewerKind === 'text' ? 'Text preview' : `${fileViewerKind} preview`}
-                />
+                <View className="flex-1 gap-1">
+                  <AppText className="text-[14px] font-semibold text-foreground">
+                    Preview truncated
+                  </AppText>
+                  <AppText className="text-[13px] leading-5 text-muted">
+                    Only part of this file is loaded on mobile. Open the raw file externally if you
+                    need the full contents.
+                  </AppText>
+                </View>
               </View>
             ) : null}
-          </View>
 
-          {selectedFile?.truncated ? (
-            <View
-              className="flex-row items-start gap-3 rounded-[22px] border border-amber-500/20 bg-amber-500/10 px-4 py-3"
-              style={{ borderCurve: 'continuous' }}
-            >
-              <StyledFeather
-                className="mt-0.5 text-amber-600"
-                name="alert-triangle"
-                size={appSizes.iconSm}
-              />
-              <View className="flex-1 gap-1">
-                <AppText className="text-[14px] font-semibold text-foreground">
-                  Preview truncated
-                </AppText>
-                <AppText className="text-[13px] leading-5 text-muted">
-                  Only part of this file is loaded on mobile. Open the raw file externally if you
-                  need the full contents.
-                </AppText>
-              </View>
-            </View>
-          ) : null}
-
-          {renderFilePreview()}
-        </ScrollView>
+            {renderFilePreview()}
+          </ScrollView>
+        </View>
       ) : (
         renderDirectoryView()
       )}
