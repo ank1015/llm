@@ -1,15 +1,16 @@
 {
   "expo": {
-    "name": "native-app",
-    "slug": "native-app",
+    "name": "Folders",
+    "slug": "folders",
     "version": "0.0.1",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "native-app",
+    "icon": "./assets/icons/ios-light.png",
+    "scheme": "folders",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.notacoder.nativeapp"
+      "bundleIdentifier": "com.notacoder.folders",
+      "icon": "./assets/icons/ios-light.png"
     },
     "android": {
       "adaptiveIcon": {
@@ -30,11 +31,12 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/icons/splash-icon-light.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
           "dark": {
+            "image": "./assets/icons/splash-icon-dark.png",
             "backgroundColor": "#000000"
           }
         }

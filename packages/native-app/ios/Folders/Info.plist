@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>native-app</string>
+	<string>Folders</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -27,8 +27,8 @@
 		<dict>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>native-app</string>
-				<string>com.notacoder.nativeapp</string>
+				<string>folders</string>
+				<string>com.notacoder.folders</string>
 			</array>
 		</dict>
 	</array>
