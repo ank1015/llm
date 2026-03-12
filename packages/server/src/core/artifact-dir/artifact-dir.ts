@@ -110,6 +110,24 @@ export class ArtifactDir {
     return readMetadata<ArtifactDirMetadata>(this.dataPath);
   }
 
+  /** Rename this artifact directory without changing its stable id */
+  async rename(name: string): Promise<ArtifactDirMetadata> {
+    const trimmedName = name.trim();
+
+    if (!trimmedName) {
+      throw new Error('name is required');
+    }
+
+    const metadata = await this.getMetadata();
+    const nextMetadata: ArtifactDirMetadata = {
+      ...metadata,
+      name: trimmedName,
+    };
+
+    await writeMetadata(this.dataPath, nextMetadata);
+    return nextMetadata;
+  }
+
   /** List artifact files in the working directory (the actual content agents produce) */
   async listArtifacts(): Promise<string[]> {
     return listFiles(this.dirPath);

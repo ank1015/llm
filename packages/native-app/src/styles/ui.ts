@@ -23,8 +23,8 @@ export const appTypography = {
   artifactTabInactiveLabel: `text-[17px] font-semibold ${TEXT_MUTED}`,
   artifactChatTitle: 'text-[19px] font-medium text-foreground',
   artifactChatMeta: `text-[15px] leading-6 ${TEXT_MUTED}`,
-  sidebarSectionLabel: `px-1 py-4 text-lg font-medium ${TEXT_MUTED}`,
-  sidebarChatTitle: 'text-[17px] font-normal text-foreground',
+  sidebarSectionLabel: `px-1 text-base font-sm ${TEXT_MUTED}`,
+  sidebarChatTitle: 'text-[15px] font-normal text-foreground',
   sectionLabel: 'px-1 text-base font-semibold text-foreground',
   sectionTitle: 'text-base font-semibold text-foreground',
   title: 'text-lg font-semibold text-foreground',
@@ -110,8 +110,8 @@ export const appLayout = {
   composerMentionList: 'gap-1',
   composerMentionRow: 'flex-row items-center gap-3 px-4 py-3',
   sidebarSection: 'gap-1',
-  sidebarSectionHeader: 'flex-row items-center justify-between px-3 pb-1 pt-3',
-  sidebarNestedList: 'gap-4 px-2 pb-3 pl-6 pt-2',
+  sidebarSectionHeader: 'flex-row items-center justify-between px-0 pt-8',
+  sidebarNestedList: 'gap-1 px-2 pb-1 pl-2 pt-0.5',
   textStack: 'flex-1 gap-1',
   centeredStack: 'items-center gap-1',
   projectList: 'gap-4',
@@ -130,12 +130,12 @@ export const appStateStyles = {
 } as const;
 
 export const appListStyles = {
-  filesystemRow: 'flex-row items-center gap-3 px-1 py-3',
+  filesystemRow: 'flex-row items-center gap-3',
   rowContent: 'flex-1',
   rowRight: 'flex-row items-center gap-2',
-  sidebarPrimaryRow: 'gap-3 px-3 py-3',
+  sidebarPrimaryRow: 'gap-2 px-2 py-[9px] my-0.5',
   sidebarItemSurface: 'rounded-[22px]',
-  sidebarThreadItem: 'rounded-[20px] px-3 py-2',
+  sidebarThreadItem: 'rounded-[20px] px-3 py-3',
 } as const;
 
 export const appInputStyles = {

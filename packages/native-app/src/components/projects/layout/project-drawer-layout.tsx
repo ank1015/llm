@@ -75,7 +75,7 @@ export const ProjectDrawerLayout: FC<ProjectDrawerLayoutProps> = ({ projectId })
           drawerType: 'slide',
           overlayColor: drawerOverlayColor,
           swipeEdgeWidth: width,
-          swipeMinDistance: 10,
+          swipeMinDistance: 5,
         }}
       />
     </ProjectShellProvider>

@@ -31,6 +31,7 @@ export {
   listProjects,
   listBundledSkills,
   listInstalledArtifactSkills,
+  renameArtifactDir,
   renameProject,
   renameArtifactPath,
 } from './projects';

@@ -14,11 +14,13 @@ type SidebarStoreState = {
   projectName: string | null;
   artifactDirs: ArtifactDirWithSessions[];
   isLoading: boolean;
+  isRefreshing: boolean;
   error: string | null;
 
   setProjectName: (name: string | null) => void;
   setArtifactDirs: (dirs: ArtifactDirWithSessions[]) => void;
   setIsLoading: (loading: boolean) => void;
+  setIsRefreshing: (refreshing: boolean) => void;
   setError: (error: string | null) => void;
   refreshOverview: (
     projectId: string,
@@ -34,6 +36,12 @@ type SidebarStoreState = {
   /** Optimistically insert a new session into an artifact's session list. */
   addSession: (artifactId: string, session: OverviewSession) => void;
 
+  /** Optimistically rename an artifact directory. */
+  renameArtifactDir: (artifactId: string, artifactName: string) => void;
+
+  /** Optimistically remove an artifact directory. */
+  removeArtifactDir: (artifactId: string) => void;
+
   /** Optimistically rename a session across all artifacts. */
   renameSession: (sessionId: string, sessionName: string) => void;
 
@@ -45,6 +53,7 @@ const initialState = {
   projectName: null,
   artifactDirs: [] as ArtifactDirWithSessions[],
   isLoading: true,
+  isRefreshing: false,
   error: null as string | null,
 };
 
@@ -56,6 +65,7 @@ export const useSidebarStore = create<SidebarStoreState>((set) => ({
   setProjectName: (name) => set({ projectName: name }),
   setArtifactDirs: (dirs) => set({ artifactDirs: dirs }),
   setIsLoading: (loading) => set({ isLoading: loading }),
+  setIsRefreshing: (refreshing) => set({ isRefreshing: refreshing }),
   setError: (error) => set({ error }),
   refreshOverview: async (projectId, options) => {
     const mode = options?.mode ?? 'refresh';
@@ -66,10 +76,14 @@ export const useSidebarStore = create<SidebarStoreState>((set) => ({
         projectName: null,
         artifactDirs: [],
         isLoading: true,
+        isRefreshing: false,
         error: null,
       });
     } else {
-      set({ error: null });
+      set({
+        isRefreshing: true,
+        error: null,
+      });
     }
 
     try {
@@ -100,8 +114,12 @@ export const useSidebarStore = create<SidebarStoreState>((set) => ({
         error: message,
       }));
     } finally {
-      if (mode === 'initial' && requestId === latestOverviewRequestId) {
-        set({ isLoading: false });
+      if (requestId === latestOverviewRequestId) {
+        if (mode === 'initial') {
+          set({ isLoading: false });
+        } else {
+          set({ isRefreshing: false });
+        }
       }
     }
   },
@@ -124,6 +142,18 @@ export const useSidebarStore = create<SidebarStoreState>((set) => ({
       artifactDirs: state.artifactDirs.map((dir) =>
         dir.id === artifactId ? { ...dir, sessions: [session, ...dir.sessions] } : dir
       ),
+    })),
+
+  renameArtifactDir: (artifactId, artifactName) =>
+    set((state) => ({
+      artifactDirs: state.artifactDirs.map((dir) =>
+        dir.id === artifactId ? { ...dir, name: artifactName.trim() || dir.name } : dir
+      ),
+    })),
+
+  removeArtifactDir: (artifactId) =>
+    set((state) => ({
+      artifactDirs: state.artifactDirs.filter((dir) => dir.id !== artifactId),
     })),
 
   renameSession: (sessionId, sessionName) =>

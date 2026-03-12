@@ -50,6 +50,26 @@ artifactDirRoutes.get(`${BASE}/:artifactDirId`, async (c) => {
   }
 });
 
+/** PATCH /api/projects/:projectId/artifacts/:artifactDirId/name — Rename an artifact directory */
+artifactDirRoutes.patch(`${BASE}/:artifactDirId/name`, async (c) => {
+  const { projectId, artifactDirId } = c.req.param();
+  const body = await c.req.json<{ name?: string }>();
+
+  if (!body.name?.trim()) {
+    return c.json({ error: 'name is required' }, 400);
+  }
+
+  try {
+    const dir = await ArtifactDir.getById(projectId, artifactDirId);
+    const metadata = await dir.rename(body.name);
+    return c.json(metadata);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Failed to rename artifact directory';
+    const status = message.includes('not found') ? 404 : 500;
+    return c.json({ error: message }, status);
+  }
+});
+
 /** GET /api/projects/:projectId/artifacts/:artifactDirId/files — List artifact files */
 artifactDirRoutes.get(`${BASE}/:artifactDirId/files`, async (c) => {
   const { projectId, artifactDirId } = c.req.param();

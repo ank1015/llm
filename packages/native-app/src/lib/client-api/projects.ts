@@ -179,6 +179,21 @@ export async function createArtifactDir(
   );
 }
 
+export async function renameArtifactDir(
+  projectId: string,
+  artifactDirId: string,
+  input: { name: string }
+): Promise<ArtifactDirMetadata> {
+  return apiRequestJson<ArtifactDirMetadata>(
+    `${PROJECTS_BASE}/${encodeURIComponent(projectId)}/artifacts/${encodeURIComponent(artifactDirId)}/name`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    }
+  );
+}
+
 export async function deleteArtifactDir(
   projectId: string,
   artifactDirId: string
