@@ -1,18 +1,8 @@
-import Markdown, {
-  MarkdownIt,
-  type ASTNode,
-  type RenderRules,
-} from '@ronradtke/react-native-markdown-display';
-import { Image } from 'expo-image';
-import * as WebBrowser from 'expo-web-browser';
 import { useThemeColor } from 'heroui-native';
-import { useMemo } from 'react';
-import { Linking, Pressable, ScrollView, View } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { View } from 'react-native';
 
-import { AppText } from '@/components/app-text';
-import { ThreadCodeBlock } from '@/components/projects/thread/thread-code-block';
 import ThreadMarkdownDom from '@/components/projects/thread/thread-markdown-dom';
-import { isInlineFilePath, shouldUseDomFallback } from '@/lib/messages/markdown';
 
 type ThreadMarkdownProps = {
   children: string;
@@ -20,11 +10,6 @@ type ThreadMarkdownProps = {
   resolveImageSource?: (source: string) => string | null;
   resolveLinkHref?: (href: string) => string | null;
 };
-
-function getCodeLanguage(node: ASTNode): string {
-  const language = node.sourceInfo.trim().split(/\s+/)[0];
-  return language && language.length > 0 ? language : 'plaintext';
-}
 
 export function ThreadMarkdown({
   children,
@@ -39,336 +24,63 @@ export function ThreadMarkdown({
     'background',
     'border',
   ]);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const [measuredHeight, setMeasuredHeight] = useState(compact ? 24 : 32);
   const linkColor = '#2563EB';
   const subtleSurface = compact ? 'rgba(15, 23, 42, 0.04)' : 'rgba(15, 23, 42, 0.05)';
-  const inlineCodeStyle = useMemo(
+
+  const handleHeightChange = useCallback(
+    async (height: number) => {
+      const nextHeight = Math.max(compact ? 24 : 32, Math.ceil(height));
+      setMeasuredHeight((current) => (current === nextHeight ? current : nextHeight));
+    },
+    [compact]
+  );
+
+  const domStyle = useMemo(
     () => ({
-      backgroundColor: surfaceColor,
-      borderColor,
-      borderRadius: 8,
-      borderWidth: 1,
-      color: foregroundColor,
-      fontFamily: process.env.EXPO_OS === 'ios' ? 'Menlo' : 'monospace',
-      fontSize: compact ? 12 : 13,
-      overflow: 'hidden' as const,
-      paddingHorizontal: 6,
-      paddingVertical: 2,
+      height: measuredHeight,
+      width: containerWidth,
     }),
-    [borderColor, compact, foregroundColor, surfaceColor]
+    [containerWidth, measuredHeight]
   );
-  const inlineFilePathStyle = useMemo(
+  const theme = useMemo(
     () => ({
-      color: foregroundColor,
-      fontSize: compact ? 13 : 15,
-      fontWeight: '700' as const,
+      background: backgroundColor,
+      blockquoteBackground: subtleSurface,
+      border: borderColor,
+      codeBackground: surfaceColor,
+      foreground: foregroundColor,
+      link: linkColor,
+      muted: mutedColor,
     }),
-    [compact, foregroundColor]
+    [backgroundColor, borderColor, foregroundColor, mutedColor, subtleSurface, surfaceColor]
   );
-
-  const markdownIt = useMemo(
-    () =>
-      MarkdownIt({
-        breaks: true,
-        linkify: true,
-        typographer: true,
-      }),
-    []
-  );
-
-  const rules = useMemo<RenderRules>(
-    () => ({
-      fence: (node) => (
-        <View key={node.key} className="my-3">
-          <ThreadCodeBlock code={node.content} compact={compact} language={getCodeLanguage(node)} />
-        </View>
-      ),
-      code_block: (node) => (
-        <View key={node.key} className="my-3">
-          <ThreadCodeBlock code={node.content} compact={compact} />
-        </View>
-      ),
-      code_inline: (node) => {
-        const content = node.content.trim();
-
-        return (
-          <AppText
-            key={node.key}
-            style={isInlineFilePath(content) ? inlineFilePathStyle : inlineCodeStyle}
-          >
-            {content}
-          </AppText>
-        );
-      },
-      image: (node) => {
-        const rawSource = node.attributes.src;
-        const source =
-          typeof rawSource === 'string'
-            ? (resolveImageSource?.(rawSource) ?? (resolveImageSource ? null : rawSource))
-            : null;
-
-        if (typeof source !== 'string' || source.length === 0) {
-          return null;
-        }
-
-        return (
-          <View key={node.key} className="my-3 overflow-hidden rounded-[18px] bg-default">
-            <Image
-              accessible={Boolean(node.attributes.alt)}
-              accessibilityLabel={node.attributes.alt}
-              contentFit="contain"
-              source={{ uri: source }}
-              style={{ height: compact ? 180 : 220, width: '100%' }}
-            />
-          </View>
-        );
-      },
-      link: (node, childrenNodes, _parent, _styles, onLinkPress) => (
-        <Pressable
-          accessibilityRole="link"
-          key={node.key}
-          onPress={() => {
-            const rawHref = node.attributes.href;
-            const href =
-              typeof rawHref === 'string'
-                ? (resolveLinkHref?.(rawHref) ?? (resolveLinkHref ? null : rawHref))
-                : null;
-            if (!href) {
-              return;
-            }
-
-            const result = onLinkPress?.(href);
-            if (result === true) {
-              void Linking.openURL(href);
-            }
-          }}
-        >
-          <AppText className={compact ? 'text-[13px]' : 'text-[15px]'} style={{ color: linkColor }}>
-            {childrenNodes}
-          </AppText>
-        </Pressable>
-      ),
-      blocklink: (node, childrenNodes, _parent, _styles, onLinkPress) => (
-        <Pressable
-          accessibilityRole="link"
-          key={node.key}
-          onPress={() => {
-            const rawHref = node.attributes.href;
-            const href =
-              typeof rawHref === 'string'
-                ? (resolveLinkHref?.(rawHref) ?? (resolveLinkHref ? null : rawHref))
-                : null;
-            if (!href) {
-              return;
-            }
-
-            const result = onLinkPress?.(href);
-            if (result === true) {
-              void Linking.openURL(href);
-            }
-          }}
-        >
-          <View>{childrenNodes}</View>
-        </Pressable>
-      ),
-      table: (node, childrenNodes) => (
-        <ScrollView
-          key={node.key}
-          horizontal
-          className="my-4 rounded-[18px] border border-foreground/10 bg-default"
-          showsHorizontalScrollIndicator={false}
-        >
-          <View className="min-w-full">{childrenNodes}</View>
-        </ScrollView>
-      ),
-    }),
-    [compact, inlineCodeStyle, inlineFilePathStyle, linkColor, resolveImageSource, resolveLinkHref]
-  );
-
-  const markdownStyle = useMemo(
-    // eslint-disable-next-line sonarjs/cognitive-complexity
-    () => ({
-      body: {
-        color: foregroundColor,
-        fontSize: compact ? 13 : 15,
-        lineHeight: compact ? 20 : 27,
-      },
-      blockquote: {
-        backgroundColor: subtleSurface,
-        borderLeftColor: borderColor,
-        borderLeftWidth: 3,
-        borderRadius: 14,
-        marginBottom: compact ? 12 : 16,
-        marginTop: compact ? 8 : 12,
-        paddingBottom: 10,
-        paddingHorizontal: 14,
-        paddingTop: 10,
-      },
-      bullet_list: {
-        marginBottom: compact ? 10 : 14,
-        marginTop: compact ? 8 : 10,
-      },
-      bullet_list_content: {
-        flex: 1,
-      },
-      bullet_list_icon: {
-        color: mutedColor,
-        marginRight: 8,
-      },
-      code_inline: {
-        backgroundColor: surfaceColor,
-        borderColor,
-        borderRadius: 8,
-        borderWidth: 1,
-        color: foregroundColor,
-        fontFamily: process.env.EXPO_OS === 'ios' ? 'Menlo' : 'monospace',
-        fontSize: compact ? 12 : 13,
-        overflow: 'hidden' as const,
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-      },
-      em: {
-        fontStyle: 'italic' as const,
-      },
-      heading1: {
-        fontSize: compact ? 20 : 24,
-        fontWeight: '700' as const,
-        marginBottom: 10,
-        marginTop: 18,
-      },
-      heading2: {
-        fontSize: compact ? 18 : 20,
-        fontWeight: '700' as const,
-        marginBottom: 8,
-        marginTop: 16,
-      },
-      heading3: {
-        fontSize: compact ? 16 : 18,
-        fontWeight: '600' as const,
-        marginBottom: 8,
-        marginTop: 14,
-      },
-      heading4: {
-        fontSize: compact ? 15 : 16,
-        fontWeight: '600' as const,
-        marginBottom: 8,
-        marginTop: 14,
-      },
-      heading5: {
-        fontSize: compact ? 14 : 15,
-        fontWeight: '600' as const,
-        marginBottom: 6,
-        marginTop: 12,
-      },
-      heading6: {
-        fontSize: compact ? 13 : 14,
-        fontWeight: '600' as const,
-        marginBottom: 6,
-        marginTop: 12,
-      },
-      hr: {
-        backgroundColor: borderColor,
-        height: 1,
-        marginVertical: compact ? 14 : 20,
-      },
-      image: {
-        borderRadius: 18,
-      },
-      link: {
-        color: linkColor,
-      },
-      list_item: {
-        color: foregroundColor,
-        marginBottom: 4,
-      },
-      ordered_list: {
-        marginBottom: compact ? 10 : 14,
-        marginTop: compact ? 8 : 10,
-      },
-      ordered_list_content: {
-        flex: 1,
-      },
-      ordered_list_icon: {
-        color: mutedColor,
-        fontVariant: ['tabular-nums'] as const,
-        marginRight: 8,
-      },
-      paragraph: {
-        marginBottom: compact ? 10 : 14,
-      },
-      s: {
-        textDecorationLine: 'line-through' as const,
-      },
-      strong: {
-        fontWeight: '700' as const,
-      },
-      table: {
-        minWidth: 320,
-      },
-      tbody: {},
-      td: {
-        borderColor,
-        borderTopWidth: 1,
-        minWidth: 140,
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-      },
-      text: {
-        color: foregroundColor,
-      },
-      th: {
-        backgroundColor: subtleSurface,
-        minWidth: 140,
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-      },
-      tr: {
-        borderColor,
-        flexDirection: 'row' as const,
-      },
-    }),
-    [borderColor, compact, foregroundColor, linkColor, mutedColor, subtleSurface, surfaceColor]
-  );
-
-  if (shouldUseDomFallback(children)) {
-    return (
-      <ThreadMarkdownDom
-        compact={compact}
-        dom={{
-          contentInsetAdjustmentBehavior: 'never',
-          scrollEnabled: false,
-          style: {
-            minHeight: compact ? 24 : 32,
-            width: '100%',
-          },
-        }}
-        markdown={children}
-        resolveImageSource={resolveImageSource}
-        resolveLinkHref={resolveLinkHref}
-        theme={{
-          background: backgroundColor,
-          blockquoteBackground: subtleSurface,
-          border: borderColor,
-          codeBackground: surfaceColor,
-          foreground: foregroundColor,
-          link: linkColor,
-          muted: mutedColor,
-        }}
-      />
-    );
-  }
 
   return (
-    <Markdown
-      markdownit={markdownIt}
-      mergeStyle
-      onLinkPress={(url) => {
-        void WebBrowser.openBrowserAsync(url);
-        return false;
+    <View
+      className="w-full"
+      onLayout={(event) => {
+        const nextWidth = Math.ceil(event.nativeEvent.layout.width);
+        setContainerWidth((current) => (current === nextWidth ? current : nextWidth));
       }}
-      rules={rules}
-      style={markdownStyle}
+      style={{ minHeight: measuredHeight }}
     >
-      {children}
-    </Markdown>
+      {containerWidth > 0 ? (
+        <ThreadMarkdownDom
+          compact={compact}
+          dom={{
+            contentInsetAdjustmentBehavior: 'never',
+            scrollEnabled: false,
+            style: domStyle,
+          }}
+          markdown={children}
+          onHeightChange={handleHeightChange}
+          resolveImageSource={resolveImageSource}
+          resolveLinkHref={resolveLinkHref}
+          theme={theme}
+        />
+      ) : null}
+    </View>
   );
 }

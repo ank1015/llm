@@ -13,7 +13,7 @@ import type {
 } from '@/lib/messages/working-trace';
 
 import { AppText } from '@/components/app-text';
-import { ThreadMarkdown } from '@/components/projects/thread/thread-markdown';
+import { ThreadTranscriptMarkdown } from '@/components/projects/thread/thread-transcript-markdown';
 import {
   getWorkingTraceFiles,
   getWorkingTraceImages,
@@ -269,7 +269,7 @@ function ToolTraceItem({ entry }: { entry: WorkingToolEntry }) {
   };
 
   return (
-    <View className="gap-2 pb-3">
+    <View className="w-full gap-2 pb-3">
       <Pressable
         accessibilityRole="button"
         android_ripple={{ color: 'transparent' }}
@@ -289,7 +289,7 @@ function ToolTraceItem({ entry }: { entry: WorkingToolEntry }) {
 
       {isOpen ? (
         <View
-          className="overflow-hidden rounded-[20px] border border-foreground/10 bg-default"
+          className="w-full overflow-hidden rounded-[20px] border border-foreground/10 bg-default"
           style={{ borderCurve: 'continuous' }}
         >
           <View className="flex-row items-center justify-between border-b border-foreground/10 px-3 py-2.5">
@@ -310,7 +310,7 @@ function ToolTraceItem({ entry }: { entry: WorkingToolEntry }) {
             ) : null}
           </View>
 
-          <View className="gap-3 px-3 py-3">
+          <View className="w-full gap-3 px-3 py-3">
             <ToolContentPreview entry={entry} />
             <View className="flex-row items-center justify-end gap-1.5">
               <StyledFeather
@@ -348,22 +348,22 @@ function ToolTraceItem({ entry }: { entry: WorkingToolEntry }) {
 function TraceContent({ item }: { item: Exclude<WorkingTraceItem, WorkingToolEntry> }) {
   if (item.type === 'assistant_note') {
     return (
-      <View className="pb-3">
-        <ThreadMarkdown compact>{item.body}</ThreadMarkdown>
+      <View className="w-full pb-3">
+        <ThreadTranscriptMarkdown compact>{item.body}</ThreadTranscriptMarkdown>
       </View>
     );
   }
 
   if (item.format === 'markdown') {
     return (
-      <View className="pb-3">
-        <ThreadMarkdown compact>{item.body}</ThreadMarkdown>
+      <View className="w-full pb-3">
+        <ThreadTranscriptMarkdown compact>{item.body}</ThreadTranscriptMarkdown>
       </View>
     );
   }
 
   return (
-    <View className="gap-1 pb-3">
+    <View className="w-full gap-1 pb-3">
       {item.title ? (
         <AppText className="text-[13px] font-medium leading-5 text-foreground">
           {item.title}
@@ -409,7 +409,7 @@ export function ThreadWorkingTrace({ label, live, model }: ThreadWorkingTracePro
 
       {isOpen ? (
         model.items.length > 0 ? (
-          <View className="gap-1">
+          <View className="w-full gap-1">
             {model.items.map((item) => (
               <TraceItemView key={item.id} item={item} />
             ))}

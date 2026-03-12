@@ -2,11 +2,10 @@ import * as Clipboard from 'expo-clipboard';
 import { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 
-
 import type { AgentEvent, Api, BaseAssistantMessage, Message, MessageNode } from '@ank1015/llm-sdk';
 
 import { ThreadActionButton } from '@/components/projects/thread/thread-action-button';
-import { ThreadMarkdown } from '@/components/projects/thread/thread-markdown';
+import { ThreadTranscriptMarkdown } from '@/components/projects/thread/thread-transcript-markdown';
 import { ThreadWorkingTrace } from '@/components/projects/thread/thread-working-trace';
 import { buildWorkingTraceModel } from '@/lib/messages/working-trace';
 import { useChatStore } from '@/stores/chat-store';
@@ -115,15 +114,15 @@ export function ThreadAssistantMessages({
   }
 
   return (
-    <View className="w-full items-start gap-3">
-      <View className="max-w-[96%]">
+    <View className="w-full gap-4">
+      <View className="w-full max-w-[96%]">
         <ThreadWorkingTrace label={label} live={isStreamingTurn} model={traceModel} />
       </View>
 
       {displayText ? (
         <>
-          <View className="max-w-[96%]">
-            <ThreadMarkdown>{displayText}</ThreadMarkdown>
+          <View className="w-full max-w-[96%]">
+            <ThreadTranscriptMarkdown>{displayText}</ThreadTranscriptMarkdown>
           </View>
 
           <View className="ml-1 flex-row items-center gap-1">

@@ -3,13 +3,12 @@ import { useToast } from 'heroui-native';
 import { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 
-
 import type { BranchNavigatorState } from '@/lib/messages/session-tree';
 import type { MessageNode, UserMessage } from '@ank1015/llm-sdk';
 
 import { AppText } from '@/components/app-text';
 import { ThreadActionButton } from '@/components/projects/thread/thread-action-button';
-import { ThreadMarkdown } from '@/components/projects/thread/thread-markdown';
+import { ThreadTranscriptMarkdown } from '@/components/projects/thread/thread-transcript-markdown';
 import { getTextFromUserMessage } from '@/lib/messages/utils';
 import { useChatSettingsStore, useChatStore, useComposerStore } from '@/stores';
 
@@ -137,10 +136,10 @@ export function ThreadUserMessage({
     <View className="w-full items-end gap-1.5">
       {text ? (
         <View
-          className="max-w-[82%] rounded-[24px] bg-foreground/6 px-4 py-3"
+          className="w-full max-w-[82%] rounded-[24px] bg-foreground/6 px-4 py-3"
           style={{ borderCurve: 'continuous' }}
         >
-          <ThreadMarkdown>{text}</ThreadMarkdown>
+          <ThreadTranscriptMarkdown>{text}</ThreadTranscriptMarkdown>
         </View>
       ) : null}
 
