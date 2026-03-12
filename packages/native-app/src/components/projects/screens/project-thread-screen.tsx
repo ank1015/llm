@@ -122,7 +122,7 @@ export function ProjectThreadScreen() {
   );
   const { projectId, refreshOverview } = useProjectShell();
   const { isDark } = useAppTheme();
-  const [accentColor] = useThemeColor(['accent']);
+  const [mutedColor] = useThemeColor(['muted']);
   const { height: windowHeight } = useWindowDimensions();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [composerHeight, setComposerHeight] = useState(0);
@@ -304,10 +304,10 @@ export function ProjectThreadScreen() {
           }}
           refreshControl={
             <RefreshControl
-              colors={[accentColor]}
+              colors={[mutedColor]}
               onRefresh={handleRefresh}
               refreshing={isRefreshing}
-              tintColor={accentColor}
+              tintColor={mutedColor}
             />
           }
           scrollEventThrottle={16}

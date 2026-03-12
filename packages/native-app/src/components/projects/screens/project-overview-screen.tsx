@@ -1,8 +1,8 @@
 import Feather from '@expo/vector-icons/Feather';
 import { useRouter } from 'expo-router';
 import { Button, InputGroup, useThemeColor, useToast } from 'heroui-native';
-import { useState } from 'react';
-import { Alert, RefreshControl, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Alert, RefreshControl, View, type ScrollView } from 'react-native';
 import { withUniwind } from 'uniwind';
 
 import { AppText } from '@/components/app-text';
@@ -48,6 +48,8 @@ export function ProjectOverviewScreen() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isCreatingArtifact, setIsCreatingArtifact] = useState(false);
   const [isRenamingArtifact, setIsRenamingArtifact] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+  const wasRefreshingRef = useRef(false);
   const [renameArtifactTarget, setRenameArtifactTarget] = useState<OverviewArtifactTarget | null>(
     null
   );
@@ -63,6 +65,19 @@ export function ProjectOverviewScreen() {
         );
       })
     : artifactDirs;
+
+  useEffect(() => {
+    if (wasRefreshingRef.current && !isRefreshing) {
+      requestAnimationFrame(() => {
+        scrollRef.current?.scrollTo({
+          animated: false,
+          y: 0,
+        });
+      });
+    }
+
+    wasRefreshingRef.current = isRefreshing;
+  }, [isRefreshing]);
 
   const handleCreateArtifact = async (name: string) => {
     setIsCreatingArtifact(true);
@@ -181,6 +196,7 @@ export function ProjectOverviewScreen() {
   return (
     <>
       <ScreenScrollView
+        ref={scrollRef}
         alwaysBounceVertical
         contentContainerClassName={appLayout.screenContent}
         contentContainerStyle={{

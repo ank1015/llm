@@ -136,7 +136,7 @@ export function ThreadUserMessage({
     <View className="w-full items-end gap-1.5">
       {text ? (
         <View
-          className="w-full max-w-[82%] rounded-[24px] bg-foreground/6 px-4 py-3"
+          className="w-full max-w-[82%] rounded-[24px] bg-foreground/6 px-4 pt-1"
           style={{ borderCurve: 'continuous' }}
         >
           <ThreadTranscriptMarkdown>{text}</ThreadTranscriptMarkdown>

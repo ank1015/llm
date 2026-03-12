@@ -1,7 +1,13 @@
 import { Link, useLocalSearchParams } from 'expo-router';
 import { Skeleton, Tabs, useThemeColor } from 'heroui-native';
-import { useMemo, useState } from 'react';
-import { Pressable, RefreshControl, View, useWindowDimensions } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Pressable,
+  RefreshControl,
+  View,
+  useWindowDimensions,
+  type ScrollView,
+} from 'react-native';
 
 import { AppText } from '@/components/app-text';
 import { ProjectArtifactExplorer } from '@/components/projects/artifacts/project-artifact-explorer';
@@ -35,11 +41,26 @@ export function ProjectArtifactScreen() {
   const error = useSidebarStore((state) => state.error);
   const [activeTab, setActiveTab] = useState('chats');
   const [composerHeight, setComposerHeight] = useState(0);
+  const scrollRef = useRef<ScrollView>(null);
+  const wasRefreshingRef = useRef(false);
   const { height: windowHeight } = useWindowDimensions();
   const [mutedColor] = useThemeColor(['muted']);
   const composerInset = activeTab === 'chats' ? composerHeight + appSpacing.sm : 0;
   const endSpacerHeight = Math.round(windowHeight * 0.4);
   const shouldShowChatSkeletons = !artifact && !error && (isLoading || isRefreshing);
+
+  useEffect(() => {
+    if (wasRefreshingRef.current && !isRefreshing) {
+      requestAnimationFrame(() => {
+        scrollRef.current?.scrollTo({
+          animated: false,
+          y: 0,
+        });
+      });
+    }
+
+    wasRefreshingRef.current = isRefreshing;
+  }, [isRefreshing]);
 
   const sessions = useMemo(() => {
     if (!artifact) {
@@ -94,6 +115,7 @@ export function ProjectArtifactScreen() {
         <Tabs.Content className="flex-1" value="chats">
           <View className="flex-1" style={{ paddingBottom: composerInset }}>
             <ScreenScrollView
+              ref={scrollRef}
               alwaysBounceVertical
               className="flex-1"
               contentContainerClassName={appLayout.artifactScreen}
