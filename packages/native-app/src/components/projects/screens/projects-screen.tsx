@@ -183,7 +183,12 @@ export function ProjectsScreen() {
           }}
         >
           <View className={appLayout.homeHeaderRow}>
-            <AppText className={appTypography.screenTitle}>Projects</AppText>
+            <AppText
+              className={appTypography.screenTitle}
+              style={{ minWidth: 132, paddingRight: 8 }}
+            >
+              Projects
+            </AppText>
             <Button
               className="rounded-full"
               isIconOnly
