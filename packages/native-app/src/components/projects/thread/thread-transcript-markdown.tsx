@@ -29,6 +29,29 @@ type ThreadMarkdownPalette = {
 
 const MONOSPACE_FONT = process.env.EXPO_OS === 'ios' ? 'Menlo' : 'monospace';
 
+function isInlinePathLike(value: string): boolean {
+  if (isInlineFilePath(value)) {
+    return true;
+  }
+
+  const trimmed = value.trim();
+  if (trimmed.length < 3 || /\s/.test(trimmed)) {
+    return false;
+  }
+
+  if (trimmed.includes('/') || trimmed.includes('\\')) {
+    return true;
+  }
+
+  return /^[A-Za-z0-9._-]+$/.test(trimmed) && (trimmed.includes('_') || trimmed.includes('-'));
+}
+
+function normalizeThreadMarkdown(markdown: string): string {
+  return markdown.replace(/\*\*`([^`\n]+)`\*\*/g, (match, candidate) => {
+    return isInlinePathLike(candidate) ? `\`${candidate}\`` : match;
+  });
+}
+
 function parseMarkdownIntoBlocks(markdown: string): string[] {
   const blocks = MarkedLexer(markdown, {
     breaks: true,
@@ -59,7 +82,6 @@ function createMarkedStyles({
     },
     codespan: {
       color: palette.foreground,
-      fontFamily: MONOSPACE_FONT,
       fontSize: compact ? 12 : 13,
       lineHeight: compact ? 18 : 20,
     },
@@ -287,24 +309,35 @@ class ThreadTranscriptRenderer extends Renderer implements RendererInterface {
   }
 
   override codespan(text: string, styles?: TextStyle): ReactNode {
-    const isPathChip = isInlineFilePath(text);
+    const isPathLike = isInlinePathLike(text);
 
     return (
       <AppText
         key={this.getKey()}
-        selectable
+        selectable={!isPathLike}
         style={[
           styles,
-          {
-            backgroundColor: this.palette.codeBackground,
-            borderColor: this.palette.border,
-            borderRadius: 10,
-            borderWidth: 1,
-            color: this.palette.foreground,
-            fontFamily: MONOSPACE_FONT,
-            paddingHorizontal: isPathChip ? 8 : 6,
-            paddingVertical: 2,
-          },
+          isPathLike
+            ? {
+                backgroundColor: 'transparent',
+                color: this.palette.foreground,
+                fontSize: this.compact ? 13 : 15,
+                fontStyle: 'normal',
+                fontWeight: '600',
+                lineHeight: this.compact ? 20 : 27,
+                paddingHorizontal: 0,
+                paddingVertical: 0,
+              }
+            : {
+                backgroundColor: this.palette.codeBackground,
+                borderColor: this.palette.border,
+                borderRadius: 10,
+                borderWidth: 1,
+                color: this.palette.foreground,
+                fontFamily: MONOSPACE_FONT,
+                paddingHorizontal: 6,
+                paddingVertical: 2,
+              },
         ]}
       >
         {text}
@@ -369,7 +402,8 @@ export function ThreadTranscriptMarkdown({
     'default',
     'border',
   ]);
-  const blocks = useMemo(() => parseMarkdownIntoBlocks(children), [children]);
+  const normalizedMarkdown = useMemo(() => normalizeThreadMarkdown(children), [children]);
+  const blocks = useMemo(() => parseMarkdownIntoBlocks(normalizedMarkdown), [normalizedMarkdown]);
   const palette = useMemo<ThreadMarkdownPalette>(
     () => ({
       blockquoteBackground: compact ? 'rgba(15, 23, 42, 0.04)' : 'rgba(15, 23, 42, 0.05)',

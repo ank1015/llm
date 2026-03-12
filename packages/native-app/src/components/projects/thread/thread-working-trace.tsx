@@ -279,7 +279,13 @@ function ToolTraceItem({ entry }: { entry: WorkingToolEntry }) {
           setIsOpen((current) => !current);
         }}
       >
-        <AppText className="flex-1 text-[13px] font-medium text-foreground">{entry.title}</AppText>
+        <AppText
+          className="flex-1 text-[13px] font-medium text-foreground"
+          ellipsizeMode="tail"
+          numberOfLines={1}
+        >
+          {entry.title}
+        </AppText>
         <StyledFeather
           className="text-muted"
           name={isOpen ? 'chevron-down' : 'chevron-right'}
@@ -311,6 +317,13 @@ function ToolTraceItem({ entry }: { entry: WorkingToolEntry }) {
           </View>
 
           <View className="w-full gap-3 px-3 py-3">
+            <AppText
+              selectable
+              className="text-[12px] leading-5 text-foreground"
+              style={{ fontFamily: process.env.EXPO_OS === 'ios' ? 'Menlo' : 'monospace' }}
+            >
+              {entry.title}
+            </AppText>
             <ToolContentPreview entry={entry} />
             <View className="flex-row items-center justify-end gap-1.5">
               <StyledFeather
