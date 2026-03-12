@@ -1,114 +1,174 @@
 import Feather from '@expo/vector-icons/Feather';
-import * as Haptics from 'expo-haptics';
-import { useNavigation, useRouter } from 'expo-router';
-import { Pressable, View } from 'react-native';
+import { useGlobalSearchParams, useRouter } from 'expo-router';
+import { type FC, useMemo } from 'react';
+import { Pressable, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { withUniwind } from 'uniwind';
 
-import type { DrawerNavigationProp } from '@react-navigation/drawer';
-import type { ParamListBase } from '@react-navigation/native';
-import type { ComponentProps, FC } from 'react';
-
 import { AppText } from '@/components/app-text';
-import { ThemeToggle } from '@/components/theme-toggle';
+import { cn } from '@/lib/utils';
 import { useSidebarStore } from '@/stores';
+import { appColors, appSizes } from '@/styles/ui';
 
 const StyledFeather = withUniwind(Feather);
 
-type HeaderIconButtonProps = {
-  accessibilityLabel: string;
-  icon: ComponentProps<typeof Feather>['name'];
-  onPress: () => void;
+type BreadcrumbItem = {
+  href:
+    | {
+        pathname: '/[projectId]';
+        params: { projectId: string };
+      }
+    | {
+        pathname: '/[projectId]/[artifactId]';
+        params: { projectId: string; artifactId: string };
+      }
+    | {
+        pathname: '/[projectId]/[artifactId]/[threadId]';
+        params: { projectId: string; artifactId: string; threadId: string };
+      };
+  id: string;
+  label: string;
 };
 
-const HeaderIconButton: FC<HeaderIconButtonProps> = ({ accessibilityLabel, icon, onPress }) => {
-  return (
-    <Pressable
-      android_ripple={{ color: 'transparent' }}
-      accessibilityLabel={accessibilityLabel}
-      hitSlop={12}
-      onPress={onPress}
-      onPressIn={() => {
-        if (process.env.EXPO_OS === 'ios') {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        }
-      }}
-      style={{ padding: 6 }}
-    >
-      <StyledFeather className="text-foreground" name={icon} size={22} />
-    </Pressable>
-  );
-};
+function getCrumbMaxWidth(
+  availableWidth: number,
+  itemCount: number,
+  isCurrent: boolean
+): number | undefined {
+  if (availableWidth <= 0) {
+    return undefined;
+  }
 
-export const ProjectHeaderLeft: FC = () => {
-  const navigation = useNavigation<DrawerNavigationProp<ParamListBase>>();
+  if (itemCount === 1) {
+    return availableWidth * 0.92;
+  }
 
-  return (
-    <HeaderIconButton
-      accessibilityLabel="Open project sidebar"
-      icon="menu"
-      onPress={() => {
-        navigation.toggleDrawer();
-      }}
-    />
-  );
-};
+  if (itemCount === 2) {
+    return availableWidth * (isCurrent ? 0.58 : 0.34);
+  }
 
-export const ProjectHeaderTitle: FC = () => {
-  const projectName = useSidebarStore((state) => state.projectName);
-  const router = useRouter();
-
-  return (
-    <Pressable
-      android_ripple={{ color: 'transparent' }}
-      hitSlop={12}
-      onPress={() => {
-        router.replace('/');
-      }}
-      onPressIn={() => {
-        if (process.env.EXPO_OS === 'ios') {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        }
-      }}
-      style={{ maxWidth: 220, paddingHorizontal: 6, paddingVertical: 4 }}
-    >
-      <View className="flex-row items-center justify-center gap-1">
-        <AppText
-          className="text-lg font-semibold text-foreground"
-          numberOfLines={1}
-          style={{ flexShrink: 1 }}
-        >
-          {projectName ?? 'Project'}
-        </AppText>
-        <StyledFeather className="text-foreground/70" name="chevron-down" size={16} />
-      </View>
-    </Pressable>
-  );
-};
+  return availableWidth * (isCurrent ? 0.42 : 0.24);
+}
 
 export const ProjectScreenHeader: FC = () => {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const params = useGlobalSearchParams<{
+    artifactId?: string | string[];
+    projectId?: string | string[];
+    threadId?: string | string[];
+  }>();
+  const projectName = useSidebarStore((state) => state.projectName);
+  const artifactDirs = useSidebarStore((state) => state.artifactDirs);
+  const projectId = Array.isArray(params.projectId) ? params.projectId[0] : params.projectId;
+  const artifactId = Array.isArray(params.artifactId) ? params.artifactId[0] : params.artifactId;
+  const threadId = Array.isArray(params.threadId) ? params.threadId[0] : params.threadId;
+  const artifact = artifactDirs.find((entry) => entry.id === artifactId) ?? null;
+  const thread = artifact?.sessions.find((entry) => entry.sessionId === threadId) ?? null;
+  const breadcrumbItems = useMemo(() => {
+    if (!projectId) {
+      return [] as BreadcrumbItem[];
+    }
+
+    const items: BreadcrumbItem[] = [
+      {
+        href: {
+          pathname: '/[projectId]',
+          params: { projectId },
+        },
+        id: 'project',
+        label: projectName ?? 'Project',
+      },
+    ];
+
+    if (artifactId) {
+      items.push({
+        href: {
+          pathname: '/[projectId]/[artifactId]',
+          params: {
+            projectId,
+            artifactId,
+          },
+        },
+        id: 'artifact',
+        label: artifact?.name ?? 'Artifact',
+      });
+    }
+
+    if (artifactId && threadId) {
+      items.push({
+        href: {
+          pathname: '/[projectId]/[artifactId]/[threadId]',
+          params: {
+            projectId,
+            artifactId,
+            threadId,
+          },
+        },
+        id: 'thread',
+        label: thread?.sessionName ?? 'Thread',
+      });
+    }
+
+    return items;
+  }, [artifact?.name, artifactId, projectId, projectName, thread?.sessionName, threadId]);
+
+  if (!projectId || breadcrumbItems.length === 0) {
+    return null;
+  }
+
+  const breadcrumbAvailableWidth = Math.max(width - 40, 180);
 
   return (
     <View
       className="bg-background px-5"
       style={{
-        paddingTop: insets.top + 8,
-        paddingBottom: 12,
+        paddingTop: insets.top + 10,
+        paddingBottom: 8,
       }}
     >
-      <View className="flex-row items-center">
-        <View className="items-start" style={{ width: 40 }}>
-          <ProjectHeaderLeft />
-        </View>
+      <View className="flex-row items-center overflow-hidden">
+        {breadcrumbItems.map((item, index) => {
+          const isCurrent = index === breadcrumbItems.length - 1;
 
-        <View className="flex-1 items-center justify-center px-3">
-          <ProjectHeaderTitle />
-        </View>
+          return (
+            <View key={item.id} className="flex-row items-center">
+              <Pressable
+                android_ripple={{ color: 'transparent' }}
+                disabled={isCurrent}
+                hitSlop={6}
+                style={{ borderCurve: 'continuous' }}
+                onPress={() => router.replace(item.href)}
+              >
+                <AppText
+                  className={cn(
+                    'mx-1 text-[15px]',
+                    isCurrent ? 'font-medium text-foreground' : 'text-muted'
+                  )}
+                  ellipsizeMode="tail"
+                  numberOfLines={1}
+                  style={{
+                    flexShrink: 1,
+                    maxWidth: getCrumbMaxWidth(
+                      breadcrumbAvailableWidth,
+                      breadcrumbItems.length,
+                      isCurrent
+                    ),
+                  }}
+                >
+                  {item.label}
+                </AppText>
+              </Pressable>
 
-        <View className="items-end" style={{ width: 40 }}>
-          <ThemeToggle />
-        </View>
+              <StyledFeather
+                className={appColors.foregroundSoft}
+                name="chevron-right"
+                size={appSizes.iconXs}
+              />
+            </View>
+          );
+        })}
       </View>
     </View>
   );
