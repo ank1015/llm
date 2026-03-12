@@ -6,6 +6,7 @@ import {
   createProject as createProjectApi,
   deleteProject as deleteProjectApi,
   listProjects,
+  renameProject as renameProjectApi,
   type ProjectMetadata,
 } from '@/lib/client-api';
 
@@ -20,12 +21,14 @@ type ProjectsStoreState = {
   isRefreshing: boolean;
   error: string | null;
   isCreating: boolean;
+  renamingProjectId: string | null;
   deletingProjectId: string | null;
   mutationError: string | null;
   clearMutationError: () => void;
   fetchProjects: () => Promise<void>;
   refresh: () => Promise<void>;
   createProject: (input: CreateProjectInput) => Promise<ProjectMetadata>;
+  renameProject: (projectId: string, input: { name: string }) => Promise<void>;
   deleteProject: (projectId: string) => Promise<void>;
   reset: () => void;
 };
@@ -46,6 +49,7 @@ const initialState = {
   isRefreshing: false,
   error: null as string | null,
   isCreating: false,
+  renamingProjectId: null as string | null,
   deletingProjectId: null as string | null,
   mutationError: null as string | null,
 };
@@ -152,6 +156,43 @@ export const useProjectsStore = create<ProjectsStoreState>((set, get) => ({
       throw error;
     } finally {
       set({ isCreating: false });
+    }
+  },
+
+  renameProject: async (projectId, input) => {
+    const trimmedName = input.name.trim();
+    if (trimmedName.length === 0) {
+      throw new Error('Project name cannot be empty.');
+    }
+
+    const previousProject = get().projects.find((project) => project.id === projectId);
+    const previousName = previousProject?.name;
+
+    set({
+      renamingProjectId: projectId,
+      mutationError: null,
+      projects: get().projects.map((project) =>
+        project.id === projectId ? { ...project, name: trimmedName } : project
+      ),
+    });
+
+    try {
+      await renameProjectApi(projectId, { name: trimmedName });
+    } catch (error) {
+      set((state) => ({
+        projects:
+          previousName === undefined
+            ? state.projects
+            : state.projects.map((project) =>
+                project.id === projectId ? { ...project, name: previousName } : project
+              ),
+        mutationError: getErrorMessage(error),
+      }));
+      throw error;
+    } finally {
+      set({
+        renamingProjectId: null,
+      });
     }
   },
 

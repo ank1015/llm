@@ -130,6 +130,27 @@ export class Project {
     return nextMetadata;
   }
 
+  /** Update this project's display name without changing its stable id or paths. */
+  async rename(name: string): Promise<ProjectMetadata> {
+    const trimmedName = name.trim();
+    if (trimmedName.length === 0) {
+      throw new Error('Project name cannot be empty');
+    }
+
+    const metadata = await this.getMetadata();
+    if (metadata.name === trimmedName) {
+      return metadata;
+    }
+
+    const nextMetadata: ProjectMetadata = {
+      ...metadata,
+      name: trimmedName,
+    };
+
+    await writeMetadata(this.dataPath, nextMetadata);
+    return nextMetadata;
+  }
+
   /** Check if both project directory and metadata directory exist */
   async exists(): Promise<boolean> {
     const [projectExists, dataExists] = await Promise.all([

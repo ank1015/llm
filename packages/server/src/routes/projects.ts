@@ -7,6 +7,7 @@ import type { ProjectFileIndexEntry } from '../core/index.js';
 export const projectRoutes = new Hono();
 const DEFAULT_FILE_INDEX_LIMIT = 2000;
 const MAX_FILE_INDEX_LIMIT = 10000;
+const PROJECT_NOT_FOUND_MESSAGE = 'Project not found';
 
 /** POST /api/projects — Create a new project */
 projectRoutes.post('/projects', async (c) => {
@@ -32,12 +33,16 @@ projectRoutes.get('/projects', async (c) => {
   return c.json(projects);
 });
 
-/** PATCH /api/projects/project-img — Set a project's image URL using the project name */
+/** PATCH /api/projects/project-img — Set a project's image URL using the project id or project name */
 projectRoutes.patch('/projects/project-img', async (c) => {
-  const body = await c.req.json<{ projectName?: string; projectImg?: string }>();
+  const body = await c.req.json<{
+    projectId?: string;
+    projectName?: string;
+    projectImg?: string;
+  }>();
 
-  if (!body.projectName) {
-    return c.json({ error: 'projectName is required' }, 400);
+  if (!body.projectId && !body.projectName) {
+    return c.json({ error: 'projectId or projectName is required' }, 400);
   }
 
   if (!body.projectImg) {
@@ -45,7 +50,9 @@ projectRoutes.patch('/projects/project-img', async (c) => {
   }
 
   try {
-    const project = await Project.getByName(body.projectName);
+    const project = body.projectId
+      ? await Project.getById(body.projectId)
+      : await Project.getByName(body.projectName!);
     const metadata = await project.updateProjectImg(body.projectImg);
     return c.json(metadata);
   } catch (e) {
@@ -63,7 +70,7 @@ projectRoutes.get('/projects/:projectId', async (c) => {
     const metadata = await project.getMetadata();
     return c.json(metadata);
   } catch (e) {
-    const message = e instanceof Error ? e.message : 'Project not found';
+    const message = e instanceof Error ? e.message : PROJECT_NOT_FOUND_MESSAGE;
     return c.json({ error: message }, 404);
   }
 });
@@ -86,7 +93,7 @@ projectRoutes.get('/projects/:projectId/overview', async (c) => {
 
     return c.json({ project: projectMeta, artifactDirs });
   } catch (e) {
-    const message = e instanceof Error ? e.message : 'Project not found';
+    const message = e instanceof Error ? e.message : PROJECT_NOT_FOUND_MESSAGE;
     return c.json({ error: message }, 404);
   }
 });
@@ -158,8 +165,27 @@ projectRoutes.get('/projects/:projectId/file-index', async (c) => {
       truncated,
     });
   } catch (e) {
-    const message = e instanceof Error ? e.message : 'Project not found';
+    const message = e instanceof Error ? e.message : PROJECT_NOT_FOUND_MESSAGE;
     return c.json({ error: message }, 404);
+  }
+});
+
+/** PATCH /api/projects/:projectId/name — Rename a project without changing its stable id */
+projectRoutes.patch('/projects/:projectId/name', async (c) => {
+  const { projectId } = c.req.param();
+  const body = await c.req.json<{ name?: string }>();
+
+  if (!body.name?.trim()) {
+    return c.json({ error: 'name is required' }, 400);
+  }
+
+  try {
+    const project = await Project.getById(projectId);
+    const metadata = await project.rename(body.name);
+    return c.json(metadata);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Failed to rename project';
+    return c.json({ error: message }, message.includes('not found') ? 404 : 500);
   }
 });
 
@@ -172,7 +198,7 @@ projectRoutes.delete('/projects/:projectId', async (c) => {
     await project.delete();
     return c.json({ deleted: true });
   } catch (e) {
-    const message = e instanceof Error ? e.message : 'Project not found';
+    const message = e instanceof Error ? e.message : PROJECT_NOT_FOUND_MESSAGE;
     return c.json({ error: message }, 404);
   }
 });

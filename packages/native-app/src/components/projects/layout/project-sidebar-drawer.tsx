@@ -165,7 +165,6 @@ export const ProjectSidebarDrawer: FC<DrawerContentComponentProps> = (drawerProp
       void refreshOverview('refresh');
       drawerProps.navigation.closeDrawer();
       toast.show({
-        variant: 'success',
         label: 'Artifact created',
         description: `${artifact.name} is ready.`,
       });

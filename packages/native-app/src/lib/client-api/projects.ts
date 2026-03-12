@@ -135,6 +135,17 @@ export async function createProject(input: {
   });
 }
 
+export async function renameProject(
+  projectId: string,
+  input: { name: string }
+): Promise<ProjectMetadata> {
+  return apiRequestJson<ProjectMetadata>(`${PROJECTS_BASE}/${encodeURIComponent(projectId)}/name`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+}
+
 export async function deleteProject(projectId: string): Promise<{ deleted: boolean }> {
   return apiRequestJson<{ deleted: boolean }>(`${PROJECTS_BASE}/${encodeURIComponent(projectId)}`, {
     method: 'DELETE',

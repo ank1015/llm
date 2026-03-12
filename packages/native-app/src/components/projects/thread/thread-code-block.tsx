@@ -3,7 +3,6 @@ import { useToast } from 'heroui-native';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 
-
 import { AppText } from '@/components/app-text';
 
 type ThreadCodeBlockProps = {
@@ -44,7 +43,6 @@ export function ThreadCodeBlock({
     void Clipboard.setStringAsync(trimmedCode).then(() => {
       setCopied(true);
       toast.show({
-        variant: 'success',
         label: 'Copied',
         description: 'Code block copied to clipboard.',
       });

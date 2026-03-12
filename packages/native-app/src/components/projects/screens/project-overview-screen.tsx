@@ -5,7 +5,6 @@ import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { withUniwind } from 'uniwind';
 
-
 import { AppText } from '@/components/app-text';
 import { PlusIcon } from '@/components/icons/plus';
 import { CreateArtifactDialog } from '@/components/projects/dialogs/create-artifact-dialog';
@@ -57,7 +56,6 @@ export function ProjectOverviewScreen() {
       addArtifactDir(artifact);
       void refreshOverview('refresh');
       toast.show({
-        variant: 'success',
         label: 'Artifact created',
         description: `${artifact.name} is ready.`,
       });

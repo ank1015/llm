@@ -1,5 +1,8 @@
 import { cn } from 'heroui-native';
 
+const TEXT_MUTED = 'text-muted';
+const TEXT_XS_MUTED = 'text-xs text-muted';
+
 export const appColors = {
   background: 'bg-background',
   surfaceDefault: 'bg-default',
@@ -10,38 +13,38 @@ export const appColors = {
   dangerForeground: 'text-red-500',
   foregroundMuted: 'text-foreground/70',
   foregroundSoft: 'text-foreground/40',
-  mutedText: 'text-muted',
+  mutedText: TEXT_MUTED,
 } as const;
 
 export const appTypography = {
-  screenTitle: 'text-[26px] font-semibold tracking-tight text-foreground',
+  screenTitle: 'text-[26px] font-semibold text-foreground',
   artifactTitle: 'text-[28px] font-semibold tracking-tight text-foreground',
   artifactTabActiveLabel: 'text-[17px] font-semibold text-foreground',
-  artifactTabInactiveLabel: 'text-[17px] font-semibold text-muted',
+  artifactTabInactiveLabel: `text-[17px] font-semibold ${TEXT_MUTED}`,
   artifactChatTitle: 'text-[19px] font-medium text-foreground',
-  artifactChatMeta: 'text-[15px] leading-6 text-muted',
-  sidebarSectionLabel: 'px-1 py-4 text-lg font-medium text-muted',
+  artifactChatMeta: `text-[15px] leading-6 ${TEXT_MUTED}`,
+  sidebarSectionLabel: `px-1 py-4 text-lg font-medium ${TEXT_MUTED}`,
   sidebarChatTitle: 'text-[17px] font-normal text-foreground',
   sectionLabel: 'px-1 text-base font-semibold text-foreground',
   sectionTitle: 'text-base font-semibold text-foreground',
   title: 'text-lg font-semibold text-foreground',
   listTitle: 'text-sm font-medium text-foreground',
-  listCount: 'text-sm font-medium text-muted',
-  listMeta: 'text-xs text-muted',
+  listCount: `text-sm font-medium ${TEXT_MUTED}`,
+  listMeta: TEXT_XS_MUTED,
   bodyStrong: 'text-sm font-semibold text-foreground',
-  body: 'text-sm leading-5 text-muted',
-  bodyCentered: 'text-center text-sm leading-5 text-muted',
-  bodyMuted: 'text-sm text-muted',
-  caption: 'text-xs text-muted',
+  body: `text-sm leading-5 ${TEXT_MUTED}`,
+  bodyCentered: `text-center text-sm leading-5 ${TEXT_MUTED}`,
+  bodyMuted: `text-sm ${TEXT_MUTED}`,
+  caption: TEXT_XS_MUTED,
   composerInputText: 'text-[17px] leading-6 text-foreground',
   composerPickerLabel: 'text-[13px] font-medium text-foreground',
-  composerEditLabel: 'text-[11px] text-muted',
+  composerEditLabel: `text-[11px] ${TEXT_MUTED}`,
   composerEditAction: 'text-[11px] font-medium text-foreground',
-  composerMenuLabel: 'px-2 pb-2 text-sm font-semibold text-muted',
+  composerMenuLabel: `px-2 pb-2 text-sm font-semibold ${TEXT_MUTED}`,
   composerMenuItemTitle: 'text-[15px] text-foreground',
   composerMentionTitle: 'text-sm font-medium text-foreground',
-  composerMentionMeta: 'text-xs text-muted',
-  composerMentionEmpty: 'px-4 py-3 text-sm text-muted',
+  composerMentionMeta: TEXT_XS_MUTED,
+  composerMentionEmpty: `px-4 py-3 text-sm ${TEXT_MUTED}`,
   composerMentionError: 'px-4 py-3 text-sm text-red-500',
   dialogTitle: 'text-[18px] font-bold leading-6 text-black dark:text-white',
   buttonLabel: 'text-[14px]',
@@ -111,7 +114,7 @@ export const appLayout = {
   sidebarNestedList: 'gap-4 px-2 pb-3 pl-6 pt-2',
   textStack: 'flex-1 gap-1',
   centeredStack: 'items-center gap-1',
-  projectList: 'mt-5 gap-4',
+  projectList: 'gap-4',
 } as const;
 
 export const appCardStyles = {
@@ -142,8 +145,8 @@ export const appInputStyles = {
     'h-14 rounded-[12px] border-0 bg-zinc-100 px-4 py-0 text-black shadow-none focus:border-0 dark:bg-[#39393D] dark:text-white dark:focus:border-0',
   composerField:
     'rounded-none border-0 bg-transparent px-1 py-1 text-[17px] leading-6 text-foreground shadow-none focus:border-0 ios:shadow-none android:shadow-none',
-  placeholder: 'text-muted',
-  icon: 'text-muted',
+  placeholder: TEXT_MUTED,
+  icon: TEXT_MUTED,
 } as const;
 
 export const appTabsStyles = {

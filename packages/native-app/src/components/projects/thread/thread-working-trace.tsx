@@ -262,7 +262,6 @@ function ToolTraceItem({ entry }: { entry: WorkingToolEntry }) {
     void Clipboard.setStringAsync(copyText).then(() => {
       setCopied(true);
       toast.show({
-        variant: 'success',
         label: 'Copied',
         description: 'Tool output copied to clipboard.',
       });
