@@ -45,6 +45,9 @@
       "expo-image",
       "expo-web-browser"
     ],
+    "extra": {
+      "serverUrl": "https://ananyas-macbook-pro.tail77420a.ts.net"
+    },
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
