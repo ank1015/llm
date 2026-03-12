@@ -1,9 +1,7 @@
 import { Link, useLocalSearchParams } from 'expo-router';
 import { Tabs } from 'heroui-native';
 import { useMemo, useState } from 'react';
-import { Pressable, View } from 'react-native';
-
-import type { OverviewSession } from '@/lib/client-api';
+import { Pressable, View, useWindowDimensions } from 'react-native';
 
 import { AppText } from '@/components/app-text';
 import { ProjectArtifactExplorer } from '@/components/projects/artifacts/project-artifact-explorer';
@@ -12,18 +10,6 @@ import { useProjectShell } from '@/components/projects/layout/project-shell-cont
 import { ScreenScrollView } from '@/components/screen-scroll-view';
 import { useSidebarStore } from '@/stores';
 import { appLayout, appSpacing, appTabsStyles, appTypography } from '@/styles/ui';
-
-function formatSessionMeta(session: OverviewSession): string {
-  const messageLabel = `${session.nodeCount} ${session.nodeCount === 1 ? 'message' : 'messages'}`;
-  const timestamp = session.updatedAt ?? session.createdAt;
-  const dateLabel = new Date(timestamp).toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-
-  return `${messageLabel} • ${dateLabel}`;
-}
 
 export function ProjectArtifactScreen() {
   const params = useLocalSearchParams<{ artifactId?: string | string[] }>();
@@ -36,6 +22,9 @@ export function ProjectArtifactScreen() {
   const error = useSidebarStore((state) => state.error);
   const [activeTab, setActiveTab] = useState('chats');
   const [composerHeight, setComposerHeight] = useState(0);
+  const { height: windowHeight } = useWindowDimensions();
+  const composerInset = activeTab === 'chats' ? composerHeight + appSpacing.sm : 0;
+  const endSpacerHeight = Math.round(windowHeight * 0.4);
 
   const sessions = useMemo(() => {
     if (!artifact) {
@@ -88,65 +77,67 @@ export function ProjectArtifactScreen() {
         </View>
 
         <Tabs.Content className="flex-1" value="chats">
-          <ScreenScrollView
-            className="flex-1"
-            contentContainerClassName={appLayout.artifactScreen}
-            contentContainerStyle={{
-              paddingTop: appSpacing.sm,
-              paddingBottom: composerHeight + appSpacing.xl,
-            }}
-            contentInsetAdjustmentBehavior="never"
-            keyboardShouldPersistTaps="handled"
-          >
-            <View className={appLayout.artifactChatList}>
-              {error && !artifact ? (
-                <AppText className={appTypography.body}>{error}</AppText>
-              ) : null}
+          <View className="flex-1" style={{ paddingBottom: composerInset }}>
+            <ScreenScrollView
+              className="flex-1"
+              contentContainerClassName={appLayout.artifactScreen}
+              contentContainerStyle={{
+                paddingTop: appSpacing.sm,
+                paddingBottom: appSpacing.lg,
+              }}
+              contentInsetAdjustmentBehavior="never"
+              keyboardShouldPersistTaps="handled"
+            >
+              <View className={appLayout.artifactChatList}>
+                {error && !artifact ? (
+                  <AppText className={appTypography.body}>{error}</AppText>
+                ) : null}
 
-              {isLoading && !artifact ? (
-                <AppText className={appTypography.bodyMuted}>Loading artifact…</AppText>
-              ) : null}
+                {isLoading && !artifact ? (
+                  <AppText className={appTypography.bodyMuted}>Loading artifact…</AppText>
+                ) : null}
 
-              {!isLoading && !error && !artifact ? (
-                <AppText className={appTypography.bodyMuted}>Artifact not found.</AppText>
-              ) : null}
+                {!isLoading && !error && !artifact ? (
+                  <AppText className={appTypography.bodyMuted}>Artifact not found.</AppText>
+                ) : null}
 
-              {artifact && sessions.length === 0 ? (
-                <AppText className={appTypography.bodyMuted}>No chats yet.</AppText>
-              ) : null}
+                {artifact && sessions.length === 0 ? (
+                  <AppText className={appTypography.bodyMuted}>No chats yet.</AppText>
+                ) : null}
 
-              {artifact
-                ? sessions.map((session) => (
-                    <Link
-                      key={session.sessionId}
-                      asChild
-                      href={{
-                        pathname: '/[projectId]/[artifactId]/[threadId]',
-                        params: {
-                          projectId,
-                          artifactId: artifact.id,
-                          threadId: session.sessionId,
-                        },
-                      }}
-                    >
-                      <Pressable
-                        android_ripple={{ color: 'transparent' }}
-                        style={{ borderCurve: 'continuous' }}
+                {artifact
+                  ? sessions.map((session) => (
+                      <Link
+                        key={session.sessionId}
+                        asChild
+                        href={{
+                          pathname: '/[projectId]/[artifactId]/[threadId]',
+                          params: {
+                            projectId,
+                            artifactId: artifact.id,
+                            threadId: session.sessionId,
+                          },
+                        }}
                       >
-                        <View className={appLayout.artifactChatRow}>
-                          <AppText className={appTypography.artifactChatTitle} numberOfLines={1}>
-                            {session.sessionName}
-                          </AppText>
-                          <AppText className={appTypography.artifactChatMeta} numberOfLines={1}>
-                            {formatSessionMeta(session)}
-                          </AppText>
-                        </View>
-                      </Pressable>
-                    </Link>
-                  ))
-                : null}
-            </View>
-          </ScreenScrollView>
+                        <Pressable
+                          android_ripple={{ color: 'transparent' }}
+                          pressRetentionOffset={{ bottom: 12, left: 0, right: 0, top: 12 }}
+                          style={{ borderCurve: 'continuous' }}
+                        >
+                          <View className={appLayout.artifactChatRow}>
+                            <AppText className={appTypography.artifactChatTitle} numberOfLines={1}>
+                              {session.sessionName}
+                            </AppText>
+                          </View>
+                        </Pressable>
+                      </Link>
+                    ))
+                  : null}
+
+                <View pointerEvents="none" style={{ height: endSpacerHeight }} />
+              </View>
+            </ScreenScrollView>
+          </View>
         </Tabs.Content>
 
         <Tabs.Content className="flex-1" value="artifacts">

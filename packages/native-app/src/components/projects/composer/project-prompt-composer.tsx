@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   extractActiveMention,
   getRelativeMentionPath,
+  removeMentionBeforeCaret,
   replaceMentionToken,
   type MentionRange,
 } from './project-prompt-composer-utils';
@@ -20,6 +21,7 @@ import type {
   LayoutChangeEvent,
   NativeSyntheticEvent,
   TextInput,
+  TextInputKeyPressEventData,
   TextInputSelectionChangeEventData,
 } from 'react-native';
 
@@ -67,6 +69,30 @@ function isAbortError(error: unknown): boolean {
   return false;
 }
 
+function mentionsEqual(a: MentionRange | null, b: MentionRange | null): boolean {
+  if (!a && !b) {
+    return true;
+  }
+
+  if (!a || !b) {
+    return false;
+  }
+
+  return a.start === b.start && a.end === b.end && a.query === b.query;
+}
+
+function getNextCaret(
+  previousValue: string,
+  nextValue: string,
+  selection: { start: number; end: number }
+): number {
+  const replacedLength = Math.max(0, selection.end - selection.start);
+  const insertedLength = nextValue.length - (previousValue.length - replacedLength);
+  const nextCaret = selection.start + insertedLength;
+
+  return Math.max(0, Math.min(nextCaret, nextValue.length));
+}
+
 export function ProjectPromptComposer({
   artifactId,
   onHeightChange,
@@ -78,6 +104,9 @@ export function ProjectPromptComposer({
   const { toast } = useToast();
   const insets = useSafeAreaInsets();
   const inputRef = useRef<TextInput>(null);
+  const activeMentionRef = useRef<MentionRange | null>(null);
+  const inputValueRef = useRef('');
+  const lastKeyPressRef = useRef<string | null>(null);
   const mentionRequestIdRef = useRef(0);
   const previousThreadIdRef = useRef<string | undefined>(undefined);
   const selectionRef = useRef({ start: 0, end: 0 });
@@ -164,6 +193,39 @@ export function ProjectPromptComposer({
     [artifactId, projectId]
   );
 
+  const updateInput = (nextValue: string) => {
+    inputValueRef.current = nextValue;
+
+    if (currentSession) {
+      setDraft({
+        draft: nextValue,
+        session: currentSession,
+      });
+      return;
+    }
+
+    setLocalInput(nextValue);
+  };
+
+  const setMentionState = (next: MentionRange | null) => {
+    if (mentionsEqual(activeMentionRef.current, next)) {
+      return;
+    }
+
+    activeMentionRef.current = next;
+    setActiveMention(next);
+
+    if (!next) {
+      mentionRequestIdRef.current += 1;
+      setMentionResults([]);
+      setMentionError(null);
+      setMentionLoading(false);
+      return;
+    }
+
+    setMentionError(null);
+  };
+
   useEffect(() => {
     void loadProjectFileIndex(projectId).catch(() => {
       // Mention search can fall back to server-side queries.
@@ -171,11 +233,14 @@ export function ProjectPromptComposer({
   }, [loadProjectFileIndex, projectId]);
 
   useEffect(() => {
+    inputValueRef.current = input;
+  }, [input]);
+
+  useEffect(() => {
     if (!visible) {
-      setActiveMention(null);
-      setMentionResults([]);
-      setMentionError(null);
-      setMentionLoading(false);
+      setMentionState(null);
+      lastKeyPressRef.current = null;
+      setPendingSelection(undefined);
       onHeightChange(0);
     }
   }, [onHeightChange, visible]);
@@ -214,7 +279,8 @@ export function ProjectPromptComposer({
     };
     selectionRef.current = nextSelection;
     setPendingSelection(nextSelection);
-    setActiveMention(null);
+    lastKeyPressRef.current = null;
+    setMentionState(null);
   }, [composerInput.length, threadId]);
 
   useEffect(() => {
@@ -265,22 +331,40 @@ export function ProjectPromptComposer({
     };
   }, [activeMention, projectId, searchProjectFiles, visible]);
 
-  const syncActiveMention = (value: string, caret: number) => {
-    setActiveMention(extractActiveMention(value, caret));
-    setMentionError(null);
+  const syncActiveMention = (value: string, caret: number | null) => {
+    const resolvedCaret = caret ?? value.length;
+    setMentionState(extractActiveMention(value, resolvedCaret));
   };
 
   const handleInputChange = (nextValue: string) => {
-    if (currentSession) {
-      setDraft({
-        draft: nextValue,
-        session: currentSession,
-      });
-    } else {
-      setLocalInput(nextValue);
+    const previousValue = inputValueRef.current;
+    const previousSelection = selectionRef.current;
+    const lastKeyPress = lastKeyPressRef.current;
+    lastKeyPressRef.current = null;
+
+    if (lastKeyPress === 'Backspace' && previousSelection.start === previousSelection.end) {
+      const removal = removeMentionBeforeCaret(previousValue, previousSelection.start);
+      if (removal) {
+        updateInput(removal.value);
+        const nextSelection = {
+          start: removal.cursor,
+          end: removal.cursor,
+        };
+        selectionRef.current = nextSelection;
+        setPendingSelection(nextSelection);
+        setMentionState(null);
+        return;
+      }
     }
 
-    syncActiveMention(nextValue, selectionRef.current.start);
+    updateInput(nextValue);
+
+    const nextCaret = getNextCaret(previousValue, nextValue, previousSelection);
+    selectionRef.current = {
+      start: nextCaret,
+      end: nextCaret,
+    };
+    syncActiveMention(nextValue, nextCaret);
   };
 
   const handleSelectionChange = (
@@ -295,25 +379,24 @@ export function ProjectPromptComposer({
     ) {
       setPendingSelection(undefined);
     }
-    syncActiveMention(input, nextSelection.start);
+    lastKeyPressRef.current = null;
+    syncActiveMention(inputValueRef.current, nextSelection.start);
+  };
+
+  const handleKeyPress = (event: NativeSyntheticEvent<TextInputKeyPressEventData>) => {
+    lastKeyPressRef.current = event.nativeEvent.key;
   };
 
   const handleMentionSelect = (entry: ProjectFileIndexEntry) => {
-    if (!activeMention) {
+    const mention = activeMentionRef.current;
+    if (!mention) {
       return;
     }
 
     const mentionToken = `@${getRelativeMentionPath(artifactId, entry)}`;
-    const nextValue = replaceMentionToken(input, activeMention, mentionToken);
+    const nextValue = replaceMentionToken(inputValueRef.current, mention, mentionToken);
 
-    if (currentSession) {
-      setDraft({
-        draft: nextValue.value,
-        session: currentSession,
-      });
-    } else {
-      setLocalInput(nextValue.value);
-    }
+    updateInput(nextValue.value);
 
     const nextSelection = {
       start: nextValue.cursor,
@@ -321,7 +404,8 @@ export function ProjectPromptComposer({
     };
     selectionRef.current = nextSelection;
     setPendingSelection(nextSelection);
-    setActiveMention(null);
+    lastKeyPressRef.current = null;
+    setMentionState(null);
 
     requestAnimationFrame(() => {
       inputRef.current?.focus();
@@ -342,7 +426,8 @@ export function ProjectPromptComposer({
           session: currentSession,
         });
         clearAttachments(currentSession);
-        setActiveMention(null);
+        inputValueRef.current = '';
+        setMentionState(null);
 
         await editFromNode({
           api: selectedApi,
@@ -415,12 +500,13 @@ export function ProjectPromptComposer({
       if (currentSession) {
         markSubmitted(currentSession);
       } else {
-        setLocalInput('');
+        updateInput('');
       }
 
-      setActiveMention(null);
+      setMentionState(null);
       selectionRef.current = { start: 0, end: 0 };
       setPendingSelection(undefined);
+      lastKeyPressRef.current = null;
 
       await startStream({
         api: selectedApi,
@@ -484,7 +570,7 @@ export function ProjectPromptComposer({
     }
 
     cancelEdit(currentSession);
-    setActiveMention(null);
+    setMentionState(null);
   };
 
   const handleLayout = (event: LayoutChangeEvent) => {
@@ -545,6 +631,7 @@ export function ProjectPromptComposer({
           modelValue={selectedModel.modelId}
           onCancelEdit={handleCancelEdit}
           onChangeText={handleInputChange}
+          onKeyPress={handleKeyPress}
           onModelChange={setSelectedModel}
           onSelectionChange={handleSelectionChange}
           onStop={handleStop}

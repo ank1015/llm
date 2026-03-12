@@ -1,5 +1,5 @@
 import Feather from '@expo/vector-icons/Feather';
-import { Pressable, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { withUniwind } from 'uniwind';
 
 import { buildFileLabel, getIndexedEntryDisplayName } from './project-prompt-composer-utils';
@@ -9,8 +9,9 @@ import type { ProjectFileIndexEntry } from '@/lib/client-api';
 import { AppText } from '@/components/app-text';
 import { appColors, appLayout, appSizes, appTypography } from '@/styles/ui';
 
-
 const StyledFeather = withUniwind(Feather);
+const MAX_VISIBLE_RESULTS = 4;
+const MENTION_LIST_MAX_HEIGHT = 224;
 
 type ProjectPromptMentionListProps = {
   error: string | null;
@@ -40,32 +41,39 @@ export function ProjectPromptMentionList({
       ) : null}
 
       {!isLoading && !error && results.length > 0 ? (
-        <View className={appLayout.composerMentionList}>
-          {results.map((entry) => (
-            <Pressable
-              key={entry.artifactPath}
-              android_ripple={{ color: 'transparent' }}
-              style={{ borderCurve: 'continuous' }}
-              onPress={() => onSelect(entry)}
-            >
-              <View className={appLayout.composerMentionRow}>
-                <StyledFeather
-                  className={appColors.foregroundMuted}
-                  name={entry.type === 'directory' ? 'folder' : 'file'}
-                  size={appSizes.iconSm}
-                />
-                <View className="flex-1">
-                  <AppText className={appTypography.composerMentionTitle} numberOfLines={1}>
-                    {getIndexedEntryDisplayName(entry)}
-                  </AppText>
-                  <AppText className={appTypography.composerMentionMeta} numberOfLines={1}>
-                    {buildFileLabel(entry)}
-                  </AppText>
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          nestedScrollEnabled
+          showsVerticalScrollIndicator={results.length > MAX_VISIBLE_RESULTS}
+          style={{ maxHeight: MENTION_LIST_MAX_HEIGHT }}
+        >
+          <View className={appLayout.composerMentionList}>
+            {results.map((entry) => (
+              <Pressable
+                key={entry.artifactPath}
+                android_ripple={{ color: 'transparent' }}
+                style={{ borderCurve: 'continuous' }}
+                onPress={() => onSelect(entry)}
+              >
+                <View className={appLayout.composerMentionRow}>
+                  <StyledFeather
+                    className={appColors.foregroundMuted}
+                    name={entry.type === 'directory' ? 'folder' : 'file'}
+                    size={appSizes.iconSm}
+                  />
+                  <View className="flex-1">
+                    <AppText className={appTypography.composerMentionTitle} numberOfLines={1}>
+                      {getIndexedEntryDisplayName(entry)}
+                    </AppText>
+                    <AppText className={appTypography.composerMentionMeta} numberOfLines={1}>
+                      {buildFileLabel(entry)}
+                    </AppText>
+                  </View>
                 </View>
-              </View>
-            </Pressable>
-          ))}
-        </View>
+              </Pressable>
+            ))}
+          </View>
+        </ScrollView>
       ) : null}
     </View>
   );

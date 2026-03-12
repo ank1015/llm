@@ -6,7 +6,11 @@ import { withUniwind } from 'uniwind';
 import { ProjectPromptPicker } from './project-prompt-picker';
 
 import type { RefObject } from 'react';
-import type { NativeSyntheticEvent, TextInputSelectionChangeEventData } from 'react-native';
+import type {
+  NativeSyntheticEvent,
+  TextInputKeyPressEventData,
+  TextInputSelectionChangeEventData,
+} from 'react-native';
 
 import { AppText } from '@/components/app-text';
 import { appInputStyles, appLayout, appSizes, appTypography } from '@/styles/ui';
@@ -30,6 +34,7 @@ type ProjectPromptInputShellProps = {
   modelValue: string;
   onCancelEdit: () => void;
   onChangeText: (value: string) => void;
+  onKeyPress: (event: NativeSyntheticEvent<TextInputKeyPressEventData>) => void;
   onModelChange: (value: string) => void;
   onSelectionChange: (event: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => void;
   onStop: () => void;
@@ -56,6 +61,7 @@ export function ProjectPromptInputShell({
   modelValue,
   onCancelEdit,
   onChangeText,
+  onKeyPress,
   onModelChange,
   onSelectionChange,
   onStop,
@@ -109,6 +115,7 @@ export function ProjectPromptInputShell({
           cursorColor={accentColor}
           multiline
           onChangeText={onChangeText}
+          onKeyPress={onKeyPress}
           onSelectionChange={onSelectionChange}
           placeholder={placeholder}
           placeholderTextColor={mutedColor}

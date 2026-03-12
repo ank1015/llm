@@ -131,3 +131,40 @@ export function replaceMentionToken(
     cursor: before.length + replacement.length + suffix.length,
   };
 }
+
+export function removeMentionBeforeCaret(
+  value: string,
+  caret: number
+): { value: string; cursor: number } | null {
+  if (caret <= 0 || caret > value.length) {
+    return null;
+  }
+
+  const prefix = value.slice(0, caret);
+  const trailingWhitespace = prefix.match(/\s+$/)?.[0] ?? '';
+  if (trailingWhitespace.length === 0) {
+    return null;
+  }
+
+  const prefixWithoutWhitespace = prefix.slice(0, prefix.length - trailingWhitespace.length);
+  const mentionMatch = prefixWithoutWhitespace.match(/(?:^|\s)(@[^\s]+)$/);
+  if (!mentionMatch) {
+    return null;
+  }
+
+  const mentionToken = mentionMatch[1];
+  if (!mentionToken || !/^@[a-zA-Z0-9_./-]+$/.test(mentionToken)) {
+    return null;
+  }
+
+  const tokenStart = prefixWithoutWhitespace.length - mentionToken.length;
+  const before = value.slice(0, tokenStart);
+  const after = value.slice(caret);
+  const normalizedAfter =
+    before.endsWith(' ') && after.startsWith(' ') ? after.replace(/^\s+/, ' ') : after;
+
+  return {
+    value: `${before}${normalizedAfter}`,
+    cursor: tokenStart,
+  };
+}

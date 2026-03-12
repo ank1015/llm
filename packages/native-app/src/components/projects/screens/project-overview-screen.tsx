@@ -11,6 +11,7 @@ import { CreateArtifactDialog } from '@/components/projects/dialogs/create-artif
 import { RenameArtifactDialog } from '@/components/projects/dialogs/rename-artifact-dialog';
 import { useProjectShell } from '@/components/projects/layout/project-shell-context';
 import { ProjectOverviewArtifactItem } from '@/components/projects/screens/project-overview-artifact-item';
+import { ProjectOverviewArtifactItemSkeleton } from '@/components/projects/screens/project-overview-artifact-item-base';
 import { ScreenScrollView } from '@/components/screen-scroll-view';
 import { createArtifactDir, deleteArtifactDir, renameArtifactDir } from '@/lib/client-api';
 import { useSidebarStore } from '@/stores';
@@ -50,6 +51,8 @@ export function ProjectOverviewScreen() {
   const [renameArtifactTarget, setRenameArtifactTarget] = useState<OverviewArtifactTarget | null>(
     null
   );
+  const shouldShowArtifactSkeletons =
+    artifactDirs.length === 0 && !error && (isLoading || isRefreshing);
   const normalizedSearchQuery = searchQuery.trim().toLowerCase();
   const filteredArtifacts = normalizedSearchQuery
     ? artifactDirs.filter((artifact) => {
@@ -243,52 +246,62 @@ export function ProjectOverviewScreen() {
               <AppText className={appTypography.body}>{error}</AppText>
             ) : null}
 
-            {isLoading && artifactDirs.length === 0 ? (
-              <AppText className={appTypography.bodyMuted}>Loading artifacts…</AppText>
-            ) : null}
+            {shouldShowArtifactSkeletons
+              ? Array.from({ length: 4 }, (_, index) => (
+                  <ProjectOverviewArtifactItemSkeleton
+                    key={`artifact-skeleton-${index}`}
+                    index={index}
+                  />
+                ))
+              : null}
 
-            {!isLoading && !error && artifactDirs.length === 0 ? (
+            {!shouldShowArtifactSkeletons && !isLoading && !error && artifactDirs.length === 0 ? (
               <AppText className={appTypography.bodyMuted}>No artifacts yet.</AppText>
             ) : null}
 
-            {!isLoading && artifactDirs.length > 0 && filteredArtifacts.length === 0 ? (
+            {!shouldShowArtifactSkeletons &&
+            !isLoading &&
+            artifactDirs.length > 0 &&
+            filteredArtifacts.length === 0 ? (
               <AppText className={appTypography.bodyMuted}>No matching artifacts.</AppText>
             ) : null}
 
-            {filteredArtifacts.map((artifact) => (
-              <ProjectOverviewArtifactItem
-                key={artifact.id}
-                label={artifact.name}
-                onContextMenuPress={() =>
-                  handleArtifactOptions({
-                    artifactId: artifact.id,
-                    artifactName: artifact.name,
-                  })
-                }
-                onDeletePress={() =>
-                  handleDeleteArtifact({
-                    artifactId: artifact.id,
-                    artifactName: artifact.name,
-                  })
-                }
-                onOpenPress={() =>
-                  router.replace({
-                    pathname: '/[projectId]/[artifactId]',
-                    params: {
-                      projectId,
-                      artifactId: artifact.id,
-                    },
-                  })
-                }
-                onRenamePress={() =>
-                  handleOpenRenameArtifact({
-                    artifactId: artifact.id,
-                    artifactName: artifact.name,
-                  })
-                }
-                sessionCount={artifact.sessions.length}
-              />
-            ))}
+            {!shouldShowArtifactSkeletons
+              ? filteredArtifacts.map((artifact) => (
+                  <ProjectOverviewArtifactItem
+                    key={artifact.id}
+                    label={artifact.name}
+                    onContextMenuPress={() =>
+                      handleArtifactOptions({
+                        artifactId: artifact.id,
+                        artifactName: artifact.name,
+                      })
+                    }
+                    onDeletePress={() =>
+                      handleDeleteArtifact({
+                        artifactId: artifact.id,
+                        artifactName: artifact.name,
+                      })
+                    }
+                    onOpenPress={() =>
+                      router.replace({
+                        pathname: '/[projectId]/[artifactId]',
+                        params: {
+                          projectId,
+                          artifactId: artifact.id,
+                        },
+                      })
+                    }
+                    onRenamePress={() =>
+                      handleOpenRenameArtifact({
+                        artifactId: artifact.id,
+                        artifactName: artifact.name,
+                      })
+                    }
+                    sessionCount={artifact.sessions.length}
+                  />
+                ))
+              : null}
           </View>
         </View>
       </ScreenScrollView>
