@@ -1,6 +1,6 @@
 import Feather from '@expo/vector-icons/Feather';
 import { FlashList } from '@shopify/flash-list';
-import { Button, Spinner, useThemeColor } from 'heroui-native';
+import { Button, Skeleton, Spinner, useThemeColor } from 'heroui-native';
 import { useEffect, useState } from 'react';
 import { Pressable, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,6 +21,7 @@ import { appColors, appListStyles, appSizes, appSpacing, appTypography } from '@
 
 const StyledFeather = withUniwind(Feather);
 const EXPLORER_STATUS_TEXT_WIDTH = 'max-w-[280px]';
+const EXPLORER_SKELETON_WIDTHS = ['w-[32%]', 'w-[54%]', 'w-[44%]', 'w-[62%]'] as const;
 
 type ProjectArtifactExplorerProps = {
   artifactId: string;
@@ -38,6 +39,20 @@ type VisibleBreadcrumbItem =
       kind: 'ellipsis';
       key: string;
     };
+
+function ArtifactExplorerEntrySkeleton({ index }: { index: number }) {
+  return (
+    <View className={cn(appListStyles.filesystemRow, 'gap-4 py-1')}>
+      <Skeleton className="h-7 w-7 rounded-md" />
+      <View className={appListStyles.rowContent}>
+        <Skeleton
+          className={`h-8 rounded-md ${EXPLORER_SKELETON_WIDTHS[index % EXPLORER_SKELETON_WIDTHS.length]}`}
+        />
+      </View>
+      <Skeleton className="h-5 w-5 rounded-md" />
+    </View>
+  );
+}
 
 function getArtifactKey(projectId: string, artifactId: string): string {
   return `${projectId}::${artifactId}`;
@@ -219,6 +234,7 @@ export function ProjectArtifactExplorer({ artifactId, projectId }: ProjectArtifa
   const canGoForward = navigationHistory
     ? navigationHistory.index < navigationHistory.entries.length - 1
     : false;
+  const shouldShowDirectorySkeletons = !currentDirectory && !directoryError && isDirectoryLoading;
 
   useEffect(() => {
     if (!artifactId) {
@@ -323,11 +339,15 @@ export function ProjectArtifactExplorer({ artifactId, projectId }: ProjectArtifa
   };
 
   const renderDirectoryEmptyState = () => {
-    if (isDirectoryLoading) {
+    if (shouldShowDirectorySkeletons) {
       return (
-        <View className="flex-1 items-center justify-center gap-3 px-6 py-16">
-          <Spinner color={foregroundColor} size="lg" />
-          <AppText className={appTypography.bodyMuted}>Loading files…</AppText>
+        <View className="gap-4 px-1 py-2">
+          {Array.from({ length: 4 }, (_, index) => (
+            <ArtifactExplorerEntrySkeleton
+              key={`artifact-explorer-skeleton-${index}`}
+              index={index}
+            />
+          ))}
         </View>
       );
     }

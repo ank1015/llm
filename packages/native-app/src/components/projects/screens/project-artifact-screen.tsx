@@ -1,5 +1,5 @@
 import { Link, useLocalSearchParams } from 'expo-router';
-import { Tabs, useThemeColor } from 'heroui-native';
+import { Skeleton, Tabs, useThemeColor } from 'heroui-native';
 import { useMemo, useState } from 'react';
 import { Pressable, RefreshControl, View, useWindowDimensions } from 'react-native';
 
@@ -10,6 +10,18 @@ import { useProjectShell } from '@/components/projects/layout/project-shell-cont
 import { ScreenScrollView } from '@/components/screen-scroll-view';
 import { useSidebarStore } from '@/stores';
 import { appLayout, appSpacing, appTabsStyles, appTypography } from '@/styles/ui';
+
+const CHAT_SKELETON_WIDTHS = ['w-[88%]', 'w-[76%]', 'w-[82%]', 'w-[68%]'] as const;
+
+function ArtifactChatSkeletonRow({ index }: { index: number }) {
+  return (
+    <View className={appLayout.artifactChatRow}>
+      <Skeleton
+        className={`h-8 rounded-md ${CHAT_SKELETON_WIDTHS[index % CHAT_SKELETON_WIDTHS.length]}`}
+      />
+    </View>
+  );
+}
 
 export function ProjectArtifactScreen() {
   const params = useLocalSearchParams<{ artifactId?: string | string[] }>();
@@ -27,6 +39,7 @@ export function ProjectArtifactScreen() {
   const [mutedColor] = useThemeColor(['muted']);
   const composerInset = activeTab === 'chats' ? composerHeight + appSpacing.sm : 0;
   const endSpacerHeight = Math.round(windowHeight * 0.4);
+  const shouldShowChatSkeletons = !artifact && !error && (isLoading || isRefreshing);
 
   const sessions = useMemo(() => {
     if (!artifact) {
@@ -106,19 +119,24 @@ export function ProjectArtifactScreen() {
                   <AppText className={appTypography.body}>{error}</AppText>
                 ) : null}
 
-                {isLoading && !artifact ? (
-                  <AppText className={appTypography.bodyMuted}>Loading artifact…</AppText>
-                ) : null}
+                {shouldShowChatSkeletons
+                  ? Array.from({ length: 4 }, (_, index) => (
+                      <ArtifactChatSkeletonRow
+                        key={`artifact-chat-skeleton-${index}`}
+                        index={index}
+                      />
+                    ))
+                  : null}
 
-                {!isLoading && !error && !artifact ? (
+                {!shouldShowChatSkeletons && !isLoading && !error && !artifact ? (
                   <AppText className={appTypography.bodyMuted}>Artifact not found.</AppText>
                 ) : null}
 
-                {artifact && sessions.length === 0 ? (
+                {!shouldShowChatSkeletons && artifact && sessions.length === 0 ? (
                   <AppText className={appTypography.bodyMuted}>No chats yet.</AppText>
                 ) : null}
 
-                {artifact
+                {!shouldShowChatSkeletons && artifact
                   ? sessions.map((session) => (
                       <Link
                         key={session.sessionId}

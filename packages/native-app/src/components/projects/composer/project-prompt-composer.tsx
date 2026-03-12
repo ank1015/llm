@@ -108,6 +108,8 @@ export function ProjectPromptComposer({
   const inputValueRef = useRef('');
   const lastKeyPressRef = useRef<string | null>(null);
   const mentionRequestIdRef = useRef(0);
+  const pendingSelectionFrameRef = useRef<number | null>(null);
+  const pendingSelectionReleaseFrameRef = useRef<number | null>(null);
   const previousThreadIdRef = useRef<string | undefined>(undefined);
   const selectionRef = useRef({ start: 0, end: 0 });
   const currentSession = useMemo<SessionRef | null>(
@@ -207,6 +209,47 @@ export function ProjectPromptComposer({
     setLocalInput(nextValue);
   };
 
+  const cancelPendingSelectionRelease = () => {
+    if (pendingSelectionFrameRef.current !== null) {
+      cancelAnimationFrame(pendingSelectionFrameRef.current);
+      pendingSelectionFrameRef.current = null;
+    }
+
+    if (pendingSelectionReleaseFrameRef.current !== null) {
+      cancelAnimationFrame(pendingSelectionReleaseFrameRef.current);
+      pendingSelectionReleaseFrameRef.current = null;
+    }
+  };
+
+  const clearPendingSelection = () => {
+    cancelPendingSelectionRelease();
+    setPendingSelection(undefined);
+  };
+
+  const setTransientSelection = (nextSelection: { start: number; end: number }) => {
+    cancelPendingSelectionRelease();
+    selectionRef.current = nextSelection;
+    setPendingSelection(nextSelection);
+
+    pendingSelectionFrameRef.current = requestAnimationFrame(() => {
+      pendingSelectionFrameRef.current = null;
+      pendingSelectionReleaseFrameRef.current = requestAnimationFrame(() => {
+        pendingSelectionReleaseFrameRef.current = null;
+        setPendingSelection((current) => {
+          if (
+            current &&
+            current.start === nextSelection.start &&
+            current.end === nextSelection.end
+          ) {
+            return undefined;
+          }
+
+          return current;
+        });
+      });
+    });
+  };
+
   const setMentionState = (next: MentionRange | null) => {
     if (mentionsEqual(activeMentionRef.current, next)) {
       return;
@@ -237,10 +280,16 @@ export function ProjectPromptComposer({
   }, [input]);
 
   useEffect(() => {
+    return () => {
+      cancelPendingSelectionRelease();
+    };
+  }, []);
+
+  useEffect(() => {
     if (!visible) {
       setMentionState(null);
       lastKeyPressRef.current = null;
-      setPendingSelection(undefined);
+      clearPendingSelection();
       onHeightChange(0);
     }
   }, [onHeightChange, visible]);
@@ -254,8 +303,7 @@ export function ProjectPromptComposer({
       start: input.length,
       end: input.length,
     };
-    selectionRef.current = nextSelection;
-    setPendingSelection(nextSelection);
+    setTransientSelection(nextSelection);
 
     requestAnimationFrame(() => {
       inputRef.current?.focus();
@@ -277,8 +325,7 @@ export function ProjectPromptComposer({
       start: composerInput.length,
       end: composerInput.length,
     };
-    selectionRef.current = nextSelection;
-    setPendingSelection(nextSelection);
+    setTransientSelection(nextSelection);
     lastKeyPressRef.current = null;
     setMentionState(null);
   }, [composerInput.length, threadId]);
@@ -341,6 +388,7 @@ export function ProjectPromptComposer({
     const previousSelection = selectionRef.current;
     const lastKeyPress = lastKeyPressRef.current;
     lastKeyPressRef.current = null;
+    clearPendingSelection();
 
     if (lastKeyPress === 'Backspace' && previousSelection.start === previousSelection.end) {
       const removal = removeMentionBeforeCaret(previousValue, previousSelection.start);
@@ -350,8 +398,7 @@ export function ProjectPromptComposer({
           start: removal.cursor,
           end: removal.cursor,
         };
-        selectionRef.current = nextSelection;
-        setPendingSelection(nextSelection);
+        setTransientSelection(nextSelection);
         setMentionState(null);
         return;
       }
@@ -372,12 +419,8 @@ export function ProjectPromptComposer({
   ) => {
     const nextSelection = event.nativeEvent.selection;
     selectionRef.current = nextSelection;
-    if (
-      pendingSelection &&
-      pendingSelection.start === nextSelection.start &&
-      pendingSelection.end === nextSelection.end
-    ) {
-      setPendingSelection(undefined);
+    if (pendingSelection) {
+      clearPendingSelection();
     }
     lastKeyPressRef.current = null;
     syncActiveMention(inputValueRef.current, nextSelection.start);
@@ -402,8 +445,7 @@ export function ProjectPromptComposer({
       start: nextValue.cursor,
       end: nextValue.cursor,
     };
-    selectionRef.current = nextSelection;
-    setPendingSelection(nextSelection);
+    setTransientSelection(nextSelection);
     lastKeyPressRef.current = null;
     setMentionState(null);
 
@@ -505,7 +547,7 @@ export function ProjectPromptComposer({
 
       setMentionState(null);
       selectionRef.current = { start: 0, end: 0 };
-      setPendingSelection(undefined);
+      clearPendingSelection();
       lastKeyPressRef.current = null;
 
       await startStream({
