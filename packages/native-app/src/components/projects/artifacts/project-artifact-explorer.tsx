@@ -20,6 +20,7 @@ import { useArtifactFilesStore, useSidebarStore } from '@/stores';
 import { appColors, appListStyles, appSizes, appSpacing, appTypography } from '@/styles/ui';
 
 const StyledFeather = withUniwind(Feather);
+const EXPLORER_STATUS_TEXT_WIDTH = 'max-w-[280px]';
 
 type ProjectArtifactExplorerProps = {
   artifactId: string;
@@ -341,7 +342,7 @@ export function ProjectArtifactExplorer({ artifactId, projectId }: ProjectArtifa
             <AppText className="text-base font-semibold text-foreground">
               Couldn&apos;t load this folder
             </AppText>
-            <AppText className={cn(appTypography.bodyCentered, 'max-w-[280px]')}>
+            <AppText className={cn(appTypography.bodyCentered, EXPLORER_STATUS_TEXT_WIDTH)}>
               {directoryError}
             </AppText>
           </View>
@@ -365,7 +366,7 @@ export function ProjectArtifactExplorer({ artifactId, projectId }: ProjectArtifa
           <AppText className="text-base font-semibold text-foreground">
             This folder is empty
           </AppText>
-          <AppText className={cn(appTypography.bodyCentered, 'max-w-[280px]')}>
+          <AppText className={cn(appTypography.bodyCentered, EXPLORER_STATUS_TEXT_WIDTH)}>
             New files will appear here as the artifact grows.
           </AppText>
         </View>
@@ -377,7 +378,7 @@ export function ProjectArtifactExplorer({ artifactId, projectId }: ProjectArtifa
     <View className="flex-row items-center gap-2 mt-[-10px] mx-[-8px]">
       <Button
         accessibilityLabel="Go back"
-        className="size-8 rounded-full"
+        className="size-8 self-center rounded-full"
         isDisabled={!canGoBack}
         isIconOnly
         size="sm"
@@ -437,25 +438,20 @@ export function ProjectArtifactExplorer({ artifactId, projectId }: ProjectArtifa
             </View>
           );
         })}
+        <StyledFeather
+          className={cn(appColors.foregroundSoft, 'ml-1')}
+          name="chevron-right"
+          size={appSizes.iconXs}
+        />
       </View>
 
       <Button
-        accessibilityLabel={selectedFilePath ? 'Refresh file' : 'Refresh folder'}
-        className="size-8 rounded-full"
-        isIconOnly
-        size="sm"
-        variant="ghost"
-        onPress={() => void handleRefresh()}
-      >
-        <StyledFeather className="text-foreground" name="refresh-cw" size={appSizes.iconXs} />
-      </Button>
-
-      <Button
         accessibilityLabel="Go forward"
-        className="size-8 rounded-full"
+        className="size-8 self-center rounded-full"
         isDisabled={!canGoForward}
         isIconOnly
         size="sm"
+        style={{ marginTop: 1 }}
         variant="ghost"
         onPress={() => handleHistoryNavigation('forward')}
       >
@@ -476,12 +472,13 @@ export function ProjectArtifactExplorer({ artifactId, projectId }: ProjectArtifa
           paddingBottom: insets.bottom + appSpacing.xl,
         }}
         ListEmptyComponent={renderDirectoryEmptyState}
-        ItemSeparatorComponent={() => <View style={{ height: appSpacing.sm }} />}
+        ItemSeparatorComponent={() => <View style={{ height: appSpacing.md }} />}
         onRefresh={() => void handleRefresh()}
         refreshing={isRefreshing}
         renderItem={({ item }) => (
           <Pressable
             android_ripple={{ color: 'transparent' }}
+            hitSlop={6}
             style={{ borderCurve: 'continuous' }}
             onPress={() =>
               item.type === 'directory'
@@ -489,16 +486,19 @@ export function ProjectArtifactExplorer({ artifactId, projectId }: ProjectArtifa
                 : handleFilePress(item.path)
             }
           >
-            <View className={appListStyles.filesystemRow}>
+            <View className={cn(appListStyles.filesystemRow, 'gap-4 py-1')}>
               <StyledFeather
                 className={cn(
                   item.type === 'directory' ? 'text-foreground' : appColors.foregroundMuted
                 )}
                 name={getEntryIcon(item)}
-                size={appSizes.iconMd}
+                size={appSizes.iconLg}
               />
               <View className={appListStyles.rowContent}>
-                <AppText className="text-[16px] font-medium text-foreground" numberOfLines={1}>
+                <AppText
+                  className="text-[17px] font-medium leading-7 text-foreground"
+                  numberOfLines={1}
+                >
                   {item.name}
                 </AppText>
               </View>
@@ -506,7 +506,7 @@ export function ProjectArtifactExplorer({ artifactId, projectId }: ProjectArtifa
                 <StyledFeather
                   className={appColors.foregroundSoft}
                   name="chevron-right"
-                  size={appSizes.iconSm}
+                  size={appSizes.iconMd}
                 />
               ) : null}
             </View>
@@ -537,7 +537,7 @@ export function ProjectArtifactExplorer({ artifactId, projectId }: ProjectArtifa
             <AppText className="text-base font-semibold text-foreground">
               Couldn&apos;t open this file
             </AppText>
-            <AppText className={cn(appTypography.bodyCentered, 'max-w-[280px]')}>
+            <AppText className={cn(appTypography.bodyCentered, EXPLORER_STATUS_TEXT_WIDTH)}>
               {fileError}
             </AppText>
           </View>

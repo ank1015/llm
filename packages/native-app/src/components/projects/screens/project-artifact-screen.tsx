@@ -1,7 +1,7 @@
 import { Link, useLocalSearchParams } from 'expo-router';
-import { Tabs } from 'heroui-native';
+import { Tabs, useThemeColor } from 'heroui-native';
 import { useMemo, useState } from 'react';
-import { Pressable, View, useWindowDimensions } from 'react-native';
+import { Pressable, RefreshControl, View, useWindowDimensions } from 'react-native';
 
 import { AppText } from '@/components/app-text';
 import { ProjectArtifactExplorer } from '@/components/projects/artifacts/project-artifact-explorer';
@@ -14,15 +14,17 @@ import { appLayout, appSpacing, appTabsStyles, appTypography } from '@/styles/ui
 export function ProjectArtifactScreen() {
   const params = useLocalSearchParams<{ artifactId?: string | string[] }>();
   const artifactId = Array.isArray(params.artifactId) ? params.artifactId[0] : params.artifactId;
-  const { projectId } = useProjectShell();
+  const { projectId, refreshOverview } = useProjectShell();
   const artifact = useSidebarStore(
     (state) => state.artifactDirs.find((entry) => entry.id === artifactId) ?? null
   );
   const isLoading = useSidebarStore((state) => state.isLoading);
+  const isRefreshing = useSidebarStore((state) => state.isRefreshing);
   const error = useSidebarStore((state) => state.error);
   const [activeTab, setActiveTab] = useState('chats');
   const [composerHeight, setComposerHeight] = useState(0);
   const { height: windowHeight } = useWindowDimensions();
+  const [mutedColor] = useThemeColor(['muted']);
   const composerInset = activeTab === 'chats' ? composerHeight + appSpacing.sm : 0;
   const endSpacerHeight = Math.round(windowHeight * 0.4);
 
@@ -79,6 +81,7 @@ export function ProjectArtifactScreen() {
         <Tabs.Content className="flex-1" value="chats">
           <View className="flex-1" style={{ paddingBottom: composerInset }}>
             <ScreenScrollView
+              alwaysBounceVertical
               className="flex-1"
               contentContainerClassName={appLayout.artifactScreen}
               contentContainerStyle={{
@@ -87,6 +90,16 @@ export function ProjectArtifactScreen() {
               }}
               contentInsetAdjustmentBehavior="never"
               keyboardShouldPersistTaps="handled"
+              refreshControl={
+                <RefreshControl
+                  colors={[mutedColor]}
+                  onRefresh={() => {
+                    void refreshOverview('refresh');
+                  }}
+                  refreshing={isRefreshing}
+                  tintColor={mutedColor}
+                />
+              }
             >
               <View className={appLayout.artifactChatList}>
                 {error && !artifact ? (
