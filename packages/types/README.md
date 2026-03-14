@@ -1,18 +1,32 @@
 # @ank1015/llm-types
 
-Type definitions for a provider-agnostic LLM SDK that **preserves native provider types** instead of abstracting them away.
+Shared contracts for a multi-provider LLM SDK that **preserve native provider types** instead of flattening everything into a lowest-common-denominator abstraction.
+
+This package is mostly compile-time types, with a very small shared runtime surface:
+
+- `KnownApis`
+- `isValidApi()`
+- `LLMError` and its subclasses
+
+## Why This Package Exists
+
+The monorepo has packages that need the shared contracts without needing the full runtime implementation. For example:
+
+- `@ank1015/llm-core` implements provider calls and streaming
+- `@ank1015/llm-sdk` composes higher-level workflows on top
+- `@ank1015/llm-sdk-adapters` implements storage adapters and mostly needs interfaces, messages, sessions, and errors
+
+Keeping the contracts separate lets those packages share the same shapes without forcing all of them to depend on the provider runtime stack.
 
 ## Philosophy
 
-Most multi-provider LLM libraries define a single common type for options and responses. This loses important provider-specific details — each provider has different capabilities, different parameters, and different response shapes.
+Most multi-provider LLM libraries normalize both inputs and outputs so aggressively that provider-specific capabilities disappear.
 
-This package takes the opposite approach:
+This package takes a different approach:
 
-- **Provider options are the real SDK types.** `AnthropicProviderOptions` extends Anthropic's `MessageCreateParams`. `OpenAIProviderOptions` extends OpenAI's `ResponseCreateParamsBase`. You get the full set of knobs each provider offers.
-- **Native responses are preserved.** `BaseAssistantMessage<'anthropic'>` carries `message: Anthropic.Message`. `BaseAssistantMessage<'openai'>` carries `message: OpenAI.Response`. The original response is always accessible.
-- **Normalized fields are added on top.** Every `BaseAssistantMessage` also has a unified `content` array and `usage` object, so you can write provider-agnostic code where it makes sense.
-
-The type system enforces this with generic type parameters (`TApi extends Api`) and type maps (`ApiNativeResponseMap`, `ApiOptionsMap`) that resolve to the correct provider-specific types at compile time.
+- **Provider options stay provider-native.** `OpenAIProviderOptions` stays close to the OpenAI Responses API. `AnthropicProviderOptions` stays close to Anthropic Messages. `GoogleProviderOptions` stays close to `@google/genai`.
+- **Native responses are preserved.** `BaseAssistantMessage<TApi>` always keeps the original provider response object in `message`.
+- **Normalized fields are added on top.** You still get provider-agnostic `content`, `usage`, `stopReason`, and streaming event shapes for UI and orchestration logic.
 
 ## Installation
 
@@ -20,9 +34,7 @@ The type system enforces this with generic type parameters (`TApi extends Api`) 
 pnpm add @ank1015/llm-types
 ```
 
-## Core Types
-
-### Api
+## Supported Providers
 
 ```typescript
 type Api =
@@ -33,162 +45,215 @@ type Api =
   | 'anthropic'
   | 'claude-code'
   | 'zai'
-  | 'kimi';
+  | 'kimi'
+  | 'minimax'
+  | 'cerebras'
+  | 'openrouter';
 ```
 
-Derived from the `KnownApis` const array. Adding a new string to the array automatically extends the union, and TypeScript exhaustiveness checks will flag every switch/map that needs updating.
+The union is derived from `KnownApis`, so adding a provider in `src/api.ts` automatically updates the type and triggers exhaustiveness errors across consumers.
 
-### BaseAssistantMessage
+## Core Types
 
-The central response type — carries both normalized and native data:
+### `BaseAssistantMessage<TApi>`
+
+The central response contract preserves both normalized and native data:
 
 ```typescript
 interface BaseAssistantMessage<TApi extends Api> {
   role: 'assistant';
   api: TApi;
+  id: string;
   model: Model<TApi>;
 
-  // Normalized — same shape for every provider
-  content: AssistantResponse; // text blocks, thinking blocks, tool calls
-  usage: Usage; // token counts + cost in USD
-  stopReason: StopReason; // 'stop' | 'length' | 'toolUse' | 'error' | 'aborted'
+  // Normalized fields
+  content: AssistantResponse;
+  usage: Usage;
+  stopReason: StopReason;
+  timestamp: number;
+  duration: number;
+  errorMessage?: string;
 
-  // Native — the provider's original response object
+  // Provider-native response
   message: NativeResponseForApi<TApi>;
-  // Resolves to:
-  //   Anthropic.Message        when TApi = 'anthropic' | 'claude-code'
-  //   OpenAI.Response           when TApi = 'openai' | 'codex'
-  //   GenerateContentResponse   when TApi = 'google'
-  //   ChatCompletion            when TApi = 'deepseek' | 'kimi' | 'zai'
 }
 ```
 
-### Provider Options
+`NativeResponseForApi<TApi>` resolves to the real SDK response type:
 
-Each provider's options type extends the official SDK params, omitting fields managed by the library (model, messages) and adding common fields (apiKey, signal):
+- `anthropic`, `claude-code`, `minimax` -> `Anthropic.Message`
+- `openai`, `codex` -> `OpenAI.Response`
+- `google` -> `GenerateContentResponse`
+- `deepseek`, `kimi`, `zai`, `cerebras`, `openrouter` -> `ChatCompletion`
 
-```typescript
-// Anthropic — extends MessageCreateParamsNonStreaming
-type AnthropicProviderOptions = Omit<
-  MessageCreateParamsNonStreaming,
-  'model' | 'messages' | 'system' | 'max_tokens'
-> & { apiKey: string; signal?: AbortSignal; max_tokens?: number };
+### `BaseAssistantEvent<TApi>`
 
-// OpenAI — extends ResponseCreateParamsBase
-type OpenAIProviderOptions = Omit<ResponseCreateParamsBase, 'model' | 'input'> & {
-  apiKey: string;
-  signal?: AbortSignal;
-};
+Typed streaming events cover the full assistant lifecycle:
 
-// Google — extends GenerateContentConfig
-type GoogleProviderOptions = Omit<GenerateContentConfig, 'abortSignal' | 'systemPrompt'> & {
-  apiKey: string;
-  signal?: AbortSignal;
-};
+- `start`
+- `text_start` / `text_delta` / `text_end`
+- `thinking_start` / `thinking_delta` / `thinking_end`
+- `image_start` / `image_frame` / `image_end`
+- `toolcall_start` / `toolcall_delta` / `toolcall_end`
+- `done`
+- `error`
 
-// DeepSeek, Kimi, Z.AI — extend ChatCompletionCreateParamsBase
-type DeepSeekProviderOptions = Omit<ChatCompletionCreateParamsBase, 'model' | 'messages'> & {
-  apiKey: string;
-  signal?: AbortSignal;
-};
+Every event includes the in-progress `BaseAssistantMessage<TApi>`.
 
-// Claude Code — extends Anthropic's MessageCreateParams, uses OAuth + beta headers
-type ClaudeCodeProviderOptions = Omit<
-  MessageCreateParamsNonStreaming,
-  'model' | 'messages' | 'system' | 'max_tokens'
-> & { oauthToken: string; betaFlag: string; billingHeader: string; signal?: AbortSignal };
+### `Content`
 
-// Codex — extends OpenAI's ResponseCreateParamsBase, uses chatgpt-account-id
-type CodexProviderOptions = Omit<ResponseCreateParamsBase, 'model' | 'input'> & {
-  apiKey: string;
-  'chatgpt-account-id': string;
-  instructions?: string;
-  signal?: AbortSignal;
-};
-```
-
-### Type Maps
-
-Compile-time lookups from `Api` to provider-specific types:
-
-```typescript
-// Get the native response type for a provider
-type NativeResponseForApi<TApi extends Api> = ApiNativeResponseMap[TApi];
-
-// Get the options type for a provider
-type OptionsForApi<TApi extends Api> = ApiOptionsMap[TApi];
-
-// Make apiKey optional (for boundaries where it's injected externally)
-type WithOptionalKey<T> = Omit<T, 'apiKey'> & { apiKey?: string };
-```
-
-### Content
-
-Multimodal content blocks used in messages:
+Unified multimodal content blocks:
 
 ```typescript
 type Content = (TextContent | ImageContent | FileContent)[];
 ```
 
-### Streaming Events
+`ImageContent` also supports normalized generated-image metadata such as:
 
-`BaseAssistantEvent<TApi>` is a discriminated union covering the full streaming lifecycle:
+- generation stage (`partial`, `thought`, `final`)
+- provider
+- provider item id
+- revised prompt
+- output size / quality / format / background
 
-- `start` — Stream opened
-- `text_start` / `text_delta` / `text_end` — Text content
-- `thinking_start` / `thinking_delta` / `thinking_end` — Reasoning content
-- `toolcall_start` / `toolcall_delta` / `toolcall_end` — Tool calls
-- `done` / `error` — Stream completion
+### `Model<TApi>` and `Provider<TApi>`
 
-Every event includes the in-progress `BaseAssistantMessage` for accumulated state access.
+`Model<TApi>` is the shared model metadata contract:
 
-### Adapter Interfaces
+- `api`, `id`, `name`, `baseUrl`
+- `reasoning`
+- supported inputs
+- token pricing
+- `contextWindow`, `maxTokens`
+- `headers`
+- supported tool capabilities
 
-Contracts for SDK storage operations — implementations live in consumer packages:
+`Provider<TApi>` pairs a model with its provider-specific options.
 
-- `KeysAdapter` — API key storage with multi-credential support (`getCredentials`/`setCredentials` for providers like claude-code that need multiple fields)
-- `UsageAdapter` — Usage tracking and statistics (`track`, `getStats`, `getMessages`)
-- `SessionsAdapter` — Session CRUD, branching, history, and search
-- `UsageFilters`, `UsageStats`, `TokenBreakdown`, `CostBreakdown` — Supporting types
+### `Tool` and `Context`
 
-### Error Classes
+Tools use TypeBox schemas directly:
 
-Typed error hierarchy with `LLMErrorCode` discriminant:
+```typescript
+interface Tool<TParameters extends TSchema = TSchema> {
+  name: string;
+  description: string;
+  parameters: TParameters;
+}
 
-- `LLMError` — Base class with `code` and `message`
-- `ApiKeyNotFoundError` — Provider key missing
-- `CostLimitError` — Cost budget exceeded
-- `ContextLimitError` — Context window exceeded
-- `ConversationBusyError` — Concurrent prompt attempted
-- `ModelNotConfiguredError` — No provider configured
-- `SessionNotFoundError` — Session not found
-- `InvalidParentError` — Invalid parent node in session tree
-- `PathTraversalError` — Path traversal attack detected
+interface Context {
+  messages: Message[];
+  systemPrompt?: string;
+  tools?: Tool[];
+}
+```
 
-### Agent Types
+## Provider Option Families
 
-Types for building tool-using agent loops:
+The current provider options fall into a few families:
 
-- `AgentTool` — Extends `Tool` with an `execute` function
-- `AgentEvent` — Lifecycle events (agent_start, turn_start, message_start, tool_execution_start, etc.)
-- `AgentState` / `AgentLoopConfig` — State and configuration
+- **Anthropic Messages-compatible**
+  - `AnthropicProviderOptions`
+  - `ClaudeCodeProviderOptions`
+  - `MiniMaxProviderOptions`
+- **OpenAI Responses-compatible**
+  - `OpenAIProviderOptions`
+  - `CodexProviderOptions`
+- **Google GenAI-compatible**
+  - `GoogleProviderOptions`
+- **OpenAI Chat Completions-compatible**
+  - `DeepSeekProviderOptions`
+  - `KimiProviderOptions`
+  - `ZaiProviderOptions`
+  - `CerebrasProviderOptions`
+  - `OpenRouterProviderOptions`
 
-### Session Types
+The package preserves provider-specific extensions where needed, for example:
 
-Types for append-only JSONL session storage with tree-structured branching:
+- `CodexProviderOptions` requires `chatgpt-account-id`
+- `ClaudeCodeProviderOptions` uses `oauthToken`, `betaFlag`, and `billingHeader`
+- `KimiProviderOptions` and `ZaiProviderOptions` expose thinking config
+- `CerebrasProviderOptions` exposes reasoning format / effort controls
 
-- `SessionNode = SessionHeader | MessageNode | CustomNode`
-- `Session`, `SessionSummary`, `BranchInfo`
-- Service input types for CRUD operations
+## Type Maps
+
+Compile-time lookups connect `Api` to the right native response and options type:
+
+```typescript
+type NativeResponseForApi<TApi extends Api> = ApiNativeResponseMap[TApi];
+type OptionsForApi<TApi extends Api> = ApiOptionsMap[TApi];
+type WithOptionalKey<T> = Omit<T, 'apiKey'> & { apiKey?: string };
+```
+
+## Agent Contracts
+
+This package also defines the shared contracts for tool-using agents:
+
+- `AgentTool`
+- `AgentToolResult<T>`
+- `AgentState`
+- `AgentLoopConfig`
+- `AgentEvent`
+- `Attachment`
+- `QueuedMessage<T>`
+- `ToolExecutionContext`
+
+These are shared here because they are part of the monorepo-wide contract surface, even though the runtime agent loop lives in `@ank1015/llm-core`.
+
+## Storage Contracts
+
+Shared adapter and session types also live here:
+
+- `KeysAdapter`
+- `UsageAdapter`
+- `SessionsAdapter`
+- `SessionNode`, `Session`, `SessionSummary`, `BranchInfo`
+- `CreateSessionInput`, `AppendMessageInput`, `AppendCustomInput`, `UpdateSessionNameInput`
+
+These contracts are consumed directly by packages like `@ank1015/llm-sdk-adapters`.
+
+## Error Classes
+
+Minimal shared runtime errors are exported so every package can throw and catch the same error types:
+
+- `LLMError`
+- `ApiKeyNotFoundError`
+- `CostLimitError`
+- `ContextLimitError`
+- `ConversationBusyError`
+- `ModelNotConfiguredError`
+- `SessionNotFoundError`
+- `InvalidParentError`
+- `PathTraversalError`
 
 ## Adding a Provider
 
-1. Create `src/providers/<name>.ts` with native response and options types
-2. Add to `ApiNativeResponseMap` and `ApiOptionsMap` in `src/providers/index.ts`
-3. Add the provider string to `KnownApis` in `src/api.ts`
-4. Re-export from `src/index.ts`
+1. Create `src/providers/<name>.ts` with native response and provider options types
+2. Add the provider string to `KnownApis` in `src/api.ts`
+3. Add it to `ApiNativeResponseMap` and `ApiOptionsMap` in `src/providers/index.ts`
+4. Re-export it from `src/providers/index.ts`
+5. Re-export it from `src/index.ts`
 
-TypeScript will flag every location that needs to handle the new provider via exhaustiveness checks on the `Api` union.
+TypeScript will surface exhaustiveness errors anywhere the new provider is not handled.
+
+## What Does and Doesn't Belong Here
+
+Belongs here:
+
+- Shared public contracts
+- Provider-native response and option types
+- Agent/storage/session interfaces
+- Small shared runtime primitives used across packages
+
+Does not belong here:
+
+- API clients
+- Provider request execution
+- Streaming implementations
+- Model catalogs
+- Registry/dispatch logic
+
+Those live in `@ank1015/llm-core`.
 
 ## License
 
