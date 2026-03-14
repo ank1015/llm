@@ -26,7 +26,7 @@ describeIfGemini('Google Image Integration', () => {
 
   beforeAll(() => {
     const imageModel =
-      getModel('google', 'gemini-2.5-flash-image') ||
+      getModel('google', 'gemini-3.1-flash-image-preview') ||
       getModel('google', 'gemini-3-pro-image-preview');
 
     if (!imageModel) {

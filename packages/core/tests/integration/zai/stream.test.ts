@@ -15,9 +15,9 @@ describe('Zai Stream Integration', () => {
       throw new Error('ZAI_API_KEY environment variable is required for integration tests');
     }
 
-    const testModel = getModel('zai', 'glm-4.7');
+    const testModel = getModel('zai', 'glm-5');
     if (!testModel) {
-      throw new Error('Test model glm-4.7 not found');
+      throw new Error('Test model glm-5 not found');
     }
     model = testModel;
   });

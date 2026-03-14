@@ -3,23 +3,6 @@ import type { Model } from '@ank1015/llm-types';
 const openaiBaseUrl = `https://api.openai.com/v1`;
 
 export const openaiModels = {
-  'gpt-5.2': {
-    id: 'gpt-5.2',
-    name: 'GPT-5.2',
-    api: 'openai',
-    baseUrl: openaiBaseUrl,
-    reasoning: true,
-    input: ['text', 'image', 'file'],
-    cost: {
-      input: 1.75,
-      output: 14,
-      cacheRead: 0.175,
-      cacheWrite: 0,
-    },
-    contextWindow: 400000,
-    maxTokens: 128000,
-    tools: ['function_calling'],
-  } satisfies Model<'openai'>,
   'gpt-5.4': {
     id: 'gpt-5.4',
     name: 'GPT-5.4',
@@ -54,17 +37,17 @@ export const openaiModels = {
     maxTokens: 128000,
     tools: ['function_calling'],
   } satisfies Model<'openai'>,
-  'gpt-5.2-pro': {
-    id: 'gpt-5.2-pro',
-    name: 'GPT-5.2 Pro',
+  'gpt-5.4-pro': {
+    id: 'gpt-5.4-pro',
+    name: 'GPT-5.4 Pro',
     api: 'openai',
     baseUrl: openaiBaseUrl,
     reasoning: true,
     input: ['text', 'image', 'file'],
     cost: {
-      input: 21,
-      output: 168,
-      cacheRead: 21,
+      input: 30,
+      output: 180,
+      cacheRead: 30,
       cacheWrite: 0,
     },
     contextWindow: 400000,

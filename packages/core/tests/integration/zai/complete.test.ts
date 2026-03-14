@@ -15,10 +15,10 @@ describe('Zai Complete Integration', () => {
       throw new Error('ZAI_API_KEY environment variable is required for integration tests');
     }
 
-    // Use the glm-4.7 model for testing
-    const testModel = getModel('zai', 'glm-4.7');
+    // Use the current Z.AI model for testing
+    const testModel = getModel('zai', 'glm-5');
     if (!testModel) {
-      throw new Error('Test model glm-4.7 not found');
+      throw new Error('Test model glm-5 not found');
     }
     model = testModel;
   });
@@ -521,7 +521,7 @@ describe('Zai Complete Integration', () => {
         role: 'assistant' as const,
         id: 'msg-anthropic-think-1',
         api: 'anthropic' as const,
-        model: { id: 'claude-sonnet-4-5', api: 'anthropic' } as any,
+        model: { id: 'claude-sonnet-4-6', api: 'anthropic' } as any,
         timestamp: Date.now(),
         duration: 200,
         stopReason: 'stop' as const,

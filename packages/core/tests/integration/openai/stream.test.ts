@@ -363,7 +363,7 @@ describe('OpenAI Stream Integration', () => {
   describe('thinking/reasoning streaming', () => {
     it('should emit thinking_start/delta/end for reasoning models', async () => {
       // Use a reasoning model
-      const reasoningModel = getModel('openai', 'gpt-5.2');
+      const reasoningModel = getModel('openai', 'gpt-5.4');
       if (!reasoningModel) {
         return; // Skip if model not available
       }

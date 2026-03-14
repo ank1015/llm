@@ -10,10 +10,10 @@ describe('getMockMessage', () => {
     const testCases: Array<{ api: Api; modelId: string }> = [
       { api: 'anthropic', modelId: 'claude-haiku-4-5' },
       { api: 'claude-code', modelId: 'claude-haiku-4-5' },
-      { api: 'openai', modelId: 'gpt-5.2' },
+      { api: 'openai', modelId: 'gpt-5.4' },
       { api: 'google', modelId: 'gemini-3-flash-preview' },
       { api: 'deepseek', modelId: 'deepseek' },
-      { api: 'zai', modelId: 'glm-4.7' },
+      { api: 'zai', modelId: 'glm-5' },
       { api: 'kimi', modelId: 'kimi-k2.5' },
     ];
 
@@ -51,7 +51,7 @@ describe('getMockMessage', () => {
     });
 
     it('should set timestamp to current time', () => {
-      const model = getModel('openai', 'gpt-5.2')!;
+      const model = getModel('openai', 'gpt-5.4')!;
       const before = Date.now();
       const message = getMockMessage(model);
       const after = Date.now();
@@ -93,7 +93,7 @@ describe('getMockMessage', () => {
     });
 
     it('should include OpenAI native message structure', () => {
-      const model = getModel('openai', 'gpt-5.2')!;
+      const model = getModel('openai', 'gpt-5.4')!;
       const message = getMockMessage(model);
 
       expect(message.message).toBeDefined();
@@ -128,7 +128,7 @@ describe('getMockMessage', () => {
     });
 
     it('should include Z.AI native message structure', () => {
-      const model = getModel('zai', 'glm-4.7')!;
+      const model = getModel('zai', 'glm-5')!;
       const message = getMockMessage(model);
 
       expect(message.message).toBeDefined();

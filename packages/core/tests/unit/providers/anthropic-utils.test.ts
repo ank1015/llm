@@ -29,8 +29,8 @@ describe('Anthropic Utils', () => {
     });
 
     const mockModel: Model<'anthropic'> = {
-      id: 'claude-sonnet-4-5',
-      name: 'Claude Sonnet 4.5',
+      id: 'claude-sonnet-4-6',
+      name: 'Claude Sonnet 4.6',
       api: 'anthropic',
       baseUrl: 'https://api.anthropic.com',
       reasoning: true,
@@ -89,8 +89,8 @@ describe('Anthropic Utils', () => {
 
   describe('buildAnthropicMessages', () => {
     const mockModel: Model<'anthropic'> = {
-      id: 'claude-sonnet-4-5',
-      name: 'Claude Sonnet 4.5',
+      id: 'claude-sonnet-4-6',
+      name: 'Claude Sonnet 4.6',
       api: 'anthropic',
       baseUrl: 'https://api.anthropic.com',
       reasoning: true,
@@ -402,7 +402,7 @@ describe('Anthropic Utils', () => {
             type: 'message',
             role: 'assistant',
             content: [{ type: 'text', text: 'Hello' }],
-            model: 'claude-sonnet-4-5',
+            model: 'claude-sonnet-4-6',
             stop_reason: 'end_turn',
             stop_sequence: null,
             usage: {
@@ -452,7 +452,7 @@ describe('Anthropic Utils', () => {
                 input: { query: 'test' },
               },
             ],
-            model: 'claude-sonnet-4-5',
+            model: 'claude-sonnet-4-6',
             stop_reason: 'tool_use',
             stop_sequence: null,
             usage: {
@@ -707,7 +707,7 @@ describe('Anthropic Utils', () => {
 
   describe('buildParams', () => {
     const mockModel: Model<'anthropic'> = {
-      id: 'claude-sonnet-4-5',
+      id: 'claude-sonnet-4-6',
       name: 'Claude Sonnet 4.5',
       api: 'anthropic',
       baseUrl: 'https://api.anthropic.com',
@@ -728,7 +728,7 @@ describe('Anthropic Utils', () => {
       };
 
       const result = buildParams(mockModel, context, options, false);
-      expect(result.model).toBe('claude-sonnet-4-5');
+      expect(result.model).toBe('claude-sonnet-4-6');
     });
 
     it('should set stream to false', () => {

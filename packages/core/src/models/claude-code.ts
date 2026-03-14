@@ -1,12 +1,13 @@
 import type { Model } from '@ank1015/llm-types';
 
 const anthropicBaseUrl = `https://api.anthropic.com`;
+const claudeCodeApi = 'claude-code' as const;
 
 export const claudeCodeModels = {
   'claude-haiku-4-5': {
     id: 'claude-haiku-4-5',
     name: 'Haiku 4.5',
-    api: 'claude-code',
+    api: claudeCodeApi,
     baseUrl: anthropicBaseUrl,
     reasoning: true,
     input: ['text', 'image', 'file'],
@@ -20,27 +21,10 @@ export const claudeCodeModels = {
     maxTokens: 64000,
     tools: ['function_calling'],
   } satisfies Model<'claude-code'>,
-  'claude-opus-4-5': {
-    id: 'claude-opus-4-5',
-    name: 'Opus 4.5',
-    api: 'claude-code',
-    baseUrl: anthropicBaseUrl,
-    reasoning: true,
-    input: ['text', 'image', 'file'],
-    cost: {
-      input: 5,
-      output: 25,
-      cacheRead: 0.5,
-      cacheWrite: 6.25,
-    },
-    contextWindow: 200000,
-    maxTokens: 64000,
-    tools: ['function_calling'],
-  } satisfies Model<'claude-code'>,
   'claude-opus-4-6': {
     id: 'claude-opus-4-6',
     name: 'Opus 4.6',
-    api: 'claude-code',
+    api: claudeCodeApi,
     baseUrl: anthropicBaseUrl,
     reasoning: true,
     input: ['text', 'image', 'file'],
@@ -49,23 +33,6 @@ export const claudeCodeModels = {
       output: 25,
       cacheRead: 0.5,
       cacheWrite: 6.25,
-    },
-    contextWindow: 200000,
-    maxTokens: 64000,
-    tools: ['function_calling'],
-  } satisfies Model<'claude-code'>,
-  'claude-sonnet-4-5': {
-    id: 'claude-sonnet-4-5',
-    name: 'Sonnet 4.5',
-    api: 'claude-code',
-    baseUrl: anthropicBaseUrl,
-    reasoning: true,
-    input: ['text', 'image', 'file'],
-    cost: {
-      input: 3,
-      output: 15,
-      cacheRead: 0.3,
-      cacheWrite: 3.75,
     },
     contextWindow: 200000,
     maxTokens: 64000,
@@ -74,7 +41,7 @@ export const claudeCodeModels = {
   'claude-sonnet-4-6': {
     id: 'claude-sonnet-4-6',
     name: 'Sonnet 4.6',
-    api: 'claude-code',
+    api: claudeCodeApi,
     baseUrl: anthropicBaseUrl,
     reasoning: true,
     input: ['text', 'image', 'file'],

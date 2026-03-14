@@ -18,8 +18,8 @@ import type {
 
 describe('Claude Code Utils', () => {
   const mockModel: Model<'claude-code'> = {
-    id: 'claude-sonnet-4-5',
-    name: 'Claude Sonnet 4.5',
+    id: 'claude-sonnet-4-6',
+    name: 'Claude Sonnet 4.6',
     api: 'claude-code',
     baseUrl: 'https://api.anthropic.com',
     reasoning: true,
@@ -117,7 +117,7 @@ describe('Claude Code Utils', () => {
       const context: Context = { messages: [] };
       const result = buildParams(mockModel, context, defaultOptions);
 
-      expect(result.model).toBe('claude-sonnet-4-5');
+      expect(result.model).toBe('claude-sonnet-4-6');
       expect(result.max_tokens).toBe(64000);
       expect(result.stream).toBe(false);
     });

@@ -33,8 +33,7 @@ describe('getProviders', () => {
   it('should return all providers from KnownApis', () => {
     const providers = getProviders();
 
-    // Should have at least the 8 main providers
-    expect(providers.length).toBeGreaterThanOrEqual(8);
+    expect(providers.length).toBeGreaterThanOrEqual(11);
   });
 });
 
@@ -49,11 +48,11 @@ describe('getModel', () => {
     });
 
     it('should return OpenAI model', () => {
-      const model = getModel('openai', 'gpt-5.2');
+      const model = getModel('openai', 'gpt-5.4');
 
       expect(model).toBeDefined();
       expect(model?.api).toBe('openai');
-      expect(model?.id).toBe('gpt-5.2');
+      expect(model?.id).toBe('gpt-5.4');
     });
 
     it('should return Codex model', () => {
@@ -88,11 +87,11 @@ describe('getModel', () => {
     });
 
     it('should return Z.AI model', () => {
-      const model = getModel('zai', 'glm-4.7');
+      const model = getModel('zai', 'glm-5');
 
       expect(model).toBeDefined();
       expect(model?.api).toBe('zai');
-      expect(model?.id).toBe('glm-4.7');
+      expect(model?.id).toBe('glm-5');
     });
 
     it('should return Kimi model', () => {
@@ -127,13 +126,13 @@ describe('getModel', () => {
     });
 
     it('should have positive context window', () => {
-      const model = getModel('openai', 'gpt-5.2');
+      const model = getModel('openai', 'gpt-5.4');
 
       expect(model?.contextWindow).toBeGreaterThan(0);
     });
 
     it('should have positive max tokens', () => {
-      const model = getModel('openai', 'gpt-5.2');
+      const model = getModel('openai', 'gpt-5.4');
 
       expect(model?.maxTokens).toBeGreaterThan(0);
     });
@@ -452,7 +451,7 @@ describe('calculateCost', () => {
     });
 
     it('should calculate cost for real OpenAI model', () => {
-      const model = getModel('openai', 'gpt-5.2')!;
+      const model = getModel('openai', 'gpt-5.4')!;
       const usage: Usage = {
         input: 5000,
         output: 2000,

@@ -447,7 +447,7 @@ describe('Cerebras Complete Integration', () => {
         role: 'assistant' as const,
         id: 'msg-anthropic-think-1',
         api: 'anthropic' as const,
-        model: { id: 'claude-sonnet-4-5', api: 'anthropic' } as any,
+        model: { id: 'claude-sonnet-4-6', api: 'anthropic' } as any,
         timestamp: Date.now(),
         duration: 200,
         stopReason: 'stop' as const,

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* global console, fetch, process */
 /**
  * Fetches models from the OpenRouter API and updates openrouter.ts.
  *

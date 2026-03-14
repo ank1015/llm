@@ -1,186 +1,114 @@
 # Adding a New Provider
 
-This guide walks through every file you need to create or modify when adding a new provider. The examples use a hypothetical provider called `acme`.
+This guide walks through the current provider flow for `@ank1015/llm-core`. The examples use a hypothetical provider called `acme`.
 
 ## Overview
 
-The project uses a **self-registering provider system**. Each provider registers its stream function and mock message factory when its `index.ts` is imported. The central registry dispatches to the correct implementation at runtime.
+The package uses a self-registering provider system:
 
-**Files to create:** 4
-**Files to modify:** 6
+1. `packages/types` defines the provider contract.
+2. `packages/core/src/providers/<name>/index.ts` registers the runtime implementation.
+3. `packages/core/src/index.ts` re-exports that provider, which triggers registration for normal consumers.
+4. `packages/core/vitest.setup.ts` imports the provider directly so tests register it before execution.
 
----
+For most providers, you will touch both `packages/types` and `packages/core`.
 
-## Step 1: Define types (`packages/types/`)
+## Step 1: define the contracts in `packages/types`
 
-### 1a. Add to KnownApis
+### 1a. Add the API name
 
-**File:** `packages/types/src/api.ts`
+File: `packages/types/src/api.ts`
 
-Add the provider string to the `KnownApis` array:
+Add your provider to `KnownApis`:
 
-```typescript
+```ts
 export const KnownApis = [
   'openai',
   'google',
   'deepseek',
   'anthropic',
+  'codex',
+  'claude-code',
   'zai',
   'kimi',
-  'acme', // <-- add here
+  'minimax',
+  'cerebras',
+  'openrouter',
+  'acme',
 ] as const;
 ```
 
-The `Api` union type is derived from this automatically.
+### 1b. Add provider-native types
 
-### 1b. Create provider type file (NEW)
+File: `packages/types/src/providers/acme.ts`
 
-**File:** `packages/types/src/providers/acme.ts`
+Choose the native response and options shape that matches the real provider:
 
-For an **OpenAI-compatible** provider (Chat Completions API):
+- OpenAI chat-completions style: use `ChatCompletion` and `ChatCompletionCreateParamsBase`
+- OpenAI Responses style: use `Response` and `ResponseCreateParamsBase`
+- Anthropic style: use `Message` and `MessageCreateParamsNonStreaming`
+- Native SDK: use the provider SDK's own types
 
-```typescript
-import type {
-  ChatCompletion,
-  ChatCompletionCreateParamsBase,
-} from 'openai/resources/chat/completions.js';
+### 1c. Wire the provider maps
 
-export type AcmeNativeResponse = ChatCompletion;
+File: `packages/types/src/providers/index.ts`
 
-interface AcmeProps {
-  apiKey: string;
-  signal?: AbortSignal;
-}
+Add:
 
-export type AcmeProviderOptions = Omit<ChatCompletionCreateParamsBase, 'model' | 'messages'> &
-  AcmeProps;
-```
+- imports for `AcmeNativeResponse` and `AcmeProviderOptions`
+- re-exports
+- `acme` entries in `ApiNativeResponseMap`
+- `acme` entries in `ApiOptionsMap`
 
-For a **native SDK** provider, import the SDK's response type instead of `ChatCompletion` and define options to match the SDK's params. See `anthropic.ts` or `google.ts` for examples.
+### 1d. Re-export from the package barrel
 
-### 1c. Register in provider maps
+File: `packages/types/src/index.ts`
 
-**File:** `packages/types/src/providers/index.ts`
+Re-export the new provider types so downstream consumers can import them from the package root.
 
-Three changes:
+## Step 2: implement the runtime in `packages/core`
 
-```typescript
-// 1. Import
-import type { AcmeNativeResponse, AcmeProviderOptions } from './acme.js';
+Create `packages/core/src/providers/acme/` with:
 
-// 2. Re-export
-export type { AcmeNativeResponse, AcmeProviderOptions } from './acme.js';
+- `index.ts`
+- `stream.ts`
+- `utils.ts`
 
-// 3. Add to both maps
-export interface ApiNativeResponseMap {
-  // ... existing entries ...
-  acme: AcmeNativeResponse;
-}
+### 2a. `utils.ts`
 
-export interface ApiOptionsMap {
-  // ... existing entries ...
-  acme: AcmeProviderOptions;
-}
-```
+This file usually contains:
 
-### 1d. Re-export from package barrel
+- client creation
+- request param building
+- context-to-provider message conversion
+- stop-reason mapping
+- mock native message generation
 
-**File:** `packages/types/src/index.ts`
+Pick the closest existing provider as a template:
 
-Add to the provider types export block:
+- `anthropic/` for native Anthropic streams
+- `minimax/` for Anthropic-wire providers
+- `openai/` for native OpenAI Responses streams
+- `codex/` for OpenAI Responses proxy providers
+- `google/` for Gemini native streams and image events
+- `deepseek/`, `kimi/`, `zai/`, `cerebras/`, or `openrouter/` for shared chat-completions providers
 
-```typescript
-export type {
-  // ... existing exports ...
-  AcmeNativeResponse,
-  AcmeProviderOptions,
-} from './providers/index.js';
-```
+### 2b. `stream.ts`
 
----
+Every provider implements a stream function.
 
-## Step 2: Implement the provider (`packages/core/src/providers/acme/`)
+Common patterns:
 
-### 2a. Create `utils.ts`
+- Native custom stream: manually build `AssistantMessageEventStream`
+- Shared OpenAI chat-completions stream: reuse `createChatCompletionStream()`
+- Anthropic-wire stream: follow `anthropic` or `minimax`
+- OpenAI Responses stream: follow `openai` or `codex`
 
-**File:** `packages/core/src/providers/acme/utils.ts`
+### 2c. `index.ts`
 
-This file contains the message builder, param builder, and mock message factory.
+Register the provider at module scope:
 
-For **OpenAI-compatible** providers, you can reuse the shared Chat Completions utilities:
-
-```typescript
-import { sanitizeSurrogates } from '../../utils/sanitize-unicode.js';
-import { convertChatTools, createMockChatCompletion } from '../utils/index.js';
-
-import type { ChatCompletion } from 'openai/resources/chat/completions.js';
-// ... other OpenAI types as needed
-
-import type { Context, Model, AcmeProviderOptions } from '@ank1015/llm-types';
-
-export function getMockAcmeMessage(modelId: string, requestId: string): ChatCompletion {
-  return createMockChatCompletion(modelId, requestId);
-}
-
-export function buildParams(model: Model<'acme'>, context: Context, options: AcmeProviderOptions) {
-  const messages = buildAcmeMessages(model, context);
-  const { apiKey, signal, ...providerOptions } = options;
-  // ... build and return params
-}
-
-export function buildAcmeMessages(_model: Model<'acme'>, context: Context) {
-  // Convert Context messages to provider-native format.
-  // See deepseek/utils.ts or kimi/utils.ts for complete examples.
-}
-```
-
-For **native SDK** providers, implement these from scratch. See `anthropic/utils.ts` or `google/utils.ts`.
-
-### 2b. Create `stream.ts`
-
-**File:** `packages/core/src/providers/acme/stream.ts`
-
-For **OpenAI-compatible** providers:
-
-```typescript
-import {
-  createChatCompletionClient,
-  createChatCompletionStream,
-  mapChatStopReason,
-} from '../utils/index.js';
-import { buildParams } from './utils.js';
-
-import type { StreamFunction } from '../../utils/types.js';
-import type { Context, Model, AcmeProviderOptions } from '@ank1015/llm-types';
-
-export const streamAcme: StreamFunction<'acme'> = (
-  model: Model<'acme'>,
-  context: Context,
-  options: AcmeProviderOptions,
-  id: string
-) => {
-  const client = createChatCompletionClient(model, options.apiKey, 'Acme');
-  const params = buildParams(model, context, options);
-
-  return createChatCompletionStream(
-    { mapStopReason: mapChatStopReason },
-    client,
-    params,
-    model,
-    context,
-    options?.signal,
-    id
-  );
-};
-```
-
-For **native SDK** providers, create the `AssistantMessageEventStream` manually and handle streaming events. See `anthropic/stream.ts` or `google/stream.ts`.
-
-### 2c. Create `index.ts` (self-registration)
-
-**File:** `packages/core/src/providers/acme/index.ts`
-
-```typescript
+```ts
 import { registerProvider } from '../registry.js';
 import { streamAcme } from './stream.js';
 import { getMockAcmeMessage } from './utils.js';
@@ -194,104 +122,122 @@ export { streamAcme } from './stream.js';
 export { getMockAcmeMessage } from './utils.js';
 ```
 
-This is the key file. Importing it triggers registration — no other files need to know about the registry.
+## Step 3: wire the provider into the package
 
----
+### 3a. Export it from the public barrel
 
-## Step 3: Wire it up
+File: `packages/core/src/index.ts`
 
-### 3a. Export from core barrel
+Add:
 
-**File:** `packages/core/src/index.ts`
-
-Add one line to the Providers section:
-
-```typescript
-// Providers
-export * from './providers/anthropic/index.js';
-export * from './providers/openai/index.js';
-export * from './providers/google/index.js';
-export * from './providers/deepseek/index.js';
-export * from './providers/zai/index.js';
-export * from './providers/kimi/index.js';
-export * from './providers/acme/index.js'; // <-- add
+```ts
+export * from './providers/acme/index.js';
 ```
 
-This `export *` triggers the side-effect import of `acme/index.ts`, which calls `registerProvider()`.
+This export is required for normal package consumers because it triggers the side-effect registration.
 
-### 3b. Add to test setup
+### 3b. Register it in tests
 
-**File:** `packages/core/vitest.setup.ts`
+File: `packages/core/vitest.setup.ts`
 
-```typescript
+Add:
+
+```ts
 import './src/providers/acme/index.js';
 ```
 
-Tests import directly from source (not the barrel), so this ensures registration happens before any test runs.
+## Step 4: add models
 
----
+Create a provider-specific model file:
 
-## Step 4: Add models
+File: `packages/core/src/models/acme.ts`
 
-**File:** `packages/core/src/models.generated.ts`
+```ts
+import type { Model } from '@ank1015/llm-types';
 
-Add a base URL constant and model entries:
-
-```typescript
 const acmeBaseUrl = `https://api.acme.com/v1`;
 
-export const MODELS = {
-  // ... existing providers ...
-
-  acme: {
-    'acme-model-1': {
-      id: 'acme-model-1',
-      name: 'Acme Model 1',
-      api: 'acme',
-      baseUrl: acmeBaseUrl,
-      reasoning: false,
-      input: ['text'],
-      cost: {
-        input: 0.5,
-        output: 1.5,
-        cacheRead: 0.1,
-        cacheWrite: 0,
-      },
-      contextWindow: 128000,
-      maxTokens: 8192,
-      tools: ['function_calling'],
-    } satisfies Model<'acme'>,
-  },
-} as const;
+export const acmeModels = {
+  'acme-model-1': {
+    id: 'acme-model-1',
+    name: 'Acme Model 1',
+    api: 'acme',
+    baseUrl: acmeBaseUrl,
+    reasoning: true,
+    input: ['text'],
+    cost: {
+      input: 1,
+      output: 2,
+      cacheRead: 0,
+      cacheWrite: 0,
+    },
+    contextWindow: 128000,
+    maxTokens: 8192,
+    tools: ['function_calling'],
+  } satisfies Model<'acme'>,
+};
 ```
 
----
+Then wire it into:
 
-## File Checklist
+File: `packages/core/src/models/index.ts`
 
-| #   | File                                | Action                                                    |
-| --- | ----------------------------------- | --------------------------------------------------------- |
-| 1   | `types/src/api.ts`                  | Add to `KnownApis`                                        |
-| 2   | `types/src/providers/acme.ts`       | **Create** — native response + options types              |
-| 3   | `types/src/providers/index.ts`      | Import, re-export, add to both maps                       |
-| 4   | `types/src/index.ts`                | Re-export new types                                       |
-| 5   | `core/src/providers/acme/utils.ts`  | **Create** — message builder, param builder, mock factory |
-| 6   | `core/src/providers/acme/stream.ts` | **Create** — streaming implementation                     |
-| 7   | `core/src/providers/acme/index.ts`  | **Create** — self-registration + re-exports               |
-| 8   | `core/src/index.ts`                 | Add `export *` line                                       |
-| 9   | `core/vitest.setup.ts`              | Add side-effect import                                    |
-| 10  | `core/src/models.generated.ts`      | Add base URL + model entries                              |
+```ts
+import { acmeModels } from './acme.js';
 
-**Files that never need touching:** `registry.ts`, `mock.ts`, `stream.ts` (central), `complete.ts`
+export const MODELS = {
+  // existing providers...
+  acme: acmeModels,
+};
+```
 
----
+## Current built-in providers
+
+Use these as references when choosing the nearest implementation pattern:
+
+- `anthropic`
+- `claude-code`
+- `openai`
+- `codex`
+- `google`
+- `deepseek`
+- `kimi`
+- `zai`
+- `cerebras`
+- `openrouter`
+- `minimax`
+
+## File checklist
+
+| #   | File                                         | Action                                      |
+| --- | -------------------------------------------- | ------------------------------------------- |
+| 1   | `packages/types/src/api.ts`                  | Add to `KnownApis`                          |
+| 2   | `packages/types/src/providers/acme.ts`       | Create provider-native response and options |
+| 3   | `packages/types/src/providers/index.ts`      | Import, re-export, and add map entries      |
+| 4   | `packages/types/src/index.ts`                | Re-export new provider types                |
+| 5   | `packages/core/src/providers/acme/utils.ts`  | Create runtime helpers                      |
+| 6   | `packages/core/src/providers/acme/stream.ts` | Create stream implementation                |
+| 7   | `packages/core/src/providers/acme/index.ts`  | Register provider and re-export             |
+| 8   | `packages/core/src/index.ts`                 | Add provider barrel export                  |
+| 9   | `packages/core/vitest.setup.ts`              | Add test registration import                |
+| 10  | `packages/core/src/models/acme.ts`           | Add provider models                         |
+| 11  | `packages/core/src/models/index.ts`          | Add provider model catalog to `MODELS`      |
 
 ## Verification
 
+From the monorepo root:
+
 ```bash
-# From project root
-pnpm typecheck          # No type errors
-pnpm --filter core test # All tests pass
+pnpm --filter @ank1015/llm-types typecheck
+pnpm --filter @ank1015/llm-core lint
+pnpm --filter @ank1015/llm-core typecheck
+pnpm --filter @ank1015/llm-core test:unit
 ```
 
-The exhaustive `Api` union type will cause compile errors anywhere a switch/map doesn't handle the new provider, guiding you to any spots you missed.
+Then run targeted integration coverage if the provider needs live testing:
+
+```bash
+pnpm --filter @ank1015/llm-core exec vitest run tests/integration/acme
+```
+
+If the API union or provider maps are incomplete, TypeScript will usually point at the missing registrations quickly.

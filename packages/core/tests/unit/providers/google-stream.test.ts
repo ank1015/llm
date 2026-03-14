@@ -30,8 +30,8 @@ describe('Google Stream', () => {
   let streamGoogle: typeof import('../../../src/providers/google/stream.js').streamGoogle;
 
   const mockModel: Model<'google'> = {
-    id: 'gemini-2.5-flash-image',
-    name: 'Gemini 2.5 Flash Image',
+    id: 'gemini-3.1-flash-image-preview',
+    name: 'Gemini 3.1 Flash Image Preview',
     api: 'google',
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
     reasoning: false,

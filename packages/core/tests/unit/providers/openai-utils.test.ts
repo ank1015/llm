@@ -524,7 +524,7 @@ describe('OpenAI Utils', () => {
             role: 'assistant',
             id: 'msg-g-img',
             api: 'google',
-            model: { id: 'gemini-2.5-flash-image', api: 'google' } as any,
+            model: { id: 'gemini-3.1-flash-image-preview', api: 'google' } as any,
             timestamp: Date.now(),
             duration: 100,
             stopReason: 'stop',
