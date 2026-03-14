@@ -1,4 +1,4 @@
-import type { Api, BaseAssistantMessage, UserMessage } from '@ank1015/llm-sdk';
+import type { Api, BaseAssistantMessage, UserMessage } from '@ank1015/llm-types';
 
 export function getTextFromUserMessage(msg: UserMessage): string {
   const textContentBlocks = msg.content.filter((c) => c.type === 'text');

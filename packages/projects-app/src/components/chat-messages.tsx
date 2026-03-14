@@ -5,7 +5,7 @@ import { Fragment, memo, useMemo } from 'react';
 import { AssistantMessages } from './assistant-messages';
 import { UserMessageComponent } from './user-message';
 
-import type { Api, BaseAssistantMessage, Message, MessageNode } from '@ank1015/llm-sdk';
+import type { Api, BaseAssistantMessage, Message, MessageNode } from '@ank1015/llm-types';
 
 import { getBranchNavigatorState, type BranchNavigatorState } from '@/lib/messages/session-tree';
 import { useChatStore } from '@/stores/chat-store';

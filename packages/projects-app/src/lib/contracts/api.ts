@@ -1,4 +1,4 @@
-import type { AgentEvent, Api, MessageNode } from '@ank1015/llm-sdk';
+import type { AgentEvent, Api, MessageNode } from '@ank1015/llm-types';
 
 export type ApiErrorBody = {
   code: string;

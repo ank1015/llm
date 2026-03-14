@@ -10,8 +10,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@ank1015/llm-sdk": "workspace:^",
-    "@ank1015/llm-sdk-adapters": "workspace:^",
+    "@ank1015/llm-types": "workspace:^",
+    "@ank1015/llm-core": "workspace:^",
     "@mendable/firecrawl-js": "^4.12.0",
     "@monaco-editor/react": "^4.7.0",
     "@radix-ui/react-avatar": "^1.1.11",

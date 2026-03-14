@@ -1,6 +1,6 @@
 'use client';
 
-import { getModel } from '@ank1015/llm-sdk';
+import { getModel } from '@ank1015/llm-core';
 import { useMemo } from 'react';
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';

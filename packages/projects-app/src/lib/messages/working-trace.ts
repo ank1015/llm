@@ -7,7 +7,7 @@ import type {
   ImageContent,
   Message,
   MessageNode,
-} from '@ank1015/llm-sdk';
+} from '@ank1015/llm-types';
 
 type AssistantStreamingMessage = Omit<BaseAssistantMessage<Api>, 'message'>;
 type CotRenderableMessage = Message | AssistantStreamingMessage;

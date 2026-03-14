@@ -8,7 +8,7 @@ import type {
   TurnSettings,
   VisibleLeafSelection,
 } from '@/lib/contracts';
-import type { MessageNode } from '@ank1015/llm-sdk';
+import type { MessageNode } from '@ank1015/llm-types';
 
 type ArtifactContext = {
   projectId: string;

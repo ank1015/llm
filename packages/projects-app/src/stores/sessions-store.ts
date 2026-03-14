@@ -3,7 +3,7 @@
 import { create } from 'zustand';
 
 import type { ModelSelection } from '@/lib/contracts';
-import type { SessionSummary } from '@ank1015/llm-sdk';
+import type { SessionSummary } from '@ank1015/llm-types';
 
 import {
   createSession as createSessionApi,

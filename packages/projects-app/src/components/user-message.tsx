@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import { ChatMarkdown } from './markdown-renderer';
 
 import type { BranchNavigatorState } from '@/lib/messages/session-tree';
-import type { MessageNode, UserMessage } from '@ank1015/llm-sdk';
+import type { MessageNode, UserMessage } from '@ank1015/llm-types';
 
 import { getTextFromUserMessage } from '@/lib/messages/utils';
 import { useChatSettingsStore, useChatStore, useComposerStore } from '@/stores';

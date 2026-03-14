@@ -16,7 +16,7 @@ import {
 
 import type { ProjectFileIndexEntry } from '@/lib/client-api';
 import type { ReasoningLevel, SessionRef } from '@/lib/contracts';
-import type { MessageNode } from '@ank1015/llm-sdk';
+import type { MessageNode } from '@ank1015/llm-types';
 
 import { Button } from '@/components/ui/button';
 import {

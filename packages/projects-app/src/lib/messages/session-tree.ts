@@ -1,4 +1,4 @@
-import type { MessageNode } from '@ank1015/llm-sdk';
+import type { MessageNode } from '@ank1015/llm-types';
 
 export type BranchNavigatorState = {
   currentIndex: number;

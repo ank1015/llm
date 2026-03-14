@@ -1,4 +1,4 @@
-import type { Api } from '@ank1015/llm-sdk';
+import type { Api } from '@ank1015/llm-types';
 
 const defaultOpenaiProviderOptions = {
   reasoning: {

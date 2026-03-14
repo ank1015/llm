@@ -1,7 +1,7 @@
 import { apiRequestJson, SERVER_BASE } from './http';
 
 import type { ModelSelection, SessionMetadata } from '@/lib/contracts';
-import type { SessionSummary } from '@ank1015/llm-sdk';
+import type { SessionSummary } from '@ank1015/llm-types';
 
 type ArtifactContext = {
   projectId: string;

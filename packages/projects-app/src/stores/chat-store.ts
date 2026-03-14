@@ -21,7 +21,7 @@ import type {
   Message,
   MessageNode,
   UserMessage,
-} from '@ank1015/llm-sdk';
+} from '@ank1015/llm-types';
 
 import {
   attachToSessionRun,

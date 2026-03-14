@@ -5,7 +5,7 @@ import { useMemo } from 'react';
 
 import { ChatMarkdown } from './markdown-renderer';
 
-import type { Api, BaseAssistantMessage, Message, MessageNode } from '@ank1015/llm-sdk';
+import type { Api, BaseAssistantMessage, Message, MessageNode } from '@ank1015/llm-types';
 
 import { useChatStore } from '@/stores/chat-store';
 

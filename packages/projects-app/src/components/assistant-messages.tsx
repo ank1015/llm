@@ -6,7 +6,13 @@ import { useCallback, useMemo, useState } from 'react';
 import { ChatMarkdown } from './markdown-renderer';
 import { WorkingTrace } from './working-trace';
 
-import type { AgentEvent, Api, BaseAssistantMessage, Message, MessageNode } from '@ank1015/llm-sdk';
+import type {
+  AgentEvent,
+  Api,
+  BaseAssistantMessage,
+  Message,
+  MessageNode,
+} from '@ank1015/llm-types';
 
 import { buildWorkingTraceModel } from '@/lib/messages/working-trace';
 import { useChatStore } from '@/stores/chat-store';
