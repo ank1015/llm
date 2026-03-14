@@ -17,7 +17,6 @@ import type {
   GoogleProviderOptions,
   Model,
   StopReason,
-  TextContent,
   Tool,
 } from '@ank1015/llm-types';
 import type { TSchema } from '@sinclair/typebox';
@@ -181,16 +180,28 @@ export function buildGoogleMessages(model: Model<'google'>, context: Context): C
               text: `<thinking>${sanitizeSurrogates(contentBlock.thinkingText)}</thinking>`,
             });
           } else if (contentBlock.type === 'response') {
-            // Convert response content to text parts
-            const textContent = contentBlock.content
-              .filter((c) => c.type === 'text')
-              .map((c) => sanitizeSurrogates((c as TextContent).content))
-              .join('');
-
-            if (textContent) {
-              parts.push({
-                text: textContent,
-              });
+            for (const responseItem of contentBlock.content) {
+              if (responseItem.type === 'text') {
+                if (responseItem.content) {
+                  parts.push({
+                    text: sanitizeSurrogates(responseItem.content),
+                  });
+                }
+              } else if (responseItem.type === 'image' && model.input.includes('image')) {
+                parts.push({
+                  inlineData: {
+                    mimeType: responseItem.mimeType,
+                    data: responseItem.data,
+                  },
+                });
+              } else if (responseItem.type === 'file' && model.input.includes('file')) {
+                parts.push({
+                  inlineData: {
+                    mimeType: responseItem.mimeType,
+                    data: responseItem.data,
+                  },
+                });
+              }
             }
           } else if (contentBlock.type === 'toolCall') {
             // Convert tool call to Google's functionCall format

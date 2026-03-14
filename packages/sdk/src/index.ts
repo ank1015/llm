@@ -35,6 +35,39 @@ export { resolveApiKey, resolveProviderCredentials } from './utils/resolve-key.j
 export { Conversation } from './agent/index.js';
 export type { ConversationExternalCallback, ConversationOptions } from './agent/index.js';
 
+// Image
+export {
+  GOOGLE_FLASH_IMAGE_ASPECT_RATIOS,
+  GOOGLE_IMAGE_SIZES,
+  GOOGLE_PRO_IMAGE_ASPECT_RATIOS,
+  IMAGE_MODEL_IDS,
+  OPENAI_IMAGE_SIZES,
+  createImage,
+  editImage,
+} from './image/index.js';
+export type {
+  CreateImageRequest,
+  EditImageRequest,
+  GoogleFlashImageAspectRatio,
+  GoogleFlashImageOptions,
+  GoogleFlashImageProvider,
+  GoogleImageOptions,
+  GoogleImageProvider,
+  GoogleImageSize,
+  GoogleProImageAspectRatio,
+  GoogleProImageOptions,
+  GoogleProImageProvider,
+  ImageModelId,
+  ImageOptions,
+  ImageProvider,
+  ImageResult,
+  ImageSource,
+  ImageUpdate,
+  OpenAIImageOptions,
+  OpenAIImageProvider,
+  OpenAIImageSize,
+} from './image/index.js';
+
 // Session Manager
 export { SessionManager, createSessionManager } from './session/index.js';
 

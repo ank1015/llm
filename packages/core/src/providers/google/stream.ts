@@ -11,11 +11,13 @@ import type {
   AssistantToolCall,
   BaseAssistantMessage,
   Context,
+  GeneratedImageMetadata,
   GoogleProviderOptions,
+  ImageContent,
   Model,
   TextContent,
 } from '@ank1015/llm-types';
-import type { Content, GenerateContentResponse, Part } from '@google/genai';
+import type { GenerateContentResponse, Part } from '@google/genai';
 
 export const streamGoogle: StreamFunction<'google'> = (
   model: Model<'google'>,
@@ -55,21 +57,70 @@ export const streamGoogle: StreamFunction<'google'> = (
       duration: 0,
     };
 
-    // Counter for generating unique tool call IDs
     let toolCallCounter = 0;
 
     try {
       const client = createClient(model, options.apiKey);
       const params = buildParams(model, context, options);
-
       const googleStream = await client.models.generateContentStream(params);
 
       stream.push({ type: 'start', message: { ...output, timestamp: Date.now() } });
+
       let currentBlock: AssistantResponseContent | AssistantThinkingContent | null = null;
       const blocks = output.content;
       const blockIndex = () => blocks.length - 1;
-      const messageInputs: Content[] = [];
       const accumulatedParts: Part[] = [];
+
+      const closeCurrentBlock = () => {
+        if (!currentBlock) return;
+
+        if (currentBlock.type === 'response') {
+          stream.push({
+            type: 'text_end',
+            contentIndex: blockIndex(),
+            content: currentBlock.content,
+            message: output,
+          });
+        } else {
+          stream.push({
+            type: 'thinking_end',
+            contentIndex: blockIndex(),
+            content: currentBlock.thinkingText,
+            message: output,
+          });
+        }
+
+        currentBlock = null;
+      };
+
+      const appendImageBlock = (image: ImageContent, metadata: GeneratedImageMetadata) => {
+        const imageBlock: AssistantResponseContent = {
+          type: 'response',
+          content: [image],
+        };
+
+        output.content.push(imageBlock);
+        const imageContentIndex = blockIndex();
+
+        stream.push({
+          type: 'image_start',
+          contentIndex: imageContentIndex,
+          metadata,
+          message: output,
+        });
+        stream.push({
+          type: 'image_frame',
+          contentIndex: imageContentIndex,
+          image,
+          message: output,
+        });
+        stream.push({
+          type: 'image_end',
+          contentIndex: imageContentIndex,
+          image,
+          message: output,
+        });
+      };
 
       for await (const chunk of googleStream) {
         finalResponse = chunk;
@@ -77,28 +128,26 @@ export const streamGoogle: StreamFunction<'google'> = (
         const candidate = chunk.candidates?.[0];
 
         if (candidate?.content?.parts) {
-          // Accumulate parts, merging consecutive parts of the same type
           for (const part of candidate.content.parts) {
             const lastPart = accumulatedParts[accumulatedParts.length - 1];
-
-            // Check if we can merge with the last part
-            const canMerge =
+            const canMergeText =
               lastPart &&
               part.text !== undefined &&
               lastPart.text !== undefined &&
-              part.thought === lastPart.thought; // Both thinking or both regular text
+              part.inlineData === undefined &&
+              lastPart.inlineData === undefined &&
+              part.functionCall === undefined &&
+              lastPart.functionCall === undefined &&
+              part.thought === lastPart.thought;
 
-            if (canMerge) {
-              // Merge the text into the last part
+            if (canMergeText) {
               if (part.text) {
                 lastPart.text += part.text;
               }
-              // Copy over thoughtSignature if present
               if (part.thoughtSignature) {
                 lastPart.thoughtSignature = part.thoughtSignature;
               }
             } else {
-              // Add as a new part
               accumulatedParts.push({ ...part });
             }
           }
@@ -111,23 +160,8 @@ export const streamGoogle: StreamFunction<'google'> = (
                 (isThinking && currentBlock.type !== 'thinking') ||
                 (!isThinking && currentBlock.type !== 'response')
               ) {
-                if (currentBlock) {
-                  if (currentBlock.type === 'response') {
-                    stream.push({
-                      type: 'text_end',
-                      contentIndex: blocks.length - 1,
-                      content: currentBlock.content,
-                      message: output,
-                    });
-                  } else {
-                    stream.push({
-                      type: 'thinking_end',
-                      contentIndex: blockIndex(),
-                      content: currentBlock.thinkingText,
-                      message: output,
-                    });
-                  }
-                }
+                closeCurrentBlock();
+
                 if (isThinking) {
                   currentBlock = { type: 'thinking', thinkingText: '' };
                   output.content.push(currentBlock);
@@ -146,6 +180,7 @@ export const streamGoogle: StreamFunction<'google'> = (
                   });
                 }
               }
+
               if (currentBlock.type === 'thinking') {
                 currentBlock.thinkingText += part.text;
                 stream.push({
@@ -155,9 +190,11 @@ export const streamGoogle: StreamFunction<'google'> = (
                   message: output,
                 });
               } else {
-                const index = currentBlock.content.findIndex((c) => c.type === 'text');
-                if (index !== -1) {
-                  (currentBlock.content[index] as TextContent).content += part.text;
+                const textIndex = currentBlock.content.findIndex(
+                  (content) => content.type === 'text'
+                );
+                if (textIndex !== -1) {
+                  (currentBlock.content[textIndex] as TextContent).content += part.text;
                 }
                 stream.push({
                   type: 'text_delta',
@@ -168,31 +205,32 @@ export const streamGoogle: StreamFunction<'google'> = (
               }
             }
 
-            if (part.functionCall) {
-              if (currentBlock) {
-                if (currentBlock.type === 'response') {
-                  stream.push({
-                    type: 'text_end',
-                    contentIndex: blockIndex(),
-                    content: currentBlock.content,
-                    message: output,
-                  });
-                } else {
-                  stream.push({
-                    type: 'thinking_end',
-                    contentIndex: blockIndex(),
-                    content: currentBlock.thinkingText,
-                    message: output,
-                  });
-                }
-                currentBlock = null;
-              }
+            if (part.inlineData?.data && part.inlineData.mimeType) {
+              closeCurrentBlock();
 
-              // Generate unique ID if not provided or if it's a duplicate
+              const metadata: GeneratedImageMetadata = {
+                generationStage: part.thought === true ? 'thought' : 'final',
+                generationProvider: 'google',
+              };
+              const image: ImageContent = {
+                type: 'image',
+                data: part.inlineData.data,
+                mimeType: part.inlineData.mimeType,
+                metadata,
+              };
+
+              appendImageBlock(image, metadata);
+            }
+
+            if (part.functionCall) {
+              closeCurrentBlock();
+
               const providedId = part.functionCall.id;
               const needsNewId =
                 !providedId ||
-                output.content.some((b) => b.type === 'toolCall' && b.toolCallId === providedId);
+                output.content.some(
+                  (block) => block.type === 'toolCall' && block.toolCallId === providedId
+                );
               const toolCallId = needsNewId
                 ? `${part.functionCall.name}_${Date.now()}_${++toolCallCounter}`
                 : providedId;
@@ -205,9 +243,10 @@ export const streamGoogle: StreamFunction<'google'> = (
                 ...(part.thoughtSignature && { thoughtSignature: part.thoughtSignature }),
               };
 
-              // Validate tool arguments if tool definition is available
               if (context.tools) {
-                const tool = context.tools.find((t) => t.name === toolCall.name);
+                const tool = context.tools.find(
+                  (registeredTool) => registeredTool.name === toolCall.name
+                );
                 if (tool) {
                   try {
                     toolCall.arguments = validateToolArguments(tool, toolCall) as Record<
@@ -215,8 +254,7 @@ export const streamGoogle: StreamFunction<'google'> = (
                       unknown
                     >;
                   } catch {
-                    // Keep the parsed arguments — validation errors are handled
-                    // downstream by the agent runner, which sends them back to the LLM
+                    // Keep the parsed arguments. Validation errors are handled downstream.
                   }
                 }
               }
@@ -245,7 +283,7 @@ export const streamGoogle: StreamFunction<'google'> = (
 
         if (candidate?.finishReason) {
           output.stopReason = mapStopReason(candidate.finishReason);
-          if (output.content.some((b) => b.type === 'toolCall')) {
+          if (output.content.some((block) => block.type === 'toolCall')) {
             output.stopReason = 'toolUse';
           }
         }
@@ -273,23 +311,7 @@ export const streamGoogle: StreamFunction<'google'> = (
         }
       }
 
-      if (currentBlock) {
-        if (currentBlock.type === 'response') {
-          stream.push({
-            type: 'text_end',
-            contentIndex: blockIndex(),
-            content: currentBlock.content,
-            message: output,
-          });
-        } else {
-          stream.push({
-            type: 'thinking_end',
-            contentIndex: blockIndex(),
-            content: currentBlock.thinkingText,
-            message: output,
-          });
-        }
-      }
+      closeCurrentBlock();
 
       if (options?.signal?.aborted) {
         throw new Error('Request was aborted');
@@ -300,19 +322,18 @@ export const streamGoogle: StreamFunction<'google'> = (
         throw new Error(`Google stream ended with finish reason: ${finishReason}`);
       }
 
-      // Build the complete Content from accumulated parts
       if (accumulatedParts.length > 0) {
-        messageInputs.push({
+        finalResponse.candidates = finalResponse.candidates || [];
+        finalResponse.candidates[0] = finalResponse.candidates[0] || {};
+        finalResponse.candidates[0].content = finalResponse.candidates[0].content || {
           role: 'model',
-          parts: accumulatedParts,
-        });
+          parts: [],
+        };
+        finalResponse.candidates[0].content.role =
+          finalResponse.candidates[0].content.role || 'model';
+        finalResponse.candidates[0].content.parts = accumulatedParts;
       }
-      finalResponse.candidates = [];
-      for (const messageInput of messageInputs) {
-        finalResponse.candidates.push({
-          content: messageInput,
-        });
-      }
+
       output.timestamp = Date.now();
       output.duration = Date.now() - startTimestamp;
       stream.push({
@@ -322,7 +343,7 @@ export const streamGoogle: StreamFunction<'google'> = (
       });
       stream.end(output);
     } catch (error) {
-      for (const block of output.content) delete (block as any).index;
+      for (const block of output.content) delete (block as { index?: number }).index;
       output.stopReason = options?.signal?.aborted ? 'aborted' : 'error';
       output.errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
       output.timestamp = Date.now();

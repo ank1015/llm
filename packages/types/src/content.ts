@@ -16,6 +16,47 @@ export interface TextContent {
 }
 
 /**
+ * Normalized lifecycle stage for generated images.
+ */
+export type GeneratedImageStage = 'partial' | 'thought' | 'final';
+
+/**
+ * Optional metadata stored alongside image content.
+ *
+ * Generated images use the normalized fields below while still allowing
+ * application-specific metadata to coexist on the same object.
+ */
+export interface ImageMetadata extends Record<string, unknown> {
+  /** Generated image lifecycle stage when the image came from model output */
+  generationStage?: GeneratedImageStage;
+  /** Provider that produced the image */
+  generationProvider?: 'google' | 'openai';
+  /** Provider-native item/call identifier */
+  generationProviderItemId?: string;
+  /** Partial preview index for streaming image updates */
+  generationPartialImageIndex?: number;
+  /** Image generation/editing action when supplied by the provider */
+  generationAction?: 'generate' | 'edit' | 'auto' | (string & {});
+  /** Provider-revised prompt for the generated image */
+  generationRevisedPrompt?: string;
+  /** Output size such as 1024x1024 */
+  generationOutputSize?: string;
+  /** Output quality such as low/medium/high/auto */
+  generationOutputQuality?: string;
+  /** Output background such as opaque/transparent/auto */
+  generationOutputBackground?: string;
+  /** Output image format such as png/jpeg/webp */
+  generationOutputFormat?: string;
+}
+
+/**
+ * Stronger metadata contract for generated images.
+ */
+export interface GeneratedImageMetadata extends ImageMetadata {
+  generationStage: GeneratedImageStage;
+}
+
+/**
  * Image content block with base64-encoded data.
  */
 export interface ImageContent {
@@ -25,7 +66,7 @@ export interface ImageContent {
   /** MIME type, e.g., "image/jpeg", "image/png" */
   mimeType: string;
   /** Optional metadata for storage/application purposes */
-  metadata?: Record<string, unknown>;
+  metadata?: ImageMetadata;
 }
 
 /**
