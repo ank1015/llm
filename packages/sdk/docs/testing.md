@@ -14,7 +14,7 @@
 - filesystem key-storage tests
 - filesystem session-storage tests
 - in-memory adapter implementation tests
-- SQLite usage-tracking tests
+- removed adapter surfaces such as usage tracking
 
 Those implementation tests belong in `@ank1015/llm-sdk-adapters`.
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { InMemoryKeysAdapter } from '../../src/memory-keys.js';
+import { InMemoryKeysAdapter } from '../../../src/memory/memory-keys.js';
 
 describe('InMemoryKeysAdapter', () => {
   it('should store and retrieve legacy api keys', async () => {

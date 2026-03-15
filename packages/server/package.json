@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@ank1015/llm-agents": "workspace:^",
+    "@anthropic-ai/claude-agent-sdk": "^0.2.42",
     "@ank1015/llm-extension": "workspace:^",
     "@ank1015/llm-research": "workspace:^",
     "@ank1015/llm-sdk": "workspace:^",

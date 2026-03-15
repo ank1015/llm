@@ -31,8 +31,8 @@ pnpm start:chat-app   # Start chat app
 packages/
   types/              # @ank1015/llm-types - Shared contracts and provider type maps
   core/               # @ank1015/llm-core - Stateless runtime built on top of types
-  sdk/                # @ank1015/llm-sdk
-  sdk-adapters/       # @ank1015/llm-sdk-adapters
+  sdk/                # @ank1015/llm-sdk - Opinionated wrappers over core
+  sdk-adapters/       # @ank1015/llm-sdk-adapters - Node keys/session adapter implementations
   extension/          # @ank1015/llm-extension
   chat-app/           # @ank1015/llm-chat-app
   usage-dashboard/    # @ank1015/llm-usage-dashboard
@@ -48,6 +48,10 @@ Bottom up, these are the currently documented base layers:
    Shared contracts package for the monorepo. It defines the normalized message/content model, provider option and native-response type maps, tool/context contracts, agent contracts, adapter/session contracts, and shared errors.
 2. `@ank1015/llm-core`
    Stateless runtime built on top of `@ank1015/llm-types`. It owns the model catalog, provider registry, provider implementations, central `stream()` / `complete()` dispatch, shared runtime utilities, and the stateless agent loop.
+3. `@ank1015/llm-sdk`
+   Opinionated SDK layer on top of `core`. It adds credential resolution, stateful conversations, and `SessionManager` helpers while staying runtime-neutral.
+4. `@ank1015/llm-sdk-adapters`
+   Concrete Node-oriented adapters used by app/server layers. It currently provides file-system and in-memory implementations for keys and sessions.
 
 More package summaries can be added here as the stack above `types` and `core` is documented.
 
@@ -71,6 +75,8 @@ More package summaries can be added here as the stack above `types` and `core` i
 
 - [packages/types/AGENTS.md](packages/types/AGENTS.md) - Shared contracts layer
 - [packages/core/AGENTS.md](packages/core/AGENTS.md) - Stateless runtime layer
+- [packages/sdk/AGENTS.md](packages/sdk/AGENTS.md) - Opinionated SDK layer
+- [packages/sdk-adapters/AGENTS.md](packages/sdk-adapters/AGENTS.md) - Node keys/session adapters
 
 ## Boundaries
 

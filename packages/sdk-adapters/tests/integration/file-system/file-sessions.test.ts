@@ -4,13 +4,16 @@
  * These tests use a temporary directory for file operations.
  */
 
-import { existsSync, mkdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { createFileSessionsAdapter, FileSessionsAdapter } from '../../src/file-sessions.js';
+import {
+  createFileSessionsAdapter,
+  FileSessionsAdapter,
+} from '../../../src/file-system/file-sessions.js';
 
 import type { Message, UserMessage } from '@ank1015/llm-types';
 
@@ -211,6 +214,11 @@ describe('FileSessionsAdapter Integration', () => {
         modelId: 'claude-haiku-4-5',
         providerOptions: {},
       });
+
+      const older = new Date('2025-01-01T00:00:00.000Z');
+      const newer = new Date('2025-01-01T00:00:10.000Z');
+      utimesSync(join(testDir, 'test-project', `${id1}.jsonl`), older, older);
+      utimesSync(join(testDir, 'test-project', `${id2}.jsonl`), newer, newer);
 
       const sessions = await adapter.listSessions('test-project');
 

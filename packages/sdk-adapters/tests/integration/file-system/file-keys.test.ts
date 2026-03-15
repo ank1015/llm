@@ -10,7 +10,7 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { createFileKeysAdapter, FileKeysAdapter } from '../../src/file-keys.js';
+import { createFileKeysAdapter, FileKeysAdapter } from '../../../src/file-system/file-keys.js';
 
 describe('FileKeysAdapter Integration', () => {
   let adapter: FileKeysAdapter;

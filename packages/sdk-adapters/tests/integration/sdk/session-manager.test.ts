@@ -10,8 +10,11 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { createSessionManager, SessionManager } from '../../../sdk/src/session/session-manager.js';
-import { createFileSessionsAdapter } from '../../src/file-sessions.js';
+import {
+  createSessionManager,
+  SessionManager,
+} from '../../../../sdk/src/session/session-manager.js';
+import { createFileSessionsAdapter } from '../../../src/file-system/file-sessions.js';
 
 import type { UserMessage } from '@ank1015/llm-types';
 

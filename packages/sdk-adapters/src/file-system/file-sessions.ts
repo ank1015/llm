@@ -18,8 +18,9 @@ import {
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import { generateUUID } from '@ank1015/llm-core';
 import { InvalidParentError, PathTraversalError, SessionNotFoundError } from '@ank1015/llm-types';
+
+import { createSessionId } from '../shared/session-id.js';
 
 import type {
   AppendCustomInput,
@@ -130,7 +131,7 @@ export class FileSessionsAdapter implements SessionsAdapter {
     input: CreateSessionInput
   ): Promise<{ sessionId: string; header: SessionHeader }> {
     const { projectName, path = '', sessionName } = input;
-    const sessionId = generateUUID();
+    const sessionId = createSessionId();
     const dirPath = this.getSessionDir(projectName, path);
     const filePath = this.getSessionFilePath(projectName, path, sessionId);
 
@@ -318,7 +319,7 @@ export class FileSessionsAdapter implements SessionsAdapter {
 
     const node: MessageNode = {
       type: 'message',
-      id: generateUUID(),
+      id: createSessionId(),
       parentId,
       branch,
       timestamp: timestamp(),
@@ -349,7 +350,7 @@ export class FileSessionsAdapter implements SessionsAdapter {
 
     const node: CustomNode = {
       type: 'custom',
-      id: generateUUID(),
+      id: createSessionId(),
       parentId,
       branch,
       timestamp: timestamp(),

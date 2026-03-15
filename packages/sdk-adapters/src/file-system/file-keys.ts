@@ -12,6 +12,8 @@ import { join } from 'node:path';
 
 import { KnownApis, PathTraversalError } from '@ank1015/llm-types';
 
+import { normalizeCredentials } from '../shared/credentials.js';
+
 import type { KeysAdapter, Api } from '@ank1015/llm-types';
 
 /** Directory for storing encrypted keys */
@@ -19,37 +21,6 @@ const DEFAULT_KEYS_DIR = join(homedir(), '.llm', 'global', 'keys');
 
 /** Encryption algorithm */
 const ALGORITHM = 'aes-256-gcm';
-
-function normalizeCredentials(
-  api: Api,
-  credentials: Record<string, string>
-): Record<string, string> {
-  const normalized = { ...credentials };
-
-  if (api === 'codex') {
-    const accountId =
-      normalized['chatgpt-account-id'] ??
-      normalized.chatgptAccountId ??
-      normalized.accountId ??
-      normalized.account_id;
-    if (accountId) {
-      normalized['chatgpt-account-id'] = accountId;
-    }
-
-    const apiKey = normalized.apiKey ?? normalized.access_token ?? normalized.accessToken;
-    if (apiKey) {
-      normalized.apiKey = apiKey;
-    }
-
-    delete normalized.chatgptAccountId;
-    delete normalized.accountId;
-    delete normalized.account_id;
-    delete normalized.access_token;
-    delete normalized.accessToken;
-  }
-
-  return normalized;
-}
 
 /**
  * File-based implementation of KeysAdapter.

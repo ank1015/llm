@@ -9,7 +9,10 @@ import { join } from 'node:path';
 import { SessionNotFoundError, InvalidParentError, PathTraversalError } from '@ank1015/llm-types';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { FileSessionsAdapter, createFileSessionsAdapter } from '../../src/file-sessions.js';
+import {
+  FileSessionsAdapter,
+  createFileSessionsAdapter,
+} from '../../../src/file-system/file-sessions.js';
 
 import type { Message } from '@ank1015/llm-types';
 

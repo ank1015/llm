@@ -19,7 +19,6 @@
     "lint:fix": "eslint packages/ --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "keys-ui": "pnpm --filter @ank1015/llm-sdk-adapters keys-ui",
     "ios:native-app": "pnpm --filter @ank1015/llm-native-app ios",
     "android:native-app": "pnpm --filter @ank1015/llm-native-app android",
     "web:native-app": "pnpm --filter @ank1015/llm-native-app web",

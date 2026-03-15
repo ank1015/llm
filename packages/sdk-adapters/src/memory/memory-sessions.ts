@@ -4,8 +4,9 @@
  * Simple Map-based implementation for testing. No persistence.
  */
 
-import { generateUUID } from '@ank1015/llm-core';
 import { InvalidParentError, SessionNotFoundError } from '@ank1015/llm-types';
+
+import { createSessionId } from '../shared/session-id.js';
 
 import type {
   AppendCustomInput,
@@ -44,7 +45,7 @@ export class InMemorySessionsAdapter implements SessionsAdapter {
     input: CreateSessionInput
   ): Promise<{ sessionId: string; header: SessionHeader }> {
     const { projectName, path = '', sessionName } = input;
-    const sessionId = generateUUID();
+    const sessionId = createSessionId();
     const now = new Date().toISOString();
 
     const header: SessionHeader = {
@@ -172,7 +173,7 @@ export class InMemorySessionsAdapter implements SessionsAdapter {
 
     const node: MessageNode = {
       type: 'message',
-      id: generateUUID(),
+      id: createSessionId(),
       parentId,
       branch,
       timestamp: new Date().toISOString(),
@@ -201,7 +202,7 @@ export class InMemorySessionsAdapter implements SessionsAdapter {
 
     const node: CustomNode = {
       type: 'custom',
-      id: generateUUID(),
+      id: createSessionId(),
       parentId,
       branch,
       timestamp: new Date().toISOString(),
