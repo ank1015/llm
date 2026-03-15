@@ -4,7 +4,7 @@
  * Agent toolkit for the LLM SDK.
  */
 
-export const VERSION = '0.0.2';
+export const VERSION = '0.0.3';
 
 export * from './tools/index.js';
 export * from './agents/system-prompt.js';

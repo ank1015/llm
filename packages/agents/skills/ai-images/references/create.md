@@ -3,6 +3,8 @@
 Use this reference when the user wants to generate a brand-new image or create a new image while
 optionally conditioning on reference images.
 
+If you are not sure which model to use, read [choose-model.md](choose-model.md) first.
+
 ## Import
 
 ```ts

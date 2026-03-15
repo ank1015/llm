@@ -5,6 +5,7 @@ Node-only general-purpose agent toolkit for the LLM monorepo.
 ## Commands
 
 - `pnpm build` — Clean and compile TypeScript to `dist/`
+- `pnpm agent:cli` — Start the local directory-scoped agent CLI
 - `pnpm dev` — Watch mode compilation
 - `pnpm test` — Run unit and integration tests
 - `pnpm test:unit` — Run unit tests
@@ -23,6 +24,8 @@ src/
     skills/index.ts     — Skill registry, install, list, delete, and temp-project setup
     system-prompt.ts    — General-purpose agent system prompt
     tools.ts            — Agent-facing tool entrypoint re-export
+  cli/
+    agent-cli.ts        — Local directory-scoped CLI agent runner
   helpers/
     ai-image/           — Helper-backed skill code for image generation/editing
   tools/
@@ -32,6 +35,7 @@ src/
 skills/
   registry.json         — Discoverability metadata for bundled skills
   ai-images/            — Helper-backed bundled skill
+    references/         — Model-selection plus task-specific image references
 docs/
   vision.md             — Package philosophy
   adding-skills.md      — Skill authoring conventions
@@ -47,3 +51,4 @@ tests/
 - Owns bundled skill packaging and installation under `.max/skills/`.
 - Owns helper-backed skill APIs exported from `@ank1015/llm-agents`.
 - Supports a reusable `.max/temp/` TypeScript workspace for helper-backed skills.
+- Includes a local CLI runner for temporary directory-scoped agent sessions.

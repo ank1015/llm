@@ -3,6 +3,8 @@
 Use this reference when the user wants to modify, transform, or extend one or more existing
 images.
 
+If you are not sure which model to use, read [choose-model.md](choose-model.md) first.
+
 ## Import
 
 ```ts

@@ -205,6 +205,44 @@ describe('skills runtime', () => {
     }
   });
 
+  it('uses custom system prompt section overrides when provided', async () => {
+    const artifactDir = await createArtifactDir();
+
+    try {
+      const prompt = await createSystemPrompt({
+        projectName: 'media',
+        projectDir: '/tmp/project',
+        artifactName: 'campaign',
+        artifactDir,
+        identity: 'You are Nova. Focus on image tasks first.',
+        tools: '- inspect: Inspect state\n- patch: Apply exact edits',
+        tools_guidelines: '- Prefer minimal edits.\n- Summarize only the final result.',
+        skills: '- Use custom skill policy only.',
+        project_information: '- Custom project information block.',
+        working_dir: '- Custom working directory guidance.',
+        agent_state: '- Custom agent state guidance.',
+        current_date: 'Current date: Override Day',
+      });
+
+      expect(prompt).toContain('You are Nova. Focus on image tasks first.');
+      expect(prompt).toContain('- inspect: Inspect state');
+      expect(prompt).toContain('- Prefer minimal edits.');
+      expect(prompt).toContain('- Use custom skill policy only.');
+      expect(prompt).toContain('- Custom project information block.');
+      expect(prompt).toContain('- Custom working directory guidance.');
+      expect(prompt).toContain('- Custom agent state guidance.');
+      expect(prompt).toContain('Current date: Override Day');
+
+      expect(prompt).not.toContain('You are Max. Max is an intelligent assistant.');
+      expect(prompt).not.toContain('- read: Read file contents');
+      expect(prompt).not.toContain('Prefer grep, find, and ls over bash');
+      expect(prompt).not.toContain('- none installed');
+      expect(prompt).not.toContain('Artifact-local agent state lives under:');
+    } finally {
+      await rm(artifactDir, { recursive: true, force: true });
+    }
+  });
+
   it('rejects unknown bundled skills', async () => {
     const artifactDir = await createArtifactDir();
 
@@ -231,18 +269,31 @@ describe('skills runtime', () => {
 
   it('documents the required ai-images reading order', async () => {
     const skillPath = join(packageRoot, 'skills', 'ai-images', 'SKILL.md');
+    const chooseModelPath = join(
+      packageRoot,
+      'skills',
+      'ai-images',
+      'references',
+      'choose-model.md'
+    );
     const createPath = join(packageRoot, 'skills', 'ai-images', 'references', 'create.md');
     const editPath = join(packageRoot, 'skills', 'ai-images', 'references', 'edit.md');
 
-    const [skillRaw, createRaw, editRaw] = await Promise.all([
+    const [skillRaw, chooseModelRaw, createRaw, editRaw] = await Promise.all([
       readFile(skillPath, 'utf-8'),
+      readFile(chooseModelPath, 'utf-8'),
       readFile(createPath, 'utf-8'),
       readFile(editPath, 'utf-8'),
     ]);
 
     expect(skillRaw).toContain('## Required Reading Order');
+    expect(skillRaw).toContain('[references/choose-model.md](references/choose-model.md)');
     expect(skillRaw).toContain('[references/create.md](references/create.md)');
     expect(skillRaw).toContain('[references/edit.md](references/edit.md)');
+    expect(chooseModelRaw).toContain('gemini-3-pro-image-preview');
+    expect(chooseModelRaw).toContain('If the user explicitly names a model, use that model.');
+    expect(createRaw).toContain('[choose-model.md](choose-model.md)');
+    expect(editRaw).toContain('[choose-model.md](choose-model.md)');
     expect(createRaw).toContain("import { createImage } from '@ank1015/llm-agents';");
     expect(editRaw).toContain("import { editImage } from '@ank1015/llm-agents';");
   });

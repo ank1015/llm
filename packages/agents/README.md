@@ -8,6 +8,7 @@ This package is the home of:
 - system-prompt construction for the monorepo's general-purpose agent
 - bundled skill packaging and installation
 - helper-backed skill APIs such as AI image generation/editing
+- a local CLI runner for directory-scoped agent sessions
 
 ## What It Exports
 
@@ -61,7 +62,7 @@ The current bundled skill is:
 
 - `ai-images`
   - overview: [skills/ai-images/SKILL.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/ai-images/SKILL.md)
-  - task-specific references for image creation and image editing
+  - task-specific references for model choice, image creation, and image editing
 
 ## Helper-Backed Temp Workspace
 
@@ -97,8 +98,24 @@ These helpers:
 
 See the skill docs for the task-specific API guidance:
 
+- [choose-model.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/ai-images/references/choose-model.md)
 - [create.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/ai-images/references/create.md)
 - [edit.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/ai-images/references/edit.md)
+
+## Local CLI
+
+For local testing and temporary directory-scoped sessions, run:
+
+```bash
+pnpm --filter @ank1015/llm-agents agent:cli
+```
+
+The CLI:
+
+- asks which directory Max should work in
+- installs the `ai-images` skill into that directory's `.max/skills/`
+- uses the file keys adapter for credentials
+- uses `codex` / `gpt-5.4` with the package's general-purpose tools
 
 ## Docs
 
@@ -109,6 +126,7 @@ See the skill docs for the task-specific API guidance:
 ## Commands
 
 - `pnpm build`
+- `pnpm agent:cli`
 - `pnpm test`
 - `pnpm test:unit`
 - `pnpm test:integration`
