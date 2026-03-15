@@ -1,5 +1,15 @@
 import { existsSync } from 'fs';
-import { access, cp, mkdir, readFile, readdir, realpath, rm, symlink } from 'node:fs/promises';
+import {
+  access,
+  cp,
+  mkdir,
+  readFile,
+  readdir,
+  realpath,
+  rm,
+  symlink,
+  writeFile,
+} from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -12,11 +22,18 @@ const packageNodeModulesDir = join(packageRoot, 'node_modules');
 export const MAX_DIR_NAME = '.max';
 export const INSTALLED_SKILLS_DIR_NAME = 'skills';
 export const TEMP_DIR_NAME = 'temp';
+const TEMP_SCRIPTS_DIR_NAME = 'scripts';
+
+export interface SkillHelperProjectConfig {
+  runtime: 'typescript';
+  package: '@ank1015/llm-agents';
+}
 
 export interface SkillRegistryEntry {
   name: string;
   description: string;
   path: string;
+  helperProject?: SkillHelperProjectConfig;
 }
 
 export interface BundledSkillEntry extends SkillRegistryEntry {
@@ -29,6 +46,7 @@ export interface InstalledSkillEntry extends SkillRegistryEntry {
   skillsDir: string;
   tempDir: string;
   directory: string;
+  helperProject?: SkillHelperProjectConfig;
 }
 
 export interface AddSkillResult extends InstalledSkillEntry {
@@ -43,6 +61,7 @@ export interface DeleteSkillResult extends InstalledSkillEntry {
 interface RegistryFileEntry {
   name: string;
   description: string;
+  helperProject?: SkillHelperProjectConfig;
 }
 
 export async function listBundledSkills(): Promise<BundledSkillEntry[]> {
@@ -57,6 +76,7 @@ export async function listBundledSkills(): Promise<BundledSkillEntry[]> {
       description: entry.description,
       directory,
       path,
+      ...(entry.helperProject ? { helperProject: entry.helperProject } : {}),
     };
   });
 }
@@ -72,6 +92,7 @@ export async function addSkill(skillName: string, artifactDir: string): Promise<
   await mkdir(artifactPaths.skillsDir, { recursive: true });
   await mkdir(artifactPaths.tempDir, { recursive: true });
   await ensureArtifactNodeModulesLink(artifactPaths.nodeModulesDir);
+  await ensureHelperTempProject(artifactPaths.tempDir, bundledSkill.helperProject);
 
   const targetDirectory = join(artifactPaths.skillsDir, bundledSkill.name);
   await rm(targetDirectory, { recursive: true, force: true });
@@ -145,6 +166,7 @@ export async function readBundledSkillMetadata(skillName: string): Promise<Skill
     name: bundledSkill.name,
     description: bundledSkill.description,
     path: bundledSkill.path,
+    ...(bundledSkill.helperProject ? { helperProject: bundledSkill.helperProject } : {}),
   };
 }
 
@@ -223,6 +245,7 @@ async function readInstalledSkill(
     skillsDir: artifactPaths.skillsDir,
     tempDir: artifactPaths.tempDir,
     directory: skillDirectory,
+    ...(await readInstalledSkillHelperProject(skillDirectory)),
   };
 }
 
@@ -240,7 +263,8 @@ async function readBundledRegistry(): Promise<RegistryFileEntry[]> {
       !entry ||
       typeof entry !== 'object' ||
       typeof entry.name !== 'string' ||
-      typeof entry.description !== 'string'
+      typeof entry.description !== 'string' ||
+      !isValidHelperProjectConfig(entry.helperProject)
     ) {
       throw new Error(`Bundled skill registry contains an invalid entry: ${bundledRegistryPath}`);
     }
@@ -248,6 +272,7 @@ async function readBundledRegistry(): Promise<RegistryFileEntry[]> {
     registry.push({
       name: entry.name,
       description: entry.description,
+      ...(entry.helperProject ? { helperProject: entry.helperProject } : {}),
     });
   }
 
@@ -343,6 +368,180 @@ async function pathExists(path: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+async function readInstalledSkillHelperProject(
+  skillDirectory: string
+): Promise<Pick<InstalledSkillEntry, 'helperProject'>> {
+  const skillName = skillDirectory.split(/[/\\]/).pop();
+  if (!skillName) {
+    return {};
+  }
+
+  const bundledSkill = (await listBundledSkills()).find((entry) => entry.name === skillName);
+  if (!bundledSkill?.helperProject) {
+    return {};
+  }
+
+  return { helperProject: bundledSkill.helperProject };
+}
+
+function isValidHelperProjectConfig(value: unknown): value is SkillHelperProjectConfig | undefined {
+  if (value === undefined) {
+    return true;
+  }
+
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const candidate = value as Partial<SkillHelperProjectConfig>;
+  return candidate.runtime === 'typescript' && candidate.package === '@ank1015/llm-agents';
+}
+
+async function ensureHelperTempProject(
+  tempDir: string,
+  helperProject?: SkillHelperProjectConfig
+): Promise<void> {
+  if (!helperProject) {
+    return;
+  }
+
+  await mkdir(tempDir, { recursive: true });
+
+  const scriptsDir = join(tempDir, TEMP_SCRIPTS_DIR_NAME);
+  await mkdir(scriptsDir, { recursive: true });
+
+  await ensureTempPackageJson(tempDir);
+  await ensureTempTsconfig(tempDir);
+  await ensureTempNodeModuleLinks(tempDir);
+}
+
+async function ensureTempPackageJson(tempDir: string): Promise<void> {
+  const packageJsonPath = join(tempDir, 'package.json');
+  const packageVersion = await readCurrentPackageVersion();
+  const tsxVersion = await readCurrentTsxVersion();
+
+  let current: Record<string, unknown> = {};
+  if (await pathExists(packageJsonPath)) {
+    try {
+      current = JSON.parse(await readFile(packageJsonPath, 'utf-8')) as Record<string, unknown>;
+    } catch {
+      current = {};
+    }
+  }
+
+  const dependencies = normalizeObjectRecord(current.dependencies);
+  const devDependencies = normalizeObjectRecord(current.devDependencies);
+
+  if (!dependencies['@ank1015/llm-agents']) {
+    dependencies['@ank1015/llm-agents'] = packageVersion;
+  }
+  if (!devDependencies.tsx) {
+    devDependencies.tsx = tsxVersion;
+  }
+
+  const nextPackageJson = {
+    name: typeof current.name === 'string' ? current.name : 'max-temp',
+    private: true,
+    type: 'module',
+    dependencies,
+    devDependencies,
+  };
+
+  await writeFile(packageJsonPath, `${JSON.stringify(nextPackageJson, null, 2)}\n`, 'utf-8');
+}
+
+async function ensureTempTsconfig(tempDir: string): Promise<void> {
+  const tsconfigPath = join(tempDir, 'tsconfig.json');
+  if (await pathExists(tsconfigPath)) {
+    return;
+  }
+
+  const tsconfig = {
+    compilerOptions: {
+      target: 'ES2022',
+      module: 'NodeNext',
+      moduleResolution: 'NodeNext',
+      strict: true,
+      esModuleInterop: true,
+      skipLibCheck: true,
+      types: ['node'],
+    },
+    include: ['scripts/**/*.ts'],
+  };
+
+  await writeFile(tsconfigPath, `${JSON.stringify(tsconfig, null, 2)}\n`, 'utf-8');
+}
+
+async function ensureTempNodeModuleLinks(tempDir: string): Promise<void> {
+  const nodeModulesDir = join(tempDir, 'node_modules');
+  const scopeDir = join(nodeModulesDir, '@ank1015');
+  const binDir = join(nodeModulesDir, '.bin');
+  await mkdir(scopeDir, { recursive: true });
+  await mkdir(binDir, { recursive: true });
+
+  await ensureSymlink(join(scopeDir, 'llm-agents'), packageRoot, 'dir');
+
+  const tsxPackageDir = join(packageNodeModulesDir, 'tsx');
+  if (!(await pathExists(tsxPackageDir))) {
+    throw new Error(`tsx runtime is missing from the package dependencies: ${tsxPackageDir}`);
+  }
+  await ensureSymlink(join(nodeModulesDir, 'tsx'), tsxPackageDir, 'dir');
+
+  for (const binaryName of ['tsx', 'tsx.cmd', 'tsx.ps1']) {
+    const source = join(packageNodeModulesDir, '.bin', binaryName);
+    if (!(await pathExists(source))) {
+      continue;
+    }
+    await ensureSymlink(join(binDir, binaryName), source, 'file');
+  }
+}
+
+async function ensureSymlink(
+  linkPath: string,
+  targetPath: string,
+  type: 'dir' | 'file'
+): Promise<void> {
+  if (await pathExists(linkPath)) {
+    return;
+  }
+
+  await symlink(
+    targetPath,
+    linkPath,
+    process.platform === 'win32' && type === 'dir' ? 'junction' : type
+  );
+}
+
+function normalizeObjectRecord(value: unknown): Record<string, string> {
+  if (!value || typeof value !== 'object') {
+    return {};
+  }
+
+  const record: Record<string, string> = {};
+  for (const [key, rawValue] of Object.entries(value)) {
+    if (typeof rawValue === 'string') {
+      record[key] = rawValue;
+    }
+  }
+  return record;
+}
+
+async function readCurrentPackageVersion(): Promise<string> {
+  const packageJsonPath = join(packageRoot, 'package.json');
+  const parsed = JSON.parse(await readFile(packageJsonPath, 'utf-8')) as { version?: string };
+  return parsed.version ?? '0.0.2';
+}
+
+async function readCurrentTsxVersion(): Promise<string> {
+  const packageJsonPath = join(packageRoot, 'package.json');
+  const parsed = JSON.parse(await readFile(packageJsonPath, 'utf-8')) as {
+    devDependencies?: Record<string, string>;
+    dependencies?: Record<string, string>;
+  };
+
+  return parsed.devDependencies?.tsx ?? parsed.dependencies?.tsx ?? '^4.19.0';
 }
 
 function findPackageRoot(startDir: string): string {

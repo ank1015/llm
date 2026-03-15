@@ -1,7 +1,7 @@
 {
   "name": "@ank1015/llm-agents",
-  "version": "0.0.1",
-  "description": "Agent toolkit for the LLM SDK",
+  "version": "0.0.2",
+  "description": "Node-only general-purpose agent toolkit with bundled skills and helper-backed workflows",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -13,31 +13,48 @@
   },
   "files": [
     "dist",
-    "skills"
+    "skills",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "rm -rf dist coverage *.tsbuildinfo && tsc",
     "dev": "tsc --watch",
-    "test": "vitest run",
+    "test": "pnpm run test:unit && pnpm run test:integration",
     "test:watch": "vitest",
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
-    "inspect:page": "node scripts/inspect-page.mjs",
-    "test:cli": "node dist/test-cli.js",
-    "repl:cli": "node dist/repl-cli.js",
+    "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
-    "lint": "echo 'No linter configured yet'",
-    "clean": "rm -rf dist *.tsbuildinfo"
+    "lint": "eslint src tests vitest.config.ts",
+    "clean": "rm -rf dist coverage *.tsbuildinfo",
+    "prepack": "pnpm run build"
   },
   "keywords": [
     "llm",
     "agents",
-    "sdk",
-    "ai"
+    "ai",
+    "node",
+    "tools",
+    "skills",
+    "typescript",
+    "images"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ank1015/llm.git",
+    "directory": "packages/agents"
+  },
+  "homepage": "https://github.com/ank1015/llm/tree/main/packages/agents",
+  "bugs": {
+    "url": "https://github.com/ank1015/llm/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
-    "@ank1015/llm-extension": "workspace:^",
     "@ank1015/llm-sdk": "workspace:^",
     "@ank1015/llm-sdk-adapters": "workspace:^",
     "@silvia-odwyer/photon-node": "^0.3.4",
@@ -45,11 +62,10 @@
     "chalk": "^5.6.2",
     "diff": "^8.0.3",
     "file-type": "^21.3.0",
-    "glob": "^13.0.6",
-    "parallel-web": "^0.3.1",
-    "proper-lockfile": "^4.1.2"
+    "glob": "^13.0.6"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^2.1.0",
     "@types/node": "^25.3.2",
     "tsx": "^4.19.0",
     "vitest": "^2.1.0"

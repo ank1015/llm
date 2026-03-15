@@ -1,32 +1,49 @@
 # @ank1015/llm-agents
 
-Agent toolkit package for the LLM monorepo.
+Node-only general-purpose agent toolkit for the LLM monorepo.
 
 ## Commands
 
-- `pnpm build` — Compile TypeScript to dist/
+- `pnpm build` — Clean and compile TypeScript to `dist/`
 - `pnpm dev` — Watch mode compilation
-- `pnpm test` — Run all tests
+- `pnpm test` — Run unit and integration tests
 - `pnpm test:unit` — Run unit tests
 - `pnpm test:integration` — Run integration tests
+- `pnpm test:coverage` — Run tests with coverage
 - `pnpm typecheck` — Type-check without emitting
+- `pnpm lint` — Run ESLint for the package
+- `pnpm clean` — Remove build artifacts
 
 ## Structure
 
 ```
 src/
-  index.ts              — Public exports
+  index.ts              — Public package exports
+  agents/
+    skills/index.ts     — Skill registry, install, list, delete, and temp-project setup
+    system-prompt.ts    — General-purpose agent system prompt
+    tools.ts            — Agent-facing tool entrypoint re-export
+  helpers/
+    ai-image/           — Helper-backed skill code for image generation/editing
   tools/
     index.ts            — Tool exports and shared entrypoint
-    browser/
-      search.ts         — Web search tool
-    file-system/
-      index.ts          — File-system tool exports and factories
-      *.ts              — File-system tools (read, write, edit, bash, grep, find, ls)
-      utils/            — Shared file-system tool utilities
+    *.ts                — Core general-purpose tools (read, write, edit, bash, grep, find, ls)
+    utils/              — Shared tool utilities
+skills/
+  registry.json         — Discoverability metadata for bundled skills
+  ai-images/            — Helper-backed bundled skill
+docs/
+  vision.md             — Package philosophy
+  adding-skills.md      — Skill authoring conventions
+  testing.md            — Validation and packaging guidance
 tests/
-  unit/
-    index.test.ts       — Unit smoke tests
-  integration/
-    index.test.ts       — Integration smoke tests
+  unit/                 — Unit tests for package exports and skill runtime
+  integration/          — Integration tests including temp helper workspace smoke coverage
 ```
+
+## Package Role
+
+- Exposes the general-purpose tool layer used by the monorepo's agent runtime.
+- Owns bundled skill packaging and installation under `.max/skills/`.
+- Owns helper-backed skill APIs exported from `@ank1015/llm-agents`.
+- Supports a reusable `.max/temp/` TypeScript workspace for helper-backed skills.

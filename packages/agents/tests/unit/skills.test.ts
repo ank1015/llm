@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, readdir, realpath, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -7,8 +7,10 @@ import { describe, expect, it } from 'vitest';
 
 import {
   addSkill,
+  createImage,
   createSystemPrompt,
   deleteSkill,
+  editImage,
   listBundledSkills,
   listInstalledSkills,
 } from '../../src/index.js';
@@ -51,13 +53,17 @@ async function createArtifactDir(): Promise<string> {
 }
 
 describe('skills runtime', () => {
-  it('exports the new artifact-local skill APIs and removes setupSkills', async () => {
+  it('exports the current skill APIs and ai-image helpers', async () => {
     const agents = await import('../../src/index.js');
 
     expect(typeof agents.addSkill).toBe('function');
     expect(typeof agents.deleteSkill).toBe('function');
     expect(typeof agents.listBundledSkills).toBe('function');
     expect(typeof agents.listInstalledSkills).toBe('function');
+    expect(typeof agents.createImage).toBe('function');
+    expect(typeof agents.editImage).toBe('function');
+    expect(agents.createImage).toBe(createImage);
+    expect(agents.editImage).toBe(editImage);
     expect('setupSkills' in agents).toBe(false);
     expect('setUpSkills' in agents).toBe(false);
   });
@@ -71,6 +77,7 @@ describe('skills runtime', () => {
       .map((entry) => entry.name)
       .sort();
 
+    expect(registryNames).toEqual(['ai-images']);
     expect(registryNames).toEqual(skillFolders);
 
     for (const skill of bundledSkills) {
@@ -85,18 +92,40 @@ describe('skills runtime', () => {
     const artifactDir = await createArtifactDir();
 
     try {
-      const installResult = await addSkill('llm-use', artifactDir);
+      const installResult = await addSkill('ai-images', artifactDir);
       const resolvedArtifactDir = await realpath(artifactDir);
+      const tempDir = join(resolvedArtifactDir, '.max', 'temp');
+      const tempPackageJsonPath = join(tempDir, 'package.json');
+      const tempTsconfigPath = join(tempDir, 'tsconfig.json');
+      const tempScriptsDir = join(tempDir, 'scripts');
       expect(installResult.artifactDir).toBe(resolvedArtifactDir);
-      expect(installResult.directory).toBe(join(resolvedArtifactDir, '.max', 'skills', 'llm-use'));
-      expect(installResult.path).toBe(
-        join(resolvedArtifactDir, '.max', 'skills', 'llm-use', 'SKILL.md')
+      expect(installResult.directory).toBe(
+        join(resolvedArtifactDir, '.max', 'skills', 'ai-images')
       );
+      expect(installResult.path).toBe(
+        join(resolvedArtifactDir, '.max', 'skills', 'ai-images', 'SKILL.md')
+      );
+      expect(installResult.helperProject).toEqual({
+        runtime: 'typescript',
+        package: '@ank1015/llm-agents',
+      });
+
+      const tempPackageJson = JSON.parse(await readFile(tempPackageJsonPath, 'utf-8')) as {
+        dependencies?: Record<string, string>;
+        devDependencies?: Record<string, string>;
+      };
+      expect(tempPackageJson.dependencies?.['@ank1015/llm-agents']).toBeTruthy();
+      expect(tempPackageJson.devDependencies?.tsx).toBeTruthy();
+      await expect(readFile(tempTsconfigPath, 'utf-8')).resolves.toContain('"include"');
+      await expect(readFile(join(tempScriptsDir, '.gitkeep'), 'utf-8')).rejects.toThrow();
+      await expect(
+        realpath(join(tempDir, 'node_modules', '@ank1015', 'llm-agents'))
+      ).resolves.toBe(packageRoot);
 
       const markerPath = join(installResult.directory, 'marker.txt');
       await writeFile(markerPath, 'stale\n', 'utf-8');
 
-      await addSkill('llm-use', artifactDir);
+      await addSkill('ai-images', artifactDir);
       await expect(readFile(markerPath, 'utf-8')).rejects.toThrow();
     } finally {
       await rm(artifactDir, { recursive: true, force: true });
@@ -109,11 +138,10 @@ describe('skills runtime', () => {
     try {
       expect(await listInstalledSkills(artifactDir)).toEqual([]);
 
-      await addSkill('browser-use', artifactDir);
-      await addSkill('xlsx', artifactDir);
+      await addSkill('ai-images', artifactDir);
 
       const installed = await listInstalledSkills(artifactDir);
-      expect(installed.map((skill) => skill.name)).toEqual(['browser-use', 'xlsx']);
+      expect(installed.map((skill) => skill.name)).toEqual(['ai-images']);
       expect(
         installed.every((skill) => skill.path.startsWith(join(artifactDir, '.max', 'skills')))
       ).toBe(true);
@@ -126,14 +154,13 @@ describe('skills runtime', () => {
     const artifactDir = await createArtifactDir();
 
     try {
-      await addSkill('browser-use', artifactDir);
-      await addSkill('xlsx', artifactDir);
+      await addSkill('ai-images', artifactDir);
 
-      const deleted = await deleteSkill('browser-use', artifactDir);
+      const deleted = await deleteSkill('ai-images', artifactDir);
 
-      expect(deleted.name).toBe('browser-use');
+      expect(deleted.name).toBe('ai-images');
       expect(deleted.deleted).toBe(true);
-      expect(await listInstalledSkills(artifactDir)).toMatchObject([{ name: 'xlsx' }]);
+      expect(await listInstalledSkills(artifactDir)).toEqual([]);
     } finally {
       await rm(artifactDir, { recursive: true, force: true });
     }
@@ -144,37 +171,35 @@ describe('skills runtime', () => {
 
     try {
       const emptyPrompt = await createSystemPrompt({
-        projectName: 'sales',
+        projectName: 'media',
         projectDir: '/tmp/project',
-        artifactName: 'product',
+        artifactName: 'campaign',
         artifactDir,
       });
       expect(emptyPrompt).toContain('- none installed');
-      expect(emptyPrompt).not.toContain('browser-use');
+      expect(emptyPrompt).not.toContain('ai-images');
       expect(emptyPrompt).toContain('.max/temp');
-      expect(emptyPrompt).toContain('scratchpad');
-      expect(emptyPrompt).toContain('install dependencies');
-      expect(emptyPrompt).not.toContain('.max/temp/scripts');
-      expect(emptyPrompt).not.toContain('.max/node_modules');
-      expect(emptyPrompt).not.toContain('max-skills');
 
-      await addSkill('browser-use', artifactDir);
+      await addSkill('ai-images', artifactDir);
       const installedPrompt = await createSystemPrompt({
-        projectName: 'sales',
+        projectName: 'media',
         projectDir: '/tmp/project',
-        artifactName: 'product',
+        artifactName: 'campaign',
         artifactDir,
       });
 
       expect(installedPrompt).toContain(
-        join(artifactDir, '.max', 'skills', 'browser-use', 'SKILL.md')
+        join(artifactDir, '.max', 'skills', 'ai-images', 'SKILL.md')
       );
-      expect(installedPrompt).toContain('browser-use');
+      expect(installedPrompt).toContain('ai-images');
+      expect(installedPrompt).not.toContain('browser-use');
       expect(installedPrompt).not.toContain('llm-use');
-      expect(installedPrompt).not.toContain('pnpm exec tsx');
-      expect(installedPrompt).not.toContain('.max/temp/scripts');
-      expect(installedPrompt).not.toContain('.max/node_modules');
-      expect(installedPrompt).not.toContain('max-skills');
+      expect(installedPrompt).not.toContain('pptx');
+      expect(installedPrompt).not.toContain('xlsx');
+      expect(installedPrompt).toContain('helper-backed');
+      expect(installedPrompt).toContain('@ank1015/llm-agents');
+      expect(installedPrompt).toContain('.max/temp');
+      expect(installedPrompt).toContain('TypeScript workspace');
     } finally {
       await rm(artifactDir, { recursive: true, force: true });
     }
@@ -196,113 +221,40 @@ describe('skills runtime', () => {
     const artifactDir = await createArtifactDir();
 
     try {
-      await expect(deleteSkill('browser-use', artifactDir)).rejects.toThrow(
-        /Installed skill "browser-use" not found/
+      await expect(deleteSkill('ai-images', artifactDir)).rejects.toThrow(
+        /Installed skill "ai-images" not found/
       );
     } finally {
       await rm(artifactDir, { recursive: true, force: true });
     }
   });
 
-  it('documents the required browser-use reading order', async () => {
-    const skillPath = join(packageRoot, 'skills', 'browser-use', 'SKILL.md');
-    const raw = await readFile(skillPath, 'utf-8');
+  it('documents the required ai-images reading order', async () => {
+    const skillPath = join(packageRoot, 'skills', 'ai-images', 'SKILL.md');
+    const createPath = join(packageRoot, 'skills', 'ai-images', 'references', 'create.md');
+    const editPath = join(packageRoot, 'skills', 'ai-images', 'references', 'edit.md');
 
-    expect(raw).toContain('## Required Reading Order');
-    expect(raw).toContain('1. read [references/sdk-core.md]');
-    expect(raw).toContain('2. read [references/modes.md]');
-    expect(raw).toContain('3. choose exactly one deeper reference');
-    expect(raw).not.toContain('script-environment.md');
+    const [skillRaw, createRaw, editRaw] = await Promise.all([
+      readFile(skillPath, 'utf-8'),
+      readFile(createPath, 'utf-8'),
+      readFile(editPath, 'utf-8'),
+    ]);
+
+    expect(skillRaw).toContain('## Required Reading Order');
+    expect(skillRaw).toContain('[references/create.md](references/create.md)');
+    expect(skillRaw).toContain('[references/edit.md](references/edit.md)');
+    expect(createRaw).toContain("import { createImage } from '@ank1015/llm-agents';");
+    expect(editRaw).toContain("import { editImage } from '@ank1015/llm-agents';");
   });
 });
 
 describe('skills regressions', () => {
-  it('removes retired max-skills and setupSkills guidance from the agents package', async () => {
-    const filesToCheck = [
-      join(packageRoot, 'src'),
-      join(packageRoot, 'skills'),
-      join(packageRoot, 'SKILL_AUTHORING.md'),
-    ];
+  it('removes retired bundled skill names from the current package surface', async () => {
+    const registryRaw = await readFile(join(packageRoot, 'skills', 'registry.json'), 'utf-8');
 
-    const violations: string[] = [];
-
-    async function scanPath(path: string): Promise<void> {
-      const pathStat = await stat(path);
-      if (pathStat.isFile()) {
-        const content = await readFile(path, 'utf-8');
-        if (
-          content.includes('max-skills') ||
-          content.includes('setupSkills') ||
-          content.includes('setUpSkills') ||
-          content.includes('scripts/<artifact-name>')
-        ) {
-          violations.push(path);
-        }
-        return;
-      }
-
-      const statEntries = await readdir(path, { withFileTypes: true });
-      for (const entry of statEntries) {
-        const entryPath = join(path, entry.name);
-        if (entry.isDirectory()) {
-          await scanPath(entryPath);
-          continue;
-        }
-
-        const content = await readFile(entryPath, 'utf-8');
-        if (
-          content.includes('max-skills') ||
-          content.includes('setupSkills') ||
-          content.includes('setUpSkills') ||
-          content.includes('scripts/<artifact-name>')
-        ) {
-          violations.push(entryPath);
-        }
-      }
-    }
-
-    for (const path of filesToCheck) {
-      await scanPath(path);
-    }
-
-    expect(violations).toEqual([]);
-  });
-
-  it('removes the retired repo-global browser-scripts guidance', async () => {
-    const filesToCheck = [
-      join(packageRoot, 'skills', 'browser-use'),
-      resolve(packageRoot, '../extension/src/automation.md'),
-    ];
-
-    const violations: string[] = [];
-    const retiredPatterns = [
-      'packages/browser-scripts',
-      'pnpm exec tsx scripts/',
-      '.max/temp/scripts/browser-use',
-      '.max/node_modules/.bin/tsx',
-      'script-environment.md',
-    ];
-
-    async function scanPath(path: string): Promise<void> {
-      const pathStat = await stat(path);
-      if (pathStat.isFile()) {
-        const content = await readFile(path, 'utf-8');
-        if (retiredPatterns.some((pattern) => content.includes(pattern))) {
-          violations.push(path);
-        }
-        return;
-      }
-
-      const entries = await readdir(path, { withFileTypes: true });
-      for (const entry of entries) {
-        await scanPath(join(path, entry.name));
-      }
-    }
-
-    for (const path of filesToCheck) {
-      await scanPath(path);
-    }
-
-    expect(violations).toEqual([]);
+    expect(registryRaw).not.toContain('browser-use');
+    expect(registryRaw).not.toContain('llm-use');
+    expect(registryRaw).not.toContain('pptx');
+    expect(registryRaw).not.toContain('xlsx');
   });
 });
