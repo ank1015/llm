@@ -6,6 +6,18 @@ Base behavior:
 - application endpoints: `/api/**`
 - JSON is used for normal request/response bodies
 - SSE is used for live session streaming
+- Public request/query/response contracts are defined in `@ank1015/llm-app-contracts`
+
+DTO naming used in these docs:
+
+- `ProjectDto`
+- `ArtifactDirDto`
+- `ArtifactDirOverviewDto`
+- `SessionMetadataDto`
+- `SessionSummaryDto`
+- `BundledSkillDto`
+- `InstalledSkillDto`
+- `LiveRunSummaryDto`
 
 ## Sections
 

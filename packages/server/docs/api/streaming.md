@@ -10,11 +10,11 @@ Base path:
 
 The server may emit:
 
-- `ready` — stream setup confirmed; includes `runId` and current run status
+- `ready` — `StreamReadyEventData`; stream setup confirmed with `runId` and current status
 - `agent_event` — forwarded runtime event from the agent loop
-- `node_persisted` — message node persisted into the session tree
-- `done` — terminal success event with `completed` or `cancelled` status
-- `error` — terminal failure event
+- `node_persisted` — `StreamNodePersistedEventData`; message node persisted into the session tree
+- `done` — `StreamDoneEventData`; terminal success event with `completed` or `cancelled` status
+- `error` — `StreamErrorEventData`; terminal failure event
 
 The server also emits keep-alive comments while a run is active.
 
@@ -39,7 +39,7 @@ Responses:
 - `200` — SSE stream
 - `400` — invalid body
 - `404` — session not found
-- `409` — another run is already active for the session
+- `409` — `StreamConflictResponse`
 
 ## `POST /api/projects/:projectId/artifacts/:artifactDirId/sessions/:sessionId/messages/:nodeId/retry/stream`
 
@@ -61,7 +61,7 @@ Responses:
 - `200` — SSE stream
 - `400` — invalid body
 - `404` — session not found
-- `409` — another run is already active
+- `409` — `StreamConflictResponse`
 
 ## `POST /api/projects/:projectId/artifacts/:artifactDirId/sessions/:sessionId/messages/:nodeId/edit/stream`
 
@@ -84,7 +84,7 @@ Responses:
 - `200` — SSE stream
 - `400` — invalid body
 - `404` — session not found
-- `409` — another run is already active
+- `409` — `StreamConflictResponse`
 
 ## `GET /api/projects/:projectId/artifacts/:artifactDirId/sessions/:sessionId/runs/:runId/stream`
 
@@ -105,6 +105,20 @@ Cancel a live run.
 
 Responses:
 
-- `200` — `{ "ok": true, "sessionId": "...", "runId": "...", "cancelled": true }`
+- `200` — `CancelSessionRunResponse`
 - `404` — run not found
-- `409` — run exists but is no longer active
+- `409` — `StreamConflictResponse`
+
+Conflict response shape:
+
+```json
+{
+  "error": "A stream is already running for this session.",
+  "liveRun": {
+    "runId": "run-1",
+    "mode": "prompt",
+    "status": "running",
+    "startedAt": "2026-03-15T00:00:00.000Z"
+  }
+}
+```

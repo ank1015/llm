@@ -6,7 +6,7 @@ import { Alert, RefreshControl, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { withUniwind } from 'uniwind';
 
-import type { ProjectMetadata } from '@/lib/client-api';
+import type { ProjectDto } from '@/lib/client-api';
 
 import { AppText } from '@/components/app-text';
 import { PlusIcon } from '@/components/icons/plus';
@@ -57,14 +57,14 @@ export function ProjectsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [renameTarget, setRenameTarget] = useState<ProjectMetadata | null>(null);
+  const [renameTarget, setRenameTarget] = useState<ProjectDto | null>(null);
   const shouldShowProjectSkeletons = projects.length === 0 && !error && (isLoading || isRefreshing);
 
   useEffect(() => {
     void fetchProjects();
   }, [fetchProjects]);
 
-  const handleOpenProject = (project: ProjectMetadata) => {
+  const handleOpenProject = (project: ProjectDto) => {
     router.replace({
       pathname: '/[projectId]',
       params: {
@@ -89,7 +89,7 @@ export function ProjectsScreen() {
     });
   };
 
-  const handleOpenRenameProject = (project: ProjectMetadata) => {
+  const handleOpenRenameProject = (project: ProjectDto) => {
     setRenameTarget(project);
   };
 
@@ -116,7 +116,7 @@ export function ProjectsScreen() {
     }
   };
 
-  const confirmDeleteProject = async (project: ProjectMetadata) => {
+  const confirmDeleteProject = async (project: ProjectDto) => {
     try {
       await deleteProject(project.id);
       toast.show({
@@ -132,7 +132,7 @@ export function ProjectsScreen() {
     }
   };
 
-  const handleDeleteProject = (project: ProjectMetadata) => {
+  const handleDeleteProject = (project: ProjectDto) => {
     Alert.alert('Delete project', `Delete ${project.name}? This action cannot be undone.`, [
       {
         text: 'Cancel',
@@ -148,7 +148,7 @@ export function ProjectsScreen() {
     ]);
   };
 
-  const handleProjectOptions = (project: ProjectMetadata) => {
+  const handleProjectOptions = (project: ProjectDto) => {
     Alert.alert(project.name, 'Choose an action for this project.', [
       {
         text: 'Rename',

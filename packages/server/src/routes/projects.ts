@@ -1,8 +1,26 @@
+import {
+  CreateProjectRequestSchema,
+  ProjectFileIndexQuerySchema,
+  RenameProjectRequestSchema,
+  UpdateProjectImageRequestSchema,
+} from '@ank1015/llm-app-contracts';
 import { Hono } from 'hono';
 
 import { ArtifactDir, Project, Session } from '../core/index.js';
+import { toArtifactDirOverviewDto, toProjectDto } from '../http/contracts.js';
+import { readJsonBody, validateSchema } from '../http/validation.js';
 
 import type { ProjectFileIndexEntry } from '../core/index.js';
+import type {
+  CreateProjectRequest,
+  ProjectDeleteResponse,
+  ProjectDto,
+  ProjectFileIndexQuery,
+  ProjectFileIndexResult,
+  ProjectOverviewDto,
+  RenameProjectRequest,
+  UpdateProjectImageRequest,
+} from '@ank1015/llm-app-contracts';
 
 export const projectRoutes = new Hono();
 const DEFAULT_FILE_INDEX_LIMIT = 2000;
@@ -11,16 +29,34 @@ const PROJECT_NOT_FOUND_MESSAGE = 'Project not found';
 
 /** POST /api/projects — Create a new project */
 projectRoutes.post('/projects', async (c) => {
-  const body = await c.req.json<{ name: string; description?: string; projectImg?: string }>();
+  const rawBody = await readJsonBody(c);
+  if (rawBody !== undefined) {
+    const validation = validateSchema(
+      c,
+      CreateProjectRequestSchema,
+      rawBody,
+      'Invalid request body'
+    );
+    if (!validation.ok) {
+      return validation.response;
+    }
+  }
 
-  if (!body.name) {
+  const body = (rawBody ?? {}) as CreateProjectRequest;
+  const name = body.name?.trim() ?? '';
+
+  if (!name) {
     return c.json({ error: 'name is required' }, 400);
   }
 
   try {
-    const project = await Project.create(body);
+    const project = await Project.create({
+      name,
+      ...(body.description?.trim() ? { description: body.description.trim() } : {}),
+      ...(body.projectImg?.trim() ? { projectImg: body.projectImg.trim() } : {}),
+    });
     const metadata = await project.getMetadata();
-    return c.json(metadata, 201);
+    return c.json<ProjectDto>(toProjectDto(metadata), 201);
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Failed to create project';
     return c.json({ error: message }, message.includes('already exists') ? 409 : 500);
@@ -30,31 +66,43 @@ projectRoutes.post('/projects', async (c) => {
 /** GET /api/projects — List all projects */
 projectRoutes.get('/projects', async (c) => {
   const projects = await Project.list();
-  return c.json(projects);
+  return c.json<ProjectDto[]>(projects.map(toProjectDto));
 });
 
 /** PATCH /api/projects/project-img — Set a project's image URL using the project id or project name */
 projectRoutes.patch('/projects/project-img', async (c) => {
-  const body = await c.req.json<{
-    projectId?: string;
-    projectName?: string;
-    projectImg?: string;
-  }>();
+  const rawBody = await readJsonBody(c);
+  if (rawBody !== undefined) {
+    const validation = validateSchema(
+      c,
+      UpdateProjectImageRequestSchema,
+      rawBody,
+      'Invalid request body'
+    );
+    if (!validation.ok) {
+      return validation.response;
+    }
+  }
 
-  if (!body.projectId && !body.projectName) {
+  const body = (rawBody ?? {}) as UpdateProjectImageRequest;
+  const projectId = body.projectId?.trim() ?? '';
+  const projectName = body.projectName?.trim() ?? '';
+  const projectImg = body.projectImg?.trim() ?? '';
+
+  if (!projectId && !projectName) {
     return c.json({ error: 'projectId or projectName is required' }, 400);
   }
 
-  if (!body.projectImg) {
+  if (!projectImg) {
     return c.json({ error: 'projectImg is required' }, 400);
   }
 
   try {
-    const project = body.projectId
-      ? await Project.getById(body.projectId)
-      : await Project.getByName(body.projectName!);
-    const metadata = await project.updateProjectImg(body.projectImg);
-    return c.json(metadata);
+    const project = projectId
+      ? await Project.getById(projectId)
+      : await Project.getByName(projectName);
+    const metadata = await project.updateProjectImg(projectImg);
+    return c.json<ProjectDto>(toProjectDto(metadata));
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Failed to update project image';
     return c.json({ error: message }, message.includes('not found') ? 404 : 500);
@@ -68,7 +116,7 @@ projectRoutes.get('/projects/:projectId', async (c) => {
   try {
     const project = await Project.getById(projectId);
     const metadata = await project.getMetadata();
-    return c.json(metadata);
+    return c.json<ProjectDto>(toProjectDto(metadata));
   } catch (e) {
     const message = e instanceof Error ? e.message : PROJECT_NOT_FOUND_MESSAGE;
     return c.json({ error: message }, 404);
@@ -87,11 +135,14 @@ projectRoutes.get('/projects/:projectId/overview', async (c) => {
     const artifactDirs = await Promise.all(
       dirs.map(async (dir) => {
         const sessions = await Session.list(projectId, dir.id).catch(() => []);
-        return { ...dir, sessions };
+        return toArtifactDirOverviewDto(dir, sessions);
       })
     );
 
-    return c.json({ project: projectMeta, artifactDirs });
+    return c.json<ProjectOverviewDto>({
+      project: toProjectDto(projectMeta),
+      artifactDirs,
+    });
   } catch (e) {
     const message = e instanceof Error ? e.message : PROJECT_NOT_FOUND_MESSAGE;
     return c.json({ error: message }, 404);
@@ -101,8 +152,19 @@ projectRoutes.get('/projects/:projectId/overview', async (c) => {
 /** GET /api/projects/:projectId/file-index — Search files and directories across all artifact directories */
 projectRoutes.get('/projects/:projectId/file-index', async (c) => {
   const { projectId } = c.req.param();
-  const query = (c.req.query('query') ?? '').trim();
-  const limitParam = c.req.query('limit');
+  const queryValidation = validateSchema(
+    c,
+    ProjectFileIndexQuerySchema,
+    c.req.query(),
+    'Invalid query parameters'
+  );
+  if (!queryValidation.ok) {
+    return queryValidation.response;
+  }
+
+  const queryParams = queryValidation.value as ProjectFileIndexQuery;
+  const query = (queryParams.query ?? '').trim();
+  const limitParam = queryParams.limit;
 
   let limit = DEFAULT_FILE_INDEX_LIMIT;
   if (limitParam !== undefined) {
@@ -158,7 +220,7 @@ projectRoutes.get('/projects/:projectId/file-index', async (c) => {
       return a.path.localeCompare(b.path);
     });
 
-    return c.json({
+    return c.json<ProjectFileIndexResult>({
       projectId,
       query,
       files,
@@ -173,16 +235,30 @@ projectRoutes.get('/projects/:projectId/file-index', async (c) => {
 /** PATCH /api/projects/:projectId/name — Rename a project without changing its stable id */
 projectRoutes.patch('/projects/:projectId/name', async (c) => {
   const { projectId } = c.req.param();
-  const body = await c.req.json<{ name?: string }>();
+  const rawBody = await readJsonBody(c);
+  if (rawBody !== undefined) {
+    const validation = validateSchema(
+      c,
+      RenameProjectRequestSchema,
+      rawBody,
+      'Invalid request body'
+    );
+    if (!validation.ok) {
+      return validation.response;
+    }
+  }
 
-  if (!body.name?.trim()) {
+  const body = (rawBody ?? {}) as RenameProjectRequest;
+  const name = body.name?.trim() ?? '';
+
+  if (!name) {
     return c.json({ error: 'name is required' }, 400);
   }
 
   try {
     const project = await Project.getById(projectId);
-    const metadata = await project.rename(body.name);
-    return c.json(metadata);
+    const metadata = await project.rename(name);
+    return c.json<ProjectDto>(toProjectDto(metadata));
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Failed to rename project';
     return c.json({ error: message }, message.includes('not found') ? 404 : 500);
@@ -196,7 +272,7 @@ projectRoutes.delete('/projects/:projectId', async (c) => {
   try {
     const project = await Project.getById(projectId);
     await project.delete();
-    return c.json({ deleted: true });
+    return c.json<ProjectDeleteResponse>({ deleted: true });
   } catch (e) {
     const message = e instanceof Error ? e.message : PROJECT_NOT_FOUND_MESSAGE;
     return c.json({ error: message }, 404);

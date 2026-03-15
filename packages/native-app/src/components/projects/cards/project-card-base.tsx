@@ -3,7 +3,7 @@ import { Image, Pressable, View } from 'react-native';
 import Animated, { Easing, FadeInDown } from 'react-native-reanimated';
 import { withUniwind } from 'uniwind';
 
-import type { ProjectMetadata } from '@/lib/client-api';
+import type { ProjectDto } from '@/lib/client-api';
 
 export type ProjectCardProps = {
   index: number;
@@ -11,14 +11,14 @@ export type ProjectCardProps = {
   onDeletePress?: () => void;
   onOpenPress: () => void;
   onRenamePress?: () => void;
-  project: ProjectMetadata;
+  project: ProjectDto;
 };
 
 type ProjectCardTriggerProps = {
   index: number;
   onLongPress?: () => void;
   onOpenPress: () => void;
-  project: ProjectMetadata;
+  project: ProjectDto;
 };
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -49,7 +49,7 @@ function formatProjectMeta(createdAt: string): string {
   });
 }
 
-function getProjectDescription(project: ProjectMetadata): string {
+function getProjectDescription(project: ProjectDto): string {
   if (project.description?.trim().length) {
     return project.description;
   }

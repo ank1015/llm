@@ -1,134 +1,68 @@
 import { apiRequestJson, SERVER_BASE } from './http';
 
+import type {
+  ArtifactDirDeleteResponse,
+  ArtifactDirDto,
+  ArtifactDirOverviewDto,
+  ArtifactExplorerResult,
+  ArtifactFileDto,
+  BundledSkillDto,
+  CreateArtifactDirRequest,
+  CreateProjectRequest,
+  DeleteArtifactPathResponse,
+  InstallArtifactSkillRequest,
+  InstalledSkillDto,
+  ProjectDeleteResponse,
+  ProjectDto,
+  ProjectFileIndexResult,
+  ProjectOverviewDto,
+  RenameArtifactDirRequest,
+  RenameArtifactPathRequest,
+  RenameArtifactPathResponse,
+  RenameProjectRequest,
+} from '@ank1015/llm-app-contracts';
+
+
 const PROJECTS_BASE = `${SERVER_BASE}/api/projects`;
-
-export type ProjectMetadata = {
-  id: string;
-  name: string;
-  description?: string;
-  projectImg?: string | null;
-  createdAt: string;
-  updatedAt: string | null;
-};
-
-export type ArtifactDirMetadata = {
-  id: string;
-  name: string;
-  description: string | null;
-  createdAt: string;
-};
-
-export type OverviewSession = {
-  sessionId: string;
-  sessionName: string;
-  createdAt: string;
-  updatedAt: string | null;
-  nodeCount: number;
-};
-
-export type ArtifactDirWithSessions = ArtifactDirMetadata & {
-  sessions: OverviewSession[];
-};
-
-export type ProjectOverview = {
-  project: ProjectMetadata;
-  artifactDirs: ArtifactDirWithSessions[];
-};
 
 export type ArtifactContext = {
   projectId: string;
   artifactId: string;
 };
 
-export type ArtifactExplorerEntryType = 'file' | 'directory';
-
-export type ArtifactExplorerEntry = {
+type CreateProjectInput = Omit<CreateProjectRequest, 'name'> & {
   name: string;
-  path: string;
-  type: ArtifactExplorerEntryType;
-  size: number | null;
-  updatedAt: string;
 };
 
-export type ArtifactExplorerResult = {
-  path: string;
-  entries: ArtifactExplorerEntry[];
-};
-
-export type ArtifactFileResult = {
-  path: string;
-  content: string;
-  size: number;
-  updatedAt: string;
-  isBinary: boolean;
-  truncated: boolean;
-};
-
-export type ArtifactPathRenameResult = {
-  ok: true;
-  oldPath: string;
-  newPath: string;
-  type: ArtifactExplorerEntryType;
-};
-
-export type ArtifactPathDeleteResult = {
-  ok: true;
-  deleted: true;
-  path: string;
-  type: ArtifactExplorerEntryType;
-};
-
-export type ProjectFileIndexEntry = {
-  artifactId: string;
-  artifactName: string;
-  path: string;
-  type: ArtifactExplorerEntryType;
-  artifactPath: string;
-  size: number;
-  updatedAt: string;
-};
-
-export type ProjectFileIndexResult = {
-  projectId: string;
-  query: string;
-  files: ProjectFileIndexEntry[];
-  truncated: boolean;
-};
-
-export type BundledSkillEntry = {
+type RenameProjectInput = Omit<RenameProjectRequest, 'name'> & {
   name: string;
-  description: string;
-  path: string;
-  directory: string;
 };
 
-export type InstalledArtifactSkill = {
+type CreateArtifactDirInput = Omit<CreateArtifactDirRequest, 'name'> & {
   name: string;
-  description: string;
+};
+
+type RenameArtifactDirInput = Omit<RenameArtifactDirRequest, 'name'> & {
+  name: string;
+};
+
+type InstallArtifactSkillInput = Omit<InstallArtifactSkillRequest, 'skillName'> & {
+  skillName: string;
+};
+
+type RenameArtifactPathInput = Omit<RenameArtifactPathRequest, 'path' | 'newName'> & {
   path: string;
-  artifactDir: string;
-  maxDir: string;
-  skillsDir: string;
-  tempDir: string;
-  directory: string;
+  newName: string;
 };
 
-export type InstallArtifactSkillResult = InstalledArtifactSkill & {
-  sourceDirectory: string;
-  sourcePath: string;
-};
-
-export async function listProjects(): Promise<ProjectMetadata[]> {
-  return apiRequestJson<ProjectMetadata[]>(PROJECTS_BASE, {
+export async function listProjects(): Promise<ProjectDto[]> {
+  return apiRequestJson<ProjectDto[]>(PROJECTS_BASE, {
     method: 'GET',
   });
 }
 
-export async function createProject(input: {
-  name: string;
-  description?: string;
-}): Promise<ProjectMetadata> {
-  return apiRequestJson<ProjectMetadata>(PROJECTS_BASE, {
+export async function createProject(input: CreateProjectInput): Promise<ProjectDto> {
+  return apiRequestJson<ProjectDto>(PROJECTS_BASE, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
@@ -137,29 +71,32 @@ export async function createProject(input: {
 
 export async function renameProject(
   projectId: string,
-  input: { name: string }
-): Promise<ProjectMetadata> {
-  return apiRequestJson<ProjectMetadata>(`${PROJECTS_BASE}/${encodeURIComponent(projectId)}/name`, {
+  input: RenameProjectInput
+): Promise<ProjectDto> {
+  return apiRequestJson<ProjectDto>(`${PROJECTS_BASE}/${encodeURIComponent(projectId)}/name`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
   });
 }
 
-export async function deleteProject(projectId: string): Promise<{ deleted: boolean }> {
-  return apiRequestJson<{ deleted: boolean }>(`${PROJECTS_BASE}/${encodeURIComponent(projectId)}`, {
-    method: 'DELETE',
-  });
+export async function deleteProject(projectId: string): Promise<ProjectDeleteResponse> {
+  return apiRequestJson<ProjectDeleteResponse>(
+    `${PROJECTS_BASE}/${encodeURIComponent(projectId)}`,
+    {
+      method: 'DELETE',
+    }
+  );
 }
 
-export async function listBundledSkills(): Promise<BundledSkillEntry[]> {
-  return apiRequestJson<BundledSkillEntry[]>(`${SERVER_BASE}/api/skills`, {
+export async function listBundledSkills(): Promise<BundledSkillDto[]> {
+  return apiRequestJson<BundledSkillDto[]>(`${SERVER_BASE}/api/skills`, {
     method: 'GET',
   });
 }
 
-export async function getProjectOverview(projectId: string): Promise<ProjectOverview> {
-  return apiRequestJson<ProjectOverview>(
+export async function getProjectOverview(projectId: string): Promise<ProjectOverviewDto> {
+  return apiRequestJson<ProjectOverviewDto>(
     `${PROJECTS_BASE}/${encodeURIComponent(projectId)}/overview`,
     { method: 'GET' }
   );
@@ -167,9 +104,9 @@ export async function getProjectOverview(projectId: string): Promise<ProjectOver
 
 export async function createArtifactDir(
   projectId: string,
-  input: { name: string; description?: string }
-): Promise<ArtifactDirMetadata> {
-  return apiRequestJson<ArtifactDirMetadata>(
+  input: CreateArtifactDirInput
+): Promise<ArtifactDirDto> {
+  return apiRequestJson<ArtifactDirDto>(
     `${PROJECTS_BASE}/${encodeURIComponent(projectId)}/artifacts`,
     {
       method: 'POST',
@@ -182,9 +119,9 @@ export async function createArtifactDir(
 export async function renameArtifactDir(
   projectId: string,
   artifactDirId: string,
-  input: { name: string }
-): Promise<ArtifactDirMetadata> {
-  return apiRequestJson<ArtifactDirMetadata>(
+  input: RenameArtifactDirInput
+): Promise<ArtifactDirDto> {
+  return apiRequestJson<ArtifactDirDto>(
     `${PROJECTS_BASE}/${encodeURIComponent(projectId)}/artifacts/${encodeURIComponent(artifactDirId)}/name`,
     {
       method: 'PATCH',
@@ -197,8 +134,8 @@ export async function renameArtifactDir(
 export async function deleteArtifactDir(
   projectId: string,
   artifactDirId: string
-): Promise<{ deleted: boolean }> {
-  return apiRequestJson<{ deleted: boolean }>(
+): Promise<ArtifactDirDeleteResponse> {
+  return apiRequestJson<ArtifactDirDeleteResponse>(
     `${PROJECTS_BASE}/${encodeURIComponent(projectId)}/artifacts/${encodeURIComponent(artifactDirId)}`,
     {
       method: 'DELETE',
@@ -216,17 +153,17 @@ export function getArtifactFileBaseUrl(ctx: ArtifactContext): string {
 
 export async function listInstalledArtifactSkills(
   ctx: ArtifactContext
-): Promise<InstalledArtifactSkill[]> {
-  return apiRequestJson<InstalledArtifactSkill[]>(`${buildArtifactBase(ctx)}/skills`, {
+): Promise<InstalledSkillDto[]> {
+  return apiRequestJson<InstalledSkillDto[]>(`${buildArtifactBase(ctx)}/skills`, {
     method: 'GET',
   });
 }
 
 export async function installArtifactSkill(
   ctx: ArtifactContext,
-  input: { skillName: string }
-): Promise<InstallArtifactSkillResult> {
-  return apiRequestJson<InstallArtifactSkillResult>(`${buildArtifactBase(ctx)}/skills`, {
+  input: InstallArtifactSkillInput
+): Promise<InstalledSkillDto> {
+  return apiRequestJson<InstalledSkillDto>(`${buildArtifactBase(ctx)}/skills`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -252,13 +189,13 @@ export async function getArtifactExplorer(
 export async function getArtifactFile(
   ctx: ArtifactContext,
   input: { path: string; maxBytes?: number }
-): Promise<ArtifactFileResult> {
+): Promise<ArtifactFileDto> {
   const params = new URLSearchParams({ path: input.path });
   if (typeof input.maxBytes === 'number' && Number.isFinite(input.maxBytes)) {
     params.set('maxBytes', `${Math.floor(input.maxBytes)}`);
   }
 
-  return apiRequestJson<ArtifactFileResult>(`${buildArtifactBase(ctx)}/file?${params.toString()}`, {
+  return apiRequestJson<ArtifactFileDto>(`${buildArtifactBase(ctx)}/file?${params.toString()}`, {
     method: 'GET',
   });
 }
@@ -270,9 +207,9 @@ export function getArtifactRawFileUrl(ctx: ArtifactContext, input: { path: strin
 
 export async function renameArtifactPath(
   ctx: ArtifactContext,
-  input: { path: string; newName: string }
-): Promise<ArtifactPathRenameResult> {
-  return apiRequestJson<ArtifactPathRenameResult>(`${buildArtifactBase(ctx)}/path/rename`, {
+  input: RenameArtifactPathInput
+): Promise<RenameArtifactPathResponse> {
+  return apiRequestJson<RenameArtifactPathResponse>(`${buildArtifactBase(ctx)}/path/rename`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -285,9 +222,9 @@ export async function renameArtifactPath(
 export async function deleteArtifactPath(
   ctx: ArtifactContext,
   input: { path: string }
-): Promise<ArtifactPathDeleteResult> {
+): Promise<DeleteArtifactPathResponse> {
   const params = new URLSearchParams({ path: input.path });
-  return apiRequestJson<ArtifactPathDeleteResult>(
+  return apiRequestJson<DeleteArtifactPathResponse>(
     `${buildArtifactBase(ctx)}/path?${params.toString()}`,
     { method: 'DELETE' }
   );
@@ -309,3 +246,17 @@ export async function getProjectFileIndex(
   const url = `${PROJECTS_BASE}/${encodeURIComponent(projectId)}/file-index${query ? `?${query}` : ''}`;
   return apiRequestJson<ProjectFileIndexResult>(url, { method: 'GET' });
 }
+
+export type {
+  ArtifactDirDto,
+  ArtifactDirOverviewDto,
+  ArtifactExplorerResult,
+  ArtifactFileDto,
+  BundledSkillDto,
+  InstalledSkillDto,
+  ProjectDto,
+  ProjectFileIndexResult,
+  ProjectOverviewDto,
+  RenameArtifactPathResponse,
+  DeleteArtifactPathResponse,
+};

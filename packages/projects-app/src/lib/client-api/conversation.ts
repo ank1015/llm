@@ -1,14 +1,17 @@
 import { apiRequestJson, SERVER_BASE } from './http';
 
 import type {
-  LiveRunSummary,
+  CancelSessionRunResponse,
+  LiveRunSummaryDto,
+  SessionMessagesResponse,
+  SessionPromptRequest,
   SessionTreeResponse,
   StreamEventMap,
   StreamEventName,
   TurnSettings,
   VisibleLeafSelection,
-} from '@/lib/contracts';
-import type { MessageNode } from '@ank1015/llm-types';
+} from '@ank1015/llm-app-contracts';
+
 
 type ArtifactContext = {
   projectId: string;
@@ -117,8 +120,8 @@ function normalizeSseChunk(value: string): string {
 export async function getSessionMessages(
   ctx: ArtifactContext,
   sessionId: string
-): Promise<MessageNode[]> {
-  return apiRequestJson<MessageNode[]>(buildMessagesPath(ctx, sessionId), {
+): Promise<SessionMessagesResponse> {
+  return apiRequestJson<SessionMessagesResponse>(buildMessagesPath(ctx, sessionId), {
     method: 'GET',
   });
 }
@@ -140,9 +143,9 @@ export type StreamHandlers = {
 };
 
 export class StreamConflictError extends Error {
-  liveRun: LiveRunSummary;
+  liveRun: LiveRunSummaryDto;
 
-  constructor(liveRun: LiveRunSummary) {
+  constructor(liveRun: LiveRunSummaryDto) {
     super('A stream is already running for this session.');
     this.name = 'StreamConflictError';
     this.liveRun = liveRun;
@@ -179,13 +182,7 @@ export type CancelRunRequest = ArtifactContext & {
   runId: string;
 };
 
-type StreamRequestBody = {
-  message?: string;
-  leafNodeId?: string;
-  api: TurnSettings['api'];
-  modelId: string;
-  reasoningLevel: TurnSettings['reasoningLevel'];
-};
+type StreamRequestBody = SessionPromptRequest;
 
 // eslint-disable-next-line sonarjs/cognitive-complexity
 async function streamConversationRequest(
@@ -214,7 +211,7 @@ async function streamConversationRequest(
   if (!response.ok) {
     const body = (await response.json().catch(() => ({}))) as {
       error?: string;
-      liveRun?: LiveRunSummary;
+      liveRun?: LiveRunSummaryDto;
     };
     if (response.status === 409 && body.liveRun) {
       throw new StreamConflictError(body.liveRun);
@@ -347,11 +344,16 @@ export async function streamRetryConversation(
   );
 }
 
-export async function cancelSessionRun(request: CancelRunRequest): Promise<{ ok: true }> {
+export async function cancelSessionRun(
+  request: CancelRunRequest
+): Promise<CancelSessionRunResponse> {
   const ctx: ArtifactContext = { projectId: request.projectId, artifactId: request.artifactId };
-  return apiRequestJson<{ ok: true }>(buildCancelRunPath(ctx, request.sessionId, request.runId), {
-    method: 'POST',
-  });
+  return apiRequestJson<CancelSessionRunResponse>(
+    buildCancelRunPath(ctx, request.sessionId, request.runId),
+    {
+      method: 'POST',
+    }
+  );
 }
 
 export async function streamEditConversation(

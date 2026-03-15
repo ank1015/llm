@@ -3,7 +3,7 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
-import type { SessionRef } from '@/lib/contracts';
+import type { SessionRef } from '@/lib/client-api';
 import type { Attachment } from '@ank1015/llm-types';
 
 type ComposerSnapshot = {

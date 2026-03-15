@@ -1,28 +1,40 @@
 import { apiRequestJson, SERVER_BASE } from './http';
 
-import type { ModelSelection, SessionMetadata } from '@/lib/contracts';
-import type { SessionSummary } from '@ank1015/llm-types';
+import type {
+  CreateSessionRequest,
+  DeleteSessionResponse,
+  ModelSelection,
+  SessionMetadataDto,
+  SessionNameResponse,
+  SessionSummaryDto,
+} from '@ank1015/llm-app-contracts';
+
 
 type ArtifactContext = {
   projectId: string;
   artifactId: string;
 };
 
+type CreateSessionInput = Omit<CreateSessionRequest, 'api' | 'modelId'> &
+  ModelSelection & {
+    name?: string;
+  };
+
 function buildSessionsBase(ctx: ArtifactContext): string {
   return `${SERVER_BASE}/api/projects/${encodeURIComponent(ctx.projectId)}/artifacts/${encodeURIComponent(ctx.artifactId)}/sessions`;
 }
 
-export async function listSessions(ctx: ArtifactContext): Promise<SessionSummary[]> {
-  return apiRequestJson<SessionSummary[]>(buildSessionsBase(ctx), {
+export async function listSessions(ctx: ArtifactContext): Promise<SessionSummaryDto[]> {
+  return apiRequestJson<SessionSummaryDto[]>(buildSessionsBase(ctx), {
     method: 'GET',
   });
 }
 
 export async function createSession(
   ctx: ArtifactContext,
-  input: { name?: string } & ModelSelection
-): Promise<SessionMetadata> {
-  return apiRequestJson<SessionMetadata>(buildSessionsBase(ctx), {
+  input: CreateSessionInput
+): Promise<SessionMetadataDto> {
+  return apiRequestJson<SessionMetadataDto>(buildSessionsBase(ctx), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -36,19 +48,22 @@ export async function createSession(
 export async function renameSession(
   ctx: ArtifactContext,
   input: { sessionId: string; name: string }
-): Promise<{ ok: true; sessionId: string; sessionName: string }> {
-  return apiRequestJson(`${buildSessionsBase(ctx)}/${encodeURIComponent(input.sessionId)}/name`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: input.name }),
-  });
+): Promise<SessionNameResponse> {
+  return apiRequestJson<SessionNameResponse>(
+    `${buildSessionsBase(ctx)}/${encodeURIComponent(input.sessionId)}/name`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: input.name }),
+    }
+  );
 }
 
 export async function generateSessionName(
   ctx: ArtifactContext,
   input: { sessionId: string; query: string }
-): Promise<{ ok: true; sessionId: string; sessionName: string }> {
-  return apiRequestJson(
+): Promise<SessionNameResponse> {
+  return apiRequestJson<SessionNameResponse>(
     `${buildSessionsBase(ctx)}/${encodeURIComponent(input.sessionId)}/generate-name`,
     {
       method: 'POST',
@@ -61,8 +76,13 @@ export async function generateSessionName(
 export async function deleteSession(
   ctx: ArtifactContext,
   sessionId: string
-): Promise<{ ok: true; sessionId: string; deleted: boolean }> {
-  return apiRequestJson(`${buildSessionsBase(ctx)}/${encodeURIComponent(sessionId)}`, {
-    method: 'DELETE',
-  });
+): Promise<DeleteSessionResponse> {
+  return apiRequestJson<DeleteSessionResponse>(
+    `${buildSessionsBase(ctx)}/${encodeURIComponent(sessionId)}`,
+    {
+      method: 'DELETE',
+    }
+  );
 }
+
+export type { SessionMetadataDto, SessionSummaryDto };

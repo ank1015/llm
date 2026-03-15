@@ -3,7 +3,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-import type { SessionRef } from '@/lib/contracts';
+import type { SessionRef } from '@/lib/client-api';
 import type { Attachment } from '@ank1015/llm-sdk';
 
 import { asyncJsonStorage } from '@/lib/state-storage';

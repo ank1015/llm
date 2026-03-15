@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@ank1015/llm-app-contracts": "workspace:^",
     "@ank1015/llm-types": "workspace:^",
     "@ank1015/llm-core": "workspace:^",
     "@mendable/firecrawl-js": "^4.12.0",

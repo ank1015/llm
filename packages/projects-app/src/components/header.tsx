@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useParams, usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
-import type { ProjectOverview } from '@/lib/client-api';
+import type { ProjectOverviewDto } from '@/lib/client-api';
 
 import { Button } from '@/components/ui/button';
 import { getProjectOverview } from '@/lib/client-api';
@@ -13,7 +13,7 @@ import { useTypewriter } from '@/lib/use-typewriter';
 import { cn } from '@/lib/utils';
 import { useSidebarStore, useUiStore } from '@/stores';
 
-const EMPTY_ARTIFACT_DIRS: ProjectOverview['artifactDirs'] = [];
+const EMPTY_ARTIFACT_DIRS: ProjectOverviewDto['artifactDirs'] = [];
 
 function HeaderBreadcrumb() {
   const { projectId, artifactId, threadId } = useParams<{
@@ -23,7 +23,7 @@ function HeaderBreadcrumb() {
   }>();
   const pathname = usePathname();
 
-  const [overview, setOverview] = useState<ProjectOverview | null>(null);
+  const [overview, setOverview] = useState<ProjectOverviewDto | null>(null);
   const sidebarProjectName = useSidebarStore((state) => state.projectName);
   const sidebarArtifactDirs = useSidebarStore((state) => state.artifactDirs ?? EMPTY_ARTIFACT_DIRS);
 

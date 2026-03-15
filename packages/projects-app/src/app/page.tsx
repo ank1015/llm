@@ -4,7 +4,7 @@ import { Ellipsis, FolderOpen, Loader2, Plus, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
-import type { ProjectMetadata } from '@/lib/client-api';
+import type { ProjectDto } from '@/lib/client-api';
 import type { FormEvent } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -25,7 +25,7 @@ import {
 import { createProject, deleteProject, listProjects } from '@/lib/client-api';
 
 export default function ProjectsPage() {
-  const [projects, setProjects] = useState<ProjectMetadata[]>([]);
+  const [projects, setProjects] = useState<ProjectDto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -49,11 +49,11 @@ export default function ProjectsPage() {
     }
   };
 
-  const handleProjectClick = (project: ProjectMetadata) => {
+  const handleProjectClick = (project: ProjectDto) => {
     router.push(`/${project.id}`);
   };
 
-  const handleProjectCreated = (project: ProjectMetadata) => {
+  const handleProjectCreated = (project: ProjectDto) => {
     setProjects((prev) => [project, ...prev]);
     setIsCreateOpen(false);
     router.push(`/${project.id}`);
@@ -180,7 +180,7 @@ function CreateProjectDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreated: (project: ProjectMetadata) => void;
+  onCreated: (project: ProjectDto) => void;
 }) {
   const [name, setName] = useState('');
   const [isCreating, setIsCreating] = useState(false);

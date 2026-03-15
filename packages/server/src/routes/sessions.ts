@@ -1,10 +1,40 @@
+import {
+  AttachSessionRunQuerySchema,
+  CreateSessionRequestSchema,
+  GenerateSessionNameRequestSchema,
+  RenameSessionRequestSchema,
+  SessionPromptRequestSchema,
+  SessionTurnSettingsRequestSchema,
+} from '@ank1015/llm-app-contracts';
 import { Hono } from 'hono';
 
 import { Session } from '../core/index.js';
 import { sessionRunRegistry } from '../core/session/run-registry.js';
+import {
+  toLiveRunSummaryDto,
+  toSessionMetadataDto,
+  toSessionSummaryDto,
+  toSessionTreeResponse,
+} from '../http/contracts.js';
+import { readJsonBody, validateSchema } from '../http/validation.js';
 
-import type { PromptInput, ReasoningLevel } from '../core/index.js';
-import type { AgentEvent, Api, MessageNode } from '@ank1015/llm-sdk';
+import type { PromptInput } from '../core/index.js';
+import type {
+  AttachSessionRunQuery,
+  CancelSessionRunResponse,
+  CreateSessionRequest,
+  DeleteSessionResponse,
+  SessionMessagesResponse,
+  SessionMetadataDto,
+  SessionNameResponse,
+  SessionPromptRequest,
+  SessionPromptResponse,
+  SessionSummaryDto,
+  SessionTreeResponse,
+  SessionTurnSettingsRequest,
+  StreamConflictResponse,
+} from '@ank1015/llm-app-contracts';
+import type { AgentEvent, MessageNode } from '@ank1015/llm-sdk';
 import type { Context } from 'hono';
 
 const BASE = '/projects/:projectId/artifacts/:artifactDirId/sessions';
@@ -13,84 +43,54 @@ const SESSION_NOT_FOUND_MESSAGE = 'Session not found';
 
 export const sessionRoutes = new Hono();
 
-const REASONING_LEVELS = new Set<ReasoningLevel>(['low', 'medium', 'high', 'xhigh']);
-
-type SessionTurnBody = {
-  message?: string;
-  leafNodeId?: string;
-  api?: string;
-  modelId?: string;
-  reasoningLevel?: string;
-  reasoning?: string;
-};
-
 function resolvePromptInput(
-  body: SessionTurnBody | undefined
+  body: SessionPromptRequest | undefined
 ): { error: string } | { input: PromptInput } {
-  if (!body?.message) {
+  const message = body?.message?.trim() ?? '';
+  if (!message) {
     return { error: 'message is required' };
   }
 
-  const api = typeof body.api === 'string' ? body.api.trim() : '';
-  const modelId = typeof body.modelId === 'string' ? body.modelId.trim() : '';
-  const hasProviderOverride = api.length > 0 || modelId.length > 0;
+  const api = body?.api;
+  const modelId = body?.modelId?.trim() ?? '';
+  const hasProviderOverride = Boolean(api) || modelId.length > 0;
 
-  if (hasProviderOverride && (api.length === 0 || modelId.length === 0)) {
+  if (hasProviderOverride && (!api || modelId.length === 0)) {
     return { error: 'api and modelId must be provided together' };
   }
 
-  const rawReasoningLevel =
-    typeof body.reasoningLevel === 'string'
-      ? body.reasoningLevel
-      : typeof body.reasoning === 'string'
-        ? body.reasoning
-        : undefined;
-  const reasoningLevel = rawReasoningLevel?.trim().toLowerCase();
-  const leafNodeId = typeof body.leafNodeId === 'string' ? body.leafNodeId.trim() : '';
-
-  if (reasoningLevel && !REASONING_LEVELS.has(reasoningLevel as ReasoningLevel)) {
-    return { error: 'reasoning must be one of: low, medium, high, xhigh' };
-  }
+  const reasoningLevel = body?.reasoningLevel ?? body?.reasoning;
+  const leafNodeId = body?.leafNodeId?.trim() ?? '';
 
   return {
     input: {
-      message: body.message,
+      message,
       ...(leafNodeId ? { leafNodeId } : {}),
-      ...(hasProviderOverride ? { api: api as Api, modelId } : {}),
-      ...(reasoningLevel ? { reasoningLevel: reasoningLevel as ReasoningLevel } : {}),
+      ...(hasProviderOverride && api ? { api, modelId } : {}),
+      ...(reasoningLevel ? { reasoningLevel } : {}),
     },
   };
 }
 
 function resolveTurnSettings(
-  body: SessionTurnBody | undefined
+  body: SessionTurnSettingsRequest | undefined
 ): { error: string } | { input: Omit<PromptInput, 'message'> } {
-  const api = typeof body?.api === 'string' ? body.api.trim() : '';
-  const modelId = typeof body?.modelId === 'string' ? body.modelId.trim() : '';
-  const hasProviderOverride = api.length > 0 || modelId.length > 0;
+  const api = body?.api;
+  const modelId = body?.modelId?.trim() ?? '';
+  const hasProviderOverride = Boolean(api) || modelId.length > 0;
 
-  if (hasProviderOverride && (api.length === 0 || modelId.length === 0)) {
+  if (hasProviderOverride && (!api || modelId.length === 0)) {
     return { error: 'api and modelId must be provided together' };
   }
 
-  const rawReasoningLevel =
-    typeof body?.reasoningLevel === 'string'
-      ? body.reasoningLevel
-      : typeof body?.reasoning === 'string'
-        ? body.reasoning
-        : undefined;
-  const reasoningLevel = rawReasoningLevel?.trim().toLowerCase();
-  const leafNodeId = typeof body?.leafNodeId === 'string' ? body.leafNodeId.trim() : '';
-
-  if (reasoningLevel && !REASONING_LEVELS.has(reasoningLevel as ReasoningLevel)) {
-    return { error: 'reasoning must be one of: low, medium, high, xhigh' };
-  }
+  const reasoningLevel = body?.reasoningLevel ?? body?.reasoning;
+  const leafNodeId = body?.leafNodeId?.trim() ?? '';
 
   return {
     input: {
       ...(leafNodeId ? { leafNodeId } : {}),
-      ...(hasProviderOverride ? { api: api as Api, modelId } : {}),
-      ...(reasoningLevel ? { reasoningLevel: reasoningLevel as ReasoningLevel } : {}),
+      ...(hasProviderOverride && api ? { api, modelId } : {}),
+      ...(reasoningLevel ? { reasoningLevel } : {}),
     },
   };
 }
@@ -98,16 +98,35 @@ function resolveTurnSettings(
 /** POST /api/.../sessions — Create a new session */
 sessionRoutes.post(BASE, async (c) => {
   const { projectId, artifactDirId } = c.req.param();
-  const body = await c.req.json<{ name?: string; modelId: string; api: string }>();
+  const rawBody = await readJsonBody(c);
+  if (rawBody !== undefined) {
+    const validation = validateSchema(
+      c,
+      CreateSessionRequestSchema,
+      rawBody,
+      'Invalid request body'
+    );
+    if (!validation.ok) {
+      return validation.response;
+    }
+  }
 
-  if (!body.modelId || !body.api) {
+  const body = (rawBody ?? {}) as CreateSessionRequest;
+  const modelId = body.modelId?.trim() ?? '';
+  const api = body.api;
+
+  if (!modelId || !api) {
     return c.json({ error: 'modelId and api are required' }, 400);
   }
 
   try {
-    const session = await Session.create(projectId, artifactDirId, body);
+    const session = await Session.create(projectId, artifactDirId, {
+      ...(body.name?.trim() ? { name: body.name.trim() } : {}),
+      api,
+      modelId,
+    });
     const metadata = await session.getMetadata();
-    return c.json(metadata, 201);
+    return c.json<SessionMetadataDto>(toSessionMetadataDto(metadata), 201);
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Failed to create session';
     return c.json({ error: message }, 500);
@@ -120,7 +139,7 @@ sessionRoutes.get(BASE, async (c) => {
 
   try {
     const sessions = await Session.list(projectId, artifactDirId);
-    return c.json(sessions);
+    return c.json<SessionSummaryDto[]>(sessions.map(toSessionSummaryDto));
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Failed to list sessions';
     return c.json({ error: message }, 500);
@@ -134,7 +153,7 @@ sessionRoutes.get(`${BASE}/:sessionId`, async (c) => {
   try {
     const session = await Session.getById(projectId, artifactDirId, sessionId);
     const metadata = await session.getMetadata();
-    return c.json(metadata);
+    return c.json<SessionMetadataDto>(toSessionMetadataDto(metadata));
   } catch (e) {
     const message = e instanceof Error ? e.message : SESSION_NOT_FOUND_MESSAGE;
     return c.json({ error: message }, 404);
@@ -148,7 +167,7 @@ sessionRoutes.get(`${BASE}/:sessionId/messages`, async (c) => {
   try {
     const session = await Session.getById(projectId, artifactDirId, sessionId);
     const nodes = await session.getHistoryNodes();
-    return c.json(nodes);
+    return c.json<SessionMessagesResponse>(nodes);
   } catch (e) {
     const message = e instanceof Error ? e.message : SESSION_NOT_FOUND_MESSAGE;
     return c.json({ error: message }, 404);
@@ -164,10 +183,9 @@ sessionRoutes.get(`${BASE}/:sessionId/tree`, async (c) => {
     const tree = await session.getMessageTree();
     const sessionKey = getSessionRunKey(projectId, artifactDirId, sessionId);
     const liveRun = sessionRunRegistry.getLiveRunSummary(sessionKey);
-    return c.json({
-      ...tree,
-      ...(liveRun ? { liveRun } : {}),
-    });
+    return c.json<SessionTreeResponse>(
+      toSessionTreeResponse(tree, liveRun ? toLiveRunSummaryDto(liveRun) : null)
+    );
   } catch (e) {
     const message = e instanceof Error ? e.message : SESSION_NOT_FOUND_MESSAGE;
     return c.json({ error: message }, 404);
@@ -177,7 +195,20 @@ sessionRoutes.get(`${BASE}/:sessionId/tree`, async (c) => {
 /** POST /api/.../sessions/:sessionId/prompt — Send a message (non-streaming) */
 sessionRoutes.post(`${BASE}/:sessionId/prompt`, async (c) => {
   const { projectId, artifactDirId, sessionId } = c.req.param();
-  const body = await c.req.json<SessionTurnBody>().catch(() => undefined);
+  const rawBody = await readJsonBody(c);
+  if (rawBody !== undefined) {
+    const validation = validateSchema(
+      c,
+      SessionPromptRequestSchema,
+      rawBody,
+      'Invalid request body'
+    );
+    if (!validation.ok) {
+      return validation.response;
+    }
+  }
+
+  const body = rawBody as SessionPromptRequest | undefined;
   const resolvedPromptInput = resolvePromptInput(body);
   if ('error' in resolvedPromptInput) {
     return c.json({ error: resolvedPromptInput.error }, 400);
@@ -186,7 +217,7 @@ sessionRoutes.post(`${BASE}/:sessionId/prompt`, async (c) => {
   try {
     const session = await Session.getById(projectId, artifactDirId, sessionId);
     const newMessages = await session.prompt(resolvedPromptInput.input);
-    return c.json(newMessages);
+    return c.json<SessionPromptResponse>(newMessages);
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Failed to prompt session';
     return c.json({ error: message }, 500);
@@ -199,7 +230,7 @@ sessionRoutes.delete(`${BASE}/:sessionId`, async (c) => {
 
   try {
     await Session.delete(projectId, artifactDirId, sessionId);
-    return c.json({ ok: true, sessionId, deleted: true });
+    return c.json<DeleteSessionResponse>({ ok: true, sessionId, deleted: true });
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Failed to delete session';
     return c.json({ error: message }, 500);
@@ -213,7 +244,20 @@ sessionRoutes.delete(`${BASE}/:sessionId`, async (c) => {
 /** POST /api/.../sessions/:sessionId/generate-name — Auto-generate session name via LLM */
 sessionRoutes.post(`${BASE}/:sessionId/generate-name`, async (c) => {
   const { projectId, artifactDirId, sessionId } = c.req.param();
-  const body = await c.req.json<{ query: string }>().catch(() => undefined);
+  const rawBody = await readJsonBody(c);
+  if (rawBody !== undefined) {
+    const validation = validateSchema(
+      c,
+      GenerateSessionNameRequestSchema,
+      rawBody,
+      'Invalid request body'
+    );
+    if (!validation.ok) {
+      return validation.response;
+    }
+  }
+
+  const body = rawBody as { query?: string } | undefined;
 
   const query = typeof body?.query === 'string' ? body.query.trim() : '';
   if (!query) {
@@ -223,7 +267,7 @@ sessionRoutes.post(`${BASE}/:sessionId/generate-name`, async (c) => {
   try {
     const session = await Session.getById(projectId, artifactDirId, sessionId);
     const sessionName = await session.generateName(query);
-    return c.json({ ok: true, sessionId, sessionName });
+    return c.json<SessionNameResponse>({ ok: true, sessionId, sessionName });
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Failed to generate name';
     return c.json({ error: message }, 500);
@@ -233,7 +277,20 @@ sessionRoutes.post(`${BASE}/:sessionId/generate-name`, async (c) => {
 /** PATCH /api/.../sessions/:sessionId/name — Manually update session name */
 sessionRoutes.patch(`${BASE}/:sessionId/name`, async (c) => {
   const { projectId, artifactDirId, sessionId } = c.req.param();
-  const body = await c.req.json<{ name: string }>().catch(() => undefined);
+  const rawBody = await readJsonBody(c);
+  if (rawBody !== undefined) {
+    const validation = validateSchema(
+      c,
+      RenameSessionRequestSchema,
+      rawBody,
+      'Invalid request body'
+    );
+    if (!validation.ok) {
+      return validation.response;
+    }
+  }
+
+  const body = rawBody as { name?: string } | undefined;
 
   const name = typeof body?.name === 'string' ? body.name.trim() : '';
   if (!name) {
@@ -243,7 +300,7 @@ sessionRoutes.patch(`${BASE}/:sessionId/name`, async (c) => {
   try {
     const session = await Session.getById(projectId, artifactDirId, sessionId);
     await session.updateName(name);
-    return c.json({ ok: true, sessionId, sessionName: name });
+    return c.json<SessionNameResponse>({ ok: true, sessionId, sessionName: name });
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Failed to update session name';
     return c.json({ error: message }, 500);
@@ -401,10 +458,10 @@ async function startSessionRun(
   });
 
   if (started.status === 'already_running') {
-    return c.json(
+    return c.json<StreamConflictResponse>(
       {
         error: 'A stream is already running for this session.',
-        liveRun: started.run.summary,
+        liveRun: toLiveRunSummaryDto(started.run.summary),
       },
       409
     );
@@ -416,7 +473,20 @@ async function startSessionRun(
 /** POST /api/.../sessions/:sessionId/stream — Stream a conversation turn via SSE */
 sessionRoutes.post(`${BASE}/:sessionId/stream`, async (c) => {
   const { projectId, artifactDirId, sessionId } = c.req.param();
-  const body = await c.req.json<SessionTurnBody>().catch(() => undefined);
+  const rawBody = await readJsonBody(c);
+  if (rawBody !== undefined) {
+    const validation = validateSchema(
+      c,
+      SessionPromptRequestSchema,
+      rawBody,
+      'Invalid request body'
+    );
+    if (!validation.ok) {
+      return validation.response;
+    }
+  }
+
+  const body = rawBody as SessionPromptRequest | undefined;
   const resolvedPromptInput = resolvePromptInput(body);
   if ('error' in resolvedPromptInput) {
     return c.json({ error: resolvedPromptInput.error }, 400);
@@ -445,7 +515,20 @@ sessionRoutes.post(`${BASE}/:sessionId/stream`, async (c) => {
 /** POST /api/.../sessions/:sessionId/messages/:nodeId/retry/stream — Retry from a user message */
 sessionRoutes.post(`${BASE}/:sessionId/messages/:nodeId/retry/stream`, async (c) => {
   const { projectId, artifactDirId, sessionId, nodeId } = c.req.param();
-  const body = await c.req.json<SessionTurnBody>().catch(() => undefined);
+  const rawBody = await readJsonBody(c);
+  if (rawBody !== undefined) {
+    const validation = validateSchema(
+      c,
+      SessionTurnSettingsRequestSchema,
+      rawBody,
+      'Invalid request body'
+    );
+    if (!validation.ok) {
+      return validation.response;
+    }
+  }
+
+  const body = rawBody as SessionTurnSettingsRequest | undefined;
   const resolvedTurnSettings = resolveTurnSettings(body);
   if ('error' in resolvedTurnSettings) {
     return c.json({ error: resolvedTurnSettings.error }, 400);
@@ -478,7 +561,20 @@ sessionRoutes.post(`${BASE}/:sessionId/messages/:nodeId/retry/stream`, async (c)
 /** POST /api/.../sessions/:sessionId/messages/:nodeId/edit/stream — Edit from a user message */
 sessionRoutes.post(`${BASE}/:sessionId/messages/:nodeId/edit/stream`, async (c) => {
   const { projectId, artifactDirId, sessionId, nodeId } = c.req.param();
-  const body = await c.req.json<SessionTurnBody>().catch(() => undefined);
+  const rawBody = await readJsonBody(c);
+  if (rawBody !== undefined) {
+    const validation = validateSchema(
+      c,
+      SessionPromptRequestSchema,
+      rawBody,
+      'Invalid request body'
+    );
+    if (!validation.ok) {
+      return validation.response;
+    }
+  }
+
+  const body = rawBody as SessionPromptRequest | undefined;
   const resolvedPromptInput = resolvePromptInput(body);
   if ('error' in resolvedPromptInput) {
     return c.json({ error: resolvedPromptInput.error }, 400);
@@ -512,7 +608,18 @@ sessionRoutes.post(`${BASE}/:sessionId/messages/:nodeId/edit/stream`, async (c) 
 sessionRoutes.get(`${BASE}/:sessionId/runs/:runId/stream`, async (c) => {
   const { projectId, artifactDirId, sessionId, runId } = c.req.param();
   const sessionKey = getSessionRunKey(projectId, artifactDirId, sessionId);
-  const afterSeq = Number.parseInt(c.req.query('afterSeq') ?? '0', 10);
+  const queryValidation = validateSchema(
+    c,
+    AttachSessionRunQuerySchema,
+    c.req.query(),
+    'Invalid query parameters'
+  );
+  if (!queryValidation.ok) {
+    return queryValidation.response;
+  }
+
+  const query = queryValidation.value as AttachSessionRunQuery;
+  const afterSeq = Number.parseInt(query.afterSeq ?? '0', 10);
   const safeAfterSeq = Number.isFinite(afterSeq) && afterSeq > 0 ? afterSeq : 0;
   const run = sessionRunRegistry.getRun(sessionKey, runId);
 
@@ -534,17 +641,17 @@ sessionRoutes.post(`${BASE}/:sessionId/runs/:runId/cancel`, async (c) => {
   }
 
   if (!run.isRunning()) {
-    return c.json(
+    return c.json<StreamConflictResponse>(
       {
         error: 'Run is not active.',
-        liveRun: run.summary,
+        liveRun: toLiveRunSummaryDto(run.summary),
       },
       409
     );
   }
 
   sessionRunRegistry.cancelRun(sessionKey, runId);
-  return c.json({
+  return c.json<CancelSessionRunResponse>({
     ok: true,
     sessionId,
     runId,

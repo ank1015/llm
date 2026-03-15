@@ -1,6 +1,42 @@
+import {
+  ArtifactExplorerQuerySchema,
+  ArtifactFileQuerySchema,
+  ArtifactRawFileQuerySchema,
+  CreateArtifactDirRequestSchema,
+  DeleteArtifactPathQuerySchema,
+  InstallArtifactSkillRequestSchema,
+  RenameArtifactDirRequestSchema,
+  RenameArtifactPathRequestSchema,
+} from '@ank1015/llm-app-contracts';
 import { Hono } from 'hono';
 
 import { ArtifactDir } from '../core/index.js';
+import {
+  toArtifactDirDto,
+  toDeleteArtifactSkillResponse,
+  toInstalledSkillDto,
+} from '../http/contracts.js';
+import { readJsonBody, validateSchema } from '../http/validation.js';
+
+import type {
+  ArtifactDirDeleteResponse,
+  ArtifactDirDto,
+  ArtifactExplorerQuery,
+  ArtifactExplorerResult,
+  ArtifactFileDto,
+  ArtifactFileQuery,
+  ArtifactFilesListResponse,
+  ArtifactRawFileQuery,
+  CreateArtifactDirRequest,
+  DeleteArtifactPathQuery,
+  DeleteArtifactPathResponse,
+  DeleteArtifactSkillResponse,
+  InstallArtifactSkillRequest,
+  InstalledSkillDto,
+  RenameArtifactDirRequest,
+  RenameArtifactPathRequest,
+  RenameArtifactPathResponse,
+} from '@ank1015/llm-app-contracts';
 
 const BASE = '/projects/:projectId/artifacts';
 const NOT_FOUND_MSG = 'Artifact directory not found';
@@ -15,18 +51,32 @@ export const artifactDirRoutes = new Hono();
 /** POST /api/projects/:projectId/artifacts — Create a new artifact directory */
 artifactDirRoutes.post(BASE, async (c) => {
   const { projectId } = c.req.param();
-  const body = await c.req.json<{ name: string; description?: string }>();
+  const rawBody = await readJsonBody(c);
+  if (rawBody !== undefined) {
+    const validation = validateSchema(
+      c,
+      CreateArtifactDirRequestSchema,
+      rawBody,
+      'Invalid request body'
+    );
+    if (!validation.ok) {
+      return validation.response;
+    }
+  }
 
-  if (!body.name) {
+  const body = (rawBody ?? {}) as CreateArtifactDirRequest;
+  const name = body.name?.trim() ?? '';
+
+  if (!name) {
     return c.json({ error: 'name is required' }, 400);
   }
 
   try {
-    const input = { name: body.name } as { name: string; description?: string };
-    if (body.description) input.description = body.description;
+    const input = { name } as { name: string; description?: string };
+    if (body.description?.trim()) input.description = body.description.trim();
     const dir = await ArtifactDir.create(projectId, input);
     const metadata = await dir.getMetadata();
-    return c.json(metadata, 201);
+    return c.json<ArtifactDirDto>(toArtifactDirDto(metadata), 201);
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Failed to create artifact directory';
     return c.json({ error: message }, 409);
@@ -37,7 +87,7 @@ artifactDirRoutes.post(BASE, async (c) => {
 artifactDirRoutes.get(BASE, async (c) => {
   const { projectId } = c.req.param();
   const dirs = await ArtifactDir.list(projectId);
-  return c.json(dirs);
+  return c.json<ArtifactDirDto[]>(dirs.map(toArtifactDirDto));
 });
 
 /** GET /api/projects/:projectId/artifacts/:artifactDirId — Get a single artifact directory */
@@ -47,7 +97,7 @@ artifactDirRoutes.get(`${BASE}/:artifactDirId`, async (c) => {
   try {
     const dir = await ArtifactDir.getById(projectId, artifactDirId);
     const metadata = await dir.getMetadata();
-    return c.json(metadata);
+    return c.json<ArtifactDirDto>(toArtifactDirDto(metadata));
   } catch (e) {
     const message = e instanceof Error ? e.message : NOT_FOUND_MSG;
     return c.json({ error: message }, 404);
@@ -57,16 +107,30 @@ artifactDirRoutes.get(`${BASE}/:artifactDirId`, async (c) => {
 /** PATCH /api/projects/:projectId/artifacts/:artifactDirId/name — Rename an artifact directory */
 artifactDirRoutes.patch(`${BASE}/:artifactDirId/name`, async (c) => {
   const { projectId, artifactDirId } = c.req.param();
-  const body = await c.req.json<{ name?: string }>();
+  const rawBody = await readJsonBody(c);
+  if (rawBody !== undefined) {
+    const validation = validateSchema(
+      c,
+      RenameArtifactDirRequestSchema,
+      rawBody,
+      'Invalid request body'
+    );
+    if (!validation.ok) {
+      return validation.response;
+    }
+  }
 
-  if (!body.name?.trim()) {
+  const body = (rawBody ?? {}) as RenameArtifactDirRequest;
+  const name = body.name?.trim() ?? '';
+
+  if (!name) {
     return c.json({ error: 'name is required' }, 400);
   }
 
   try {
     const dir = await ArtifactDir.getById(projectId, artifactDirId);
-    const metadata = await dir.rename(body.name);
-    return c.json(metadata);
+    const metadata = await dir.rename(name);
+    return c.json<ArtifactDirDto>(toArtifactDirDto(metadata));
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Failed to rename artifact directory';
     const status = message.includes('not found') ? 404 : 500;
@@ -81,7 +145,7 @@ artifactDirRoutes.get(`${BASE}/:artifactDirId/files`, async (c) => {
   try {
     const dir = await ArtifactDir.getById(projectId, artifactDirId);
     const files = await dir.listArtifacts();
-    return c.json(files);
+    return c.json<ArtifactFilesListResponse>(files);
   } catch (e) {
     const message = e instanceof Error ? e.message : NOT_FOUND_MSG;
     return c.json({ error: message }, 404);
@@ -95,7 +159,7 @@ artifactDirRoutes.get(`${BASE}/:artifactDirId/skills`, async (c) => {
   try {
     const dir = await ArtifactDir.getById(projectId, artifactDirId);
     const skills = await dir.listInstalledSkills();
-    return c.json(skills);
+    return c.json<InstalledSkillDto[]>(skills.map(toInstalledSkillDto));
   } catch (e) {
     const message = e instanceof Error ? e.message : NOT_FOUND_MSG;
     return c.json({ error: message }, 404);
@@ -105,12 +169,23 @@ artifactDirRoutes.get(`${BASE}/:artifactDirId/skills`, async (c) => {
 /** GET /api/projects/:projectId/artifacts/:artifactDirId/explorer — List one directory level */
 artifactDirRoutes.get(`${BASE}/:artifactDirId/explorer`, async (c) => {
   const { projectId, artifactDirId } = c.req.param();
-  const path = c.req.query('path') ?? '';
+  const queryValidation = validateSchema(
+    c,
+    ArtifactExplorerQuerySchema,
+    c.req.query(),
+    'Invalid query parameters'
+  );
+  if (!queryValidation.ok) {
+    return queryValidation.response;
+  }
+
+  const query = queryValidation.value as ArtifactExplorerQuery;
+  const path = query.path ?? '';
 
   try {
     const dir = await ArtifactDir.getById(projectId, artifactDirId);
     const listing = await dir.listArtifactEntries(path);
-    return c.json(listing);
+    return c.json<ArtifactExplorerResult>(listing);
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Failed to list artifact explorer entries';
     const status = classifyExplorerErrorStatus(message);
@@ -121,8 +196,19 @@ artifactDirRoutes.get(`${BASE}/:artifactDirId/explorer`, async (c) => {
 /** GET /api/projects/:projectId/artifacts/:artifactDirId/file?path=... — Read a file */
 artifactDirRoutes.get(`${BASE}/:artifactDirId/file`, async (c) => {
   const { projectId, artifactDirId } = c.req.param();
-  const path = c.req.query('path');
-  const maxBytesRaw = c.req.query('maxBytes');
+  const queryValidation = validateSchema(
+    c,
+    ArtifactFileQuerySchema,
+    c.req.query(),
+    'Invalid query parameters'
+  );
+  if (!queryValidation.ok) {
+    return queryValidation.response;
+  }
+
+  const query = queryValidation.value as ArtifactFileQuery;
+  const path = query.path;
+  const maxBytesRaw = query.maxBytes;
 
   if (!path || !path.trim()) {
     return c.json({ error: PATH_QUERY_REQUIRED_MESSAGE }, 400);
@@ -140,7 +226,7 @@ artifactDirRoutes.get(`${BASE}/:artifactDirId/file`, async (c) => {
   try {
     const dir = await ArtifactDir.getById(projectId, artifactDirId);
     const file = await dir.readArtifactFile(path, maxBytes);
-    return c.json(file);
+    return c.json<ArtifactFileDto>(file);
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Failed to read artifact file';
     const status = classifyFileReadErrorStatus(message);
@@ -151,7 +237,18 @@ artifactDirRoutes.get(`${BASE}/:artifactDirId/file`, async (c) => {
 /** GET /api/projects/:projectId/artifacts/:artifactDirId/file/raw?path=... — Read raw file bytes */
 artifactDirRoutes.get(`${BASE}/:artifactDirId/file/raw`, async (c) => {
   const { projectId, artifactDirId } = c.req.param();
-  const path = c.req.query('path');
+  const queryValidation = validateSchema(
+    c,
+    ArtifactRawFileQuerySchema,
+    c.req.query(),
+    'Invalid query parameters'
+  );
+  if (!queryValidation.ok) {
+    return queryValidation.response;
+  }
+
+  const query = queryValidation.value as ArtifactRawFileQuery;
+  const path = query.path;
 
   if (!path || !path.trim()) {
     return c.json({ error: PATH_QUERY_REQUIRED_MESSAGE }, 400);
@@ -179,7 +276,20 @@ artifactDirRoutes.get(`${BASE}/:artifactDirId/file/raw`, async (c) => {
 /** POST /api/projects/:projectId/artifacts/:artifactDirId/skills — Install a bundled skill */
 artifactDirRoutes.post(`${BASE}/:artifactDirId/skills`, async (c) => {
   const { projectId, artifactDirId } = c.req.param();
-  const body = await c.req.json<{ skillName?: string }>().catch(() => undefined);
+  const rawBody = await readJsonBody(c);
+  if (rawBody !== undefined) {
+    const validation = validateSchema(
+      c,
+      InstallArtifactSkillRequestSchema,
+      rawBody,
+      'Invalid request body'
+    );
+    if (!validation.ok) {
+      return validation.response;
+    }
+  }
+
+  const body = rawBody as InstallArtifactSkillRequest | undefined;
   const skillName = body?.skillName?.trim() ?? '';
 
   if (!skillName) {
@@ -189,7 +299,7 @@ artifactDirRoutes.post(`${BASE}/:artifactDirId/skills`, async (c) => {
   try {
     const dir = await ArtifactDir.getById(projectId, artifactDirId);
     const skill = await dir.installSkill(skillName);
-    return c.json(skill);
+    return c.json<InstalledSkillDto>(toInstalledSkillDto(skill));
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Failed to install skill';
     const status = classifySkillErrorStatus(message);
@@ -208,8 +318,8 @@ artifactDirRoutes.delete(`${BASE}/:artifactDirId/skills/:skillName`, async (c) =
 
   try {
     const dir = await ArtifactDir.getById(projectId, artifactDirId);
-    const result = await dir.deleteSkill(skillName);
-    return c.json(result);
+    await dir.deleteSkill(skillName);
+    return c.json<DeleteArtifactSkillResponse>(toDeleteArtifactSkillResponse(skillName));
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Failed to delete skill';
     const status = classifySkillErrorStatus(message);
@@ -220,7 +330,20 @@ artifactDirRoutes.delete(`${BASE}/:artifactDirId/skills/:skillName`, async (c) =
 /** PATCH /api/projects/:projectId/artifacts/:artifactDirId/path/rename — Rename a file or directory */
 artifactDirRoutes.patch(`${BASE}/:artifactDirId/path/rename`, async (c) => {
   const { projectId, artifactDirId } = c.req.param();
-  const body = await c.req.json<{ path?: string; newName?: string }>();
+  const rawBody = await readJsonBody(c);
+  if (rawBody !== undefined) {
+    const validation = validateSchema(
+      c,
+      RenameArtifactPathRequestSchema,
+      rawBody,
+      'Invalid request body'
+    );
+    if (!validation.ok) {
+      return validation.response;
+    }
+  }
+
+  const body = (rawBody ?? {}) as RenameArtifactPathRequest;
   const path = body.path?.trim() ?? '';
   const newName = body.newName?.trim() ?? '';
 
@@ -234,7 +357,7 @@ artifactDirRoutes.patch(`${BASE}/:artifactDirId/path/rename`, async (c) => {
   try {
     const dir = await ArtifactDir.getById(projectId, artifactDirId);
     const result = await dir.renameArtifactPath(path, newName);
-    return c.json({
+    return c.json<RenameArtifactPathResponse>({
       ok: true,
       ...result,
     });
@@ -248,7 +371,18 @@ artifactDirRoutes.patch(`${BASE}/:artifactDirId/path/rename`, async (c) => {
 /** DELETE /api/projects/:projectId/artifacts/:artifactDirId/path?path=... — Delete a file or directory */
 artifactDirRoutes.delete(`${BASE}/:artifactDirId/path`, async (c) => {
   const { projectId, artifactDirId } = c.req.param();
-  const path = c.req.query('path')?.trim();
+  const queryValidation = validateSchema(
+    c,
+    DeleteArtifactPathQuerySchema,
+    c.req.query(),
+    'Invalid query parameters'
+  );
+  if (!queryValidation.ok) {
+    return queryValidation.response;
+  }
+
+  const query = queryValidation.value as DeleteArtifactPathQuery;
+  const path = query.path?.trim();
 
   if (!path) {
     return c.json({ error: 'path query parameter is required' }, 400);
@@ -257,7 +391,7 @@ artifactDirRoutes.delete(`${BASE}/:artifactDirId/path`, async (c) => {
   try {
     const dir = await ArtifactDir.getById(projectId, artifactDirId);
     const result = await dir.deleteArtifactPath(path);
-    return c.json({
+    return c.json<DeleteArtifactPathResponse>({
       ok: true,
       deleted: true,
       ...result,
@@ -276,7 +410,7 @@ artifactDirRoutes.delete(`${BASE}/:artifactDirId`, async (c) => {
   try {
     const dir = await ArtifactDir.getById(projectId, artifactDirId);
     await dir.delete();
-    return c.json({ deleted: true });
+    return c.json<ArtifactDirDeleteResponse>({ deleted: true });
   } catch (e) {
     const message = e instanceof Error ? e.message : NOT_FOUND_MSG;
     return c.json({ error: message }, 404);

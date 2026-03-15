@@ -15,6 +15,13 @@ function createBundledSkillResult(skillName: string) {
   return {
     name: skillName,
     description: getSkillDescription(skillName),
+    helperProject:
+      skillName === 'ai-images'
+        ? {
+            runtime: 'typescript' as const,
+            package: '@ank1015/llm-agents' as const,
+          }
+        : undefined,
     directory: join('/mock/skills', skillName),
     path: join('/mock/skills', skillName, 'SKILL.md'),
   };
@@ -32,6 +39,7 @@ function createInstalledSkillResult(skillName: string, artifactDir: string) {
     path: join(directory, 'SKILL.md'),
     name: bundled.name,
     description: bundled.description,
+    ...(bundled.helperProject ? { helperProject: bundled.helperProject } : {}),
     artifactDir,
     maxDir,
     skillsDir,

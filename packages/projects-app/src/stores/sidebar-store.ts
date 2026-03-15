@@ -2,19 +2,19 @@
 
 import { create } from 'zustand';
 
-import type { ArtifactDirWithSessions, OverviewSession } from '@/lib/client-api';
+import type { ArtifactDirOverviewDto, SessionSummaryDto } from '@/lib/client-api';
 
 type SidebarStoreState = {
   projectName: string | null;
-  artifactDirs: ArtifactDirWithSessions[];
+  artifactDirs: ArtifactDirOverviewDto[];
   isLoading: boolean;
 
   setProjectName: (name: string) => void;
-  setArtifactDirs: (dirs: ArtifactDirWithSessions[]) => void;
+  setArtifactDirs: (dirs: ArtifactDirOverviewDto[]) => void;
   setIsLoading: (loading: boolean) => void;
 
   /** Optimistically insert a new session into an artifact's session list. */
-  addSession: (artifactId: string, session: OverviewSession) => void;
+  addSession: (artifactId: string, session: SessionSummaryDto) => void;
 
   /** Optimistically rename a session across all artifacts. */
   renameSession: (sessionId: string, sessionName: string) => void;

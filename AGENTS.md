@@ -31,6 +31,7 @@ pnpm start:chat-app   # Start chat app
 ```text
 packages/
   types/              # @ank1015/llm-types - Shared contracts and provider type maps
+  app-contracts/      # @ank1015/llm-app-contracts - Shared HTTP DTOs and schemas for server/app clients
   core/               # @ank1015/llm-core - Stateless runtime built on top of types
   sdk/                # @ank1015/llm-sdk - Opinionated wrappers over core
   sdk-adapters/       # @ank1015/llm-sdk-adapters - Node keys/session adapter implementations
@@ -48,17 +49,19 @@ Bottom up, these are the currently documented base layers:
 
 1. `@ank1015/llm-types`
    Shared contracts package for the monorepo. It defines the normalized message/content model, provider option and native-response type maps, tool/context contracts, agent contracts, adapter/session contracts, and shared errors.
-2. `@ank1015/llm-core`
+2. `@ank1015/llm-app-contracts`
+   Shared HTTP contract layer for the app/server boundary. It defines the public DTOs, request/query schemas, and SSE payload shapes used between `@ank1015/llm-server` and the app clients.
+3. `@ank1015/llm-core`
    Stateless runtime built on top of `@ank1015/llm-types`. It owns the model catalog, provider registry, provider implementations, central `stream()` / `complete()` dispatch, shared runtime utilities, and the stateless agent loop.
-3. `@ank1015/llm-sdk`
+4. `@ank1015/llm-sdk`
    Opinionated SDK layer on top of `core`. It adds shared credential resolution, stateful `Conversation` flows, and `SessionManager` helpers while staying runtime-neutral and leaving concrete storage implementations out of the package.
-4. `@ank1015/llm-sdk-adapters`
+5. `@ank1015/llm-sdk-adapters`
    Concrete Node-oriented adapters used by app/server layers. It currently provides file-system and in-memory implementations for keys and sessions, and no longer owns usage tracking or key-management UI code.
-5. `@ank1015/llm-agents`
+6. `@ank1015/llm-agents`
    Node-only general-purpose agent package built on top of the sdk stack. It owns the monorepo's filesystem/shell tool layer, system prompt construction, bundled skill runtime, helper-backed skills like `ai-images`, and the local CLI runner.
-6. `@ank1015/llm-extension`
+7. `@ank1015/llm-extension`
    Independent Chrome RPC package. It provides the Manifest V3 extension, native messaging host, TCP bridge, and Node client used to call Chrome APIs and debugger helpers from local processes.
-7. `@ank1015/llm-server`
+8. `@ank1015/llm-server`
    Node-only Hono orchestration server built on top of the SDK and agents layers. It manages projects, artifact directories, agent sessions, bundled skills, and SSE-backed live session runs over a filesystem-backed workspace model.
 
 More package summaries can be added here as the stack above `types` and `core` is documented.
@@ -82,6 +85,7 @@ More package summaries can be added here as the stack above `types` and `core` i
 ## Package Guide
 
 - [packages/types/AGENTS.md](packages/types/AGENTS.md) - Shared contracts layer
+- [packages/app-contracts/AGENTS.md](packages/app-contracts/AGENTS.md) - Shared HTTP DTOs and TypeBox schemas for server/app clients
 - [packages/core/AGENTS.md](packages/core/AGENTS.md) - Stateless runtime layer
 - [packages/sdk/AGENTS.md](packages/sdk/AGENTS.md) - Runtime-neutral SDK wrappers, credential resolution, and session helpers
 - [packages/sdk-adapters/AGENTS.md](packages/sdk-adapters/AGENTS.md) - Concrete Node file-system and in-memory keys/session adapters

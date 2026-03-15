@@ -19,7 +19,7 @@ Request body:
 
 Responses:
 
-- `201` — `ArtifactDirMetadata`
+- `201` — `ArtifactDirDto`
 - `400` — `name is required`
 - `409` — artifact already exists or project setup failed
 
@@ -29,7 +29,7 @@ List artifact directories for a project.
 
 Responses:
 
-- `200` — array of `ArtifactDirMetadata`
+- `200` — array of `ArtifactDirDto`
 
 ## `GET /api/projects/:projectId/artifacts/:artifactDirId`
 
@@ -37,7 +37,7 @@ Fetch one artifact directory.
 
 Responses:
 
-- `200` — `ArtifactDirMetadata`
+- `200` — `ArtifactDirDto`
 - `404` — artifact not found
 
 ## `PATCH /api/projects/:projectId/artifacts/:artifactDirId/name`
@@ -54,7 +54,7 @@ Request body:
 
 Responses:
 
-- `200` — updated `ArtifactDirMetadata`
+- `200` — updated `ArtifactDirDto`
 - `400` — missing name
 - `404` — artifact not found
 
@@ -121,8 +121,26 @@ List installed artifact-local skills.
 
 Responses:
 
-- `200` — array of installed skill entries
+- `200` — array of `InstalledSkillDto`
 - `404` — artifact not found
+
+`InstalledSkillDto` only exposes:
+
+```json
+{
+  "name": "ai-images",
+  "description": "Create brand-new images or edit existing images with state-of-the-art image generation models.",
+  "helperProject": {
+    "runtime": "typescript",
+    "package": "@ank1015/llm-agents"
+  }
+}
+```
+
+Notes:
+
+- local filesystem paths are intentionally hidden
+- helper-backed skills may include `helperProject` when the skill prepares `.max/temp`
 
 ## `POST /api/projects/:projectId/artifacts/:artifactDirId/skills`
 
@@ -138,7 +156,7 @@ Request body:
 
 Responses:
 
-- `200` — installed skill metadata
+- `200` — installed `InstalledSkillDto`
 - `400` — missing `skillName` or unknown bundled skill
 - `404` — artifact not found
 
@@ -148,7 +166,7 @@ Delete one installed artifact-local skill.
 
 Responses:
 
-- `200` — deleted skill metadata
+- `200` — `{ "ok": true, "skillName": "...", "deleted": true }`
 - `400` — missing `skillName`
 - `404` — artifact or installed skill not found
 

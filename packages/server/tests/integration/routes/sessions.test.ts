@@ -2,6 +2,19 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import {
+  CancelSessionRunResponseSchema,
+  SessionMessagesResponseSchema,
+  SessionMetadataDtoSchema,
+  SessionNameResponseSchema,
+  SessionPromptResponseSchema,
+  SessionSummaryDtoSchema,
+  SessionTreeResponseSchema,
+  StreamConflictResponseSchema,
+  StreamDoneEventDataSchema,
+  StreamReadyEventDataSchema,
+} from '@ank1015/llm-app-contracts';
+import { Value } from '@sinclair/typebox/value';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 import { setConfig } from '../../../src/core/config.js';
@@ -139,6 +152,7 @@ describe('Session Routes', () => {
 
       expect(res.status).toBe(201);
       const body = await res.json();
+      expect(Value.Check(SessionMetadataDtoSchema, body)).toBe(true);
       expect(body.id).toBeDefined();
       expect(body.name).toBe('My Session');
       expect(body.api).toBe('anthropic');
@@ -169,7 +183,8 @@ describe('Session Routes', () => {
       const res = await get(BASE);
 
       expect(res.status).toBe(200);
-      expect(await res.json()).toEqual([]);
+      const body = await res.json();
+      expect(body).toEqual([]);
     });
 
     it('should list created sessions', async () => {
@@ -181,6 +196,11 @@ describe('Session Routes', () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body).toHaveLength(2);
+      expect(body.every((session: unknown) => Value.Check(SessionSummaryDtoSchema, session))).toBe(
+        true
+      );
+      expect(body[0]).not.toHaveProperty('filePath');
+      expect(body[0]).not.toHaveProperty('branches');
     });
   });
 
@@ -192,6 +212,7 @@ describe('Session Routes', () => {
 
       expect(res.status).toBe(200);
       const body = await res.json();
+      expect(Value.Check(SessionMetadataDtoSchema, body)).toBe(true);
       expect(body.id).toBe(created.id);
       expect(body.name).toBe('Fetch Me');
       expect(body.api).toBe('anthropic');
@@ -212,7 +233,9 @@ describe('Session Routes', () => {
       const res = await get(`${BASE}/${created.id}/messages`);
 
       expect(res.status).toBe(200);
-      expect(await res.json()).toEqual([]);
+      const body = await res.json();
+      expect(Value.Check(SessionMessagesResponseSchema, body)).toBe(true);
+      expect(body).toEqual([]);
     });
 
     it('should return 404 for nonexistent session', async () => {
@@ -337,6 +360,7 @@ describe('Session Routes', () => {
 
       expect(res.status).toBe(200);
       const body = await res.json();
+      expect(Value.Check(SessionTreeResponseSchema, body)).toBe(true);
       expect(body.nodes).toHaveLength(6);
       expect(body.activeBranch).not.toBe('main');
 
@@ -377,6 +401,7 @@ describe('Session Routes', () => {
 
       expect(treeRes.status).toBe(200);
       const treeBody = await treeRes.json();
+      expect(Value.Check(SessionTreeResponseSchema, treeBody)).toBe(true);
       expect(treeBody.liveRun).toBeDefined();
       expect(treeBody.liveRun.status).toBe('running');
       expect(treeBody.liveRun.mode).toBe('prompt');
@@ -449,6 +474,7 @@ describe('Session Routes', () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body).toHaveLength(2);
+      expect(Value.Check(SessionPromptResponseSchema, body)).toBe(true);
       expect(body[0].role).toBe('user');
       expect(body[1].role).toBe('assistant');
     });
@@ -491,6 +517,7 @@ describe('Session Routes', () => {
 
       expect(res.status).toBe(200);
       const body = await res.json();
+      expect(Value.Check(SessionMessagesResponseSchema, body)).toBe(true);
       expect(body).toHaveLength(2);
       expect(body[0].message.role).toBe('user');
       expect(body[1].message.role).toBe('assistant');
@@ -811,6 +838,7 @@ describe('Session Routes', () => {
 
       // First event should be 'ready'
       expect(events[0]?.event).toBe('ready');
+      expect(Value.Check(StreamReadyEventDataSchema, events[0]?.data)).toBe(true);
       expect(events[0]?.data.ok).toBe(true);
       expect(events[0]?.data.sessionId).toBe(created.id);
       expect((events[0]?.data as { runId?: string }).runId).toBeDefined();
@@ -822,6 +850,7 @@ describe('Session Routes', () => {
       // Last event should be 'done'
       const doneEvent = events.find((e) => e.event === 'done');
       expect(doneEvent).toBeDefined();
+      expect(Value.Check(StreamDoneEventDataSchema, doneEvent?.data)).toBe(true);
       expect(doneEvent?.data.ok).toBe(true);
       expect(doneEvent?.data.messageCount).toBe(2);
       expect((doneEvent?.data as { status?: string }).status).toBe('completed');
@@ -885,9 +914,11 @@ describe('Session Routes', () => {
 
       const replayEvents = parseSseEvents(await attachRes.text());
       expect(replayEvents[0]?.event).toBe('ready');
+      expect(Value.Check(StreamReadyEventDataSchema, replayEvents[0]?.data)).toBe(true);
       expect(replayEvents.some((event) => event.event === 'agent_event')).toBe(true);
       expect(replayEvents.filter((event) => event.event === 'node_persisted')).toHaveLength(2);
       const doneEvent = replayEvents.find((event) => event.event === 'done');
+      expect(Value.Check(StreamDoneEventDataSchema, doneEvent?.data)).toBe(true);
       expect(doneEvent?.data).toMatchObject({
         ok: true,
         sessionId: created.id,
@@ -920,9 +951,13 @@ describe('Session Routes', () => {
 
       const cancelRes = await post(`${BASE}/${created.id}/runs/${runId}/cancel`, {});
       expect(cancelRes.status).toBe(200);
+      expect(Value.Check(CancelSessionRunResponseSchema, await cancelRes.clone().json())).toBe(
+        true
+      );
 
       const streamEvents = parseSseEvents(await streamRes.text());
       const doneEvent = streamEvents.find((event) => event.event === 'done');
+      expect(Value.Check(StreamDoneEventDataSchema, doneEvent?.data)).toBe(true);
       expect(doneEvent?.data).toMatchObject({
         ok: true,
         sessionId: created.id,
@@ -948,6 +983,7 @@ describe('Session Routes', () => {
 
       expect(duplicateRes.status).toBe(409);
       const duplicateBody = await duplicateRes.json();
+      expect(Value.Check(StreamConflictResponseSchema, duplicateBody)).toBe(true);
       expect(duplicateBody.error).toBe('A stream is already running for this session.');
       expect(duplicateBody.liveRun).toBeDefined();
       expect(duplicateBody.liveRun.status).toBe('running');
@@ -1125,6 +1161,7 @@ describe('Session Routes', () => {
       const events = parseSseEvents(await res.text());
       const doneEvent = events.find((event) => event.event === 'done');
       expect(doneEvent).toBeDefined();
+      expect(Value.Check(StreamDoneEventDataSchema, doneEvent?.data)).toBe(true);
 
       const historyRes = await get(`${BASE}/${created.id}/messages`);
       const history = await historyRes.json();
@@ -1218,6 +1255,7 @@ describe('Session Routes', () => {
       const events = parseSseEvents(await res.text());
       const doneEvent = events.find((event) => event.event === 'done');
       expect(doneEvent).toBeDefined();
+      expect(Value.Check(StreamDoneEventDataSchema, doneEvent?.data)).toBe(true);
 
       const historyRes = await get(`${BASE}/${created.id}/messages`);
       const history = await historyRes.json();
@@ -1388,6 +1426,7 @@ describe('Session Routes', () => {
       const events = parseSseEvents(await res.text());
       const doneEvent = events.find((event) => event.event === 'done');
       expect(doneEvent).toBeDefined();
+      expect(Value.Check(StreamDoneEventDataSchema, doneEvent?.data)).toBe(true);
 
       const historyRes = await get(`${BASE}/${created.id}/messages`);
       const history = await historyRes.json();
@@ -1473,6 +1512,7 @@ describe('Session Routes', () => {
 
       expect(res.status).toBe(200);
       const body = await res.json();
+      expect(Value.Check(SessionNameResponseSchema, body)).toBe(true);
       expect(body.ok).toBe(true);
       expect(body.sessionName).toBe('New Name');
 
@@ -1524,6 +1564,7 @@ describe('Session Routes', () => {
 
       expect(res.status).toBe(200);
       const body = await res.json();
+      expect(Value.Check(SessionNameResponseSchema, body)).toBe(true);
       expect(body.ok).toBe(true);
       expect(body.sessionName).toBe('Project Architecture Discussion');
 
@@ -1544,6 +1585,7 @@ describe('Session Routes', () => {
 
       expect(res.status).toBe(200);
       const body = await res.json();
+      expect(Value.Check(SessionNameResponseSchema, body)).toBe(true);
       expect(body.ok).toBe(true);
       // Fallback should use first 50 chars of query
       expect(body.sessionName).toBe('Help me design a web app architecture');

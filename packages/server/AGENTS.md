@@ -47,6 +47,7 @@ Node-only Hono orchestration server for projects, artifact directories, agent se
 ## Package Role
 
 - Uses `@ank1015/llm-agents` for tools, prompt construction, and bundled skill installation
+- Uses `@ank1015/llm-app-contracts` for public HTTP DTOs, request/query schemas, and SSE payload contracts
 - Uses `@ank1015/llm-sdk` for conversations, models, and message/session types
 - Uses `@ank1015/llm-sdk-adapters` for file-backed keys and session persistence
 - Exposes a stable HTTP API for project/artifact/session orchestration and SSE run streaming

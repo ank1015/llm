@@ -16,7 +16,7 @@ import dynamic from 'next/dynamic';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import type { ArtifactExplorerResult, ArtifactFileResult } from '@/lib/client-api';
+import type { ArtifactExplorerResult, ArtifactFileDto } from '@/lib/client-api';
 import type { ReactNode } from 'react';
 
 import { ArtifactMarkdownPreview } from '@/components/artifact-markdown-preview';
@@ -40,7 +40,7 @@ import { cn } from '@/lib/utils';
 import { useArtifactFilesStore, useSidebarStore, useUiStore } from '@/stores';
 
 const EMPTY_DIRECTORY_MAP: Record<string, ArtifactExplorerResult> = {};
-const EMPTY_FILE_MAP: Record<string, ArtifactFileResult> = {};
+const EMPTY_FILE_MAP: Record<string, ArtifactFileDto> = {};
 const EMPTY_LOADING_MAP: Record<string, boolean> = {};
 const EMPTY_ERROR_MAP: Record<string, string | null> = {};
 const ROOT_EXPANDED: Record<string, boolean> = { '': true };
@@ -142,7 +142,7 @@ function getPathExtension(path: string): string {
   return base.slice(dotIndex + 1).toLowerCase();
 }
 
-function getViewerKind(path: string, file: ArtifactFileResult | null): ViewerKind {
+function getViewerKind(path: string, file: ArtifactFileDto | null): ViewerKind {
   const extension = getPathExtension(path);
   if (IMAGE_EXTENSIONS.has(extension)) return 'image';
   if (PDF_EXTENSIONS.has(extension)) return 'pdf';

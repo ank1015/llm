@@ -16,9 +16,26 @@ Request body:
 
 Responses:
 
-- `201` — returns `ProjectMetadata`
+- `201` — returns `ProjectDto`
 - `400` — `name is required`
 - `409` — project already exists
+
+`ProjectDto`:
+
+```json
+{
+  "id": "my-project",
+  "name": "My Project",
+  "description": "Optional description",
+  "projectImg": "https://example.com/project.png",
+  "createdAt": "2026-03-15T00:00:00.000Z"
+}
+```
+
+Notes:
+
+- `projectPath` is intentionally not exposed
+- `updatedAt` is not part of the public project DTO
 
 ## `GET /api/projects`
 
@@ -26,7 +43,7 @@ List all projects.
 
 Responses:
 
-- `200` — array of `ProjectMetadata`
+- `200` — array of `ProjectDto`
 
 ## `PATCH /api/projects/project-img`
 
@@ -49,7 +66,7 @@ Rules:
 
 Responses:
 
-- `200` — updated `ProjectMetadata`
+- `200` — updated `ProjectDto`
 - `400` — missing identifier or `projectImg`
 - `404` — project not found
 
@@ -59,7 +76,7 @@ Fetch one project.
 
 Responses:
 
-- `200` — `ProjectMetadata`
+- `200` — `ProjectDto`
 - `404` — project not found
 
 ## `GET /api/projects/:projectId/overview`
@@ -70,16 +87,43 @@ Response shape:
 
 ```json
 {
-  "project": {},
+  "project": {
+    "id": "my-project",
+    "name": "My Project",
+    "description": null,
+    "projectImg": null,
+    "createdAt": "2026-03-15T00:00:00.000Z"
+  },
   "artifactDirs": [
     {
       "id": "research",
       "name": "Research",
-      "sessions": []
+      "description": null,
+      "createdAt": "2026-03-15T00:00:00.000Z",
+      "sessions": [
+        {
+          "sessionId": "session-1",
+          "sessionName": "Gemini comparison",
+          "createdAt": "2026-03-15T00:00:00.000Z",
+          "updatedAt": "2026-03-15T00:05:00.000Z",
+          "nodeCount": 8
+        }
+      ]
     }
   ]
 }
 ```
+
+Public types:
+
+- `project` is a `ProjectDto`
+- each artifact entry is an `ArtifactDirOverviewDto`
+- each session entry is a cleaned `SessionSummaryDto`
+
+Notes:
+
+- session summaries do not expose internal `filePath` or `branches`
+- project overview does not expose the project working path
 
 Responses:
 
@@ -136,7 +180,7 @@ Request body:
 
 Responses:
 
-- `200` — updated `ProjectMetadata`
+- `200` — updated `ProjectDto`
 - `400` — name missing/empty
 - `404` — project not found
 

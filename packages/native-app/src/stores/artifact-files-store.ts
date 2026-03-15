@@ -5,10 +5,10 @@ import { create } from 'zustand';
 import type {
   ArtifactContext,
   ArtifactExplorerResult,
-  ArtifactFileResult,
-  ArtifactPathDeleteResult,
-  ArtifactPathRenameResult,
+  ArtifactFileDto,
+  DeleteArtifactPathResponse,
   ProjectFileIndexEntry,
+  RenameArtifactPathResponse,
 } from '@/lib/client-api';
 
 import {
@@ -34,7 +34,7 @@ type ArtifactNavigationHistory = {
 
 type ArtifactFilesStoreState = {
   directoriesByArtifact: Record<string, Record<string, ArtifactExplorerResult>>;
-  filesByArtifact: Record<string, Record<string, ArtifactFileResult>>;
+  filesByArtifact: Record<string, Record<string, ArtifactFileDto>>;
   currentDirectoryPathByArtifact: Record<string, string>;
   selectedFileByArtifact: Record<string, string | null>;
   navigationHistoryByArtifact: Record<string, ArtifactNavigationHistory>;
@@ -61,7 +61,7 @@ type ArtifactFilesStoreState = {
     path?: string,
     force?: boolean
   ) => Promise<ArtifactExplorerResult>;
-  openFile: (ctx: ArtifactContext, path: string, force?: boolean) => Promise<ArtifactFileResult>;
+  openFile: (ctx: ArtifactContext, path: string, force?: boolean) => Promise<ArtifactFileDto>;
   clearArtifactCache: (ctx: ArtifactContext) => void;
   loadProjectFileIndex: (projectId: string, force?: boolean) => Promise<ProjectFileIndexEntry[]>;
   searchProjectFiles: (
@@ -72,8 +72,11 @@ type ArtifactFilesStoreState = {
   renamePath: (
     ctx: ArtifactContext,
     input: { path: string; newName: string }
-  ) => Promise<ArtifactPathRenameResult>;
-  deletePath: (ctx: ArtifactContext, input: { path: string }) => Promise<ArtifactPathDeleteResult>;
+  ) => Promise<RenameArtifactPathResponse>;
+  deletePath: (
+    ctx: ArtifactContext,
+    input: { path: string }
+  ) => Promise<DeleteArtifactPathResponse>;
   clearProjectFileIndex: (projectId: string) => void;
 };
 

@@ -9,6 +9,7 @@ Node-only Hono orchestration server for managing projects, artifact directories,
 - Runs LLM-backed sessions inside artifact directories using `@ank1015/llm-agents`
 - Streams live agent runs over SSE with replay and cancellation support
 - Installs bundled artifact-local skills from `@ank1015/llm-agents`
+- Publishes intentional HTTP DTOs and request/query validation through `@ank1015/llm-app-contracts`
 
 ## Runtime Model
 

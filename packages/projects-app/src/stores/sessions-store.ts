@@ -2,8 +2,7 @@
 
 import { create } from 'zustand';
 
-import type { ModelSelection } from '@/lib/contracts';
-import type { SessionSummary } from '@ank1015/llm-types';
+import type { ModelSelection, SessionSummaryDto } from '@/lib/client-api';
 
 import {
   createSession as createSessionApi,
@@ -18,7 +17,7 @@ type ArtifactContext = {
 };
 
 type SessionsStoreState = {
-  sessions: SessionSummary[];
+  sessions: SessionSummaryDto[];
   isLoading: boolean;
   isRefreshing: boolean;
   error: string | null;
@@ -41,7 +40,7 @@ type SessionsStoreState = {
   reset: () => void;
   optimisticRenameSession: (sessionId: string, sessionName: string) => void;
   optimisticRemoveSession: (sessionId: string) => void;
-  upsertSession: (session: SessionSummary) => void;
+  upsertSession: (session: SessionSummaryDto) => void;
 };
 
 let latestRequestId = 0;
@@ -55,7 +54,7 @@ function getErrorMessage(error: unknown): string {
 }
 
 const initialState = {
-  sessions: [] as SessionSummary[],
+  sessions: [] as SessionSummaryDto[],
   isLoading: false,
   isRefreshing: false,
   error: null as string | null,

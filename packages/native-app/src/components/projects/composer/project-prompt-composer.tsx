@@ -15,8 +15,7 @@ import {
 import { ProjectPromptInputShell } from './project-prompt-input-shell';
 import { ProjectPromptMentionList } from './project-prompt-mention-list';
 
-import type { ProjectFileIndexEntry } from '@/lib/client-api';
-import type { ReasoningLevel, SessionRef } from '@/lib/contracts';
+import type { ProjectFileIndexEntry , ReasoningLevel, SessionRef } from '@/lib/client-api';
 import type {
   LayoutChangeEvent,
   NativeSyntheticEvent,

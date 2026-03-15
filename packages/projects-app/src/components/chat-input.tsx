@@ -14,8 +14,7 @@ import {
   PromptInputTextarea,
 } from './prompt-input';
 
-import type { ProjectFileIndexEntry } from '@/lib/client-api';
-import type { ReasoningLevel, SessionRef } from '@/lib/contracts';
+import type { ProjectFileIndexEntry , ReasoningLevel, SessionRef } from '@/lib/client-api';
 import type { MessageNode } from '@ank1015/llm-types';
 
 import { Button } from '@/components/ui/button';

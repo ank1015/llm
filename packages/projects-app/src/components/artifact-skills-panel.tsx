@@ -13,7 +13,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
-import type { BundledSkillEntry, InstalledArtifactSkill } from '@/lib/client-api';
+import type { BundledSkillDto, InstalledSkillDto } from '@/lib/client-api';
 
 import {
   CommandDialog,
@@ -59,12 +59,12 @@ export function ArtifactSkillsPanel({
   projectId: string;
   artifactId: string;
 }) {
-  const [installedSkills, setInstalledSkills] = useState<InstalledArtifactSkill[]>([]);
+  const [installedSkills, setInstalledSkills] = useState<InstalledSkillDto[]>([]);
   const [isInstalledSkillsLoading, setIsInstalledSkillsLoading] = useState(true);
   const [installedSkillsError, setInstalledSkillsError] = useState<string | null>(null);
   const [installedSkillsRequestKey, setInstalledSkillsRequestKey] = useState(0);
 
-  const [bundledSkills, setBundledSkills] = useState<BundledSkillEntry[] | null>(null);
+  const [bundledSkills, setBundledSkills] = useState<BundledSkillDto[] | null>(null);
   const [isBundledSkillsLoading, setIsBundledSkillsLoading] = useState(false);
   const [bundledSkillsError, setBundledSkillsError] = useState<string | null>(null);
 

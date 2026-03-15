@@ -4,7 +4,7 @@ import { Folder, Loader2 } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
-import type { ArtifactDirWithSessions } from '@/lib/client-api';
+import type { ArtifactDirOverviewDto } from '@/lib/client-api';
 
 import { Button } from '@/components/ui/button';
 import { getProjectOverview } from '@/lib/client-api';
@@ -12,7 +12,7 @@ import { useSidebarStore } from '@/stores';
 
 export default function ProjectPage() {
   const { projectId } = useParams<{ projectId: string }>();
-  const [artifactDirs, setArtifactDirs] = useState<ArtifactDirWithSessions[]>([]);
+  const [artifactDirs, setArtifactDirs] = useState<ArtifactDirOverviewDto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const sidebarArtifactDirs = useSidebarStore((state) => state.artifactDirs);

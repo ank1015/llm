@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 
-import type { ModelSelection, ReasoningLevel } from '@/lib/contracts';
+import type { ModelSelection, ReasoningLevel } from '@/lib/client-api';
 
 type ChatModelOption = ModelSelection & {
   label: string;

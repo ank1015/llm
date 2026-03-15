@@ -7,7 +7,7 @@ import {
   deleteProject as deleteProjectApi,
   listProjects,
   renameProject as renameProjectApi,
-  type ProjectMetadata,
+  type ProjectDto,
 } from '@/lib/client-api';
 
 type CreateProjectInput = {
@@ -16,7 +16,7 @@ type CreateProjectInput = {
 };
 
 type ProjectsStoreState = {
-  projects: ProjectMetadata[];
+  projects: ProjectDto[];
   isLoading: boolean;
   isRefreshing: boolean;
   error: string | null;
@@ -27,7 +27,7 @@ type ProjectsStoreState = {
   clearMutationError: () => void;
   fetchProjects: () => Promise<void>;
   refresh: () => Promise<void>;
-  createProject: (input: CreateProjectInput) => Promise<ProjectMetadata>;
+  createProject: (input: CreateProjectInput) => Promise<ProjectDto>;
   renameProject: (projectId: string, input: { name: string }) => Promise<void>;
   deleteProject: (projectId: string) => Promise<void>;
   reset: () => void;
@@ -44,7 +44,7 @@ function getErrorMessage(error: unknown): string {
 }
 
 const initialState = {
-  projects: [] as ProjectMetadata[],
+  projects: [] as ProjectDto[],
   isLoading: false,
   isRefreshing: false,
   error: null as string | null,

@@ -2,6 +2,12 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import {
+  ArtifactDirDtoSchema,
+  DeleteArtifactSkillResponseSchema,
+  InstalledSkillDtoSchema,
+} from '@ank1015/llm-app-contracts';
+import { Value } from '@sinclair/typebox/value';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import { setConfig } from '../../../src/core/config.js';
@@ -62,6 +68,7 @@ describe('Artifact Dir Routes', () => {
 
       expect(res.status).toBe(201);
       const body = await res.json();
+      expect(Value.Check(ArtifactDirDtoSchema, body)).toBe(true);
       expect(body.id).toBe('research');
       expect(body.name).toBe('Research');
       expect(body.description).toBe('Findings');
@@ -103,6 +110,9 @@ describe('Artifact Dir Routes', () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body).toHaveLength(2);
+      expect(body.every((artifact: unknown) => Value.Check(ArtifactDirDtoSchema, artifact))).toBe(
+        true
+      );
     });
   });
 
@@ -114,6 +124,7 @@ describe('Artifact Dir Routes', () => {
 
       expect(res.status).toBe(200);
       const body = await res.json();
+      expect(Value.Check(ArtifactDirDtoSchema, body)).toBe(true);
       expect(body.id).toBe('findings');
       expect(body.name).toBe('Findings');
     });
@@ -189,7 +200,14 @@ describe('Artifact Dir Routes', () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body).toHaveLength(1);
+      expect(Value.Check(InstalledSkillDtoSchema, body[0])).toBe(true);
       expect(body[0].name).toBe('ai-images');
+      expect(body[0]).not.toHaveProperty('path');
+      expect(body[0]).not.toHaveProperty('directory');
+      expect(body[0]).not.toHaveProperty('artifactDir');
+      expect(body[0]).not.toHaveProperty('maxDir');
+      expect(body[0]).not.toHaveProperty('skillsDir');
+      expect(body[0]).not.toHaveProperty('tempDir');
     });
 
     it('should install a bundled skill into an artifact and return the installed metadata', async () => {
@@ -199,10 +217,10 @@ describe('Artifact Dir Routes', () => {
 
       expect(res.status).toBe(200);
       const body = await res.json();
+      expect(Value.Check(InstalledSkillDtoSchema, body)).toBe(true);
       expect(body.name).toBe('ai-images');
-      expect(body.path).toBe(
-        join(projectsRoot, PROJECT, 'skills', '.max', 'skills', 'ai-images', 'SKILL.md')
-      );
+      expect(body).not.toHaveProperty('path');
+      expect(body).not.toHaveProperty('sourcePath');
       expect(mockAddSkill).toHaveBeenCalledWith('ai-images', join(projectsRoot, PROJECT, 'skills'));
     });
 
@@ -224,7 +242,8 @@ describe('Artifact Dir Routes', () => {
 
       expect(res.status).toBe(200);
       const body = await res.json();
-      expect(body.name).toBe('ai-images');
+      expect(Value.Check(DeleteArtifactSkillResponseSchema, body)).toBe(true);
+      expect(body.skillName).toBe('ai-images');
       expect(body.deleted).toBe(true);
       expect(mockDeleteSkill).toHaveBeenCalledWith(
         'ai-images',

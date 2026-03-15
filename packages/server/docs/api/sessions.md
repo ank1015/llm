@@ -20,8 +20,21 @@ Request body:
 
 Responses:
 
-- `201` — `SessionMetadata`
+- `201` — `SessionMetadataDto`
 - `400` — `modelId and api are required`
+
+`SessionMetadataDto`:
+
+```json
+{
+  "id": "session-1",
+  "name": "Research Run",
+  "api": "codex",
+  "modelId": "gpt-5.4",
+  "createdAt": "2026-03-15T00:00:00.000Z",
+  "activeBranch": "main"
+}
+```
 
 ## `GET /api/projects/:projectId/artifacts/:artifactDirId/sessions`
 
@@ -29,7 +42,23 @@ List sessions for one artifact directory.
 
 Responses:
 
-- `200` — array of session summaries
+- `200` — array of `SessionSummaryDto`
+
+`SessionSummaryDto`:
+
+```json
+{
+  "sessionId": "session-1",
+  "sessionName": "Research Run",
+  "createdAt": "2026-03-15T00:00:00.000Z",
+  "updatedAt": "2026-03-15T00:05:00.000Z",
+  "nodeCount": 8
+}
+```
+
+Notes:
+
+- internal `filePath` and `branches` fields are intentionally not exposed
 
 ## `GET /api/projects/:projectId/artifacts/:artifactDirId/sessions/:sessionId`
 
@@ -37,7 +66,7 @@ Fetch session metadata.
 
 Responses:
 
-- `200` — `SessionMetadata`
+- `200` — `SessionMetadataDto`
 - `404` — session not found
 
 ## `GET /api/projects/:projectId/artifacts/:artifactDirId/sessions/:sessionId/messages`
@@ -46,7 +75,7 @@ Fetch the persisted message path as `MessageNode[]`.
 
 Responses:
 
-- `200`
+- `200` — `MessageNode[]`
 - `404` — session not found
 
 ## `GET /api/projects/:projectId/artifacts/:artifactDirId/sessions/:sessionId/tree`
@@ -71,8 +100,13 @@ Response shape:
 
 Responses:
 
-- `200`
+- `200` — `SessionTreeResponse`
 - `404` — session not found
+
+Notes:
+
+- `liveRun` is omitted when no run is active or replayable
+- `nodes` are returned as session message-tree nodes, not cleaned summary DTOs
 
 ## `POST /api/projects/:projectId/artifacts/:artifactDirId/sessions/:sessionId/prompt`
 

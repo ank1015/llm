@@ -22,7 +22,7 @@ import Image from 'next/image';
 import { useParams, useRouter } from 'next/navigation';
 import { memo, useEffect, useRef, useState } from 'react';
 
-import type { ArtifactDirWithSessions, OverviewSession } from '@/lib/client-api';
+import type { ArtifactDirOverviewDto, SessionSummaryDto } from '@/lib/client-api';
 import type { FC, FormEvent, ReactNode } from 'react';
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -88,11 +88,11 @@ const SidebarItem: FC<SidebarItemProps> = ({ icon, label, collapsed, onClick }) 
 // ---------------------------------------------------------------------------
 
 const SessionItem: FC<{
-  session: OverviewSession;
+  session: SessionSummaryDto;
   isActive: boolean;
-  onSelect: (session: OverviewSession) => void;
-  onRename: (session: OverviewSession, name: string) => Promise<void>;
-  onDelete: (session: OverviewSession) => Promise<void>;
+  onSelect: (session: SessionSummaryDto) => void;
+  onRename: (session: SessionSummaryDto, name: string) => Promise<void>;
+  onDelete: (session: SessionSummaryDto) => Promise<void>;
 }> = ({ session, isActive, onSelect, onRename, onDelete }) => {
   const displayName = useTypewriter(session.sessionName);
   const renameInputRef = useRef<HTMLInputElement>(null);
@@ -252,7 +252,7 @@ const SessionItem: FC<{
 // ---------------------------------------------------------------------------
 
 const ArtifactGroup: FC<{
-  artifact: ArtifactDirWithSessions;
+  artifact: ArtifactDirOverviewDto;
   projectId: string;
   activeArtifactId: string | null;
   urlThreadId: string | null;
@@ -283,12 +283,12 @@ const ArtifactGroup: FC<{
     if (defaultExpanded) setIsCollapsed(false);
   }
 
-  const handleSessionSelect = (session: OverviewSession) => {
+  const handleSessionSelect = (session: SessionSummaryDto) => {
     setActiveSession({ sessionId: session.sessionId });
     router.push(`/${projectId}/${artifact.id}/${session.sessionId}`);
   };
 
-  const handleSessionDelete = async (session: OverviewSession) => {
+  const handleSessionDelete = async (session: SessionSummaryDto) => {
     await deleteSession({ projectId, artifactId: artifact.id }, session.sessionId);
     onSessionDeleted(artifact.id, session.sessionId);
 
@@ -299,7 +299,7 @@ const ArtifactGroup: FC<{
     }
   };
 
-  const handleSessionRename = async (session: OverviewSession, name: string) => {
+  const handleSessionRename = async (session: SessionSummaryDto, name: string) => {
     const result = await renameSession(
       { projectId, artifactId: artifact.id },
       { sessionId: session.sessionId, name }
@@ -535,7 +535,7 @@ const ArtifactList: FC<{ collapsed?: boolean; onNewArtifact?: () => void }> = ({
 };
 
 const ArtifactListInner: FC<{
-  artifactDirs: ArtifactDirWithSessions[];
+  artifactDirs: ArtifactDirOverviewDto[];
   projectId: string;
   activeArtifactId: string | null;
   urlThreadId: string | null;

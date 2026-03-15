@@ -3,7 +3,7 @@
 import { create } from 'zustand';
 
 import type {
-  LiveRunSummary,
+  LiveRunSummaryDto,
   SessionRef,
   SessionTreeResponse,
   StreamAgentEventData,
@@ -12,7 +12,7 @@ import type {
   StreamNodePersistedEventData,
   StreamReadyEventData,
   TurnSettings,
-} from '@/lib/contracts';
+} from '@/lib/client-api';
 import type {
   AgentEvent,
   Api,
@@ -71,7 +71,7 @@ type ChatStoreState = {
   messageTreesBySession: Record<string, MessageNode[]>;
   persistedLeafNodeIdBySession: Record<string, string | null>;
   visibleLeafNodeIdBySession: Record<string, string | null>;
-  liveRunBySession: Record<string, LiveRunSummary | null>;
+  liveRunBySession: Record<string, LiveRunSummaryDto | null>;
   lastSeqBySession: Record<string, number>;
   streamingAssistantBySession: Record<string, Omit<BaseAssistantMessage<Api>, 'message'> | null>;
   pendingPromptsBySession: Record<string, PendingPrompt[]>;
@@ -416,7 +416,7 @@ function applyLoadedTreeState(tree: SessionTreeResponse): {
   persistedLeafNodeId: string | null;
   visibleLeafNodeId: string | null;
   visibleMessages: MessageNode[];
-  liveRun: LiveRunSummary | null;
+  liveRun: LiveRunSummaryDto | null;
 } {
   const allNodes = sortMessageNodesChronologically(tree.nodes);
   const persistedLeafNodeId = tree.persistedLeafNodeId;

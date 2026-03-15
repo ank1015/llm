@@ -4,7 +4,7 @@ import { useChatStore } from './chat-store';
 import { useComposerStore } from './composer-store';
 import { useUiStore } from './ui-store';
 
-import type { SessionRef } from '@/lib/contracts';
+import type { SessionRef } from '@/lib/client-api';
 
 let coordinationInitialized = false;
 

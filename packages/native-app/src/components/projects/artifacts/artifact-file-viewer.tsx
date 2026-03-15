@@ -6,7 +6,7 @@ import { View } from 'react-native';
 import { WebView } from 'react-native-webview';
 
 import type { ArtifactViewerKind } from '@/components/projects/artifacts/artifact-file-viewer-shared';
-import type { ArtifactContext, ArtifactFileResult } from '@/lib/client-api';
+import type { ArtifactContext, ArtifactFileDto } from '@/lib/client-api';
 import type { LayoutChangeEvent } from 'react-native';
 
 import ArtifactFileViewerDom from '@/components/projects/artifacts/artifact-file-viewer-dom';
@@ -15,7 +15,7 @@ import { getArtifactFileBaseUrl, getArtifactRawFileUrl } from '@/lib/client-api'
 
 type ArtifactFileViewerProps = {
   artifactCtx: ArtifactContext;
-  file: ArtifactFileResult;
+  file: ArtifactFileDto;
   viewerKind: ArtifactViewerKind;
 };
 

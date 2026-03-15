@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@ank1015/llm-app-contracts": "workspace:^",
     "@ank1015/llm-sdk": "workspace:^",
     "@expo-google-fonts/inter": "^0.4.1",
     "@expo-google-fonts/saira": "^0.4.2",

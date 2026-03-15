@@ -2,6 +2,13 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import {
+  ArtifactDirOverviewDtoSchema,
+  ProjectDtoSchema,
+  ProjectOverviewDtoSchema,
+  SessionSummaryDtoSchema,
+} from '@ank1015/llm-app-contracts';
+import { Value } from '@sinclair/typebox/value';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import { setConfig } from '../../../src/core/config.js';
@@ -62,11 +69,12 @@ describe('Project Routes', () => {
 
       expect(res.status).toBe(201);
       const body = await res.json();
+      expect(Value.Check(ProjectDtoSchema, body)).toBe(true);
       expect(body.id).toBe('my-project');
       expect(body.name).toBe('My Project');
       expect(body.description).toBe('A test');
       expect(body.projectImg).toBe('https://example.com/project.png');
-      expect(body.projectPath).toBeDefined();
+      expect(body).not.toHaveProperty('projectPath');
       expect(body.createdAt).toBeDefined();
       expect(await pathExists(join(projectsRoot, 'my-project', '.max'))).toBe(false);
       expect(await pathExists(join(projectsRoot, 'my-project', legacySkillsDirName))).toBe(false);
@@ -107,6 +115,7 @@ describe('Project Routes', () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body).toHaveLength(2);
+      expect(body.every((project: unknown) => Value.Check(ProjectDtoSchema, project))).toBe(true);
       expect(body).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
@@ -133,6 +142,7 @@ describe('Project Routes', () => {
 
       expect(res.status).toBe(200);
       const body = await res.json();
+      expect(Value.Check(ProjectDtoSchema, body)).toBe(true);
       expect(body.id).toBe('image-project');
       expect(body.projectImg).toBe('https://example.com/image-project.png');
 
@@ -188,8 +198,10 @@ describe('Project Routes', () => {
 
       expect(res.status).toBe(200);
       const body = await res.json();
+      expect(Value.Check(ProjectDtoSchema, body)).toBe(true);
       expect(body.id).toBe('fetch-me');
       expect(body.name).toBe('Fetch Me');
+      expect(body).not.toHaveProperty('projectPath');
     });
 
     it('should return 404 for nonexistent project', async () => {
@@ -295,6 +307,40 @@ describe('Project Routes', () => {
     it('should return 404 for missing projects', async () => {
       const res = await get('/api/projects/missing/file-index');
       expect(res.status).toBe(404);
+    });
+  });
+
+  describe('GET /api/projects/:projectId/overview', () => {
+    it('returns cleaned overview DTOs without leaked session internals', async () => {
+      await post('/api/projects', { name: 'Overview Project' });
+      await post('/api/projects/overview-project/artifacts', { name: 'research' });
+
+      const createSessionRes = await app.request(
+        '/api/projects/overview-project/artifacts/research/sessions',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: 'Overview Session',
+            api: 'anthropic',
+            modelId: 'claude-sonnet-4-5',
+          }),
+        }
+      );
+      expect(createSessionRes.status).toBe(201);
+
+      const res = await get('/api/projects/overview-project/overview');
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(Value.Check(ProjectOverviewDtoSchema, body)).toBe(true);
+      expect(Value.Check(ProjectDtoSchema, body.project)).toBe(true);
+      expect(body.project).not.toHaveProperty('projectPath');
+      expect(body.artifactDirs).toHaveLength(1);
+      expect(Value.Check(ArtifactDirOverviewDtoSchema, body.artifactDirs[0])).toBe(true);
+      expect(Value.Check(SessionSummaryDtoSchema, body.artifactDirs[0].sessions[0])).toBe(true);
+      expect(body.artifactDirs[0].sessions[0]).not.toHaveProperty('filePath');
+      expect(body.artifactDirs[0].sessions[0]).not.toHaveProperty('branches');
     });
   });
 
