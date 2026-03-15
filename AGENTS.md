@@ -49,9 +49,9 @@ Bottom up, these are the currently documented base layers:
 2. `@ank1015/llm-core`
    Stateless runtime built on top of `@ank1015/llm-types`. It owns the model catalog, provider registry, provider implementations, central `stream()` / `complete()` dispatch, shared runtime utilities, and the stateless agent loop.
 3. `@ank1015/llm-sdk`
-   Opinionated SDK layer on top of `core`. It adds credential resolution, stateful conversations, and `SessionManager` helpers while staying runtime-neutral.
+   Opinionated SDK layer on top of `core`. It adds shared credential resolution, stateful `Conversation` flows, and `SessionManager` helpers while staying runtime-neutral and leaving concrete storage implementations out of the package.
 4. `@ank1015/llm-sdk-adapters`
-   Concrete Node-oriented adapters used by app/server layers. It currently provides file-system and in-memory implementations for keys and sessions.
+   Concrete Node-oriented adapters used by app/server layers. It currently provides file-system and in-memory implementations for keys and sessions, and no longer owns usage tracking or key-management UI code.
 
 More package summaries can be added here as the stack above `types` and `core` is documented.
 
@@ -75,8 +75,8 @@ More package summaries can be added here as the stack above `types` and `core` i
 
 - [packages/types/AGENTS.md](packages/types/AGENTS.md) - Shared contracts layer
 - [packages/core/AGENTS.md](packages/core/AGENTS.md) - Stateless runtime layer
-- [packages/sdk/AGENTS.md](packages/sdk/AGENTS.md) - Opinionated SDK layer
-- [packages/sdk-adapters/AGENTS.md](packages/sdk-adapters/AGENTS.md) - Node keys/session adapters
+- [packages/sdk/AGENTS.md](packages/sdk/AGENTS.md) - Runtime-neutral SDK wrappers, credential resolution, and session helpers
+- [packages/sdk-adapters/AGENTS.md](packages/sdk-adapters/AGENTS.md) - Concrete Node file-system and in-memory keys/session adapters
 
 ## Boundaries
 
