@@ -6,7 +6,7 @@
  */
 
 import type { Api } from './api.js';
-import type { Content } from './content.js';
+import type { Content, GeneratedImageMetadata, ImageContent } from './content.js';
 import type { Model } from './model.js';
 import type { NativeResponseForApi } from './providers/index.js';
 
@@ -196,6 +196,24 @@ export type BaseAssistantEvent<TApi extends Api> =
       type: 'thinking_end';
       contentIndex: number;
       content: string;
+      message: BaseAssistantMessage<TApi>;
+    }
+  | {
+      type: 'image_start';
+      contentIndex: number;
+      metadata?: GeneratedImageMetadata;
+      message: BaseAssistantMessage<TApi>;
+    }
+  | {
+      type: 'image_frame';
+      contentIndex: number;
+      image: ImageContent;
+      message: BaseAssistantMessage<TApi>;
+    }
+  | {
+      type: 'image_end';
+      contentIndex: number;
+      image: ImageContent;
       message: BaseAssistantMessage<TApi>;
     }
   | { type: 'toolcall_start'; contentIndex: number; message: BaseAssistantMessage<TApi> }

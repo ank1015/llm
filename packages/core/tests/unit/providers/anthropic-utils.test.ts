@@ -29,12 +29,12 @@ describe('Anthropic Utils', () => {
     });
 
     const mockModel: Model<'anthropic'> = {
-      id: 'claude-sonnet-4-5',
-      name: 'Claude Sonnet 4.5',
+      id: 'claude-sonnet-4-6',
+      name: 'Claude Sonnet 4.6',
       api: 'anthropic',
       baseUrl: 'https://api.anthropic.com',
       reasoning: true,
-      input: ['text', 'image'],
+      input: ['text', 'image', 'file'],
       cost: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
       contextWindow: 200000,
       maxTokens: 64000,
@@ -89,12 +89,12 @@ describe('Anthropic Utils', () => {
 
   describe('buildAnthropicMessages', () => {
     const mockModel: Model<'anthropic'> = {
-      id: 'claude-sonnet-4-5',
-      name: 'Claude Sonnet 4.5',
+      id: 'claude-sonnet-4-6',
+      name: 'Claude Sonnet 4.6',
       api: 'anthropic',
       baseUrl: 'https://api.anthropic.com',
       reasoning: true,
-      input: ['text', 'image'],
+      input: ['text', 'image', 'file'],
       cost: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
       contextWindow: 200000,
       maxTokens: 64000,
@@ -142,6 +142,30 @@ describe('Anthropic Utils', () => {
         ]);
       });
 
+      it('should convert user PDF file to document block with base64 source', () => {
+        const userMessage: UserMessage = {
+          role: 'user',
+          id: 'msg-1',
+          content: [
+            { type: 'file', data: 'pdfdata', mimeType: 'application/pdf', filename: 'doc.pdf' },
+          ],
+        };
+        const context: Context = { messages: [userMessage] };
+
+        const result = buildAnthropicMessages(mockModel, context);
+        expect((result[0] as any).content).toEqual([
+          {
+            type: 'document',
+            title: 'doc.pdf',
+            source: {
+              type: 'base64',
+              media_type: 'application/pdf',
+              data: 'pdfdata',
+            },
+          },
+        ]);
+      });
+
       it('should skip image if model does not support images', () => {
         const modelNoImage: Model<'anthropic'> = {
           ...mockModel,
@@ -158,6 +182,25 @@ describe('Anthropic Utils', () => {
         const context: Context = { messages: [userMessage] };
 
         const result = buildAnthropicMessages(modelNoImage, context);
+        expect((result[0] as any).content).toEqual([{ type: 'text', text: 'Hello' }]);
+      });
+
+      it('should skip file if model does not support files', () => {
+        const modelNoFile: Model<'anthropic'> = {
+          ...mockModel,
+          input: ['text', 'image'],
+        };
+        const userMessage: UserMessage = {
+          role: 'user',
+          id: 'msg-1',
+          content: [
+            { type: 'text', content: 'Hello' },
+            { type: 'file', data: 'pdfdata', mimeType: 'application/pdf', filename: 'doc.pdf' },
+          ],
+        };
+        const context: Context = { messages: [userMessage] };
+
+        const result = buildAnthropicMessages(modelNoFile, context);
         expect((result[0] as any).content).toEqual([{ type: 'text', text: 'Hello' }]);
       });
 
@@ -300,6 +343,39 @@ describe('Anthropic Utils', () => {
         const result = buildAnthropicMessages(mockModel, context);
         expect((result[0] as any).content[0].content).toBe('First\nSecond');
       });
+
+      it('should attach PDF files in tool results', () => {
+        const toolResult: ToolResultMessage = {
+          role: 'toolResult',
+          id: 'result-1',
+          toolCallId: 'call-1',
+          toolName: 'generate',
+          content: [
+            { type: 'file', data: 'pdfdata', mimeType: 'application/pdf', filename: 'report.pdf' },
+          ],
+          isError: false,
+          timestamp: Date.now(),
+        };
+        const context: Context = { messages: [toolResult] };
+
+        const result = buildAnthropicMessages(mockModel, context);
+        expect((result[0] as any).content[0]).toEqual({
+          type: 'tool_result',
+          tool_use_id: 'call-1',
+          content: [
+            {
+              type: 'document',
+              title: 'report.pdf',
+              source: {
+                type: 'base64',
+                media_type: 'application/pdf',
+                data: 'pdfdata',
+              },
+            },
+          ],
+          is_error: false,
+        });
+      });
     });
 
     describe('assistant messages', () => {
@@ -326,7 +402,7 @@ describe('Anthropic Utils', () => {
             type: 'message',
             role: 'assistant',
             content: [{ type: 'text', text: 'Hello' }],
-            model: 'claude-sonnet-4-5',
+            model: 'claude-sonnet-4-6',
             stop_reason: 'end_turn',
             stop_sequence: null,
             usage: {
@@ -376,7 +452,7 @@ describe('Anthropic Utils', () => {
                 input: { query: 'test' },
               },
             ],
-            model: 'claude-sonnet-4-5',
+            model: 'claude-sonnet-4-6',
             stop_reason: 'tool_use',
             stop_sequence: null,
             usage: {
@@ -631,7 +707,7 @@ describe('Anthropic Utils', () => {
 
   describe('buildParams', () => {
     const mockModel: Model<'anthropic'> = {
-      id: 'claude-sonnet-4-5',
+      id: 'claude-sonnet-4-6',
       name: 'Claude Sonnet 4.5',
       api: 'anthropic',
       baseUrl: 'https://api.anthropic.com',
@@ -652,7 +728,7 @@ describe('Anthropic Utils', () => {
       };
 
       const result = buildParams(mockModel, context, options, false);
-      expect(result.model).toBe('claude-sonnet-4-5');
+      expect(result.model).toBe('claude-sonnet-4-6');
     });
 
     it('should set stream to false', () => {

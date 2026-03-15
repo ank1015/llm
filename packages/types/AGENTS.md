@@ -1,52 +1,55 @@
 # @ank1015/llm-types
 
-Shared type definitions for the LLM SDK monorepo. Types-only package (no runtime logic except `KnownApis`, `isValidApi`, and error classes).
+Shared contracts package for the LLM SDK monorepo. This package is mostly compile-time types, with a very small shared runtime surface: `KnownApis`, `isValidApi`, and the `LLMError` hierarchy.
 
 ## Commands
 
-- `pnpm build` — Compile TypeScript to dist/
+- `pnpm build` — Compile TypeScript to `dist/`
 - `pnpm dev` — Watch mode compilation
 - `pnpm typecheck` — Type-check without emitting
 
 ## Structure
 
-```
+```text
 src/
   index.ts          — Public barrel (all exports)
-  api.ts            — Api union type, KnownApis array, isValidApi guard
-  content.ts        — TextContent, ImageContent, FileContent, Content
-  message.ts        — Messages, assistant response types, streaming events
+  api.ts            — Api union, KnownApis array, isValidApi guard
+  content.ts        — Text, image, file content + generated image metadata
+  message.ts        — Message shapes, usage, assistant responses, streaming events
   model.ts          — Model<TApi>, Provider<TApi>
   tool.ts           — Tool definition (TypeBox), Context
-  errors.ts         — LLMError hierarchy (8 error classes)
+  errors.ts         — LLMError hierarchy
   agent-types.ts    — AgentTool, AgentEvent, AgentState, AgentLoopConfig
   adapters.ts       — KeysAdapter, UsageAdapter, SessionsAdapter interfaces
-  session.ts        — Session tree types (JSONL append-only storage)
+  session.ts        — Session tree contracts (JSONL append-only storage)
   providers/
-    index.ts        — Type maps (ApiNativeResponseMap, ApiOptionsMap) + re-exports
-    anthropic.ts    — AnthropicNativeResponse, AnthropicProviderOptions
-    openai.ts       — OpenAINativeResponse, OpenAIProviderOptions
-    google.ts       — GoogleNativeResponse, GoogleProviderOptions
-    deepseek.ts     — DeepSeekNativeResponse, DeepSeekProviderOptions
-    kimi.ts         — KimiNativeResponse, KimiProviderOptions, KimiThinkingConfig
-    zai.ts          — ZaiNativeResponse, ZaiProviderOptions, ZaiThinkingConfig
-    claude-code.ts  — ClaudeCodeNativeResponse, ClaudeCodeProviderOptions
-    codex.ts        — CodexNativeResponse, CodexProviderOptions
+    index.ts        — ApiNativeResponseMap, ApiOptionsMap, re-exports
+    anthropic.ts    — Anthropic native response + options
+    claude-code.ts  — Claude Code native response + options
+    minimax.ts      — MiniMax native response + options
+    openai.ts       — OpenAI native response + options
+    codex.ts        — Codex native response + options
+    google.ts       — Google native response + options
+    deepseek.ts     — DeepSeek native response + options
+    kimi.ts         — Kimi native response + options
+    zai.ts          — Z.AI native response + options
+    cerebras.ts     — Cerebras native response + options
+    openrouter.ts   — OpenRouter native response + options
 ```
 
 ## Key Types
 
-### Core
+### Core Contracts
 
-- `Api` — Union of known providers: `'openai' | 'codex' | 'google' | 'deepseek' | 'anthropic' | 'claude-code' | 'zai' | 'kimi'`
+- `Api` — Union of supported providers derived from `KnownApis`
 - `Content` — Array of `TextContent | ImageContent | FileContent`
 - `Message` — `UserMessage | ToolResultMessage | BaseAssistantMessage<Api> | CustomMessage`
-- `BaseAssistantMessage<TApi>` — Assistant response with normalized `content` + native `message`
-- `BaseAssistantEvent<TApi>` — Discriminated union of streaming events (start, text_delta, toolcall_end, done, error, etc.)
-- `Model<TApi>` — Model definition (id, api, baseUrl, cost, contextWindow, maxTokens, headers, tools, etc.)
+- `BaseAssistantMessage<TApi>` — Normalized assistant message with preserved native provider response
+- `BaseAssistantEvent<TApi>` — Streaming event union covering text, thinking, image, tool call, done, and error events
+- `Model<TApi>` — Model metadata (provider, pricing, context window, capabilities)
 - `Provider<TApi>` — Model + provider options pair
-- `Tool` — Tool definition with TypeBox schema for parameters
-- `Context` — Conversation context (messages, systemPrompt, tools)
+- `Tool` — Tool definition with a TypeBox parameter schema
+- `Context` — Conversation context: messages, system prompt, tools
 - `Usage` — Token counts + cost breakdown in USD
 - `StopReason` — `'stop' | 'length' | 'toolUse' | 'error' | 'aborted'`
 
@@ -56,91 +59,91 @@ src/
 - `NativeResponseForApi<TApi>` — Lookup helper for native response
 - `ApiOptionsMap` — Maps each `Api` to its provider options type
 - `OptionsForApi<TApi>` — Lookup helper for options
-- `WithOptionalKey<T>` — Makes `apiKey` optional (for SDK/agent boundaries)
+- `WithOptionalKey<T>` — Makes `apiKey` optional at boundaries where it is injected externally
 
-### Adapters
+### Agent Contracts
 
-- `KeysAdapter` — API key and multi-credential storage (get/set/delete + getCredentials/setCredentials/deleteCredentials for providers like claude-code)
-- `UsageAdapter` — Usage tracking (track, getStats, getMessage, getMessages, deleteMessage)
+- `AgentTool` — Extends `Tool` with `label` and `execute`
+- `AgentToolResult<T>` — Tool execution result with normalized content + UI details
+- `AgentState` — Full agent state snapshot
+- `AgentLoopConfig` — Stateless agent loop configuration
+- `AgentEvent` — Lifecycle event union for agent execution
+- `Attachment` — File/image attachment input for user messages
+- `QueuedMessage<T>` — Message to inject on the next turn
+- `ToolExecutionContext` — Read-only conversation history for tool execution
+
+### Storage Contracts
+
+- `KeysAdapter` — API key / credential storage
+- `UsageAdapter` — Usage tracking and stats
 - `SessionsAdapter` — Session CRUD, branching, history, search
-- `UsageFilters`, `UsageStats`, `TokenBreakdown`, `CostBreakdown` — Supporting types for usage queries
+- `SessionNode` — `SessionHeader | MessageNode | CustomNode`
+- `Session`, `SessionSummary`, `BranchInfo` — Session views and metadata
 
 ### Errors
 
 - `LLMError` — Base error class with `code: LLMErrorCode`
-- `ApiKeyNotFoundError` — API key not found for a provider
-- `CostLimitError` — Cost budget exceeded
-- `ContextLimitError` — Context window exceeded
-- `ConversationBusyError` — Concurrent prompt attempted
-- `ModelNotConfiguredError` — No provider set before prompt
-- `SessionNotFoundError` — Session lookup failed
-- `InvalidParentError` — Invalid parent node in session tree
-- `PathTraversalError` — Path contains traversal characters
+- `ApiKeyNotFoundError`
+- `CostLimitError`
+- `ContextLimitError`
+- `ConversationBusyError`
+- `ModelNotConfiguredError`
+- `SessionNotFoundError`
+- `InvalidParentError`
+- `PathTraversalError`
 
-### Agent
+## Provider Families
 
-- `AgentTool` — Extends `Tool` with `execute` function and `label`
-- `AgentToolResult<T>` — Tool execution result (content + details)
-- `AgentState` — Full agent state (messages, tools, provider, usage, limits)
-- `AgentLoopConfig` — Config for agent loop (systemPrompt, tools, provider, budget)
-- `AgentEvent` — Discriminated union of agent lifecycle events
-- `Attachment` — File/image attachment for user messages
-- `QueuedMessage<T>` — Message queued for injection at next turn
-- `ToolExecutionContext` — Read-only conversation history for tools
-
-### Session
-
-- `BaseNode` — Base for all session nodes (id, parentId, branch, timestamp)
-- `SessionHeader` — Root node (type: 'session', sessionName)
-- `MessageNode` — Conversation message node (type: 'message')
-- `CustomNode` — Application-specific data node (type: 'custom')
-- `SessionNode` — Union of all node types
-- `AppendableNode` — Nodes that can be appended (excludes header)
-- `SessionLocation` — Project/path/sessionId identifier
-- `Session` — Full session with location, header, and nodes
-- `SessionSummary` — Metadata for listing sessions
-- `BranchInfo` — Branch metadata (name, branchPointId, nodeCount)
-- `CreateSessionInput`, `AppendMessageInput`, `AppendCustomInput`, `UpdateSessionNameInput` — Service input types
+- Anthropic Messages-style: `anthropic`, `claude-code`, `minimax`
+- OpenAI Responses-style: `openai`, `codex`
+- Google GenAI-style: `google`
+- OpenAI Chat Completions-style: `deepseek`, `kimi`, `zai`, `cerebras`, `openrouter`
 
 ## Conventions
 
-- Types only — No runtime code except `KnownApis` array, `isValidApi` guard, and error classes
-- Export all public types from `src/index.ts`
-- Use discriminated unions for variant types (`Message`, `SessionNode`, `BaseAssistantEvent`, `AgentEvent`)
-- Provider types extend/omit from official SDK types — preserving full provider options
-- Use `exactOptionalPropertyTypes` — don't assign `undefined` to optional properties
-- JSDoc on all exports
+- Shared contracts only. No API clients, request execution, provider registry, streaming implementations, or model catalogs.
+- Minimal shared runtime is allowed only when it is a low-level cross-package primitive, such as `KnownApis`, `isValidApi`, or shared error classes.
+- Export all public contracts from `src/index.ts`.
+- Use discriminated unions for variant domains such as `Message`, `SessionNode`, `BaseAssistantEvent`, and `AgentEvent`.
+- Keep provider option types close to the official SDK params. Only omit fields that are library-managed.
+- Use `exactOptionalPropertyTypes`; avoid assigning `undefined` to optional properties.
+- Add JSDoc to exported public contracts.
 
 ## Adding a New Provider
 
-1. Create `providers/<name>.ts` with `NativeResponse` and `ProviderOptions` types
-2. Import and re-export from `providers/index.ts`
-3. Add to both `ApiNativeResponseMap` and `ApiOptionsMap`
-4. Add provider string to `KnownApis` in `api.ts`
-5. Re-export new types from `src/index.ts`
+1. Create `src/providers/<name>.ts` with native response and provider options types
+2. Add the provider string to `KnownApis` in `src/api.ts`
+3. Add the provider to `ApiNativeResponseMap` and `ApiOptionsMap` in `src/providers/index.ts`
+4. Re-export the new provider types from `src/providers/index.ts`
+5. Re-export them from `src/index.ts`
 
-The exhaustive `Api` union will cause compile errors wherever a switch/map doesn't handle the new provider.
+The exhaustive `Api` union will surface compile errors anywhere the new provider is not handled.
 
 ## Boundaries
 
 **Never:**
 
-- Add runtime logic (this is a types package)
-- Use `any` — use `unknown` and narrow
-- Remove types that other packages depend on without checking consumers
+- Add provider request logic, SDK clients, or streaming code
+- Add model catalogs or runtime dispatch logic
+- Use `any` when `unknown` plus narrowing will do
+- Remove or reshape public contracts without checking consumers
 
 **Ask first:**
 
-- Changing `BaseAssistantMessage` or `BaseAssistantEvent` shape (affects all providers)
-- Adding fields to `Api` union (triggers exhaustiveness errors across the codebase)
+- Changing `Api`
+- Changing `Content`, `Message`, `BaseAssistantMessage`, or `BaseAssistantEvent`
+- Changing adapter or session contract shapes
+- Introducing new runtime exports beyond simple shared primitives
 
 **Freely:**
 
-- Add new types
-- Add JSDoc to existing types
-- Add new provider type files
+- Add or refine types
+- Add provider type files
+- Improve JSDoc and package docs
+- Add compile-only validation or type-level regression coverage
 
 ## Dependencies
 
-- Depends on: none (SDK types are devDependencies for type extraction only)
-- Depended on by: `@ank1015/llm-core`, `@ank1015/llm-sdk`
+- Runtime dependencies: none
+- Dev dependencies: provider SDK packages used only for type extraction
+- Depended on by: `@ank1015/llm-core`, `@ank1015/llm-sdk`, `@ank1015/llm-sdk-adapters`

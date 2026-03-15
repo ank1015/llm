@@ -1,7 +1,7 @@
 {
   "name": "@ank1015/llm-extension",
-  "version": "0.0.1",
-  "description": "Chrome extension with general-purpose native messaging RPC",
+  "version": "0.0.12",
+  "description": "Chrome RPC bridge with a Manifest V3 extension, native messaging host, and Node client",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -12,27 +12,37 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "manifests",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
   ],
   "scripts": {
-    "build": "pnpm build:native && pnpm build:chrome",
+    "build": "rm -rf dist coverage *.tsbuildinfo && pnpm build:native && pnpm build:chrome",
     "build:native": "tsc && cp src/native/host-wrapper.sh dist/native/host-wrapper.sh && chmod +x dist/native/host-wrapper.sh",
     "build:chrome": "tsx esbuild.config.ts && cp src/chrome/manifest.json dist/chrome/manifest.json",
     "dev": "pnpm dev:native & pnpm dev:chrome",
     "dev:native": "tsc --watch",
     "dev:chrome": "tsx esbuild.config.ts --watch",
-    "test": "vitest run",
+    "test": "pnpm run test:unit",
+    "test:unit": "vitest run tests/unit",
+    "test:coverage": "vitest run tests/unit --coverage",
     "test:watch": "vitest",
     "test:e2e": "tsx tests/e2e/chrome-rpc.e2e.ts",
     "test:e2e:accessibility": "tsx tests/e2e/accessibility.e2e.ts",
     "test:e2e:cookies": "tsx tests/e2e/cookies.e2e.ts",
     "test:e2e:debugger": "tsx tests/e2e/debugger.e2e.ts",
     "test:e2e:network": "tsx tests/e2e/network.e2e.ts",
+    "test:e2e:page-markdown": "tsx tests/e2e/page-markdown.e2e.ts",
     "test:e2e:windows": "tsx tests/e2e/windows.e2e.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.chrome.json",
-    "clean": "rm -rf dist *.tsbuildinfo"
+    "lint": "eslint src tests esbuild.config.ts",
+    "clean": "rm -rf dist coverage *.tsbuildinfo",
+    "prepack": "pnpm run build"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^2.1.0",
     "@types/chrome": "^0.0.287",
     "@types/node": "^22.0.0",
     "esbuild": "^0.24.0",
@@ -40,9 +50,27 @@
     "vitest": "^2.1.0"
   },
   "keywords": [
-    "llm",
+    "chrome",
+    "rpc",
+    "chrome-rpc",
+    "extension",
+    "native-messaging",
+    "automation",
+    "typescript",
     "chrome-extension",
-    "native-messaging"
+    "llm"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ank1015/llm.git",
+    "directory": "packages/extension"
+  },
+  "homepage": "https://github.com/ank1015/llm/tree/main/packages/extension",
+  "bugs": {
+    "url": "https://github.com/ank1015/llm/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
 }

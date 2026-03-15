@@ -8,7 +8,15 @@
 export { KnownApis, isValidApi, type Api } from './api.js';
 
 // Content types
-export type { TextContent, ImageContent, FileContent, Content } from './content.js';
+export type {
+  TextContent,
+  ImageContent,
+  FileContent,
+  Content,
+  GeneratedImageStage,
+  ImageMetadata,
+  GeneratedImageMetadata,
+} from './content.js';
 
 // Provider types
 export type {

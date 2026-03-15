@@ -30,8 +30,8 @@ describe('Z.AI Utils', () => {
     });
 
     const mockModel: Model<'zai'> = {
-      id: 'glm-4.7',
-      name: 'GLM-4.7',
+      id: 'glm-5',
+      name: 'GLM-5',
       api: 'zai',
       baseUrl: 'https://api.z.ai/api/paas/v4',
       reasoning: true,
@@ -68,8 +68,8 @@ describe('Z.AI Utils', () => {
 
   describe('buildZaiMessages', () => {
     const mockModel: Model<'zai'> = {
-      id: 'glm-4.7',
-      name: 'GLM-4.7',
+      id: 'glm-5',
+      name: 'GLM-5',
       api: 'zai',
       baseUrl: 'https://api.z.ai/api/paas/v4',
       reasoning: true,
@@ -258,7 +258,7 @@ describe('Z.AI Utils', () => {
           id: 'chatcmpl-123',
           object: 'chat.completion',
           created: Date.now(),
-          model: 'glm-4.7',
+          model: 'glm-5',
           choices: [
             {
               index: 0,
@@ -306,7 +306,7 @@ describe('Z.AI Utils', () => {
           id: 'chatcmpl-123',
           object: 'chat.completion',
           created: Date.now(),
-          model: 'glm-4.7',
+          model: 'glm-5',
           choices: [
             {
               index: 0,
@@ -360,7 +360,7 @@ describe('Z.AI Utils', () => {
           id: 'chatcmpl-123',
           object: 'chat.completion',
           created: Date.now(),
-          model: 'glm-4.7',
+          model: 'glm-5',
           choices: [
             {
               index: 0,
@@ -589,7 +589,7 @@ describe('Z.AI Utils', () => {
 
   describe('buildParams', () => {
     const mockModel: Model<'zai'> = {
-      id: 'glm-4.7',
+      id: 'glm-5',
       name: 'GLM-4.7',
       api: 'zai',
       baseUrl: 'https://api.z.ai/api/paas/v4',
@@ -606,7 +606,7 @@ describe('Z.AI Utils', () => {
       const options = { apiKey: 'test', signal: undefined };
 
       const result = buildParams(mockModel, context, options);
-      expect(result.model).toBe('glm-4.7');
+      expect(result.model).toBe('glm-5');
     });
 
     it('should set stream to false', () => {
@@ -800,22 +800,22 @@ describe('Z.AI Utils', () => {
 
   describe('getMockZaiMessage', () => {
     it('should return a valid ChatCompletion structure', () => {
-      const mock = getMockZaiMessage('glm-4.7', 'test-req-123');
+      const mock = getMockZaiMessage('glm-5', 'test-req-123');
       expect(mock.id).toBe('chatcmpl-test-req-123');
       expect(mock.object).toBe('chat.completion');
-      expect(mock.model).toBe('glm-4.7');
+      expect(mock.model).toBe('glm-5');
       expect(mock.choices).toBeDefined();
       expect(mock.choices.length).toBe(1);
       expect(mock.choices[0].message.role).toBe('assistant');
     });
 
     it('should have empty content', () => {
-      const mock = getMockZaiMessage('glm-4.7', 'test-req-123');
+      const mock = getMockZaiMessage('glm-5', 'test-req-123');
       expect(mock.choices[0].message.content).toBe('');
     });
 
     it('should have zero usage', () => {
-      const mock = getMockZaiMessage('glm-4.7', 'test-req-123');
+      const mock = getMockZaiMessage('glm-5', 'test-req-123');
       expect(mock.usage?.prompt_tokens).toBe(0);
       expect(mock.usage?.completion_tokens).toBe(0);
       expect(mock.usage?.total_tokens).toBe(0);

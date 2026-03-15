@@ -2,6 +2,10 @@ import { LENGTH_PREFIX_BYTES, MAX_MESSAGE_SIZE_BYTES } from '../protocol/constan
 
 import type { Readable, Writable } from 'node:stream';
 
+export interface MessageIOOptions {
+  maxMessageSizeBytes?: number;
+}
+
 /**
  * Reads exactly `size` bytes from a readable stream.
  * Returns `null` on EOF before any bytes are read.
@@ -61,16 +65,24 @@ function readExactly(input: Readable, size: number): Promise<Buffer | null> {
  * @param input - Readable stream (defaults to `process.stdin`)
  */
 export async function readMessage<T>(input: Readable = process.stdin): Promise<T | null> {
+  return await readMessageWithOptions<T>(input);
+}
+
+export async function readMessageWithOptions<T>(
+  input: Readable = process.stdin,
+  options?: MessageIOOptions
+): Promise<T | null> {
   const lengthBuf = await readExactly(input, LENGTH_PREFIX_BYTES);
   if (lengthBuf === null) return null;
 
   const messageLength = lengthBuf.readUInt32LE(0);
+  const maxMessageSizeBytes = options?.maxMessageSizeBytes ?? MAX_MESSAGE_SIZE_BYTES;
 
   if (messageLength === 0) {
     throw new Error('Received zero-length message');
   }
-  if (messageLength > MAX_MESSAGE_SIZE_BYTES) {
-    throw new Error(`Message size ${messageLength} exceeds maximum ${MAX_MESSAGE_SIZE_BYTES}`);
+  if (messageLength > maxMessageSizeBytes) {
+    throw new Error(`Message size ${messageLength} exceeds maximum ${maxMessageSizeBytes}`);
   }
 
   const messageBuf = await readExactly(input, messageLength);
@@ -88,11 +100,20 @@ export async function readMessage<T>(input: Readable = process.stdin): Promise<T
  * @param output - Writable stream (defaults to `process.stdout`)
  */
 export function writeMessage(message: unknown, output: Writable = process.stdout): void {
-  const json = Buffer.from(JSON.stringify(message), 'utf-8');
+  writeMessageWithOptions(message, output);
+}
 
-  if (json.length > MAX_MESSAGE_SIZE_BYTES) {
+export function writeMessageWithOptions(
+  message: unknown,
+  output: Writable = process.stdout,
+  options?: MessageIOOptions
+): void {
+  const json = Buffer.from(JSON.stringify(message), 'utf-8');
+  const maxMessageSizeBytes = options?.maxMessageSizeBytes ?? MAX_MESSAGE_SIZE_BYTES;
+
+  if (json.length > maxMessageSizeBytes) {
     throw new Error(
-      `Serialized message size ${json.length} exceeds maximum ${MAX_MESSAGE_SIZE_BYTES}`
+      `Serialized message size ${json.length} exceeds maximum ${maxMessageSizeBytes}`
     );
   }
 

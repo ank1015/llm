@@ -23,6 +23,8 @@ interface TestResult {
   data?: unknown;
 }
 
+const SCRIPT_TEST_URL = 'https://example.com/?llm-extension-e2e=1';
+
 function log(msg: string): void {
   process.stderr.write(`[e2e] ${msg}\n`);
 }
@@ -48,6 +50,7 @@ async function main(): Promise<void> {
   log('connected');
 
   const results: TestResult[] = [];
+  let scriptTabId: number | null = null;
 
   // ── Test: tabs.query returns an array ───────────────────────────
   results.push(
@@ -86,18 +89,31 @@ async function main(): Promise<void> {
     })
   );
 
+  results.push(
+    await test('setup deterministic tab for scripting.executeScript tests', async () => {
+      const tab = (await chrome.call('tabs.create', {
+        url: SCRIPT_TEST_URL,
+        active: true,
+      })) as { id?: number };
+
+      scriptTabId = typeof tab.id === 'number' ? tab.id : null;
+
+      return {
+        pass: typeof scriptTabId === 'number',
+        data: { tabId: scriptTabId },
+      };
+    })
+  );
+
   // ── Test: scripting.executeScript with code string ──────────────
   results.push(
     await test('scripting.executeScript returns page title', async () => {
-      const tabs = (await chrome.call('tabs.query', {
-        active: true,
-        currentWindow: true,
-      })) as { id: number }[];
-      const tabId = tabs[0]?.id;
-      if (!tabId) return { pass: false, data: 'No active tab found' };
+      if (!scriptTabId) {
+        return { pass: false, data: 'No scripting test tab found' };
+      }
 
       const result = (await chrome.call('scripting.executeScript', {
-        target: { tabId },
+        target: { tabId: scriptTabId },
         code: 'document.title',
       })) as { result: unknown }[];
       const title = result[0]?.result;
@@ -111,15 +127,12 @@ async function main(): Promise<void> {
   // ── Test: scripting.executeScript complex expression ─────────────
   results.push(
     await test('scripting.executeScript evaluates expressions', async () => {
-      const tabs = (await chrome.call('tabs.query', {
-        active: true,
-        currentWindow: true,
-      })) as { id: number }[];
-      const tabId = tabs[0]?.id;
-      if (!tabId) return { pass: false, data: 'No active tab found' };
+      if (!scriptTabId) {
+        return { pass: false, data: 'No scripting test tab found' };
+      }
 
       const result = (await chrome.call('scripting.executeScript', {
-        target: { tabId },
+        target: { tabId: scriptTabId },
         code: '({ url: location.href, nodeCount: document.querySelectorAll("*").length })',
       })) as { result: unknown }[];
       const data = result[0]?.result as { url?: string; nodeCount?: number } | null;
@@ -165,6 +178,15 @@ async function main(): Promise<void> {
       return { pass: true, data: `received ${events.length} events during wait` };
     })
   );
+
+  if (scriptTabId) {
+    results.push(
+      await test('cleanup deterministic scripting tab', async () => {
+        await chrome.call('tabs.remove', scriptTabId);
+        return { pass: true, data: { removedTabId: scriptTabId } };
+      })
+    );
+  }
 
   // ── Report results ──────────────────────────────────────────────
   const passed = results.filter((r) => r.pass).length;

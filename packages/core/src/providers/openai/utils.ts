@@ -5,10 +5,10 @@ import { sanitizeSurrogates } from '../../utils/sanitize-unicode.js';
 import type {
   BaseAssistantMessage,
   Context,
+  ImageContent,
   Model,
   OpenAIProviderOptions,
   StopReason,
-  TextContent,
   Tool,
 } from '@ank1015/llm-types';
 import type {
@@ -70,6 +70,40 @@ export function buildParams(
   return params;
 }
 
+function buildAssistantTextMessage(text: string): ResponseOutputMessage {
+  return {
+    type: 'message',
+    role: 'assistant',
+    content: [
+      {
+        type: 'output_text',
+        text,
+      },
+    ],
+  } as ResponseOutputMessage;
+}
+
+function buildAssistantImageMessage(image: ImageContent): ResponseInputItem {
+  return {
+    type: 'message',
+    role: 'assistant',
+    content: [
+      {
+        type: 'input_image',
+        detail: 'auto',
+        image_url: `data:${image.mimeType};base64,${image.data}`,
+      },
+    ],
+  } as ResponseInputItem;
+}
+
+function buildImageGenerationReferenceItem(providerItemId: string): ResponseInputItem {
+  return {
+    type: 'image_generation_call',
+    id: providerItemId,
+  } as ResponseInputItem;
+}
+
 export function buildOpenAIMessages(model: Model<'openai'>, context: Context): ResponseInput {
   const openAIMessages: ResponseInput = [];
   if (context.systemPrompt) {
@@ -98,7 +132,7 @@ export function buildOpenAIMessages(model: Model<'openai'>, context: Context): R
           contents.push({
             type: 'input_file',
             filename: contentItem.filename,
-            file_data: `data:${contentItem.mimeType};base64,${contentItem.data}`,
+            file_data: contentItem.data,
           });
         }
       }
@@ -135,7 +169,7 @@ export function buildOpenAIMessages(model: Model<'openai'>, context: Context): R
         } else if (contentItem.type === 'file' && model.input.includes('file')) {
           toolOutputs.push({
             type: 'input_file',
-            file_data: `data:${contentItem.mimeType};base64,${contentItem.data}`,
+            file_data: contentItem.data,
           });
           hasFile = true;
         }
@@ -165,44 +199,49 @@ export function buildOpenAIMessages(model: Model<'openai'>, context: Context): R
             outputPart.type === 'reasoning'
           ) {
             openAIMessages.push(outputPart);
+          } else if (outputPart.type === 'image_generation_call') {
+            openAIMessages.push(buildImageGenerationReferenceItem(outputPart.id));
           }
         }
       }
       // Convert from other providers using the normalized content field
       else {
+        let textBuffer = '';
+        const flushTextBuffer = () => {
+          if (!textBuffer) return;
+          openAIMessages.push(buildAssistantTextMessage(textBuffer));
+          textBuffer = '';
+        };
+
         for (const contentBlock of message.content) {
           if (contentBlock.type === 'thinking') {
+            flushTextBuffer();
             // Wrap thinking in <thinking> tags as an assistant message
-            openAIMessages.push({
-              type: 'message',
-              role: 'assistant',
-              content: [
-                {
-                  type: 'output_text',
-                  text: `<thinking>${sanitizeSurrogates(contentBlock.thinkingText)}</thinking>`,
-                },
-              ],
-            } as ResponseOutputMessage);
+            openAIMessages.push(
+              buildAssistantTextMessage(
+                `<thinking>${sanitizeSurrogates(contentBlock.thinkingText)}</thinking>`
+              )
+            );
           } else if (contentBlock.type === 'response') {
-            // Convert response content to message
-            const textContent = contentBlock.content
-              .filter((c) => c.type === 'text')
-              .map((c) => sanitizeSurrogates((c as TextContent).content))
-              .join('');
+            for (const responseItem of contentBlock.content) {
+              if (responseItem.type === 'text') {
+                textBuffer += sanitizeSurrogates(responseItem.content);
+              } else if (responseItem.type === 'image' && model.input.includes('image')) {
+                flushTextBuffer();
+                const providerItemId =
+                  typeof responseItem.metadata?.generationProviderItemId === 'string'
+                    ? responseItem.metadata.generationProviderItemId
+                    : undefined;
 
-            if (textContent) {
-              openAIMessages.push({
-                type: 'message',
-                role: 'assistant',
-                content: [
-                  {
-                    type: 'output_text',
-                    text: textContent,
-                  },
-                ],
-              } as ResponseOutputMessage);
+                if (responseItem.metadata?.generationProvider === 'openai' && providerItemId) {
+                  openAIMessages.push(buildImageGenerationReferenceItem(providerItemId));
+                } else {
+                  openAIMessages.push(buildAssistantImageMessage(responseItem));
+                }
+              }
             }
           } else if (contentBlock.type === 'toolCall') {
+            flushTextBuffer();
             // Convert tool call to function_call
             openAIMessages.push({
               type: 'function_call',
@@ -212,6 +251,8 @@ export function buildOpenAIMessages(model: Model<'openai'>, context: Context): R
             } as ResponseFunctionToolCall);
           }
         }
+
+        flushTextBuffer();
       }
     }
   }

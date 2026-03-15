@@ -1,13 +1,21 @@
 import { randomUUID } from 'node:crypto';
 
-import { readMessage, writeMessage } from '../native/stdio.js';
+import { readMessageWithOptions, writeMessageWithOptions } from '../native/stdio.js';
+import { MAX_MESSAGE_SIZE_BYTES } from '../protocol/constants.js';
 
+import { getPageMarkdownForTab } from './page-markdown.js';
+
+import type { GetPageMarkdownOptions } from './page-markdown.js';
 import type { HostMessage, ChromeMessage } from '../protocol/types.js';
 import type { Readable, Writable } from 'node:stream';
+
+const CONNECTION_CLOSED_MESSAGE = 'ChromeClient connection is closed';
 
 export interface ChromeClientOptions {
   input?: Readable;
   output?: Writable;
+  maxIncomingMessageSizeBytes?: number;
+  maxOutgoingMessageSizeBytes?: number;
 }
 
 interface PendingCall {
@@ -27,16 +35,20 @@ export class ChromeClient {
   private pendingCalls = new Map<string, PendingCall>();
   private eventCallbacks = new Map<string, (data: unknown) => void>();
   private closed = false;
+  private maxIncomingMessageSizeBytes: number;
+  private maxOutgoingMessageSizeBytes: number;
 
   constructor(opts?: ChromeClientOptions) {
     this.input = opts?.input;
     this.output = opts?.output;
+    this.maxIncomingMessageSizeBytes = opts?.maxIncomingMessageSizeBytes ?? MAX_MESSAGE_SIZE_BYTES;
+    this.maxOutgoingMessageSizeBytes = opts?.maxOutgoingMessageSizeBytes ?? MAX_MESSAGE_SIZE_BYTES;
   }
 
   /** Call a Chrome API method and wait for the result. */
   async call(method: string, ...args: unknown[]): Promise<unknown> {
     if (this.closed) {
-      throw new Error('ChromeClient connection is closed');
+      throw new Error(CONNECTION_CLOSED_MESSAGE);
     }
 
     const id = randomUUID();
@@ -55,7 +67,7 @@ export class ChromeClient {
    */
   subscribe(event: string, callback: (data: unknown) => void): () => void {
     if (this.closed) {
-      throw new Error('ChromeClient connection is closed');
+      throw new Error(CONNECTION_CLOSED_MESSAGE);
     }
 
     const id = randomUUID();
@@ -69,6 +81,18 @@ export class ChromeClient {
   }
 
   /**
+   * Read a tab's HTML via `debugger.evaluate` and convert it to markdown
+   * using the local converter service.
+   */
+  async getPageMarkdown(tabId: number, options?: GetPageMarkdownOptions): Promise<string> {
+    if (this.closed) {
+      throw new Error(CONNECTION_CLOSED_MESSAGE);
+    }
+
+    return await getPageMarkdownForTab(this, tabId, options);
+  }
+
+  /**
    * Start the read loop. Runs until stdin closes (EOF).
    *
    * Must be running for `call()` and `subscribe()` to receive responses.
@@ -76,54 +100,66 @@ export class ChromeClient {
    */
   async run(): Promise<void> {
     while (true) {
-      let message: ChromeMessage | null;
-
-      try {
-        message = await readMessage<ChromeMessage>(this.input);
-      } catch (error) {
-        this.cleanup(error instanceof Error ? error : new Error(String(error)));
-        throw error;
-      }
+      const message = await this.readNextMessage();
 
       if (message === null) {
         this.cleanup(new Error('Connection closed'));
         return;
       }
 
-      switch (message.type) {
-        case 'result': {
-          const pending = this.pendingCalls.get(message.id);
-          if (pending) {
-            this.pendingCalls.delete(message.id);
-            pending.resolve(message.data);
-          }
-          break;
-        }
-
-        case 'error': {
-          const pending = this.pendingCalls.get(message.id);
-          if (pending) {
-            this.pendingCalls.delete(message.id);
-            pending.reject(new Error(message.error));
-          }
-          // If error was for a subscription setup, clean it up
-          if (this.eventCallbacks.has(message.id)) {
-            this.eventCallbacks.delete(message.id);
-          }
-          break;
-        }
-
-        case 'event': {
-          const callback = this.eventCallbacks.get(message.id);
-          callback?.(message.data);
-          break;
-        }
-      }
+      this.handleMessage(message);
     }
   }
 
   private send(message: HostMessage): void {
-    writeMessage(message, this.output);
+    writeMessageWithOptions(message, this.output, {
+      maxMessageSizeBytes: this.maxOutgoingMessageSizeBytes,
+    });
+  }
+
+  private async readNextMessage(): Promise<ChromeMessage | null> {
+    try {
+      return await readMessageWithOptions<ChromeMessage>(this.input, {
+        maxMessageSizeBytes: this.maxIncomingMessageSizeBytes,
+      });
+    } catch (error) {
+      this.cleanup(error instanceof Error ? error : new Error(String(error)));
+      throw error;
+    }
+  }
+
+  private handleMessage(message: ChromeMessage): void {
+    switch (message.type) {
+      case 'result':
+        this.resolvePendingCall(message.id, message.data);
+        break;
+      case 'error':
+        this.rejectPendingCall(message.id, message.error);
+        break;
+      case 'event':
+        this.eventCallbacks.get(message.id)?.(message.data);
+        break;
+    }
+  }
+
+  private resolvePendingCall(id: string, data: unknown): void {
+    const pending = this.pendingCalls.get(id);
+    if (!pending) {
+      return;
+    }
+
+    this.pendingCalls.delete(id);
+    pending.resolve(data);
+  }
+
+  private rejectPendingCall(id: string, errorMessage: string): void {
+    const pending = this.pendingCalls.get(id);
+    if (pending) {
+      this.pendingCalls.delete(id);
+      pending.reject(new Error(errorMessage));
+    }
+
+    this.eventCallbacks.delete(id);
   }
 
   private cleanup(error: Error): void {

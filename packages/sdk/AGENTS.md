@@ -1,232 +1,175 @@
 # @ank1015/llm-sdk
 
-Unified SDK for LLM interactions with multiple providers. Uses adapter pattern for storage operations (keys, usage, sessions).
+Opinionated SDK layer over `@ank1015/llm-core`.
+
+This package owns the higher-level application surface:
+
+- credential resolution through `KeysAdapter`
+- stateful conversations via `Conversation`
+- session convenience via `SessionManager`
+- selected re-exports from `core` and `types`
+
+It should stay runtime-neutral. Concrete filesystem/database adapters belong in the companion `@ank1015/llm-sdk-adapters` package, not here.
 
 ## Commands
 
-- `pnpm build` — Compile TypeScript to dist/
-- `pnpm dev` — Watch mode compilation
-- `pnpm test` — Run all tests
-- `pnpm test:unit` — Run unit tests
-- `pnpm test:integration` — Run integration tests (requires API keys)
-- `pnpm typecheck` — Type-check without emitting
+- `pnpm build` — clean `dist/` and compile TypeScript
+- `pnpm dev` — watch mode compilation
+- `pnpm test` — run unit and integration tests
+- `pnpm test:unit` — run unit tests
+- `pnpm test:integration` — run integration tests (skips suites without credentials)
+- `pnpm test:coverage` — run unit tests with coverage
+- `pnpm typecheck` — type-check without emitting
+- `pnpm lint` — run ESLint for the package
+- `pnpm clean` — remove build output and coverage
 
 ## Structure
 
-```
+```text
 src/
-  index.ts              — Public exports
+  index.ts                — public exports
   adapters/
-    index.ts            — Adapter exports (interfaces and types only)
-    types.ts            — Adapter interfaces (KeysAdapter, UsageAdapter, SessionsAdapter)
-    file-keys.ts        — [MOVED to @ank1015/llm-sdk-adapters]
-    sqlite-usage.ts     — [MOVED to @ank1015/llm-sdk-adapters]
-    file-sessions.ts    — [MOVED to @ank1015/llm-sdk-adapters]
+    index.ts              — adapter contracts re-exported from @ank1015/llm-types
   llm/
-    index.ts            — LLM module exports
-    complete.ts         — Complete function with adapter support
-    stream.ts           — Stream function with adapter support
+    complete.ts           — complete() with credential resolution
+    stream.ts             — stream() with credential resolution
+    index.ts              — llm exports
   agent/
-    index.ts            — Agent module exports
-    conversation.ts     — Conversation class (uses core's runAgentLoop)
+    conversation.ts       — stateful wrapper around core's runAgentLoop
+    index.ts              — agent exports
   session/
-    index.ts            — Session module exports
-    session-manager.ts  — SessionManager class wrapping SessionsAdapter
+    session-manager.ts    — convenience wrapper around SessionsAdapter
+    index.ts              — session exports
+  utils/
+    resolve-key.ts        — shared credential-resolution logic
+
+docs/
+  README.md               — docs index
+  adapters.md             — package boundaries and adapter expectations
+  testing.md              — test ownership and commands
+
+tests/
+  unit/
+    llm/                  — complete/stream wrapper behavior
+    conversation/         — state and execution behavior
+    session/              — SessionManager delegation
+  integration/
+    complete.test.ts      — complete() with live providers
+    stream.test.ts        — stream() with live providers
+    conversation/         — end-to-end conversation flows and budgets
 ```
 
-## Key Exports
+## Key Behavior
 
-### Adapters
+### Credential Resolution
 
-Adapters provide pluggable storage for keys, usage tracking, and sessions.
+`complete()`, `stream()`, and `Conversation` all use the same precedence:
 
-**Interfaces:**
+1. explicit credential fields in `providerOptions`
+2. `keysAdapter.getCredentials(api)` when available
+3. `keysAdapter.get(api)` for `apiKey`
+4. throw if required fields are still missing
 
-- `KeysAdapter` — Store/retrieve API keys
-- `UsageAdapter` — Track LLM usage and costs
-- `SessionsAdapter` — Manage conversation sessions
+This matters for providers with multiple credential fields such as `codex` and `claude-code`.
 
-**Implementations (in @ank1015/llm-sdk-adapters):**
+### Main Exports
 
-- `FileKeysAdapter` — Encrypted file storage (~/.llm/global/keys/)
-- `SqliteUsageAdapter` — SQLite database (~/.llm/global/usages/messages.db)
-- `FileSessionsAdapter` — JSONL files (~/.llm/sessions/)
-- `InMemoryKeysAdapter` — In-memory for testing
-- `InMemoryUsageAdapter` — In-memory for testing
-- `InMemorySessionsAdapter` — In-memory for testing
+- `complete(model, context, options?)`
+- `stream(model, context, options?)`
+- `Conversation`
+- `SessionManager`, `createSessionManager(adapter)`
+- `resolveApiKey()`, `resolveProviderCredentials()`
+- selected `@ank1015/llm-core` and `@ank1015/llm-types` re-exports
 
-### LLM Functions
+### Package Boundary
 
-- `complete(model, context, options?)` — Complete a chat request
-- `stream(model, context, options?)` — Stream a chat request
+- `sdk` owns contracts, wrappers, and stateful helpers
+- `sdk-adapters` owns concrete Node-oriented implementations and their implementation tests
+- provider/runtime coverage follows the current `@ank1015/llm-core` model catalog
 
-Options include:
+## Usage Examples
 
-- `providerOptions` — Provider-specific options (apiKey optional)
-- `keysAdapter` — Adapter for API key lookup
-- `usageAdapter` — Adapter for usage tracking
+### Direct Provider Options
 
-API key resolution: `providerOptions.apiKey` → `keysAdapter.get()` → error
+```ts
+import { complete, getModel } from '@ank1015/llm-sdk';
 
-### Agent
+const model = getModel('anthropic', 'claude-haiku-4-5');
 
-- `Conversation` — Stateful agent class with tool execution
-  - Uses core's `runAgentLoop` internally
-  - Accepts optional `keysAdapter` and `usageAdapter`
+const response = await complete(
+  model!,
+  {
+    messages: [
+      {
+        role: 'user',
+        id: 'msg-1',
+        timestamp: Date.now(),
+        content: [{ type: 'text', content: 'Say hello.' }],
+      },
+    ],
+  },
+  {
+    providerOptions: {
+      apiKey: process.env.ANTHROPIC_API_KEY!,
+      max_tokens: 128,
+    },
+  }
+);
+```
+
+### Conversation
+
+```ts
+import { Conversation, getModel } from '@ank1015/llm-sdk';
+
+const conversation = new Conversation();
+
+conversation.setProvider({
+  model: getModel('openai', 'gpt-5.2')!,
+  providerOptions: { apiKey: process.env.OPENAI_API_KEY! },
+});
+
+const newMessages = await conversation.prompt('Plan a weekend trip.');
+```
 
 ### Session Manager
 
-- `SessionManager` — Wraps a SessionsAdapter for session operations
-- `createSessionManager(adapter)` — Create a SessionManager instance
+```ts
+import { createSessionManager, type SessionsAdapter } from '@ank1015/llm-sdk';
 
-### From Core (re-exported)
+declare const sessionsAdapter: SessionsAdapter;
 
-- `runAgentLoop` — Stateless agent loop function
-- `buildUserMessage`, `buildToolResultMessage` — Message builders
-- `getMockMessage` — Mock message generator
-- `MODELS`, `getModel`, `getModels`, `calculateCost` — Model utilities
-
-## Usage
-
-### Basic LLM with Adapters
-
-```typescript
-import { complete, getModel } from '@ank1015/llm-sdk';
-import { createFileKeysAdapter, createSqliteUsageAdapter } from '@ank1015/llm-sdk-adapters';
-
-const keysAdapter = createFileKeysAdapter();
-const usageAdapter = createSqliteUsageAdapter();
-
-// Set an API key
-await keysAdapter.set('anthropic', 'sk-ant-...');
-
-// Complete with automatic key lookup and usage tracking
-const response = await complete(
-  getModel('anthropic', 'claude-sonnet-4-20250514')!,
-  { messages: [{ role: 'user', id: '1', content: [{ type: 'text', content: 'Hello!' }] }] },
-  { keysAdapter, usageAdapter }
-);
-```
-
-### Direct API Key (no adapter)
-
-```typescript
-import { complete, getModel } from '@ank1015/llm-sdk';
-
-const response = await complete(
-  getModel('anthropic', 'claude-sonnet-4-20250514')!,
-  { messages: [{ role: 'user', id: '1', content: [{ type: 'text', content: 'Hello!' }] }] },
-  { providerOptions: { apiKey: 'sk-ant-...' } }
-);
-```
-
-### Conversation with Adapters
-
-```typescript
-import { Conversation, getModel } from '@ank1015/llm-sdk';
-import { createFileKeysAdapter } from '@ank1015/llm-sdk-adapters';
-
-const keysAdapter = createFileKeysAdapter();
-const conversation = new Conversation({ keysAdapter });
-
-conversation.setProvider({ model: getModel('anthropic', 'claude-sonnet-4-20250514')! });
-conversation.subscribe((event) => console.log(event.type));
-
-const messages = await conversation.prompt('Hello!');
-```
-
-### Session Management
-
-```typescript
-import { createSessionManager } from '@ank1015/llm-sdk';
-import { createFileSessionsAdapter } from '@ank1015/llm-sdk-adapters';
-
-const sessionsAdapter = createFileSessionsAdapter();
-const sessionManager = createSessionManager(sessionsAdapter);
-
-// Create a session
-const { sessionId, header } = await sessionManager.createSession({
-  projectName: 'my-project',
-  sessionName: 'My Chat',
+const sessions = createSessionManager(sessionsAdapter);
+const created = await sessions.createSession({
+  projectName: 'demo',
+  sessionName: 'First Session',
 });
-
-// Append a message
-await sessionManager.appendMessage({
-  projectName: 'my-project',
-  sessionId,
-  parentId: header.id,
-  branch: 'main',
-  message: { role: 'user', id: 'msg-1', content: [{ type: 'text', content: 'Hello!' }] },
-  api: 'anthropic',
-  modelId: 'claude-sonnet-4-20250514',
-});
-
-// Get the session
-const session = await sessionManager.getSession('my-project', sessionId);
 ```
 
 ## Testing
 
-```
-tests/
-  unit/
-    adapters/
-      file-keys.test.ts       — FileKeysAdapter tests (encryption, CRUD)
-      sqlite-usage.test.ts    — SqliteUsageAdapter tests (tracking, stats, filters)
-      file-sessions.test.ts   — FileSessionsAdapter tests (JSONL, branches)
-    llm/
-      complete.test.ts        — Complete function (key resolution, usage tracking)
-      stream.test.ts          — Stream function (key resolution, usage tracking)
-    conversation/
-      state.test.ts           — Conversation state management
-      execution.test.ts       — Conversation execution with adapters
-    session/
-      session-manager.test.ts — SessionManager delegation tests
-  integration/
-    complete.test.ts          — End-to-end complete tests (requires API keys)
-    stream.test.ts            — End-to-end stream tests (requires API keys)
-    adapters/
-      file-keys.test.ts       — FileKeysAdapter file system tests
-      sqlite-usage.test.ts    — SqliteUsageAdapter database tests
-      file-sessions.test.ts   — FileSessionsAdapter file system tests
-      usage-tracking.test.ts  — End-to-end usage tracking with complete/stream
-    session/
-      session-manager.test.ts — SessionManager with real adapter
-    conversation/
-      anthropic.test.ts       — Anthropic provider tests (tools, events)
-      openai.test.ts          — OpenAI provider tests
-      google.test.ts          — Google provider tests
-      deepseek.test.ts        — DeepSeek provider tests
-      kimi.test.ts            — Kimi provider tests
-      zai.test.ts             — Z.AI provider tests
-      budget.test.ts          — Cost/context limit tests
-```
+- sdk unit tests should cover wrapper behavior only
+- adapter implementation tests belong in `sdk-adapters`
+- live integration tests in this package should use sdk-owned entry points only
 
-Run tests:
+Environment variables commonly used by integration tests:
 
-- `pnpm test` — All tests
-- `pnpm test tests/unit` — Unit tests only
-- `pnpm test tests/integration` — Integration tests (requires API keys)
-
-Environment variables for integration tests:
-
-- `ANTHROPIC_API_KEY` — Anthropic API key
-- `OPENAI_API_KEY` — OpenAI API key
-- `GEMINI_API_KEY` — Google Gemini API key
-- `DEEPSEEK_API_KEY` — DeepSeek API key
-- `KIMI_API_KEY` — Kimi API key
-- `ZAI_API_KEY` — Z.AI API key
+- `ANTHROPIC_API_KEY`
+- `OPENAI_API_KEY`
+- `GEMINI_API_KEY`
+- `DEEPSEEK_API_KEY`
+- `KIMI_API_KEY`
+- `ZAI_API_KEY`
 
 ## Conventions
 
-- Use adapters for storage operations (keys, usage, sessions)
-- No server dependency — SDK works standalone with adapters
-- API key resolution: explicit apiKey → adapter → error
-- Agent events are for UI updates; messages array is the source of truth
-- Use `exactOptionalPropertyTypes` — conditionally set optional properties
-- Mock `runAgentLoop` from core in unit tests; use `vi.resetAllMocks()` in beforeEach
+- Keep `src/` free of Node-specific persistence code
+- Do not add concrete adapter implementations here
+- Keep `Conversation` stateful and `core` stateless
+- Mock `@ank1015/llm-core` in sdk unit tests when testing wrapper behavior
+- Prefer current live model IDs from `core` in docs and examples
 
 ## Dependencies
 
-- Depends on: @ank1015/llm-types, @ank1015/llm-core
-- Depended on by: @ank1015/llm-sdk-adapters, (consumer applications)
+- Depends on: `@ank1015/llm-core`, `@ank1015/llm-types`
+- Companion package: `@ank1015/llm-sdk-adapters`

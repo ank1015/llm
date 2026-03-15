@@ -1,7 +1,7 @@
 {
   "name": "@ank1015/llm-sdk",
-  "version": "0.0.1",
-  "description": "Unified SDK for LLM interactions with multiple providers",
+  "version": "0.0.2",
+  "description": "Opinionated SDK layer over @ank1015/llm-core with credential resolution, conversations, and session helpers",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -12,35 +12,52 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "rm -rf dist *.tsbuildinfo && tsc",
     "dev": "tsc --watch",
-    "test": "vitest run",
+    "test": "pnpm run test:unit && pnpm run test:integration",
     "test:watch": "vitest",
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
+    "test:coverage": "vitest run tests/unit --coverage",
     "typecheck": "tsc --noEmit",
-    "lint": "echo 'No linter configured yet'",
-    "clean": "rm -rf dist *.tsbuildinfo"
+    "lint": "eslint src tests vitest.config.ts",
+    "clean": "rm -rf dist coverage *.tsbuildinfo",
+    "prepack": "pnpm run build"
   },
   "keywords": [
     "llm",
     "sdk",
     "ai",
-    "anthropic",
-    "openai",
-    "google",
-    "gemini"
+    "agents",
+    "conversations",
+    "sessions",
+    "adapters",
+    "typescript"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ank1015/llm.git",
+    "directory": "packages/sdk"
+  },
+  "homepage": "https://github.com/ank1015/llm/tree/main/packages/sdk",
+  "bugs": {
+    "url": "https://github.com/ank1015/llm/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
     "@ank1015/llm-core": "workspace:^",
     "@ank1015/llm-types": "workspace:^"
   },
   "devDependencies": {
-    "@ank1015/llm-sdk-adapters": "workspace:^",
     "@sinclair/typebox": "^0.34.48",
     "vitest": "^2.1.0"
   }

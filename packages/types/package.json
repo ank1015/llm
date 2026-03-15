@@ -1,7 +1,7 @@
 {
   "name": "@ank1015/llm-types",
-  "version": "0.0.1",
-  "description": "Type definitions for LLM SDK",
+  "version": "0.0.2",
+  "description": "Shared contracts and provider-native types for @ank1015/llm",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -12,25 +12,43 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "CHANGELOG.md",
+    "LICENSE"
   ],
+  "sideEffects": false,
   "scripts": {
-    "build": "tsc",
+    "build": "rm -rf dist *.tsbuildinfo && tsc",
     "dev": "tsc --watch",
     "typecheck": "tsc --noEmit",
     "lint": "echo 'No linter configured yet'",
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "keywords": [
+    "contracts",
     "llm",
+    "sdk",
+    "ai",
     "types",
     "typescript"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ank1015/llm.git",
+    "directory": "packages/types"
+  },
+  "homepage": "https://github.com/ank1015/llm/tree/main/packages/types",
+  "bugs": {
+    "url": "https://github.com/ank1015/llm/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "devDependencies": {
-    "@anthropic-ai/sdk": "^0.72.1",
-    "@google/genai": "^1.39.0",
+    "@anthropic-ai/sdk": "^0.78.0",
+    "@google/genai": "^1.44.0",
     "@sinclair/typebox": "^0.34.48",
-    "openai": "^6.17.0"
+    "openai": "^6.27.0"
   }
 }

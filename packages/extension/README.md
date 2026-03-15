@@ -1,214 +1,139 @@
 # @ank1015/llm-extension
 
-A Chrome extension that exposes Chrome APIs over a general-purpose RPC bridge. Any process on your machine can connect via TCP and call Chrome APIs like `tabs.query`, `scripting.executeScript`, `storage.local.get`, or subscribe to events like `tabs.onUpdated` — all through a simple `call()` / `subscribe()` interface.
+Chrome RPC bridge for automating or inspecting a live Chrome session from Node.js.
 
-## How It Works
+This package combines:
 
+- a Manifest V3 Chrome extension that exposes Chrome APIs over RPC
+- a native messaging host that bridges Chrome to TCP
+- a Node client with `connect()`, `call()`, `subscribe()`, and `getPageMarkdown()`
+
+It is intentionally a low-level Chrome RPC package. It does not ship a higher-level browser automation wrapper.
+
+## What You Get
+
+- `connect(opts?)` to attach to the local Chrome bridge
+- `ChromeClient.call(method, ...args)` for generic Chrome API access
+- `ChromeClient.subscribe(event, callback)` for Chrome events
+- `ChromeClient.getPageMarkdown(tabId, opts?)` as an optional HTML-to-markdown helper
+- `ChromeServer` plus protocol/stdio helpers if you need lower-level integration
+
+## Architecture
+
+```text
+Node process ── TCP :9224 ──→ native host ── native messaging ──→ Chrome extension
 ```
-Your Agent ── TCP :9224 ──→ Native Host ── stdin/stdout ──→ Chrome Extension
-                                │                               │
-                           ChromeServer                    background.ts
-                           (TCP proxy)                    (RPC proxy)
-```
 
-1. **Chrome extension** installs as a Manifest V3 service worker. On startup, it connects to a native messaging host.
-2. **Native host** is a Node.js process Chrome launches via the [Native Messaging](https://developer.chrome.com/docs/extensions/develop/concepts/native-messaging) protocol. It opens a TCP server on port 9224.
-3. **Your agent** connects to the TCP server and sends RPC messages. The native host forwards them to Chrome over stdin/stdout. Chrome executes the API call and sends the result back through the same chain.
+1. The Chrome extension runs a background service worker.
+2. Chrome launches the native host through native messaging.
+3. The native host opens a local TCP server.
+4. Your Node process connects and sends length-prefixed JSON RPC messages.
 
-The protocol uses 6 message types: `call`, `subscribe`, `unsubscribe` (agent → Chrome) and `result`, `error`, `event` (Chrome → agent). All messages are length-prefixed JSON, correlated by UUID.
+Docs:
 
-## Setup
+- [docs/README.md](docs/README.md)
+- [docs/architecture.md](docs/architecture.md)
+- [docs/deployment.md](docs/deployment.md)
+- [docs/testing.md](docs/testing.md)
 
-### Prerequisites
-
-- Chrome browser
-- Node.js 18+
-- pnpm
-
-### Install
+## Install and Setup
 
 ```bash
-# Build the extension and native host
-pnpm build
-
-# Load the extension in Chrome:
-# 1. Open chrome://extensions
-# 2. Enable "Developer mode"
-# 3. Click "Load unpacked" → select packages/extension/dist/chrome/
-# 4. Copy the extension ID shown on the card
-
-# Register the native messaging host
-./manifests/install-host.sh <extension-id>
-
-# Quit and reopen Chrome (required for native host registration)
+pnpm add @ank1015/llm-extension
 ```
 
-After this one-time setup, Chrome will automatically launch the native host whenever the extension loads.
+Build the package:
 
-### Verify
-
-Check the extension's service worker console (`chrome://extensions` → Inspect views → service worker):
-
-```
-[bg] background service worker loaded
+```bash
+pnpm --filter @ank1015/llm-extension build
 ```
 
-No disconnect error means the native host is running and the TCP server is ready on port 9224.
+Load the unpacked extension from `packages/extension/dist/chrome/` in `chrome://extensions`, then register the native host.
+
+For macOS, use the packaged installer script:
+
+```bash
+./packages/extension/manifests/install-host.sh <extension-id>
+```
+
+The script is macOS-specific. For other environments, use `manifests/com.ank1015.llm.json` as the template for manual native-host registration.
 
 ## Usage
-
-### From TypeScript/JavaScript
 
 ```ts
 import { connect } from '@ank1015/llm-extension';
 
-// Auto-launch Chrome if not running, retry until native host is ready
 const chrome = await connect({ launch: true });
 
-// Query tabs
-const tabs = await chrome.call('tabs.query', { active: true, currentWindow: true });
-console.log(tabs);
+const tabs = (await chrome.call('tabs.query', {
+  active: true,
+  currentWindow: true,
+})) as { id?: number; url?: string }[];
 
-// Execute JavaScript in a tab
-const result = await chrome.call('scripting.executeScript', {
-  target: { tabId: tabs[0].id },
+const tabId = tabs[0]?.id;
+if (typeof tabId !== 'number') {
+  throw new Error('No active tab found');
+}
+
+const title = await chrome.call('debugger.evaluate', {
+  tabId,
   code: 'document.title',
 });
-console.log(result[0].result); // page title
 
-// Use storage
-await chrome.call('storage.local.set', { myKey: 'myValue' });
-const data = await chrome.call('storage.local.get', 'myKey');
-console.log(data.myKey); // 'myValue'
-
-// Subscribe to events
-const unsubscribe = chrome.subscribe('tabs.onUpdated', (args) => {
-  const [tabId, changeInfo, tab] = args;
-  console.log(`Tab ${tabId} updated:`, changeInfo);
-});
-
-// Later...
-unsubscribe();
+const markdown = await chrome.getPageMarkdown(tabId);
 ```
 
-### From Any Language
-
-The protocol is language-agnostic. Connect to TCP port 9224 and exchange length-prefixed JSON:
-
-```
-[4 bytes: uint32 LE message length][JSON payload]
-```
-
-Send a call:
-
-```json
-{ "id": "uuid-here", "type": "call", "method": "tabs.query", "args": [{ "active": true }] }
-```
-
-Receive the result:
-
-```json
-{ "id": "uuid-here", "type": "result", "data": [{ "id": 1, "url": "https://..." }] }
-```
-
-## API
+## Core API
 
 ### `connect(opts?)`
 
-Connect to the Chrome RPC server. Returns a `ChromeClient`.
+Opens a TCP connection to the local Chrome RPC bridge and returns a ready-to-use `ChromeClient`.
 
-| Option          | Default       | Description                                         |
-| --------------- | ------------- | --------------------------------------------------- |
-| `port`          | `9224`        | TCP port to connect to                              |
-| `host`          | `'127.0.0.1'` | TCP host to connect to                              |
-| `launch`        | `false`       | Launch Chrome automatically if connection fails     |
-| `launchTimeout` | `30000`       | Max ms to wait for Chrome + native host to be ready |
+Options:
 
-```ts
-const chrome = await connect();
-const chrome = await connect({ port: 9224, host: '127.0.0.1' });
-const chrome = await connect({ launch: true }); // auto-open Chrome if not running
-const chrome = await connect({ launch: true, launchTimeout: 15000 });
-```
+- `host`: TCP host, default `127.0.0.1`
+- `port`: TCP port, default `9224`
+- `launch`: auto-open Chrome on connection failure
+- `launchTimeout`: max time to wait for Chrome/native host startup
 
-### `ChromeClient.call(method, ...args)`
+### `chrome.call(method, ...args)`
 
-Call any Chrome API method. The method string maps to `chrome.<method>` in the extension.
+Calls Chrome APIs by dot-path. Examples:
 
-```ts
-// chrome.tabs.query({ active: true })
-await chrome.call('tabs.query', { active: true });
+- `tabs.query`
+- `tabs.get`
+- `windows.create`
+- `cookies.getAll`
+- `storage.local.get`
 
-// chrome.tabs.get(123)
-await chrome.call('tabs.get', 123);
+Special RPC helpers also exist:
 
-// chrome.storage.local.get('key')
-await chrome.call('storage.local.get', 'key');
-```
+- `debugger.evaluate`
+- `debugger.attach`
+- `debugger.sendCommand`
+- `debugger.getEvents`
+- `debugger.detach`
 
-### `ChromeClient.call('scripting.executeScript', opts)`
+### `chrome.subscribe(event, callback)`
 
-Special case: pass a `code` string instead of a function reference. The code runs in the page's main world via `eval`.
+Subscribes to Chrome events such as `tabs.onUpdated`.
 
-```ts
-await chrome.call('scripting.executeScript', {
-  target: { tabId: 123 },
-  code: 'document.title',
-});
+### `chrome.getPageMarkdown(tabId, opts?)`
 
-await chrome.call('scripting.executeScript', {
-  target: { tabId: 123 },
-  code: '({ title: document.title, url: location.href })',
-});
-```
+Reads full page HTML via `debugger.evaluate`, sends it to a local converter service, and returns markdown.
 
-### `ChromeClient.subscribe(event, callback)`
+This helper is optional and non-core:
 
-Subscribe to a Chrome event. Returns an unsubscribe function.
+- it requires a converter service, default `http://localhost:8080/convert`
+- it throws on converter failures instead of returning a fallback string
 
-```ts
-const unsub = chrome.subscribe('tabs.onUpdated', (args) => {
-  console.log('Tab updated:', args);
-});
-
-// Stop listening
-unsub();
-```
-
-## Configuration
-
-| Variable          | Default | Description                         |
-| ----------------- | ------- | ----------------------------------- |
-| `CHROME_RPC_PORT` | `9224`  | TCP port the native host listens on |
-
-Set in the wrapper script at `~/.local/share/llm-native-host/run-host.sh` or pass via `connect({ port })`.
-
-## Development
+## Commands
 
 ```bash
-pnpm dev              # Watch mode (native + chrome)
-pnpm test             # Unit tests (25 tests)
-pnpm test:e2e         # E2E tests against live Chrome
-pnpm typecheck        # Type-check both tsconfigs
+pnpm --filter @ank1015/llm-extension build
+pnpm --filter @ank1015/llm-extension lint
+pnpm --filter @ank1015/llm-extension typecheck
+pnpm --filter @ank1015/llm-extension test:unit
+pnpm --filter @ank1015/llm-extension test:e2e
+pnpm --filter @ank1015/llm-extension test:e2e:page-markdown
 ```
-
-### Project Structure
-
-```
-src/
-  protocol/           # Shared message types and constants
-  sdk/                # ChromeClient, connect(), createChromeClient()
-  native/             # Node.js native host (host.ts, server.ts, stdio.ts)
-  chrome/             # Chrome extension (background.ts, manifest.json)
-tests/
-  unit/               # Unit tests (stdio, client, server, factory)
-  e2e/                # E2E tests against live Chrome
-manifests/            # Native host manifest and install script
-```
-
-### Two Build Targets
-
-The package has two runtime contexts with separate TypeScript configs:
-
-- **Node** (`tsconfig.json`): native host + SDK, compiled by `tsc` to `dist/`
-- **Chrome** (`tsconfig.chrome.json`): extension service worker, bundled by `esbuild` to `dist/chrome/`

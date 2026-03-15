@@ -173,7 +173,7 @@ describe('OpenAI Utils', () => {
         expect((result[0] as any).content).toContainEqual({
           type: 'input_file',
           filename: 'doc.pdf',
-          file_data: 'data:application/pdf;base64,pdfdata',
+          file_data: 'pdfdata',
         });
       });
 
@@ -327,7 +327,7 @@ describe('OpenAI Utils', () => {
         const result = buildOpenAIMessages(mockModel, context);
         expect((result[0] as any).output).toContainEqual({
           type: 'input_file',
-          file_data: 'data:application/pdf;base64,filedata',
+          file_data: 'filedata',
         });
       });
     });
@@ -445,6 +445,44 @@ describe('OpenAI Utils', () => {
         });
       });
 
+      it('should reduce native image generation calls to replay references', () => {
+        const assistantMessage: BaseAssistantMessage<'openai'> = {
+          role: 'assistant',
+          id: 'msg-image-native',
+          api: 'openai',
+          model: mockModel,
+          timestamp: Date.now(),
+          duration: 100,
+          stopReason: 'stop',
+          content: [],
+          usage: {
+            input: 10,
+            output: 20,
+            cacheRead: 0,
+            cacheWrite: 0,
+            totalTokens: 30,
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+          },
+          message: {
+            output: [
+              {
+                type: 'image_generation_call',
+                id: 'img_123',
+                result: 'base64image',
+                status: 'completed',
+              },
+            ],
+          } as Response,
+        };
+        const context: Context = { messages: [assistantMessage] };
+
+        const result = buildOpenAIMessages(mockModel, context);
+        expect(result[0]).toEqual({
+          type: 'image_generation_call',
+          id: 'img_123',
+        });
+      });
+
       describe('cross-provider handoff', () => {
         it('should convert Google assistant text response to OpenAI format', () => {
           const assistantMessage: BaseAssistantMessage<'google'> = {
@@ -479,6 +517,71 @@ describe('OpenAI Utils', () => {
             role: 'assistant',
             content: [{ type: 'output_text', text: 'Hello from Gemini!' }],
           });
+        });
+
+        it('should convert cross-provider assistant images into assistant image inputs', () => {
+          const assistantMessage: BaseAssistantMessage<'google'> = {
+            role: 'assistant',
+            id: 'msg-g-img',
+            api: 'google',
+            model: { id: 'gemini-3.1-flash-image-preview', api: 'google' } as any,
+            timestamp: Date.now(),
+            duration: 100,
+            stopReason: 'stop',
+            content: [
+              {
+                type: 'response',
+                content: [
+                  { type: 'text', content: 'Here is the render.' },
+                  {
+                    type: 'image',
+                    data: 'imgdata',
+                    mimeType: 'image/png',
+                    metadata: {
+                      generationStage: 'final',
+                      generationProvider: 'google',
+                    },
+                  },
+                  { type: 'text', content: 'Let me know if you want edits.' },
+                ],
+              },
+            ],
+            usage: {
+              input: 10,
+              output: 20,
+              cacheRead: 0,
+              cacheWrite: 0,
+              totalTokens: 30,
+              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+            },
+            message: {} as any,
+          };
+          const context: Context = { messages: [assistantMessage as any] };
+
+          const result = buildOpenAIMessages(mockModel, context);
+          expect(result).toEqual([
+            {
+              type: 'message',
+              role: 'assistant',
+              content: [{ type: 'output_text', text: 'Here is the render.' }],
+            },
+            {
+              type: 'message',
+              role: 'assistant',
+              content: [
+                {
+                  type: 'input_image',
+                  detail: 'auto',
+                  image_url: 'data:image/png;base64,imgdata',
+                },
+              ],
+            },
+            {
+              type: 'message',
+              role: 'assistant',
+              content: [{ type: 'output_text', text: 'Let me know if you want edits.' }],
+            },
+          ]);
         });
 
         it('should convert Google assistant thinking to OpenAI format with thinking tags', () => {

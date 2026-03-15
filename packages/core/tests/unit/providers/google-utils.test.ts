@@ -366,6 +366,53 @@ describe('Google Utils', () => {
           });
         });
 
+        it('should convert cross-provider assistant images and files to inlineData parts', () => {
+          const assistantMessage: BaseAssistantMessage<'openai'> = {
+            role: 'assistant',
+            id: 'msg-img-1',
+            api: 'openai',
+            model: { id: 'gpt-4o', api: 'openai' } as any,
+            timestamp: Date.now(),
+            duration: 100,
+            stopReason: 'stop',
+            content: [
+              {
+                type: 'response',
+                content: [
+                  { type: 'text', content: 'Use these references.' },
+                  { type: 'image', data: 'imgdata', mimeType: 'image/png' },
+                  {
+                    type: 'file',
+                    data: 'filedata',
+                    mimeType: 'application/pdf',
+                    filename: 'brief.pdf',
+                  },
+                ],
+              },
+            ],
+            usage: {
+              input: 10,
+              output: 20,
+              cacheRead: 0,
+              cacheWrite: 0,
+              totalTokens: 30,
+              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+            },
+            message: {} as any,
+          };
+          const context: Context = { messages: [assistantMessage as any] };
+
+          const result = buildGoogleMessages(mockModel, context);
+          expect(result[0]).toEqual({
+            role: 'model',
+            parts: [
+              { text: 'Use these references.' },
+              { inlineData: { mimeType: 'image/png', data: 'imgdata' } },
+              { inlineData: { mimeType: 'application/pdf', data: 'filedata' } },
+            ],
+          });
+        });
+
         it('should convert OpenAI assistant thinking to Google format with thinking tags', () => {
           const assistantMessage: BaseAssistantMessage<'openai'> = {
             role: 'assistant',

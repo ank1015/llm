@@ -77,6 +77,7 @@ export const streamAnthropic: StreamFunction<'anthropic'> = (
         if (event.type === 'message_start') {
           // Capture message metadata from message_start event
           finalResponse.id = event.message.id;
+          finalResponse.container = event.message.container;
           finalResponse.model = event.message.model;
           finalResponse.role = event.message.role;
           finalResponse.type = event.message.type;

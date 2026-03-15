@@ -4,7 +4,7 @@
  * Unified SDK for LLM interactions with multiple providers.
  *
  * This package provides:
- * - Adapter-based storage for API keys, usage tracking, and sessions
+ * - Adapter-based credential and session contracts
  * - Conversation class for stateful agent interactions
  * - Session management for conversation persistence
  */
@@ -12,12 +12,7 @@
 // Adapter interfaces and types (implementations in @ank1015/llm-sdk-adapters)
 export type {
   KeysAdapter,
-  UsageAdapter,
   SessionsAdapter,
-  UsageFilters,
-  UsageStats,
-  TokenBreakdown,
-  CostBreakdown,
   CreateSessionInput,
   AppendMessageInput,
   AppendCustomInput,
@@ -107,6 +102,8 @@ export type {
   ZaiThinkingConfig,
   ApiNativeResponseMap,
   NativeResponseForApi,
+  CodexProviderOptions,
+  ClaudeCodeProviderOptions,
   ApiOptionsMap,
   OptionsForApi,
   // Model

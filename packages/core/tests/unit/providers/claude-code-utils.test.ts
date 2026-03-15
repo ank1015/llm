@@ -18,12 +18,12 @@ import type {
 
 describe('Claude Code Utils', () => {
   const mockModel: Model<'claude-code'> = {
-    id: 'claude-sonnet-4-5',
-    name: 'Claude Sonnet 4.5',
+    id: 'claude-sonnet-4-6',
+    name: 'Claude Sonnet 4.6',
     api: 'claude-code',
     baseUrl: 'https://api.anthropic.com',
     reasoning: true,
-    input: ['text', 'image'],
+    input: ['text', 'image', 'file'],
     cost: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
     contextWindow: 200000,
     maxTokens: 64000,
@@ -80,6 +80,36 @@ describe('Claude Code Utils', () => {
         },
       ]);
     });
+
+    it('should convert user PDF file to Anthropic document format', () => {
+      const userMessage: UserMessage = {
+        role: 'user',
+        id: 'msg-1',
+        content: [
+          { type: 'file', data: 'pdfdata', mimeType: 'application/pdf', filename: 'doc.pdf' },
+        ],
+      };
+      const context: Context = { messages: [userMessage] };
+
+      const messages = buildClaudeCodeMessages(mockModel, context);
+
+      expect(messages).toEqual([
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'document',
+              title: 'doc.pdf',
+              source: {
+                type: 'base64',
+                media_type: 'application/pdf',
+                data: 'pdfdata',
+              },
+            },
+          ],
+        },
+      ]);
+    });
   });
 
   describe('buildParams', () => {
@@ -87,7 +117,7 @@ describe('Claude Code Utils', () => {
       const context: Context = { messages: [] };
       const result = buildParams(mockModel, context, defaultOptions);
 
-      expect(result.model).toBe('claude-sonnet-4-5');
+      expect(result.model).toBe('claude-sonnet-4-6');
       expect(result.max_tokens).toBe(64000);
       expect(result.stream).toBe(false);
     });

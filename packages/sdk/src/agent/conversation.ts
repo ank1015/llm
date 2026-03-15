@@ -2,7 +2,7 @@
  * Conversation class for managing stateful agent interactions.
  *
  * Uses core's runAgentLoop for execution with optional adapter support
- * for provider credential resolution and usage tracking.
+ * for provider credential resolution.
  */
 
 import {
@@ -16,7 +16,7 @@ import { ConversationBusyError, CostLimitError, ModelNotConfiguredError } from '
 
 import { resolveProviderCredentials } from '../utils/resolve-key.js';
 
-import type { KeysAdapter, UsageAdapter } from '../adapters/index.js';
+import type { KeysAdapter } from '../adapters/index.js';
 import type { AgentRunnerCallbacks, AgentRunnerConfig } from '@ank1015/llm-core';
 import type {
   Api,
@@ -40,8 +40,6 @@ export interface ConversationOptions {
   queueMode?: 'all' | 'one-at-a-time';
   /** Adapter for retrieving provider credentials */
   keysAdapter?: KeysAdapter;
-  /** Adapter for tracking usage */
-  usageAdapter?: UsageAdapter;
   /** Optional cost limit */
   costLimit?: number;
   /** Optional context limit */
@@ -74,7 +72,6 @@ const defaultMessageTransformer = (messages: Message[]): Message[] => {
 
 export class Conversation {
   private keysAdapter?: KeysAdapter;
-  private usageAdapter?: UsageAdapter;
   private _state: AgentState = defaultConversationState;
   private listeners = new Set<(e: AgentEvent) => void>();
   private abortController?: AbortController;
@@ -89,9 +86,6 @@ export class Conversation {
     const initialState = opts.initialState ?? {};
     if (opts.keysAdapter) {
       this.keysAdapter = opts.keysAdapter;
-    }
-    if (opts.usageAdapter) {
-      this.usageAdapter = opts.usageAdapter;
     }
     this.streamAssistantMessage = opts.streamAssistantMessage ?? true;
 
@@ -176,10 +170,6 @@ export class Conversation {
 
   setKeysAdapter(adapter: KeysAdapter): void {
     this.keysAdapter = adapter;
-  }
-
-  setUsageAdapter(adapter: UsageAdapter): void {
-    this.usageAdapter = adapter;
   }
 
   replaceMessages(ms: Message[]): void {
@@ -378,37 +368,22 @@ export class Conversation {
       budget.contextLimit = this._state.contextLimit;
     }
 
-    // Create bound complete/stream functions with resolved credentials
-    const usageAdapter = this.usageAdapter;
     const boundComplete: AgentRunnerConfig['complete'] = async (m, ctx, opts, id) => {
-      const result = await coreComplete(
+      return coreComplete(
         m,
         ctx,
         { ...opts, ...resolvedCredentials } as OptionsForApi<typeof m.api>,
         id
       );
-      if (usageAdapter) {
-        await usageAdapter.track(result);
-      }
-      return result;
     };
 
     const boundStream: AgentRunnerConfig['stream'] = (m, ctx, opts, id) => {
-      const eventStream = coreStream(
+      return coreStream(
         m,
         ctx,
         { ...opts, ...resolvedCredentials } as OptionsForApi<typeof m.api>,
         id
       );
-      if (usageAdapter) {
-        const originalResult = eventStream.result.bind(eventStream);
-        eventStream.result = async () => {
-          const message = await originalResult();
-          await usageAdapter.track(message);
-          return message;
-        };
-      }
-      return eventStream;
     };
 
     const cfg: AgentRunnerConfig = {

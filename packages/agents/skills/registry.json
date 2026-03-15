@@ -1,0 +1,10 @@
+[
+  {
+    "name": "ai-images",
+    "description": "Create brand-new images or edit existing images with state-of-the-art image generation models. Use this skill when the task involves image generation, visual variations, or image transformation.",
+    "helperProject": {
+      "runtime": "typescript",
+      "package": "@ank1015/llm-agents"
+    }
+  }
+]

@@ -9,7 +9,16 @@ import prettier from 'eslint-config-prettier';
 export default [
   // Ignore patterns
   {
-    ignores: ['**/dist/**', '**/node_modules/**', '**/.next/**', '**/coverage/**'],
+    ignores: [
+      '**/dist/**',
+      '**/node_modules/**',
+      '**/.next/**',
+      '**/.expo/**',
+      '**/coverage/**',
+      '**/web-build/**',
+      '**/android/**',
+      '**/ios/**',
+    ],
   },
 
   // Base ESLint recommended rules
@@ -114,6 +123,44 @@ export default [
     },
   },
 
+  // Package-local CommonJS config files
+  {
+    files: [
+      'packages/native-app/babel.config.js',
+      'packages/native-app/eslint.config.js',
+      'packages/native-app/metro.config.js',
+    ],
+    languageOptions: {
+      sourceType: 'commonjs',
+      globals: {
+        __dirname: 'readonly',
+        module: 'readonly',
+        require: 'readonly',
+      },
+    },
+    rules: {
+      'unicorn/filename-case': 'off',
+      '@typescript-eslint/explicit-function-return-type': 'off',
+    },
+  },
+
+  // Expo Router route filenames use framework-specific conventions.
+  {
+    files: ['**/src/app/**/_layout.tsx', '**/src/app/**/+*.tsx', '**/src/app/**/[[]*[]].tsx'],
+    rules: {
+      'unicorn/filename-case': 'off',
+    },
+  },
+
+  // React Native's published sources still contain syntax that the import-cycle rule
+  // tries to parse poorly; keep the rest of the import rules enabled.
+  {
+    files: ['packages/native-app/**/*.{ts,tsx}'],
+    rules: {
+      'import/no-cycle': 'off',
+    },
+  },
+
   // Provider files - complex streaming logic
   {
     files: ['**/providers/**/stream.ts', '**/providers/**/utils.ts'],
@@ -135,6 +182,31 @@ export default [
   // SDK stream - complex SSE parsing
   {
     files: ['**/sdk/src/llm/stream.ts'],
+    rules: {
+      'sonarjs/cognitive-complexity': 'off',
+    },
+  },
+
+  // UI/tool orchestration files with unavoidable control-flow fanout
+  {
+    files: [
+      'packages/agents/src/cli/agent-cli.ts',
+      'packages/agents/src/helpers/ai-image/ai-image.ts',
+      'packages/agents/src/tools/**/*.ts',
+      'packages/native-app/src/components/projects/artifacts/artifact-file-viewer-shared.ts',
+      'packages/native-app/src/components/projects/composer/project-prompt-composer.tsx',
+      'packages/native-app/src/components/projects/thread/thread-transcript-markdown.tsx',
+      'packages/native-app/src/components/projects/thread/thread-working-trace.tsx',
+      'packages/native-app/src/lib/client-api/conversation.ts',
+      'packages/native-app/src/lib/messages/chat-turns.ts',
+      'packages/native-app/src/lib/messages/working-trace.ts',
+      'packages/web-app/src/app/**/artifacts/page.tsx',
+      'packages/web-app/src/components/activity-drawer.tsx',
+      'packages/web-app/src/components/chat-input.tsx',
+      'packages/web-app/src/components/working-trace.tsx',
+      'packages/web-app/src/lib/client-api/conversation.ts',
+      'packages/web-app/src/lib/messages/working-trace.ts',
+    ],
     rules: {
       'sonarjs/cognitive-complexity': 'off',
     },

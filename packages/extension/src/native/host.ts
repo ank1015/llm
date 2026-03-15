@@ -1,4 +1,8 @@
-import { DEFAULT_PORT } from '../protocol/constants.js';
+import {
+  DEFAULT_PORT,
+  MAX_CHROME_TO_HOST_MESSAGE_SIZE_BYTES,
+  MAX_HOST_TO_CHROME_MESSAGE_SIZE_BYTES,
+} from '../protocol/constants.js';
 import { ChromeClient } from '../sdk/client.js';
 
 import { ChromeServer } from './server.js';
@@ -9,7 +13,10 @@ function log(msg: string): void {
 
 log(`started (pid=${process.pid})`);
 
-const client = new ChromeClient();
+const client = new ChromeClient({
+  maxIncomingMessageSizeBytes: MAX_CHROME_TO_HOST_MESSAGE_SIZE_BYTES,
+  maxOutgoingMessageSizeBytes: MAX_HOST_TO_CHROME_MESSAGE_SIZE_BYTES,
+});
 client.run().then(
   () => {
     log('Chrome disconnected, exiting');

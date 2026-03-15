@@ -1,51 +1,80 @@
 # @ank1015/llm-sdk-adapters
 
-Node.js adapter implementations for @ank1015/llm-sdk. Provides file-based, SQLite, and in-memory adapters.
+Node-oriented adapter implementations for `@ank1015/llm-sdk`.
+
+This package now owns only concrete keys and sessions storage:
+
+- file-system adapters for persisted encrypted keys and JSONL sessions
+- in-memory adapters for tests and lightweight local usage
+
+It does not own usage tracking, browser-facing code, or UI utilities.
 
 ## Commands
 
-- `pnpm build` — Compile TypeScript to dist/
-- `pnpm dev` — Watch mode compilation
-- `pnpm test` — Run all tests
-- `pnpm test:unit` — Run unit tests
-- `pnpm test:integration` — Run integration tests
-- `pnpm typecheck` — Type-check without emitting
+- `pnpm build` — clean `dist/` and compile TypeScript
+- `pnpm dev` — watch mode compilation
+- `pnpm test` — run all tests
+- `pnpm test:unit` — run unit tests
+- `pnpm test:integration` — run integration tests
+- `pnpm test:coverage` — run tests with coverage
+- `pnpm typecheck` — type-check without emitting
+- `pnpm lint` — run ESLint for the package
+- `pnpm clean` — remove build output and coverage
 
 ## Structure
 
-```
+```text
 src/
-  index.ts              — Public exports (all adapters)
-  file-keys.ts          — AES-256-GCM encrypted file-based keys storage
-  sqlite-usage.ts       — SQLite-based usage tracking (WAL mode)
-  file-sessions.ts      — JSONL append-only session storage with branching
-  memory-keys.ts        — In-memory keys adapter (for testing)
-  memory-usage.ts       — In-memory usage adapter (for testing)
-  memory-sessions.ts    — In-memory sessions adapter (for testing)
+  index.ts                           — public exports
+  file-system/
+    file-keys.ts                     — encrypted filesystem KeysAdapter
+    file-sessions.ts                 — JSONL filesystem SessionsAdapter
+  memory/
+    memory-keys.ts                   — in-memory KeysAdapter
+    memory-sessions.ts               — in-memory SessionsAdapter
+  shared/
+    credentials.ts                   — shared credential normalization
+    session-id.ts                    — local UUID helper
+
+tests/
+  unit/
+    file-system/                     — file adapter behavior
+    memory/                          — in-memory adapter behavior
+  integration/
+    file-system/                     — real filesystem adapter checks
+    sdk/                             — SessionManager compatibility checks
 ```
 
-## Adapters
+## Public Surface
 
-### File-based (Node.js specific)
+Root exports only:
 
-- `FileKeysAdapter` — Encrypted keys in ~/.llm/global/keys/
-- `SqliteUsageAdapter` — Usage data in ~/.llm/global/usages/messages.db
-- `FileSessionsAdapter` — Sessions in ~/.llm/sessions/<project>/<path>/<id>.jsonl
+- `FileKeysAdapter`
+- `createFileKeysAdapter`
+- `FileSessionsAdapter`
+- `createFileSessionsAdapter`
+- `InMemoryKeysAdapter`
+- `InMemorySessionsAdapter`
 
-### In-memory (zero deps, for testing)
-
-- `InMemoryKeysAdapter` — Map-based key storage
-- `InMemoryUsageAdapter` — Array-based message storage
-- `InMemorySessionsAdapter` — Map-based session storage with full tree support
+Do not add usage adapters or UI/server utilities back into this package.
 
 ## Conventions
 
-- Adapter implementations import interfaces from `@ank1015/llm-types`
-- File adapters include path traversal protection (`sanitizePath`)
-- Session adapters validate `parentId` existence and throw `InvalidParentError`
-- Session adapters throw `SessionNotFoundError` when provided `sessionId` doesn't exist
+- Import adapter interfaces and shared errors from `@ank1015/llm-types`
+- Keep package internals Node-only, but keep the public API small and root-exported
+- Preserve legacy single-key compatibility inside `FileKeysAdapter`
+- Validate path inputs and throw `PathTraversalError` for unsafe components
+- Validate `parentId` in session adapters and throw `InvalidParentError`
+- Throw `SessionNotFoundError` when session IDs do not exist
+
+## Testing
+
+- Implementation tests for concrete adapters belong here
+- `sdk` should only test wrapper behavior, not adapter storage details
+- `sdk` compatibility coverage for `SessionManager` stays here because it validates the concrete sessions adapter
+- Add tests for new adapter behaviors before publishing
 
 ## Dependencies
 
-- Depends on: @ank1015/llm-core, @ank1015/llm-types, better-sqlite3
-- Depended on by: @ank1015/llm-chat-app, (consumer applications)
+- Depends on: `@ank1015/llm-types`
+- Used by: `@ank1015/llm-server`, `@ank1015/llm-agents`, and any Node-side consumers that want ready-made keys/session adapters

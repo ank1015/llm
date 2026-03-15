@@ -5,17 +5,14 @@
  *
  * This package provides:
  * - File-based encrypted API key storage (FileKeysAdapter)
- * - SQLite-based usage tracking (SqliteUsageAdapter)
  * - JSONL file-based session storage (FileSessionsAdapter)
- * - In-memory adapters for testing (InMemoryKeysAdapter, InMemoryUsageAdapter, InMemorySessionsAdapter)
+ * - In-memory adapters for testing (InMemoryKeysAdapter, InMemorySessionsAdapter)
  */
 
 // File-based adapters (Node.js specific)
-export { FileKeysAdapter, createFileKeysAdapter } from './file-keys.js';
-export { SqliteUsageAdapter, createSqliteUsageAdapter } from './sqlite-usage.js';
-export { FileSessionsAdapter, createFileSessionsAdapter } from './file-sessions.js';
+export { FileKeysAdapter, createFileKeysAdapter } from './file-system/file-keys.js';
+export { FileSessionsAdapter, createFileSessionsAdapter } from './file-system/file-sessions.js';
 
 // In-memory adapters (zero deps, for testing)
-export { InMemoryKeysAdapter } from './memory-keys.js';
-export { InMemoryUsageAdapter } from './memory-usage.js';
-export { InMemorySessionsAdapter } from './memory-sessions.js';
+export { InMemoryKeysAdapter } from './memory/memory-keys.js';
+export { InMemorySessionsAdapter } from './memory/memory-sessions.js';
