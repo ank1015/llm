@@ -1,18 +1,15 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { basename, extname, join, parse, resolve } from 'node:path';
 
-import { buildUserMessage, getModel } from '@ank1015/llm-core';
+import { buildUserMessage, getModel, stream as sdkStream } from '@ank1015/llm-sdk';
 
-import { stream as sdkStream } from '../llm/stream.js';
-
-import type { KeysAdapter, UsageAdapter } from '../adapters/index.js';
-import type {
+import type { KeysAdapter ,
   BaseAssistantEvent,
   BaseAssistantMessage,
   GoogleProviderOptions,
   ImageContent,
   OpenAIProviderOptions,
-} from '@ank1015/llm-types';
+} from '@ank1015/llm-sdk';
 
 export const IMAGE_MODEL_IDS = [
   'gpt-5.4',
@@ -117,7 +114,6 @@ interface BaseImageRequest {
   outputDir: string;
   outputName?: string;
   keysAdapter?: KeysAdapter;
-  usageAdapter?: UsageAdapter;
   systemPrompt?: string;
   onUpdate?: (update: ImageUpdate) => void | Promise<void>;
 }
@@ -617,7 +613,6 @@ async function runImageRequest(
       {
         providerOptions,
         ...(request.keysAdapter ? { keysAdapter: request.keysAdapter } : {}),
-        ...(request.usageAdapter ? { usageAdapter: request.usageAdapter } : {}),
       }
     );
 

@@ -6,9 +6,10 @@ import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { FileSessionsAdapter, createFileSessionsAdapter } from '@ank1015/llm-sdk-adapters';
 import { SessionNotFoundError, InvalidParentError, PathTraversalError } from '@ank1015/llm-types';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import { FileSessionsAdapter, createFileSessionsAdapter } from '../../src/file-sessions.js';
 
 import type { Message } from '@ank1015/llm-types';
 

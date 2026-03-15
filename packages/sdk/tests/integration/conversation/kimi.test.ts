@@ -382,9 +382,9 @@ describe('Kimi Conversation Integration', () => {
     expect(textContent.content).toContain('8');
   }, 60000);
 
-  it('should work with kimi-k2-turbo-preview model', async () => {
+  it('should work with kimi-k2.5 model', async () => {
     const conversation = new Conversation();
-    const model = MODELS.kimi['kimi-k2-turbo-preview'];
+    const model = MODELS.kimi['kimi-k2.5'];
 
     conversation.setProvider({
       model: model,

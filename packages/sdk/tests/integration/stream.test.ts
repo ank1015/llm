@@ -15,6 +15,7 @@ import type { Context, BaseAssistantEvent } from '@ank1015/llm-types';
 describe('stream integration', () => {
   const anthropicApiKey = process.env['ANTHROPIC_API_KEY'];
   const openaiApiKey = process.env['OPENAI_API_KEY'];
+  const openaiModel = getModel('openai', 'gpt-5-nano');
 
   describe('with apiKey in providerOptions', () => {
     it.skipIf(!anthropicApiKey)(
@@ -57,12 +58,9 @@ describe('stream integration', () => {
       30000
     );
 
-    it.skipIf(!openaiApiKey)(
+    it.skipIf(!openaiApiKey || !openaiModel)(
       'should stream with OpenAI',
       async () => {
-        const model = getModel('openai', 'gpt-5.2');
-        expect(model).toBeDefined();
-
         const context: Context = {
           messages: [
             {
@@ -73,7 +71,7 @@ describe('stream integration', () => {
           ],
         };
 
-        const eventStream = await stream(model!, context, {
+        const eventStream = await stream(openaiModel!, context, {
           providerOptions: { apiKey: openaiApiKey },
         });
 

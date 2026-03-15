@@ -15,6 +15,7 @@ import type { Context } from '@ank1015/llm-types';
 describe('complete integration', () => {
   const anthropicApiKey = process.env['ANTHROPIC_API_KEY'];
   const openaiApiKey = process.env['OPENAI_API_KEY'];
+  const openaiModel = getModel('openai', 'gpt-5-nano');
 
   describe('with apiKey in providerOptions', () => {
     it.skipIf(!anthropicApiKey)(
@@ -49,12 +50,9 @@ describe('complete integration', () => {
       30000
     );
 
-    it.skipIf(!openaiApiKey)(
+    it.skipIf(!openaiApiKey || !openaiModel)(
       'should complete with OpenAI',
       async () => {
-        const model = getModel('openai', 'gpt-5.2');
-        expect(model).toBeDefined();
-
         const context: Context = {
           messages: [
             {
@@ -65,7 +63,7 @@ describe('complete integration', () => {
           ],
         };
 
-        const response = await complete(model!, context, {
+        const response = await complete(openaiModel!, context, {
           providerOptions: { apiKey: openaiApiKey },
         });
 

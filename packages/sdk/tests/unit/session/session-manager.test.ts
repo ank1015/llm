@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SessionManager, createSessionManager } from '../../../src/session/session-manager.js';
 
-import type { SessionsAdapter } from '../../../src/adapters/types.js';
+import type { SessionsAdapter } from '../../../src/adapters/index.js';
 import type {
   BranchInfo,
   CustomNode,

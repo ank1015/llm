@@ -2,14 +2,13 @@
  * SDK complete function
  *
  * Calls core's complete function with provider credentials from options or adapter.
- * Optionally tracks usage via UsageAdapter.
  */
 
 import { complete as coreComplete } from '@ank1015/llm-core';
 
 import { resolveProviderCredentials } from '../utils/resolve-key.js';
 
-import type { KeysAdapter, UsageAdapter } from '../adapters/index.js';
+import type { KeysAdapter } from '../adapters/index.js';
 import type { Api, BaseAssistantMessage, Context, Model, OptionsForApi } from '@ank1015/llm-types';
 
 /**
@@ -20,8 +19,6 @@ export interface CompleteOptions<TApi extends Api> {
   providerOptions?: Partial<OptionsForApi<TApi>>;
   /** Adapter for retrieving provider credentials */
   keysAdapter?: KeysAdapter;
-  /** Adapter for tracking usage */
-  usageAdapter?: UsageAdapter;
 }
 
 /**
@@ -31,8 +28,6 @@ export interface CompleteOptions<TApi extends Api> {
  * 1. Use explicit credential fields from providerOptions
  * 2. Fill missing fields from keysAdapter
  * 3. Throw if required fields are still missing
- *
- * After completion, if usageAdapter is provided, tracks the usage.
  *
  * @param model - The model configuration
  * @param context - The conversation context (messages, system prompt, tools)
@@ -46,7 +41,7 @@ export async function complete<TApi extends Api>(
   options: CompleteOptions<TApi> = {},
   id?: string
 ): Promise<BaseAssistantMessage<TApi>> {
-  const { providerOptions = {}, keysAdapter, usageAdapter } = options;
+  const { providerOptions = {}, keysAdapter } = options;
 
   // Resolve provider credential fields
   const credentialOptions = await resolveProviderCredentials(
@@ -64,13 +59,5 @@ export async function complete<TApi extends Api>(
   // Generate request ID
   const requestId = id ?? `sdk-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 
-  // Call core's complete
-  const message = await coreComplete(model, context, finalOptions, requestId);
-
-  // Track usage if adapter provided
-  if (usageAdapter) {
-    await usageAdapter.track(message);
-  }
-
-  return message;
+  return coreComplete(model, context, finalOptions, requestId);
 }

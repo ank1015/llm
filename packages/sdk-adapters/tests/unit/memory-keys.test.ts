@@ -1,5 +1,6 @@
-import { InMemoryKeysAdapter } from '@ank1015/llm-sdk-adapters';
 import { describe, expect, it } from 'vitest';
+
+import { InMemoryKeysAdapter } from '../../src/memory-keys.js';
 
 describe('InMemoryKeysAdapter', () => {
   it('should store and retrieve legacy api keys', async () => {

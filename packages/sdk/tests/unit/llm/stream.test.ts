@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { stream } from '../../../src/llm/stream.js';
 
-import type { KeysAdapter, UsageAdapter } from '../../../src/adapters/types.js';
+import type { KeysAdapter } from '../../../src/adapters/index.js';
 import type { AssistantMessageEventStream } from '@ank1015/llm-core';
 import type { Model, Context, BaseAssistantMessage } from '@ank1015/llm-types';
 
@@ -282,55 +282,6 @@ describe('stream', () => {
         }),
         expect.any(String)
       );
-    });
-  });
-
-  describe('usage tracking', () => {
-    it('should track usage when result() is called and usageAdapter is provided', async () => {
-      const originalResultFn = vi.fn().mockResolvedValue(mockResponse);
-      const mockEventStream = {
-        [Symbol.asyncIterator]: async function* () {
-          yield mockResponse;
-        },
-        result: originalResultFn,
-      } as unknown as AssistantMessageEventStream<'anthropic'>;
-
-      vi.mocked(core.stream).mockReturnValue(mockEventStream);
-
-      const mockUsageAdapter: UsageAdapter = {
-        track: vi.fn().mockResolvedValue(undefined),
-        getStats: vi.fn(),
-        getMessage: vi.fn(),
-        getMessages: vi.fn(),
-        deleteMessage: vi.fn(),
-      };
-
-      const eventStream = await stream(mockModel, mockContext, {
-        providerOptions: { apiKey: 'test-key' },
-        usageAdapter: mockUsageAdapter,
-      });
-
-      // Usage should not be tracked yet
-      expect(mockUsageAdapter.track).not.toHaveBeenCalled();
-
-      // Call result() to get the final message
-      const result = await eventStream.result();
-
-      // Now usage should be tracked
-      expect(mockUsageAdapter.track).toHaveBeenCalledWith(mockResponse);
-      expect(result).toEqual(mockResponse);
-    });
-
-    it('should not track usage when usageAdapter is not provided', async () => {
-      const mockEventStream = createMockEventStream();
-      vi.mocked(core.stream).mockReturnValue(mockEventStream);
-
-      const eventStream = await stream(mockModel, mockContext, {
-        providerOptions: { apiKey: 'test-key' },
-      });
-
-      const result = await eventStream.result();
-      expect(result).toEqual(mockResponse);
     });
   });
 

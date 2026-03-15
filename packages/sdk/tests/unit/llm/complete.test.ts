@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { complete } from '../../../src/llm/complete.js';
 
-import type { KeysAdapter, UsageAdapter } from '../../../src/adapters/types.js';
+import type { KeysAdapter } from '../../../src/adapters/index.js';
 import type { Model, Context, BaseAssistantMessage } from '@ank1015/llm-types';
 
 // Mock the core complete function
@@ -265,56 +265,6 @@ describe('complete', () => {
         }),
         expect.any(String)
       );
-    });
-  });
-
-  describe('usage tracking', () => {
-    it('should track usage when usageAdapter is provided', async () => {
-      vi.mocked(core.complete).mockResolvedValue(mockResponse);
-
-      const mockUsageAdapter: UsageAdapter = {
-        track: vi.fn().mockResolvedValue(undefined),
-        getStats: vi.fn(),
-        getMessage: vi.fn(),
-        getMessages: vi.fn(),
-        deleteMessage: vi.fn(),
-      };
-
-      await complete(mockModel, mockContext, {
-        providerOptions: { apiKey: 'test-key' },
-        usageAdapter: mockUsageAdapter,
-      });
-
-      expect(mockUsageAdapter.track).toHaveBeenCalledWith(mockResponse);
-    });
-
-    it('should not track usage when usageAdapter is not provided', async () => {
-      vi.mocked(core.complete).mockResolvedValue(mockResponse);
-
-      const result = await complete(mockModel, mockContext, {
-        providerOptions: { apiKey: 'test-key' },
-      });
-
-      expect(result).toEqual(mockResponse);
-    });
-
-    it('should return response even if tracking fails', async () => {
-      vi.mocked(core.complete).mockResolvedValue(mockResponse);
-
-      const mockUsageAdapter: UsageAdapter = {
-        track: vi.fn().mockRejectedValue(new Error('Tracking failed')),
-        getStats: vi.fn(),
-        getMessage: vi.fn(),
-        getMessages: vi.fn(),
-        deleteMessage: vi.fn(),
-      };
-
-      await expect(
-        complete(mockModel, mockContext, {
-          providerOptions: { apiKey: 'test-key' },
-          usageAdapter: mockUsageAdapter,
-        })
-      ).rejects.toThrow('Tracking failed');
     });
   });
 
