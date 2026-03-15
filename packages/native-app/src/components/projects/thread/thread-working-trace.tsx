@@ -74,7 +74,6 @@ function getToolPanelLabel(toolName: string): string {
   }
 }
 
-// eslint-disable-next-line sonarjs/cognitive-complexity
 function getToolCopyText(entry: WorkingToolEntry): string | null {
   const textContent = getWorkingTraceTextContent(entry.content);
 
@@ -122,7 +121,6 @@ function getToolCopyText(entry: WorkingToolEntry): string | null {
   return value.length > 0 ? value : null;
 }
 
-// eslint-disable-next-line sonarjs/cognitive-complexity
 function ToolContentPreview({ entry }: { entry: WorkingToolEntry }) {
   const textContent = useMemo(() => getWorkingTraceTextContent(entry.content), [entry.content]);
   const images = useMemo(() => getWorkingTraceImages(entry.content), [entry.content]);
@@ -233,7 +231,6 @@ function ToolContentPreview({ entry }: { entry: WorkingToolEntry }) {
   );
 }
 
-// eslint-disable-next-line sonarjs/cognitive-complexity
 function ToolTraceItem({ entry }: { entry: WorkingToolEntry }) {
   const { toast } = useToast();
   const copyText = useMemo(() => getToolCopyText(entry), [entry]);

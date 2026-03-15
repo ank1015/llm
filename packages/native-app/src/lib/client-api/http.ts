@@ -16,9 +16,7 @@ function normalizeBaseUrl(url: string): string {
 
 function getConfiguredServerBase(): string | null {
   const value =
-    process.env.EXPO_PUBLIC_LLM_SERVER_URL ??
-    process.env.EXPO_PUBLIC_SERVER_URL ??
-    Constants.expoConfig?.extra?.serverUrl;
+    process.env.EXPO_PUBLIC_LLM_SERVER_BASE_URL ?? process.env.EXPO_PUBLIC_LLM_SERVER_URL;
   if (typeof value !== 'string' || value.trim().length === 0) {
     return null;
   }
@@ -98,7 +96,7 @@ function getExpoDevServerBase(): string | null {
   return `http://${normalizeNativeHost(host)}:${DEFAULT_SERVER_PORT}`;
 }
 
-function resolveServerBase(): string {
+export function resolveServerBaseUrl(): string {
   return (
     getConfiguredServerBase() ??
     getReactNativeBundleServerBase() ??
@@ -110,7 +108,7 @@ function resolveServerBase(): string {
   );
 }
 
-export const SERVER_BASE = resolveServerBase();
+export const SERVER_BASE = resolveServerBaseUrl();
 export const apiFetch = expoFetch;
 
 function isRecord(value: unknown): value is Record<string, unknown> {

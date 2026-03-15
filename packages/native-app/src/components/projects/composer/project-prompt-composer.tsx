@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useToast } from 'heroui-native';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { KeyboardStickyView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,7 +15,7 @@ import {
 import { ProjectPromptInputShell } from './project-prompt-input-shell';
 import { ProjectPromptMentionList } from './project-prompt-mention-list';
 
-import type { ProjectFileIndexEntry , ReasoningLevel, SessionRef } from '@/lib/client-api';
+import type { ProjectFileIndexEntry, ReasoningLevel, SessionRef } from '@/lib/client-api';
 import type {
   LayoutChangeEvent,
   NativeSyntheticEvent,
@@ -208,7 +208,7 @@ export function ProjectPromptComposer({
     setLocalInput(nextValue);
   };
 
-  const cancelPendingSelectionRelease = () => {
+  const cancelPendingSelectionRelease = useCallback(() => {
     if (pendingSelectionFrameRef.current !== null) {
       cancelAnimationFrame(pendingSelectionFrameRef.current);
       pendingSelectionFrameRef.current = null;
@@ -218,38 +218,41 @@ export function ProjectPromptComposer({
       cancelAnimationFrame(pendingSelectionReleaseFrameRef.current);
       pendingSelectionReleaseFrameRef.current = null;
     }
-  };
+  }, []);
 
-  const clearPendingSelection = () => {
+  const clearPendingSelection = useCallback(() => {
     cancelPendingSelectionRelease();
     setPendingSelection(undefined);
-  };
+  }, [cancelPendingSelectionRelease]);
 
-  const setTransientSelection = (nextSelection: { start: number; end: number }) => {
-    cancelPendingSelectionRelease();
-    selectionRef.current = nextSelection;
-    setPendingSelection(nextSelection);
+  const setTransientSelection = useCallback(
+    (nextSelection: { start: number; end: number }) => {
+      cancelPendingSelectionRelease();
+      selectionRef.current = nextSelection;
+      setPendingSelection(nextSelection);
 
-    pendingSelectionFrameRef.current = requestAnimationFrame(() => {
-      pendingSelectionFrameRef.current = null;
-      pendingSelectionReleaseFrameRef.current = requestAnimationFrame(() => {
-        pendingSelectionReleaseFrameRef.current = null;
-        setPendingSelection((current) => {
-          if (
-            current &&
-            current.start === nextSelection.start &&
-            current.end === nextSelection.end
-          ) {
-            return undefined;
-          }
+      pendingSelectionFrameRef.current = requestAnimationFrame(() => {
+        pendingSelectionFrameRef.current = null;
+        pendingSelectionReleaseFrameRef.current = requestAnimationFrame(() => {
+          pendingSelectionReleaseFrameRef.current = null;
+          setPendingSelection((current) => {
+            if (
+              current &&
+              current.start === nextSelection.start &&
+              current.end === nextSelection.end
+            ) {
+              return undefined;
+            }
 
-          return current;
+            return current;
+          });
         });
       });
-    });
-  };
+    },
+    [cancelPendingSelectionRelease]
+  );
 
-  const setMentionState = (next: MentionRange | null) => {
+  const setMentionState = useCallback((next: MentionRange | null) => {
     if (mentionsEqual(activeMentionRef.current, next)) {
       return;
     }
@@ -266,7 +269,7 @@ export function ProjectPromptComposer({
     }
 
     setMentionError(null);
-  };
+  }, []);
 
   useEffect(() => {
     void loadProjectFileIndex(projectId).catch(() => {
@@ -282,7 +285,7 @@ export function ProjectPromptComposer({
     return () => {
       cancelPendingSelectionRelease();
     };
-  }, []);
+  }, [cancelPendingSelectionRelease]);
 
   useEffect(() => {
     if (!visible) {
@@ -291,7 +294,7 @@ export function ProjectPromptComposer({
       clearPendingSelection();
       onHeightChange(0);
     }
-  }, [onHeightChange, visible]);
+  }, [clearPendingSelection, onHeightChange, setMentionState, visible]);
 
   useEffect(() => {
     if (!visible || !currentSession || focusRequestToken === 0) {
@@ -307,7 +310,7 @@ export function ProjectPromptComposer({
     requestAnimationFrame(() => {
       inputRef.current?.focus();
     });
-  }, [currentSession, focusRequestToken, input.length, visible]);
+  }, [currentSession, focusRequestToken, input.length, setTransientSelection, visible]);
 
   useEffect(() => {
     if (!threadId) {
@@ -327,7 +330,7 @@ export function ProjectPromptComposer({
     setTransientSelection(nextSelection);
     lastKeyPressRef.current = null;
     setMentionState(null);
-  }, [composerInput.length, threadId]);
+  }, [composerInput.length, setMentionState, setTransientSelection, threadId]);
 
   useEffect(() => {
     if (!activeMention || !visible) {
@@ -453,7 +456,6 @@ export function ProjectPromptComposer({
     });
   };
 
-  // eslint-disable-next-line sonarjs/cognitive-complexity
   const handleSubmit = async () => {
     const trimmed = input.trim();
     if (trimmed.length === 0 || isStreaming) {

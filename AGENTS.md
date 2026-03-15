@@ -19,6 +19,7 @@ pnpm lint:fix         # Auto-fix ESLint issues
 pnpm clean            # Remove build artifacts
 
 # Development
+pnpm dev:native-app   # Start the Expo native app
 pnpm dev:web-app      # Start the web app
 pnpm agent:cli        # Start the local agents package CLI
 
@@ -37,6 +38,7 @@ packages/
   sdk-adapters/       # @ank1015/llm-sdk-adapters - Node keys/session adapter implementations
   agents/             # @ank1015/llm-agents - General-purpose agent tools, skills, and helper-backed workflows
   extension/          # @ank1015/llm-extension - Chrome RPC bridge
+  native-app/         # @ank1015/llm-native-app - Expo mobile client for the server
   web-app/            # @ank1015/llm-web-app - Next.js web client for the server
   usage-dashboard/    # @ank1015/llm-usage-dashboard
   server/             # @ank1015/llm-server
@@ -63,6 +65,10 @@ Bottom up, these are the currently documented base layers:
    Independent Chrome RPC package. It provides the Manifest V3 extension, native messaging host, TCP bridge, and Node client used to call Chrome APIs and debugger helpers from local processes.
 8. `@ank1015/llm-server`
    Node-only Hono orchestration server built on top of the SDK and agents layers. It manages projects, artifact directories, agent sessions, bundled skills, and SSE-backed live session runs over a filesystem-backed workspace model.
+9. `@ank1015/llm-web-app`
+   Private Next.js web client for the server stack. It consumes `@ank1015/llm-app-contracts` through a local `client-api` layer and provides the projects, artifacts, sessions, and streaming conversation UI.
+10. `@ank1015/llm-native-app`
+    Private Expo mobile client for the same server/app-contracts boundary. It ships the Folders mobile UI, native artifact/thread flows, and mobile-specific state management on top of `@ank1015/llm-server`.
 
 More package summaries can be added here as the stack above `types` and `core` is documented.
 
@@ -91,6 +97,7 @@ More package summaries can be added here as the stack above `types` and `core` i
 - [packages/sdk-adapters/AGENTS.md](packages/sdk-adapters/AGENTS.md) - Concrete Node file-system and in-memory keys/session adapters
 - [packages/agents/AGENTS.md](packages/agents/AGENTS.md) - General-purpose agent tools, bundled skills, helper-backed workflows, and local CLI
 - [packages/extension/AGENTS.md](packages/extension/AGENTS.md) - Chrome RPC bridge, native host, and Node client
+- [packages/native-app/AGENTS.md](packages/native-app/AGENTS.md) - Expo mobile client for projects, artifacts, sessions, and streaming conversation
 - [packages/web-app/AGENTS.md](packages/web-app/AGENTS.md) - Next.js web client for projects, artifacts, sessions, and streaming conversation
 - [packages/server/AGENTS.md](packages/server/AGENTS.md) - Node-only orchestration server for projects, artifact directories, sessions, and skills
 

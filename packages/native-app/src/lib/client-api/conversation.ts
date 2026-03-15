@@ -12,7 +12,6 @@ import type {
   VisibleLeafSelection,
 } from '@ank1015/llm-app-contracts';
 
-
 type ArtifactContext = {
   projectId: string;
   artifactId: string;
@@ -184,7 +183,6 @@ export type CancelRunRequest = ArtifactContext & {
 
 type StreamRequestBody = SessionPromptRequest;
 
-// eslint-disable-next-line sonarjs/cognitive-complexity
 async function streamConversationRequest(
   url: string,
   request: {

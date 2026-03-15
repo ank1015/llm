@@ -7,7 +7,6 @@ export type MessageTurn = {
   assistantNode: MessageNode | null;
 };
 
-// eslint-disable-next-line sonarjs/cognitive-complexity
 export function groupMessageNodesIntoTurns(nodes: MessageNode[]): MessageTurn[] {
   const turns: MessageTurn[] = [];
   let index = 0;

@@ -1,34 +1,65 @@
-# native-app
+# `@ank1015/llm-native-app`
 
-This package contains the monorepo's React Native Expo app scaffold, based on [HeroUI Native](https://github.com/heroui-inc/heroui-native).
+Private Expo mobile client for [`@ank1015/llm-server`](../server/README.md).
 
-## Get started
+This workspace package contains the **Folders** app. The workspace/package name is
+`@ank1015/llm-native-app`, while the end-user product branding inside Expo and the
+checked-in iOS project remains `Folders`.
 
-1. Install dependencies from the monorepo root
+## What it does
 
-   ```bash
-   pnpm install
-   ```
+- Connects to `@ank1015/llm-server` for projects, artifact directories, sessions, and
+  streamed agent conversations
+- Uses `@ank1015/llm-app-contracts` through the local `src/lib/client-api` boundary
+- Renders native-first project, thread, and artifact flows with Expo Router and Zustand
+- Supports native and web artifact viewing paths where needed
 
-2. Start the app from the monorepo root
+## Local development
 
-   ```bash
-   pnpm dev:native-app
-   ```
+From the monorepo root:
 
-3. If the API server is not reachable at the default local address, set
-   `EXPO_PUBLIC_LLM_SERVER_URL` to your server base URL before starting Expo.
+```bash
+pnpm install
+pnpm dev:native-app
+```
 
-You can start developing by editing the files inside the **src/app** directory. This project uses file-based routing with Expo Router.
+Or from this package:
 
-## About HeroUI Native
+```bash
+pnpm start
+pnpm ios
+pnpm android
+pnpm web
+```
 
-HeroUI Native is a comprehensive UI library built for React Native that provides:
+## Server configuration
 
-- Beautiful, accessible components out of the box
-- Consistent design system
-- TypeScript support
-- Customizable theming
-- Modern styling with NativeWind/Tailwind CSS
+The canonical env var is:
 
-Learn more about HeroUI Native at: https://github.com/heroui-inc/heroui-native
+```bash
+EXPO_PUBLIC_LLM_SERVER_BASE_URL=http://localhost:8001
+```
+
+- Copy [`.env.example`](./.env.example) to `.env.local` for local development
+- `EXPO_PUBLIC_LLM_SERVER_URL` is still read temporarily for compatibility
+- If no env var is present, the app falls back to Expo/native host inference and then to a
+  platform-specific localhost default
+
+No personal or environment-specific server URL should be committed to `app.json`.
+
+## Package health
+
+```bash
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm test:coverage
+```
+
+## Docs
+
+- [AGENTS.md](./AGENTS.md) - package structure and maintenance notes
+- [docs/README.md](./docs/README.md) - package docs index
+- [docs/architecture.md](./docs/architecture.md) - app structure and data flow
+- [docs/configuration.md](./docs/configuration.md) - env vars and server resolution
+- [docs/testing.md](./docs/testing.md) - test and validation strategy
