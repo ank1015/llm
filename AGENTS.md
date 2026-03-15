@@ -19,11 +19,11 @@ pnpm lint:fix         # Auto-fix ESLint issues
 pnpm clean            # Remove build artifacts
 
 # Development
-pnpm dev:chat-app     # Start chat app
+pnpm dev:web-app      # Start the web app
 pnpm agent:cli        # Start the local agents package CLI
 
 # Production
-pnpm start:chat-app   # Start chat app
+pnpm start:web-app    # Start the web app
 ```
 
 ## Architecture
@@ -37,7 +37,7 @@ packages/
   sdk-adapters/       # @ank1015/llm-sdk-adapters - Node keys/session adapter implementations
   agents/             # @ank1015/llm-agents - General-purpose agent tools, skills, and helper-backed workflows
   extension/          # @ank1015/llm-extension - Chrome RPC bridge
-  chat-app/           # @ank1015/llm-chat-app
+  web-app/            # @ank1015/llm-web-app - Next.js web client for the server
   usage-dashboard/    # @ank1015/llm-usage-dashboard
   server/             # @ank1015/llm-server
   research/           # @ank1015/llm-research
@@ -91,6 +91,7 @@ More package summaries can be added here as the stack above `types` and `core` i
 - [packages/sdk-adapters/AGENTS.md](packages/sdk-adapters/AGENTS.md) - Concrete Node file-system and in-memory keys/session adapters
 - [packages/agents/AGENTS.md](packages/agents/AGENTS.md) - General-purpose agent tools, bundled skills, helper-backed workflows, and local CLI
 - [packages/extension/AGENTS.md](packages/extension/AGENTS.md) - Chrome RPC bridge, native host, and Node client
+- [packages/web-app/AGENTS.md](packages/web-app/AGENTS.md) - Next.js web client for projects, artifacts, sessions, and streaming conversation
 - [packages/server/AGENTS.md](packages/server/AGENTS.md) - Node-only orchestration server for projects, artifact directories, sessions, and skills
 
 ## Boundaries

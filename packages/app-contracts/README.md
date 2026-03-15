@@ -7,7 +7,7 @@ Shared HTTP DTOs and TypeBox schemas for the app-facing boundary around `@ank101
 This package is the explicit contract layer between:
 
 - `@ank1015/llm-server`
-- `@ank1015/llm-projects-app`
+- `@ank1015/llm-web-app`
 - `@ank1015/llm-native-app`
 
 It defines the public request and response shapes for project, artifact, session, skill, and streaming APIs. It is intentionally separate from `@ank1015/llm-types`, which owns lower-level SDK/runtime contracts.
