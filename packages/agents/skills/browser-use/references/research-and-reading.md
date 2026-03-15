@@ -55,9 +55,7 @@ It is the default read-only extraction path because it:
 
 Treat this as the first move before writing custom extraction logic.
 
-If the converter service is unavailable, this path is unavailable for the task.
-At that point, either switch modes or use a more specialized workflow instead
-of pretending the markdown is good enough.
+If the converter service is unavailable, this helper throws and this path is unavailable for the task. At that point, either switch modes or use a more specialized workflow instead of pretending the markdown is good enough.
 
 ## Read-Only Workflow
 

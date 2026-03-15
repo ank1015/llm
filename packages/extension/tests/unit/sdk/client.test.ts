@@ -267,7 +267,7 @@ describe('ChromeClient.getPageMarkdown', () => {
     });
   });
 
-  it('should return the fallback message when the converter is unavailable', async () => {
+  it('should throw when the converter is unavailable', async () => {
     const client = new ChromeClient();
     vi.spyOn(client, 'call').mockImplementation(async (method) => {
       if (method === 'tabs.get') {
@@ -285,9 +285,9 @@ describe('ChromeClient.getPageMarkdown', () => {
 
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('connect ECONNREFUSED')));
 
-    const markdown = await client.getPageMarkdown(123);
-
-    expect(markdown).toBe('service not running use observe tool');
+    await expect(client.getPageMarkdown(123)).rejects.toThrow(
+      'Failed to reach markdown converter'
+    );
   });
 });
 

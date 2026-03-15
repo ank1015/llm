@@ -9,6 +9,8 @@ import type { GetPageMarkdownOptions } from './page-markdown.js';
 import type { HostMessage, ChromeMessage } from '../protocol/types.js';
 import type { Readable, Writable } from 'node:stream';
 
+const CONNECTION_CLOSED_MESSAGE = 'ChromeClient connection is closed';
+
 export interface ChromeClientOptions {
   input?: Readable;
   output?: Writable;
@@ -46,7 +48,7 @@ export class ChromeClient {
   /** Call a Chrome API method and wait for the result. */
   async call(method: string, ...args: unknown[]): Promise<unknown> {
     if (this.closed) {
-      throw new Error('ChromeClient connection is closed');
+      throw new Error(CONNECTION_CLOSED_MESSAGE);
     }
 
     const id = randomUUID();
@@ -65,7 +67,7 @@ export class ChromeClient {
    */
   subscribe(event: string, callback: (data: unknown) => void): () => void {
     if (this.closed) {
-      throw new Error('ChromeClient connection is closed');
+      throw new Error(CONNECTION_CLOSED_MESSAGE);
     }
 
     const id = randomUUID();
@@ -84,7 +86,7 @@ export class ChromeClient {
    */
   async getPageMarkdown(tabId: number, options?: GetPageMarkdownOptions): Promise<string> {
     if (this.closed) {
-      throw new Error('ChromeClient connection is closed');
+      throw new Error(CONNECTION_CLOSED_MESSAGE);
     }
 
     return await getPageMarkdownForTab(this, tabId, options);
@@ -98,51 +100,14 @@ export class ChromeClient {
    */
   async run(): Promise<void> {
     while (true) {
-      let message: ChromeMessage | null;
-
-      try {
-        message = await readMessageWithOptions<ChromeMessage>(this.input, {
-          maxMessageSizeBytes: this.maxIncomingMessageSizeBytes,
-        });
-      } catch (error) {
-        this.cleanup(error instanceof Error ? error : new Error(String(error)));
-        throw error;
-      }
+      const message = await this.readNextMessage();
 
       if (message === null) {
         this.cleanup(new Error('Connection closed'));
         return;
       }
 
-      switch (message.type) {
-        case 'result': {
-          const pending = this.pendingCalls.get(message.id);
-          if (pending) {
-            this.pendingCalls.delete(message.id);
-            pending.resolve(message.data);
-          }
-          break;
-        }
-
-        case 'error': {
-          const pending = this.pendingCalls.get(message.id);
-          if (pending) {
-            this.pendingCalls.delete(message.id);
-            pending.reject(new Error(message.error));
-          }
-          // If error was for a subscription setup, clean it up
-          if (this.eventCallbacks.has(message.id)) {
-            this.eventCallbacks.delete(message.id);
-          }
-          break;
-        }
-
-        case 'event': {
-          const callback = this.eventCallbacks.get(message.id);
-          callback?.(message.data);
-          break;
-        }
-      }
+      this.handleMessage(message);
     }
   }
 
@@ -150,6 +115,51 @@ export class ChromeClient {
     writeMessageWithOptions(message, this.output, {
       maxMessageSizeBytes: this.maxOutgoingMessageSizeBytes,
     });
+  }
+
+  private async readNextMessage(): Promise<ChromeMessage | null> {
+    try {
+      return await readMessageWithOptions<ChromeMessage>(this.input, {
+        maxMessageSizeBytes: this.maxIncomingMessageSizeBytes,
+      });
+    } catch (error) {
+      this.cleanup(error instanceof Error ? error : new Error(String(error)));
+      throw error;
+    }
+  }
+
+  private handleMessage(message: ChromeMessage): void {
+    switch (message.type) {
+      case 'result':
+        this.resolvePendingCall(message.id, message.data);
+        break;
+      case 'error':
+        this.rejectPendingCall(message.id, message.error);
+        break;
+      case 'event':
+        this.eventCallbacks.get(message.id)?.(message.data);
+        break;
+    }
+  }
+
+  private resolvePendingCall(id: string, data: unknown): void {
+    const pending = this.pendingCalls.get(id);
+    if (!pending) {
+      return;
+    }
+
+    this.pendingCalls.delete(id);
+    pending.resolve(data);
+  }
+
+  private rejectPendingCall(id: string, errorMessage: string): void {
+    const pending = this.pendingCalls.get(id);
+    if (pending) {
+      this.pendingCalls.delete(id);
+      pending.reject(new Error(errorMessage));
+    }
+
+    this.eventCallbacks.delete(id);
   }
 
   private cleanup(error: Error): void {

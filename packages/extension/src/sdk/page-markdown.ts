@@ -1,6 +1,5 @@
 const DEFAULT_GET_PAGE_TIMEOUT_MS = 30_000;
 const DEFAULT_HTML_CONVERTER_URL = 'http://localhost:8080/convert';
-const GET_PAGE_SERVICE_ERROR = 'service not running use observe tool';
 const TAB_POLL_INTERVAL_MS = 100;
 const TAB_SETTLE_DELAY_MS = 200;
 
@@ -13,7 +12,7 @@ interface ChromeCaller {
   call(method: string, ...args: unknown[]): Promise<unknown>;
 }
 
-interface WindowTab {
+interface TabLoadState {
   status?: string;
 }
 
@@ -66,12 +65,12 @@ async function waitForTabLoad(
   const deadline = Date.now() + timeoutMs;
 
   while (Date.now() < deadline) {
-    const tab = (await chrome.call('tabs.get', tabId)) as WindowTab;
+    const tab = (await chrome.call('tabs.get', tabId)) as TabLoadState;
 
     if (tab.status === 'complete') {
       await sleep(TAB_SETTLE_DELAY_MS);
 
-      const settled = (await chrome.call('tabs.get', tabId)) as WindowTab;
+      const settled = (await chrome.call('tabs.get', tabId)) as TabLoadState;
       if (settled.status === 'complete') {
         return;
       }
@@ -94,13 +93,20 @@ async function convertHtmlToMarkdown(html: string, converterUrl: string): Promis
     });
 
     if (!response.ok) {
-      return GET_PAGE_SERVICE_ERROR;
+      throw new Error(
+        `Markdown converter request failed with ${response.status}${response.statusText ? ` ${response.statusText}` : ''}`
+      );
     }
 
     const raw = await response.text();
     return parseConvertedMarkdown(raw);
-  } catch {
-    return GET_PAGE_SERVICE_ERROR;
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('Markdown converter request failed')) {
+      throw error;
+    }
+
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to reach markdown converter at ${converterUrl}: ${message}`);
   }
 }
 

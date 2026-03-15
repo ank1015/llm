@@ -44,8 +44,7 @@ Stay low-level here:
 Use long-lived debugger sessions only when the batch task needs network or
 state visibility in addition to extraction.
 
-Do not treat `Window` as the normal batch tool in this file. If the task is
-really interactive, switch to [webapp-flows.md](webapp-flows.md).
+Do not treat ad hoc UI-driving as the normal batch tool in this file. If the task is really interactive, switch to [webapp-flows.md](webapp-flows.md).
 
 When you turn a batch workflow into a standalone Node script, explicitly
 `process.exit(0)` or `process.exit(1)` after cleanup. The Chrome connection can
@@ -69,8 +68,7 @@ Use this order:
 
 Do not jump straight to a full run before the probe works.
 
-Do not build the core crawl around `Window` unless a specific interactive step
-cannot be expressed cleanly with low-level SDK calls.
+Do not build the core crawl around one-off UI-driving logic unless a specific interactive step cannot be expressed cleanly with low-level SDK calls.
 
 ## Two Common Batch Shapes
 

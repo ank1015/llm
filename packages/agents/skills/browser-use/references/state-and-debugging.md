@@ -50,7 +50,7 @@ Optional note:
 - `chrome.subscribe(...)` can help with event-driven waiting, but it is not the
   default pattern in this file
 
-Do not mix `Window` into the main workflows here.
+Keep the workflow at the RPC and Chrome API level here.
 
 ## Cookies
 
@@ -178,7 +178,7 @@ Important rules:
 ### Avoid by default
 
 - using `debugger.evaluate` as a substitute for every state API
-- mixing `Window` into the main workflows in this file
+- turning a state/debugging task into an ad hoc UI-driving flow
 - expanding this document into a broad CDP reference
 
 ## Examples
@@ -279,7 +279,7 @@ try {
 
 Use other references when the task stops being state/debugging work:
 
-- [webapp-flows.md](webapp-flows.md) for UI-level interaction
+- [webapp-flows.md](webapp-flows.md) for explicit UI-level interaction
 - [pitfalls.md](pitfalls.md) for debugger, session, and focus gotchas
 - [batch-automation.md](batch-automation.md) when these workflows need to
   scale

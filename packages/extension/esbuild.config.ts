@@ -12,6 +12,9 @@ const buildOptions = {
   outdir: 'dist/chrome',
   target: 'chrome120',
   logLevel: 'info' as const,
+  logOverride: {
+    'direct-eval': 'silent' as const,
+  },
 };
 
 async function main(): Promise<void> {
@@ -20,7 +23,7 @@ async function main(): Promise<void> {
   if (isWatch) {
     const ctx = await context(buildOptions);
     await ctx.watch();
-    console.log('[esbuild] watching for changes...');
+    console.warn('[esbuild] watching for changes...');
   } else {
     await build(buildOptions);
   }

@@ -33,7 +33,7 @@ packages/
   core/               # @ank1015/llm-core - Stateless runtime built on top of types
   sdk/                # @ank1015/llm-sdk - Opinionated wrappers over core
   sdk-adapters/       # @ank1015/llm-sdk-adapters - Node keys/session adapter implementations
-  extension/          # @ank1015/llm-extension
+  extension/          # @ank1015/llm-extension - Chrome RPC bridge
   chat-app/           # @ank1015/llm-chat-app
   usage-dashboard/    # @ank1015/llm-usage-dashboard
   server/             # @ank1015/llm-server
@@ -52,6 +52,8 @@ Bottom up, these are the currently documented base layers:
    Opinionated SDK layer on top of `core`. It adds shared credential resolution, stateful `Conversation` flows, and `SessionManager` helpers while staying runtime-neutral and leaving concrete storage implementations out of the package.
 4. `@ank1015/llm-sdk-adapters`
    Concrete Node-oriented adapters used by app/server layers. It currently provides file-system and in-memory implementations for keys and sessions, and no longer owns usage tracking or key-management UI code.
+5. `@ank1015/llm-extension`
+   Independent Chrome RPC package. It provides the Manifest V3 extension, native messaging host, TCP bridge, and Node client used to call Chrome APIs and debugger helpers from local processes.
 
 More package summaries can be added here as the stack above `types` and `core` is documented.
 
@@ -77,6 +79,7 @@ More package summaries can be added here as the stack above `types` and `core` i
 - [packages/core/AGENTS.md](packages/core/AGENTS.md) - Stateless runtime layer
 - [packages/sdk/AGENTS.md](packages/sdk/AGENTS.md) - Runtime-neutral SDK wrappers, credential resolution, and session helpers
 - [packages/sdk-adapters/AGENTS.md](packages/sdk-adapters/AGENTS.md) - Concrete Node file-system and in-memory keys/session adapters
+- [packages/extension/AGENTS.md](packages/extension/AGENTS.md) - Chrome RPC bridge, native host, and Node client
 
 ## Boundaries
 

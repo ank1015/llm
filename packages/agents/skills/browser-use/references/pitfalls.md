@@ -25,27 +25,26 @@ Preferred fallback:
 - move to the low-level debugger workflow in
   [state-and-debugging.md](state-and-debugging.md)
 
-## 2) Stale Observe Snapshot Or Acting Without Observe
+## 2) Acting Without Explicit State Checks
 
 Symptom:
 
-- `You must observe before act`
 - actions stop matching what is visibly on the page
+- a click or input seemed to work, but the follow-up state is wrong
 
 Likely cause:
 
-- acting before `observe()`
-- reusing old `E*` ids after the page changed
+- skipping a fresh DOM check before acting
+- assuming the page stayed stable after a meaningful UI change
 
 Fix:
 
-- observe first
-- re-observe after meaningful UI changes, navigation, modal opens, or SPA
-  transitions
+- inspect current state with `debugger.evaluate`
+- re-check after meaningful UI changes, navigation, modal opens, or SPA transitions
 
 Preferred fallback:
 
-- return to the normal `Window` loop in [webapp-flows.md](webapp-flows.md)
+- return to the explicit interactive loop in [webapp-flows.md](webapp-flows.md)
 
 ## 3) Missing Target Caused By Observation Limits
 
@@ -56,19 +55,17 @@ Symptom:
 Likely cause:
 
 - hidden or offscreen filtering
-- truncation in the observation output
-- iframe contents are not expanded in the snapshot
+- the selector or DOM probe is narrower than the real UI state
+- iframe contents are not covered by the check you wrote
 
 Fix:
 
-- scroll or change the page state, then observe again
-- read the notes and warnings in the observation output before assuming the
-  target is truly absent
+- scroll or change the page state, then inspect again
+- widen the DOM probe before assuming the target is truly absent
 
 Preferred fallback:
 
-- use a lower-level inspection path if the target is outside
-  `Window.observe()` coverage
+- use a broader low-level inspection path with `debugger.evaluate`
 
 ## 4) Focus-Sensitive Failures
 
@@ -102,7 +99,7 @@ Likely cause:
 Fix:
 
 - wait for the relevant state change
-- re-observe or re-check page state before continuing
+- re-check page state before continuing
 
 Preferred fallback:
 
@@ -140,8 +137,7 @@ Symptom:
 Likely cause:
 
 - using the wrong mode too long
-- for example, using `Window` for state-heavy work or low-level calls for a
-  straightforward interactive flow
+- for example, using read-only extraction for an interactive task or using a UI script when the task is really about browser state
 
 Fix:
 

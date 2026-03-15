@@ -1,10 +1,10 @@
 /**
- * E2E tests for Window.getPage.
+ * E2E tests for ChromeClient.getPageMarkdown.
  *
  * Verifies:
- *   - getPage with tabId returns markdown from converter service
- *   - getPage with url opens a temporary tab and closes it after conversion
- *   - converter failure returns fallback error string
+ *   - getPageMarkdown with an explicit tabId returns converter markdown
+ *   - getPageMarkdown against the current tab works through raw RPC setup
+ *   - converter failure surfaces as a thrown error
  *
  * Prerequisites:
  *   1. pnpm build
@@ -12,12 +12,12 @@
  *   3. Native host running (TCP :9224)
  *
  * Run:
- *   pnpm test:e2e:window-get-page
+ *   pnpm test:e2e:page-markdown
  */
 
 import { createServer } from 'node:http';
 
-import { connect, Window } from '../../src/index.js';
+import { connect } from '../../src/index.js';
 
 interface TestResult {
   name: string;
@@ -26,15 +26,10 @@ interface TestResult {
   data?: unknown;
 }
 
-interface WindowTab {
-  id?: number;
-  windowId?: number;
-}
-
-const FALLBACK_MESSAGE = 'service not running use observe tool';
+const CONVERTER_FAILURE_URL = 'http://127.0.0.1:65535/convert';
 
 function log(message: string): void {
-  process.stderr.write(`[e2e:window-get-page] ${message}\n`);
+  process.stderr.write(`[e2e:page-markdown] ${message}\n`);
 }
 
 async function test(
@@ -53,7 +48,7 @@ async function test(
   }
 }
 
-function buildGetPageDataUrl(title: string, text: string): string {
+function buildDataUrl(title: string, text: string): string {
   const html = `
     <!doctype html>
     <html>
@@ -98,17 +93,14 @@ async function startConverterService(): Promise<{
       try {
         const payload = JSON.parse(body) as { html?: unknown };
         const html = typeof payload.html === 'string' ? payload.html : '';
-
         const h1Match = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
         const paragraphMatch = html.match(/<p[^>]*>([\s\S]*?)<\/p>/i);
         const heading = h1Match ? stripHtml(h1Match[1] || '') : 'Untitled';
         const paragraph = paragraphMatch ? stripHtml(paragraphMatch[1] || '') : '';
 
-        const markdown = `# ${heading}\n\n${paragraph}`;
-
         res.statusCode = 200;
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-        res.end(markdown);
+        res.end(`# ${heading}\n\n${paragraph}`);
       } catch {
         res.statusCode = 400;
         res.end('invalid payload');
@@ -141,43 +133,35 @@ async function main(): Promise<void> {
 
   const port = process.env.CHROME_RPC_PORT ? parseInt(process.env.CHROME_RPC_PORT, 10) : undefined;
   const chrome = await connect({ port, launch: true });
-  const window = new Window();
   const converter = await startConverterService();
-
-  await window.ready;
-  log('connected and window initialized');
+  log('connected');
 
   const results: TestResult[] = [];
-
-  let windowId: number | null = null;
   let tabId: number | null = null;
 
   results.push(
-    await test('setup: open deterministic page', async () => {
-      const tab = (await window.open(buildGetPageDataUrl('Alpha Page', 'Alpha paragraph text.'), {
-        newTab: true,
+    await test('setup: open deterministic page in a new tab', async () => {
+      const tab = (await chrome.call('tabs.create', {
+        url: buildDataUrl('Alpha Page', 'Alpha paragraph text.'),
         active: true,
-      })) as WindowTab;
+      })) as { id?: number };
 
-      if (typeof tab.id !== 'number' || typeof tab.windowId !== 'number') {
+      if (typeof tab.id !== 'number') {
         return { pass: false, data: tab };
       }
 
       tabId = tab.id;
-      windowId = tab.windowId;
-
-      return { pass: true, data: { tabId, windowId } };
+      return { pass: true, data: { tabId } };
     })
   );
 
   results.push(
-    await test('getPage with tabId returns converter markdown', async () => {
+    await test('getPageMarkdown with an explicit tabId returns converter markdown', async () => {
       if (tabId === null) {
         return { pass: false, data: 'Missing tabId' };
       }
 
-      const markdown = await window.getPage({
-        tabId,
+      const markdown = await chrome.getPageMarkdown(tabId, {
         converterUrl: converter.endpoint,
       });
 
@@ -189,77 +173,65 @@ async function main(): Promise<void> {
   );
 
   results.push(
-    await test('getPage without tabId/url reads current active tab', async () => {
-      const markdown = await window.getPage({
+    await test('getPageMarkdown works with the current active tab obtained via raw RPC', async () => {
+      const tabs = (await chrome.call('tabs.query', {
+        active: true,
+        currentWindow: true,
+      })) as { id?: number }[];
+      const currentTabId = tabs[0]?.id;
+
+      if (typeof currentTabId !== 'number') {
+        return { pass: false, data: tabs };
+      }
+
+      const markdown = await chrome.getPageMarkdown(currentTabId, {
         converterUrl: converter.endpoint,
       });
 
       return {
         pass: markdown.includes('# Alpha Page') && markdown.includes('Alpha paragraph text.'),
-        data: { markdown },
+        data: { currentTabId, markdown },
       };
     })
   );
 
   results.push(
-    await test('getPage with url closes temporary tab after conversion', async () => {
-      const beforeTabs = await window.tabs();
-      const markdown = await window.getPage({
-        url: buildGetPageDataUrl('Temp Page', 'Temp paragraph text.'),
-        converterUrl: converter.endpoint,
-      });
-      const afterTabs = await window.tabs();
-
-      return {
-        pass:
-          beforeTabs.length === afterTabs.length &&
-          markdown.includes('# Temp Page') &&
-          markdown.includes('Temp paragraph text.'),
-        data: {
-          beforeCount: beforeTabs.length,
-          afterCount: afterTabs.length,
-          markdown,
-        },
-      };
-    })
-  );
-
-  results.push(
-    await test('getPage returns fallback string when converter is unavailable', async () => {
+    await test('getPageMarkdown throws when the converter is unavailable', async () => {
       if (tabId === null) {
         return { pass: false, data: 'Missing tabId' };
-      }
-
-      const markdown = await window.getPage({
-        tabId,
-        converterUrl: 'http://127.0.0.1:65535/convert',
-      });
-
-      return {
-        pass: markdown === FALLBACK_MESSAGE,
-        data: { markdown },
-      };
-    })
-  );
-
-  results.push(
-    await test('cleanup: remove created window', async () => {
-      if (windowId === null) {
-        return { pass: true, data: 'No window id captured for cleanup' };
       }
 
       try {
-        await chrome.call('windows.remove', windowId);
-        return { pass: true, data: { removedWindowId: windowId } };
+        await chrome.getPageMarkdown(tabId, {
+          converterUrl: CONVERTER_FAILURE_URL,
+        });
+        return { pass: false, data: 'Expected an error' };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        if (message.includes('No window with id')) {
-          return { pass: true, data: { removedWindowId: windowId, note: 'already closed' } };
-        }
-        return { pass: false, data: { windowId, error: message } };
+        return {
+          pass: message.includes('Failed to reach markdown converter'),
+          data: { message },
+        };
       }
     })
   );
+
+  if (tabId !== null) {
+    results.push(
+      await test('cleanup: remove created tab', async () => {
+        try {
+          await chrome.call('tabs.remove', tabId);
+          return { pass: true, data: { removedTabId: tabId } };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          if (message.includes('No tab with id')) {
+            return { pass: true, data: { removedTabId: tabId, note: 'already closed' } };
+          }
+          return { pass: false, data: { tabId, error: message } };
+        }
+      })
+    );
+  }
 
   await converter.close();
 
@@ -268,7 +240,7 @@ async function main(): Promise<void> {
 
   log('');
   log('='.repeat(60));
-  log(`  Window getPage E2E: ${passed} passed, ${failed} failed, ${results.length} total`);
+  log(`  Page Markdown E2E: ${passed} passed, ${failed} failed, ${results.length} total`);
   log('='.repeat(60));
 
   for (const result of results) {

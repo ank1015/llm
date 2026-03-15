@@ -21,24 +21,11 @@ export {
 } from './protocol/constants.js';
 
 // SDK
-export { ChromeClient, createChromeClient, connect, Window } from './sdk/index.js';
+export { ChromeClient, createChromeClient, connect } from './sdk/index.js';
 export type {
   ChromeClientOptions,
   ConnectOptions,
   GetPageMarkdownOptions,
-  ObserveFilter,
-  WindowActionOptions,
-  WindowDownloadOptions,
-  WindowEvaluateOptions,
-  WindowGetPageOptions,
-  WindowObserveOptions,
-  WindowOpenOptions,
-  WindowScrollBehavior,
-  WindowScrollOptions,
-  WindowSemanticFilter,
-  WindowScreenshotOptions,
-  WindowTab,
-  WindowTypeOptions,
 } from './sdk/index.js';
 
 // Server
