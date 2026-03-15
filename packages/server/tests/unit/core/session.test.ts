@@ -4,14 +4,13 @@ import { join } from 'node:path';
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
-import { setConfig } from '../src/core/config.js';
-import { pathExists } from '../src/core/storage/fs.js';
-
+import { setConfig } from '../../../src/core/config.js';
+import { pathExists } from '../../../src/core/storage/fs.js';
 import {
   mockCreateAllTools,
   mockCreateSystemPrompt,
   resetAgentMocks,
-} from './helpers/mock-agents.js';
+} from '../../helpers/mock-agents.js';
 
 // Mock the Conversation class so we don't make real LLM calls
 const mockPrompt = vi.fn();
@@ -41,9 +40,9 @@ vi.mock('@ank1015/llm-sdk', async (importOriginal) => {
   };
 });
 
-const { ArtifactDir } = await import('../src/core/artifact-dir/artifact-dir.js');
-const { Project } = await import('../src/core/project/project.js');
-const { Session } = await import('../src/core/session/session.js');
+const { ArtifactDir } = await import('../../../src/core/artifact-dir/artifact-dir.js');
+const { Project } = await import('../../../src/core/project/project.js');
+const { Session } = await import('../../../src/core/session/session.js');
 
 let projectsRoot: string;
 let dataRoot: string;

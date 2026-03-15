@@ -4,14 +4,8 @@ import { vi } from 'vitest';
 
 function getSkillDescription(skillName: string): string {
   switch (skillName) {
-    case 'browser-use':
-      return 'Browser automation and site-specific helpers.';
-    case 'llm-use':
-      return 'LLM SDK workflows and scripts.';
-    case 'pptx':
-      return 'PowerPoint deck creation and editing helpers.';
-    case 'xlsx':
-      return 'Spreadsheet automation and validation helpers.';
+    case 'ai-images':
+      return 'Create brand-new images or edit existing images with state-of-the-art image generation models.';
     default:
       return `${skillName} description`;
   }
@@ -54,12 +48,7 @@ function createDeletedSkillResult(skillName: string, artifactDir: string) {
   };
 }
 
-export const mockListBundledSkills = vi.fn(async () => [
-  createBundledSkillResult('browser-use'),
-  createBundledSkillResult('llm-use'),
-  createBundledSkillResult('pptx'),
-  createBundledSkillResult('xlsx'),
-]);
+export const mockListBundledSkills = vi.fn(async () => [createBundledSkillResult('ai-images')]);
 export const mockListInstalledSkills = vi.fn(async () => []);
 export const mockAddSkill = vi.fn(async (skillName: string, artifactDir: string) =>
   createInstalledSkillResult(skillName, artifactDir)
@@ -72,12 +61,7 @@ export const mockCreateAllTools = vi.fn(() => ({}));
 
 export function resetAgentMocks(): void {
   mockListBundledSkills.mockReset();
-  mockListBundledSkills.mockImplementation(async () => [
-    createBundledSkillResult('browser-use'),
-    createBundledSkillResult('llm-use'),
-    createBundledSkillResult('pptx'),
-    createBundledSkillResult('xlsx'),
-  ]);
+  mockListBundledSkills.mockImplementation(async () => [createBundledSkillResult('ai-images')]);
 
   mockListInstalledSkills.mockReset();
   mockListInstalledSkills.mockResolvedValue([]);

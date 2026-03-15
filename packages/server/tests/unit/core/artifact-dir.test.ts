@@ -4,15 +4,14 @@ import { join } from 'node:path';
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
-import { setConfig } from '../src/core/config.js';
-import { pathExists, readMetadata } from '../src/core/storage/fs.js';
+import { setConfig } from '../../../src/core/config.js';
+import { pathExists, readMetadata } from '../../../src/core/storage/fs.js';
+import { mockDeleteSkill, resetAgentMocks } from '../../helpers/mock-agents.js';
 
-import { mockDeleteSkill, resetAgentMocks } from './helpers/mock-agents.js';
+import type { ArtifactDirMetadata } from '../../../src/core/types.js';
 
-import type { ArtifactDirMetadata } from '../src/core/types.js';
-
-const { ArtifactDir } = await import('../src/core/artifact-dir/artifact-dir.js');
-const { Project } = await import('../src/core/project/project.js');
+const { ArtifactDir } = await import('../../../src/core/artifact-dir/artifact-dir.js');
+const { Project } = await import('../../../src/core/project/project.js');
 
 let projectsRoot: string;
 let dataRoot: string;
@@ -163,11 +162,11 @@ describe('ArtifactDir', () => {
     it('should delete an installed skill from the artifact working directory', async () => {
       const dir = await ArtifactDir.create(PROJECT_NAME, { name: 'skills' });
 
-      const result = await dir.deleteSkill('browser-use');
+      const result = await dir.deleteSkill('ai-images');
 
-      expect(result.name).toBe('browser-use');
+      expect(result.name).toBe('ai-images');
       expect(result.deleted).toBe(true);
-      expect(mockDeleteSkill).toHaveBeenCalledWith('browser-use', dir.dirPath);
+      expect(mockDeleteSkill).toHaveBeenCalledWith('ai-images', dir.dirPath);
     });
   });
 });

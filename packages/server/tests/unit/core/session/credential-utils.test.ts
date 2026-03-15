@@ -8,7 +8,7 @@ import {
   extractClaudeCodeCredentials,
   loadCodexCredentials,
   reloadCredentials,
-} from '../../../src/core/session/credential-utils.js';
+} from '../../../../src/core/session/credential-utils.js';
 
 async function* emptyQueryRunner(): AsyncIterable<unknown> {
   // Intentionally empty to exercise timeout behavior.

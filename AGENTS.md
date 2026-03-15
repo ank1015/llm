@@ -7,7 +7,7 @@ TypeScript SDK monorepo for multi-provider LLM interactions.
 ```bash
 pnpm install          # Install dependencies
 pnpm build            # Build all packages
-pnpm build:packages   # Build SDK packages only (excludes apps)
+pnpm build:packages   # Build SDK/agent packages only (excludes apps)
 pnpm test             # Run all tests
 pnpm test:unit        # Run unit tests only
 pnpm test:integration # Run integration tests only
@@ -20,6 +20,7 @@ pnpm clean            # Remove build artifacts
 
 # Development
 pnpm dev:chat-app     # Start chat app
+pnpm agent:cli        # Start the local agents package CLI
 
 # Production
 pnpm start:chat-app   # Start chat app
@@ -33,6 +34,7 @@ packages/
   core/               # @ank1015/llm-core - Stateless runtime built on top of types
   sdk/                # @ank1015/llm-sdk - Opinionated wrappers over core
   sdk-adapters/       # @ank1015/llm-sdk-adapters - Node keys/session adapter implementations
+  agents/             # @ank1015/llm-agents - General-purpose agent tools, skills, and helper-backed workflows
   extension/          # @ank1015/llm-extension - Chrome RPC bridge
   chat-app/           # @ank1015/llm-chat-app
   usage-dashboard/    # @ank1015/llm-usage-dashboard
@@ -52,8 +54,12 @@ Bottom up, these are the currently documented base layers:
    Opinionated SDK layer on top of `core`. It adds shared credential resolution, stateful `Conversation` flows, and `SessionManager` helpers while staying runtime-neutral and leaving concrete storage implementations out of the package.
 4. `@ank1015/llm-sdk-adapters`
    Concrete Node-oriented adapters used by app/server layers. It currently provides file-system and in-memory implementations for keys and sessions, and no longer owns usage tracking or key-management UI code.
-5. `@ank1015/llm-extension`
+5. `@ank1015/llm-agents`
+   Node-only general-purpose agent package built on top of the sdk stack. It owns the monorepo's filesystem/shell tool layer, system prompt construction, bundled skill runtime, helper-backed skills like `ai-images`, and the local CLI runner.
+6. `@ank1015/llm-extension`
    Independent Chrome RPC package. It provides the Manifest V3 extension, native messaging host, TCP bridge, and Node client used to call Chrome APIs and debugger helpers from local processes.
+7. `@ank1015/llm-server`
+   Node-only Hono orchestration server built on top of the SDK and agents layers. It manages projects, artifact directories, agent sessions, bundled skills, and SSE-backed live session runs over a filesystem-backed workspace model.
 
 More package summaries can be added here as the stack above `types` and `core` is documented.
 
@@ -79,7 +85,9 @@ More package summaries can be added here as the stack above `types` and `core` i
 - [packages/core/AGENTS.md](packages/core/AGENTS.md) - Stateless runtime layer
 - [packages/sdk/AGENTS.md](packages/sdk/AGENTS.md) - Runtime-neutral SDK wrappers, credential resolution, and session helpers
 - [packages/sdk-adapters/AGENTS.md](packages/sdk-adapters/AGENTS.md) - Concrete Node file-system and in-memory keys/session adapters
+- [packages/agents/AGENTS.md](packages/agents/AGENTS.md) - General-purpose agent tools, bundled skills, helper-backed workflows, and local CLI
 - [packages/extension/AGENTS.md](packages/extension/AGENTS.md) - Chrome RPC bridge, native host, and Node client
+- [packages/server/AGENTS.md](packages/server/AGENTS.md) - Node-only orchestration server for projects, artifact directories, sessions, and skills
 
 ## Boundaries
 

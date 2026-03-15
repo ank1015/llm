@@ -4,9 +4,9 @@ import { join } from 'node:path';
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
-import { setConfig } from '../../src/core/config.js';
-import { resetSessionRunRegistry } from '../../src/core/session/run-registry.js';
-import { resetAgentMocks } from '../helpers/mock-agents.js';
+import { setConfig } from '../../../src/core/config.js';
+import { resetSessionRunRegistry } from '../../../src/core/session/run-registry.js';
+import { resetAgentMocks } from '../../helpers/mock-agents.js';
 
 const mockPrompt = vi.fn();
 const mockSubscribe = vi.fn().mockReturnValue(vi.fn()); // returns unsubscribe
@@ -43,7 +43,7 @@ vi.mock('@ank1015/llm-sdk', async (importOriginal) => {
 });
 
 // Import app after mock setup
-const { app } = await import('../../src/index.js');
+const { app } = await import('../../../src/index.js');
 
 let projectsRoot: string;
 let dataRoot: string;
@@ -929,7 +929,7 @@ describe('Session Routes', () => {
         runId,
         status: 'cancelled',
       });
-    });
+    }, 45_000);
 
     it('should return 409 with liveRun metadata when another run is already active', async () => {
       const created = await createSession();

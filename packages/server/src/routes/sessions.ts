@@ -9,6 +9,7 @@ import type { Context } from 'hono';
 
 const BASE = '/projects/:projectId/artifacts/:artifactDirId/sessions';
 const HEARTBEAT_INTERVAL_MS = 15_000;
+const SESSION_NOT_FOUND_MESSAGE = 'Session not found';
 
 export const sessionRoutes = new Hono();
 
@@ -135,7 +136,7 @@ sessionRoutes.get(`${BASE}/:sessionId`, async (c) => {
     const metadata = await session.getMetadata();
     return c.json(metadata);
   } catch (e) {
-    const message = e instanceof Error ? e.message : 'Session not found';
+    const message = e instanceof Error ? e.message : SESSION_NOT_FOUND_MESSAGE;
     return c.json({ error: message }, 404);
   }
 });
@@ -149,7 +150,7 @@ sessionRoutes.get(`${BASE}/:sessionId/messages`, async (c) => {
     const nodes = await session.getHistoryNodes();
     return c.json(nodes);
   } catch (e) {
-    const message = e instanceof Error ? e.message : 'Session not found';
+    const message = e instanceof Error ? e.message : SESSION_NOT_FOUND_MESSAGE;
     return c.json({ error: message }, 404);
   }
 });
@@ -168,7 +169,7 @@ sessionRoutes.get(`${BASE}/:sessionId/tree`, async (c) => {
       ...(liveRun ? { liveRun } : {}),
     });
   } catch (e) {
-    const message = e instanceof Error ? e.message : 'Session not found';
+    const message = e instanceof Error ? e.message : SESSION_NOT_FOUND_MESSAGE;
     return c.json({ error: message }, 404);
   }
 });
@@ -271,7 +272,7 @@ function streamAttachedRun(
   sessionId: string,
   run: NonNullable<ReturnType<typeof sessionRunRegistry.getRun>>,
   afterSeq = 0
-) {
+): Response {
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
       let closed = false;
@@ -390,7 +391,7 @@ async function startSessionRun(
       onNodePersisted: (node: MessageNode) => void;
     }) => Promise<{ messageCount: number }>;
   }
-) {
+): Promise<Response> {
   const sessionKey = getSessionRunKey(input.projectId, input.artifactDirId, input.sessionId);
   const started = sessionRunRegistry.startRun({
     sessionKey,
@@ -425,7 +426,7 @@ sessionRoutes.post(`${BASE}/:sessionId/stream`, async (c) => {
   try {
     session = await Session.getById(projectId, artifactDirId, sessionId);
   } catch (e) {
-    const message = e instanceof Error ? e.message : 'Session not found';
+    const message = e instanceof Error ? e.message : SESSION_NOT_FOUND_MESSAGE;
     return c.json({ error: message }, 404);
   }
 
@@ -454,7 +455,7 @@ sessionRoutes.post(`${BASE}/:sessionId/messages/:nodeId/retry/stream`, async (c)
   try {
     session = await Session.getById(projectId, artifactDirId, sessionId);
   } catch (e) {
-    const message = e instanceof Error ? e.message : 'Session not found';
+    const message = e instanceof Error ? e.message : SESSION_NOT_FOUND_MESSAGE;
     return c.json({ error: message }, 404);
   }
 
@@ -487,7 +488,7 @@ sessionRoutes.post(`${BASE}/:sessionId/messages/:nodeId/edit/stream`, async (c) 
   try {
     session = await Session.getById(projectId, artifactDirId, sessionId);
   } catch (e) {
-    const message = e instanceof Error ? e.message : 'Session not found';
+    const message = e instanceof Error ? e.message : SESSION_NOT_FOUND_MESSAGE;
     return c.json({ error: message }, 404);
   }
 

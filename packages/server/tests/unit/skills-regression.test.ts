@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const packageRoot = resolve(__dirname, '..');
+const packageRoot = resolve(__dirname, '../..');
 
 describe('server skill regressions', () => {
   it('removes retired skill bootstrap and prompt plumbing from the server package', async () => {

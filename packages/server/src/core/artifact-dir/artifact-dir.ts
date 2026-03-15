@@ -26,6 +26,7 @@ import type {
 
 const DEFAULT_MAX_FILE_BYTES = 200_000;
 const MAX_ALLOWED_FILE_BYTES = 2_000_000;
+const PATH_REQUIRED_MESSAGE = 'Path is required';
 
 /**
  * Manages a single artifact directory within a project.
@@ -193,7 +194,7 @@ export class ArtifactDir {
     const { absolutePath, relativePath: safePath } = this.resolveArtifactPath(relativePath);
 
     if (!safePath) {
-      throw new Error('Path is required');
+      throw new Error(PATH_REQUIRED_MESSAGE);
     }
 
     const fileStats = await this.statPath(absolutePath);
@@ -241,7 +242,7 @@ export class ArtifactDir {
     const { absolutePath, relativePath: safePath } = this.resolveArtifactPath(relativePath);
 
     if (!safePath) {
-      throw new Error('Path is required');
+      throw new Error(PATH_REQUIRED_MESSAGE);
     }
 
     const fileStats = await this.statPath(absolutePath);
@@ -284,7 +285,7 @@ export class ArtifactDir {
     const { absolutePath, relativePath: safePath } = this.resolveArtifactPath(relativePath);
 
     if (!safePath) {
-      throw new Error('Path is required');
+      throw new Error(PATH_REQUIRED_MESSAGE);
     }
 
     const targetStats = await this.statPath(absolutePath);
@@ -313,7 +314,7 @@ export class ArtifactDir {
     const { absolutePath, relativePath: safePath } = this.resolveArtifactPath(relativePath);
 
     if (!safePath) {
-      throw new Error('Path is required');
+      throw new Error(PATH_REQUIRED_MESSAGE);
     }
 
     const normalizedName = normalizePathName(newName);
@@ -364,6 +365,7 @@ export class ArtifactDir {
   }
 
   /** Recursively index files and directories in this artifact directory (for mentions/search). */
+  // eslint-disable-next-line sonarjs/cognitive-complexity
   async buildFileIndex(options?: {
     query?: string;
     limit?: number;

@@ -617,7 +617,9 @@ export class Session {
     return conversation;
   }
 
-  private resolveModel(execution: SessionExecutionConfig) {
+  private resolveModel(
+    execution: SessionExecutionConfig
+  ): NonNullable<ReturnType<typeof getModel>> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const model = getModel(execution.api, execution.modelId as any);
     if (!model) {

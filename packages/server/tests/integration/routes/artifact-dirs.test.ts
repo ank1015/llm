@@ -4,15 +4,15 @@ import { join } from 'node:path';
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
-import { setConfig } from '../../src/core/config.js';
+import { setConfig } from '../../../src/core/config.js';
 import {
   mockAddSkill,
   mockDeleteSkill,
   mockListInstalledSkills,
   resetAgentMocks,
-} from '../helpers/mock-agents.js';
+} from '../../helpers/mock-agents.js';
 
-const { app } = await import('../../src/index.js');
+const { app } = await import('../../../src/index.js');
 
 let projectsRoot: string;
 let dataRoot: string;
@@ -172,14 +172,15 @@ describe('Artifact Dir Routes', () => {
       await post(BASE, { name: 'skills' });
       mockListInstalledSkills.mockResolvedValueOnce([
         {
-          name: 'browser-use',
-          description: 'Browser automation and site-specific helpers.',
-          path: join(projectsRoot, PROJECT, 'skills', '.max', 'skills', 'browser-use', 'SKILL.md'),
+          name: 'ai-images',
+          description:
+            'Create brand-new images or edit existing images with state-of-the-art image generation models.',
+          path: join(projectsRoot, PROJECT, 'skills', '.max', 'skills', 'ai-images', 'SKILL.md'),
           artifactDir: join(projectsRoot, PROJECT, 'skills'),
           maxDir: join(projectsRoot, PROJECT, 'skills', '.max'),
           skillsDir: join(projectsRoot, PROJECT, 'skills', '.max', 'skills'),
           tempDir: join(projectsRoot, PROJECT, 'skills', '.max', 'temp'),
-          directory: join(projectsRoot, PROJECT, 'skills', '.max', 'skills', 'browser-use'),
+          directory: join(projectsRoot, PROJECT, 'skills', '.max', 'skills', 'ai-images'),
         },
       ]);
 
@@ -188,31 +189,28 @@ describe('Artifact Dir Routes', () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body).toHaveLength(1);
-      expect(body[0].name).toBe('browser-use');
+      expect(body[0].name).toBe('ai-images');
     });
 
     it('should install a bundled skill into an artifact and return the installed metadata', async () => {
       await post(BASE, { name: 'skills' });
 
-      const res = await post(`${BASE}/skills/skills`, { skillName: 'browser-use' });
+      const res = await post(`${BASE}/skills/skills`, { skillName: 'ai-images' });
 
       expect(res.status).toBe(200);
       const body = await res.json();
-      expect(body.name).toBe('browser-use');
+      expect(body.name).toBe('ai-images');
       expect(body.path).toBe(
-        join(projectsRoot, PROJECT, 'skills', '.max', 'skills', 'browser-use', 'SKILL.md')
+        join(projectsRoot, PROJECT, 'skills', '.max', 'skills', 'ai-images', 'SKILL.md')
       );
-      expect(mockAddSkill).toHaveBeenCalledWith(
-        'browser-use',
-        join(projectsRoot, PROJECT, 'skills')
-      );
+      expect(mockAddSkill).toHaveBeenCalledWith('ai-images', join(projectsRoot, PROJECT, 'skills'));
     });
 
     it('should allow reinstalling the same skill', async () => {
       await post(BASE, { name: 'skills' });
 
-      const first = await post(`${BASE}/skills/skills`, { skillName: 'browser-use' });
-      const second = await post(`${BASE}/skills/skills`, { skillName: 'browser-use' });
+      const first = await post(`${BASE}/skills/skills`, { skillName: 'ai-images' });
+      const second = await post(`${BASE}/skills/skills`, { skillName: 'ai-images' });
 
       expect(first.status).toBe(200);
       expect(second.status).toBe(200);
@@ -222,14 +220,14 @@ describe('Artifact Dir Routes', () => {
     it('should delete an installed skill from an artifact and return the deleted metadata', async () => {
       await post(BASE, { name: 'skills' });
 
-      const res = await del(`${BASE}/skills/skills/browser-use`);
+      const res = await del(`${BASE}/skills/skills/ai-images`);
 
       expect(res.status).toBe(200);
       const body = await res.json();
-      expect(body.name).toBe('browser-use');
+      expect(body.name).toBe('ai-images');
       expect(body.deleted).toBe(true);
       expect(mockDeleteSkill).toHaveBeenCalledWith(
-        'browser-use',
+        'ai-images',
         join(projectsRoot, PROJECT, 'skills')
       );
     });
@@ -237,14 +235,14 @@ describe('Artifact Dir Routes', () => {
     it('should return 404 when deleting a skill that is not installed', async () => {
       await post(BASE, { name: 'skills' });
       mockDeleteSkill.mockRejectedValueOnce(
-        new Error('Installed skill "browser-use" not found in artifact')
+        new Error('Installed skill "ai-images" not found in artifact')
       );
 
-      const res = await del(`${BASE}/skills/skills/browser-use`);
+      const res = await del(`${BASE}/skills/skills/ai-images`);
 
       expect(res.status).toBe(404);
       expect(await res.json()).toEqual({
-        error: 'Installed skill "browser-use" not found in artifact',
+        error: 'Installed skill "ai-images" not found in artifact',
       });
     });
 
@@ -260,7 +258,7 @@ describe('Artifact Dir Routes', () => {
     it('should return 400 when the skill is unknown', async () => {
       await post(BASE, { name: 'skills' });
       mockAddSkill.mockRejectedValueOnce(
-        new Error('Unknown bundled skill "bad-skill". Available skills: browser-use, llm-use')
+        new Error('Unknown bundled skill "bad-skill". Available skills: ai-images')
       );
 
       const res = await post(`${BASE}/skills/skills`, { skillName: 'bad-skill' });
@@ -271,7 +269,7 @@ describe('Artifact Dir Routes', () => {
     });
 
     it('should return 404 when installing into a missing artifact', async () => {
-      const res = await post(`${BASE}/missing/skills`, { skillName: 'browser-use' });
+      const res = await post(`${BASE}/missing/skills`, { skillName: 'ai-images' });
 
       expect(res.status).toBe(404);
     });
@@ -284,14 +282,14 @@ describe('Artifact Dir Routes', () => {
 
     it('should return 404 when installing into a missing project', async () => {
       const res = await post('/api/projects/missing-project/artifacts/skills/skills', {
-        skillName: 'browser-use',
+        skillName: 'ai-images',
       });
 
       expect(res.status).toBe(404);
     });
 
     it('should return 404 when deleting from a missing artifact', async () => {
-      const res = await del(`${BASE}/missing/skills/browser-use`);
+      const res = await del(`${BASE}/missing/skills/ai-images`);
 
       expect(res.status).toBe(404);
     });

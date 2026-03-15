@@ -1,6 +1,7 @@
 {
   "name": "@ank1015/llm-server",
-  "version": "0.0.1",
+  "version": "0.0.2",
+  "description": "Node-only Hono orchestration server for projects, artifact directories, agent sessions, and bundled skills",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -11,32 +12,60 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "docs",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "rm -rf dist coverage *.tsbuildinfo && tsc",
     "dev": "sh -c 'tsc && tsc --watch --preserveWatchOutput & TSC_PID=$!; trap \"kill $TSC_PID\" EXIT; node --watch dist/server.js'",
     "start": "node dist/server.js",
-    "test": "vitest run --exclude tests/integration/**",
-    "test:watch": "vitest --exclude tests/integration/**",
+    "test": "pnpm run test:unit && pnpm run test:integration",
+    "test:watch": "vitest",
+    "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
+    "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
-    "clean": "rm -rf dist *.tsbuildinfo"
+    "lint": "eslint src tests vitest.config.ts",
+    "clean": "rm -rf dist coverage *.tsbuildinfo",
+    "prepack": "pnpm run build"
+  },
+  "keywords": [
+    "llm",
+    "server",
+    "hono",
+    "agents",
+    "sessions",
+    "skills",
+    "typescript",
+    "node"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ank1015/llm.git",
+    "directory": "packages/server"
+  },
+  "homepage": "https://github.com/ank1015/llm/tree/main/packages/server",
+  "bugs": {
+    "url": "https://github.com/ank1015/llm/issues"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "dependencies": {
     "@ank1015/llm-agents": "workspace:^",
     "@anthropic-ai/claude-agent-sdk": "^0.2.42",
-    "@ank1015/llm-extension": "workspace:^",
-    "@ank1015/llm-research": "workspace:^",
     "@ank1015/llm-sdk": "workspace:^",
     "@ank1015/llm-sdk-adapters": "workspace:^",
     "@hono/node-server": "^1.14.1",
-    "better-sqlite3": "^11.0.0",
     "hono": "^4.7.6"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.11",
     "@types/node": "^25.2.3",
+    "@vitest/coverage-v8": "^2.1.0",
     "vitest": "^2.1.0"
   }
 }

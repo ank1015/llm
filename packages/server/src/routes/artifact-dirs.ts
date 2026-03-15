@@ -5,6 +5,10 @@ import { ArtifactDir } from '../core/index.js';
 const BASE = '/projects/:projectId/artifacts';
 const NOT_FOUND_MSG = 'Artifact directory not found';
 const FILE_READ_DEFAULT_MAX_BYTES = 200_000;
+const PATH_QUERY_REQUIRED_MESSAGE = 'path query parameter is required';
+const SKILL_NAME_REQUIRED_MESSAGE = 'skillName is required';
+const NOT_FOUND_IN_PROJECT_FRAGMENT = 'not found in project';
+const INVALID_PATH_MESSAGE = 'Invalid path';
 
 export const artifactDirRoutes = new Hono();
 
@@ -121,7 +125,7 @@ artifactDirRoutes.get(`${BASE}/:artifactDirId/file`, async (c) => {
   const maxBytesRaw = c.req.query('maxBytes');
 
   if (!path || !path.trim()) {
-    return c.json({ error: 'path query parameter is required' }, 400);
+    return c.json({ error: PATH_QUERY_REQUIRED_MESSAGE }, 400);
   }
 
   let maxBytes = FILE_READ_DEFAULT_MAX_BYTES;
@@ -150,7 +154,7 @@ artifactDirRoutes.get(`${BASE}/:artifactDirId/file/raw`, async (c) => {
   const path = c.req.query('path');
 
   if (!path || !path.trim()) {
-    return c.json({ error: 'path query parameter is required' }, 400);
+    return c.json({ error: PATH_QUERY_REQUIRED_MESSAGE }, 400);
   }
 
   try {
@@ -179,7 +183,7 @@ artifactDirRoutes.post(`${BASE}/:artifactDirId/skills`, async (c) => {
   const skillName = body?.skillName?.trim() ?? '';
 
   if (!skillName) {
-    return c.json({ error: 'skillName is required' }, 400);
+    return c.json({ error: SKILL_NAME_REQUIRED_MESSAGE }, 400);
   }
 
   try {
@@ -199,7 +203,7 @@ artifactDirRoutes.delete(`${BASE}/:artifactDirId/skills/:skillName`, async (c) =
   const skillName = rawSkillName?.trim() ?? '';
 
   if (!skillName) {
-    return c.json({ error: 'skillName is required' }, 400);
+    return c.json({ error: SKILL_NAME_REQUIRED_MESSAGE }, 400);
   }
 
   try {
@@ -282,12 +286,12 @@ artifactDirRoutes.delete(`${BASE}/:artifactDirId`, async (c) => {
 function classifyExplorerErrorStatus(message: string): 400 | 404 | 500 {
   if (
     message === NOT_FOUND_MSG ||
-    message.includes('not found in project') ||
+    message.includes(NOT_FOUND_IN_PROJECT_FRAGMENT) ||
     message.includes('not found')
   ) {
     return 404;
   }
-  if (message === 'Invalid path' || message.includes('not a directory')) {
+  if (message === INVALID_PATH_MESSAGE || message.includes('not a directory')) {
     return 400;
   }
   return 500;
@@ -296,13 +300,13 @@ function classifyExplorerErrorStatus(message: string): 400 | 404 | 500 {
 function classifyFileReadErrorStatus(message: string): 400 | 404 | 500 {
   if (
     message === NOT_FOUND_MSG ||
-    message.includes('not found in project') ||
+    message.includes(NOT_FOUND_IN_PROJECT_FRAGMENT) ||
     message.includes('not found')
   ) {
     return 404;
   }
   if (
-    message === 'Invalid path' ||
+    message === INVALID_PATH_MESSAGE ||
     message.includes('Path is required') ||
     message.includes('not a file')
   ) {
@@ -314,7 +318,7 @@ function classifyFileReadErrorStatus(message: string): 400 | 404 | 500 {
 function classifyPathMutationErrorStatus(message: string): 400 | 404 | 409 | 500 {
   if (
     message === NOT_FOUND_MSG ||
-    message.includes('not found in project') ||
+    message.includes(NOT_FOUND_IN_PROJECT_FRAGMENT) ||
     message.includes('not found')
   ) {
     return 404;
@@ -323,7 +327,7 @@ function classifyPathMutationErrorStatus(message: string): 400 | 404 | 409 | 500
     return 409;
   }
   if (
-    message === 'Invalid path' ||
+    message === INVALID_PATH_MESSAGE ||
     message.includes('Path is required') ||
     message.includes('newName is required') ||
     message.includes('newName cannot contain path separators') ||
@@ -338,12 +342,12 @@ function classifyPathMutationErrorStatus(message: string): 400 | 404 | 409 | 500
 function classifySkillErrorStatus(message: string): 400 | 404 | 500 {
   if (
     message === NOT_FOUND_MSG ||
-    message.includes('not found in project') ||
+    message.includes(NOT_FOUND_IN_PROJECT_FRAGMENT) ||
     message.includes('not found')
   ) {
     return 404;
   }
-  if (message === 'skillName is required' || message.startsWith('Unknown bundled skill')) {
+  if (message === SKILL_NAME_REQUIRED_MESSAGE || message.startsWith('Unknown bundled skill')) {
     return 400;
   }
   return 500;

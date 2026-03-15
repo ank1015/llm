@@ -10,6 +10,8 @@ export {
   type InstalledSkillEntry,
 } from '@ank1015/llm-agents';
 
-export async function listBundledAgentSkills() {
+export async function listBundledAgentSkills(): Promise<
+  Awaited<ReturnType<typeof listBundledSkills>>
+> {
   return listBundledSkills();
 }

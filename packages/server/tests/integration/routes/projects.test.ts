@@ -4,11 +4,11 @@ import { join } from 'node:path';
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
-import { setConfig } from '../../src/core/config.js';
-import { pathExists } from '../../src/core/storage/fs.js';
-import { resetAgentMocks } from '../helpers/mock-agents.js';
+import { setConfig } from '../../../src/core/config.js';
+import { pathExists } from '../../../src/core/storage/fs.js';
+import { resetAgentMocks } from '../../helpers/mock-agents.js';
 
-const { app } = await import('../../src/index.js');
+const { app } = await import('../../../src/index.js');
 
 let projectsRoot: string;
 let dataRoot: string;
@@ -148,14 +148,14 @@ describe('Project Routes', () => {
       );
     });
 
-    it('should return 400 when projectName is missing', async () => {
+    it('should return 400 when projectId and projectName are both missing', async () => {
       const res = await patch('/api/projects/project-img', {
         projectImg: 'https://example.com/project.png',
       });
 
       expect(res.status).toBe(400);
       const body = await res.json();
-      expect(body.error).toBe('projectName is required');
+      expect(body.error).toBe('projectId or projectName is required');
     });
 
     it('should return 400 when projectImg is missing', async () => {

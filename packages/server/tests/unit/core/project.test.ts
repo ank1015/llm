@@ -4,14 +4,13 @@ import { join } from 'node:path';
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
-import { setConfig } from '../src/core/config.js';
-import { pathExists, readMetadata } from '../src/core/storage/fs.js';
+import { setConfig } from '../../../src/core/config.js';
+import { pathExists, readMetadata } from '../../../src/core/storage/fs.js';
+import { resetAgentMocks } from '../../helpers/mock-agents.js';
 
-import { resetAgentMocks } from './helpers/mock-agents.js';
+import type { ProjectMetadata } from '../../../src/core/types.js';
 
-import type { ProjectMetadata } from '../src/core/types.js';
-
-const { Project } = await import('../src/core/project/project.js');
+const { Project } = await import('../../../src/core/project/project.js');
 
 let projectsRoot: string;
 let dataRoot: string;
