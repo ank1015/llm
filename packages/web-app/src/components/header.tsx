@@ -14,6 +14,10 @@ import { cn } from '@/lib/utils';
 import { useSidebarStore, useUiStore } from '@/stores';
 
 const EMPTY_ARTIFACT_DIRS: ProjectOverviewDto['artifactDirs'] = [];
+const BREADCRUMB_LINK_TRANSITION_CLASS = 'hover:text-foreground transition-colors';
+const ACTIVE_BREADCRUMB_LINK_CLASS = `text-foreground font-medium hover:text-foreground/80 transition-colors`;
+const INACTIVE_BREADCRUMB_LINK_CLASS = `text-muted-foreground ${BREADCRUMB_LINK_TRANSITION_CLASS}`;
+const TRUNCATED_BREADCRUMB_LABEL_CLASS = 'min-w-0 truncate';
 
 function HeaderBreadcrumb() {
   const { projectId, artifactId, threadId } = useParams<{
@@ -56,22 +60,17 @@ function HeaderBreadcrumb() {
         : 'project';
 
   const linkClass = (active: boolean) =>
-    active
-      ? 'text-foreground font-medium hover:text-foreground/80 transition-colors'
-      : 'text-muted-foreground hover:text-foreground transition-colors';
+    active ? ACTIVE_BREADCRUMB_LINK_CLASS : INACTIVE_BREADCRUMB_LINK_CLASS;
 
   return (
     <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden text-sm whitespace-nowrap">
-      <Link
-        href="/"
-        className="text-muted-foreground hover:text-foreground shrink-0 transition-colors"
-      >
+      <Link href="/" className={`${INACTIVE_BREADCRUMB_LINK_CLASS} shrink-0`}>
         Projects
       </Link>
       <ChevronRight size={14} className="text-muted-foreground shrink-0" />
       <Link
         href={`/${projectId}`}
-        className={cn(linkClass(lastSegment === 'project'), 'min-w-0 truncate')}
+        className={cn(linkClass(lastSegment === 'project'), TRUNCATED_BREADCRUMB_LABEL_CLASS)}
       >
         {projectName}
       </Link>
@@ -80,7 +79,7 @@ function HeaderBreadcrumb() {
           <ChevronRight size={14} className="text-muted-foreground shrink-0" />
           <Link
             href={`/${projectId}/${artifactId}`}
-            className={cn(linkClass(lastSegment === 'artifact'), 'min-w-0 truncate')}
+            className={cn(linkClass(lastSegment === 'artifact'), TRUNCATED_BREADCRUMB_LABEL_CLASS)}
           >
             {artifactName}
           </Link>
@@ -91,7 +90,7 @@ function HeaderBreadcrumb() {
           <ChevronRight size={14} className="text-muted-foreground shrink-0" />
           <Link
             href={`/${projectId}/${artifactId}/${threadId}`}
-            className={cn(linkClass(lastSegment === 'thread'), 'min-w-0 truncate')}
+            className={cn(linkClass(lastSegment === 'thread'), TRUNCATED_BREADCRUMB_LABEL_CLASS)}
           >
             {threadName}
           </Link>

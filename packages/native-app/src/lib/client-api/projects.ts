@@ -22,7 +22,6 @@ import type {
   RenameProjectRequest,
 } from '@ank1015/llm-app-contracts';
 
-
 const PROJECTS_BASE = `${SERVER_BASE}/api/projects`;
 
 export type ArtifactContext = {

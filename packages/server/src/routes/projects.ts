@@ -26,6 +26,8 @@ export const projectRoutes = new Hono();
 const DEFAULT_FILE_INDEX_LIMIT = 2000;
 const MAX_FILE_INDEX_LIMIT = 10000;
 const PROJECT_NOT_FOUND_MESSAGE = 'Project not found';
+const INVALID_REQUEST_BODY_MESSAGE = 'Invalid request body';
+const NAME_REQUIRED_MESSAGE = 'name is required';
 
 /** POST /api/projects — Create a new project */
 projectRoutes.post('/projects', async (c) => {
@@ -35,7 +37,7 @@ projectRoutes.post('/projects', async (c) => {
       c,
       CreateProjectRequestSchema,
       rawBody,
-      'Invalid request body'
+      INVALID_REQUEST_BODY_MESSAGE
     );
     if (!validation.ok) {
       return validation.response;
@@ -46,7 +48,7 @@ projectRoutes.post('/projects', async (c) => {
   const name = body.name?.trim() ?? '';
 
   if (!name) {
-    return c.json({ error: 'name is required' }, 400);
+    return c.json({ error: NAME_REQUIRED_MESSAGE }, 400);
   }
 
   try {
@@ -77,7 +79,7 @@ projectRoutes.patch('/projects/project-img', async (c) => {
       c,
       UpdateProjectImageRequestSchema,
       rawBody,
-      'Invalid request body'
+      INVALID_REQUEST_BODY_MESSAGE
     );
     if (!validation.ok) {
       return validation.response;
@@ -241,7 +243,7 @@ projectRoutes.patch('/projects/:projectId/name', async (c) => {
       c,
       RenameProjectRequestSchema,
       rawBody,
-      'Invalid request body'
+      INVALID_REQUEST_BODY_MESSAGE
     );
     if (!validation.ok) {
       return validation.response;
@@ -252,7 +254,7 @@ projectRoutes.patch('/projects/:projectId/name', async (c) => {
   const name = body.name?.trim() ?? '';
 
   if (!name) {
-    return c.json({ error: 'name is required' }, 400);
+    return c.json({ error: NAME_REQUIRED_MESSAGE }, 400);
   }
 
   try {

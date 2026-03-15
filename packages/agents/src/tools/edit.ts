@@ -55,6 +55,10 @@ export interface EditToolOptions {
   operations?: EditOperations;
 }
 
+function toError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
 export function createEditTool(
   cwd: string,
   options?: EditToolOptions
@@ -87,7 +91,7 @@ export function createEditTool(
         let aborted = false;
 
         // Set up abort handler
-        const onAbort = () => {
+        const onAbort = (): void => {
           aborted = true;
           reject(new Error('Operation aborted'));
         };
@@ -217,14 +221,14 @@ export function createEditTool(
               ],
               details: editDetails,
             });
-          } catch (error: any) {
+          } catch (error: unknown) {
             // Clean up abort handler
             if (signal) {
               signal.removeEventListener('abort', onAbort);
             }
 
             if (!aborted) {
-              reject(error);
+              reject(toError(error));
             }
           }
         })();

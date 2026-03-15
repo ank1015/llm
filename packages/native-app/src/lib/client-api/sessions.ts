@@ -9,7 +9,6 @@ import type {
   SessionSummaryDto,
 } from '@ank1015/llm-app-contracts';
 
-
 type ArtifactContext = {
   projectId: string;
   artifactId: string;

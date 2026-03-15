@@ -285,9 +285,7 @@ describe('ChromeClient.getPageMarkdown', () => {
 
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('connect ECONNREFUSED')));
 
-    await expect(client.getPageMarkdown(123)).rejects.toThrow(
-      'Failed to reach markdown converter'
-    );
+    await expect(client.getPageMarkdown(123)).rejects.toThrow('Failed to reach markdown converter');
   });
 });
 

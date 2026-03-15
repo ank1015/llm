@@ -45,6 +45,9 @@ const PATH_QUERY_REQUIRED_MESSAGE = 'path query parameter is required';
 const SKILL_NAME_REQUIRED_MESSAGE = 'skillName is required';
 const NOT_FOUND_IN_PROJECT_FRAGMENT = 'not found in project';
 const INVALID_PATH_MESSAGE = 'Invalid path';
+const INVALID_REQUEST_BODY_MESSAGE = 'Invalid request body';
+const INVALID_QUERY_PARAMETERS_MESSAGE = 'Invalid query parameters';
+const NAME_REQUIRED_MESSAGE = 'name is required';
 
 export const artifactDirRoutes = new Hono();
 
@@ -57,7 +60,7 @@ artifactDirRoutes.post(BASE, async (c) => {
       c,
       CreateArtifactDirRequestSchema,
       rawBody,
-      'Invalid request body'
+      INVALID_REQUEST_BODY_MESSAGE
     );
     if (!validation.ok) {
       return validation.response;
@@ -68,7 +71,7 @@ artifactDirRoutes.post(BASE, async (c) => {
   const name = body.name?.trim() ?? '';
 
   if (!name) {
-    return c.json({ error: 'name is required' }, 400);
+    return c.json({ error: NAME_REQUIRED_MESSAGE }, 400);
   }
 
   try {
@@ -113,7 +116,7 @@ artifactDirRoutes.patch(`${BASE}/:artifactDirId/name`, async (c) => {
       c,
       RenameArtifactDirRequestSchema,
       rawBody,
-      'Invalid request body'
+      INVALID_REQUEST_BODY_MESSAGE
     );
     if (!validation.ok) {
       return validation.response;
@@ -124,7 +127,7 @@ artifactDirRoutes.patch(`${BASE}/:artifactDirId/name`, async (c) => {
   const name = body.name?.trim() ?? '';
 
   if (!name) {
-    return c.json({ error: 'name is required' }, 400);
+    return c.json({ error: NAME_REQUIRED_MESSAGE }, 400);
   }
 
   try {
@@ -173,7 +176,7 @@ artifactDirRoutes.get(`${BASE}/:artifactDirId/explorer`, async (c) => {
     c,
     ArtifactExplorerQuerySchema,
     c.req.query(),
-    'Invalid query parameters'
+    INVALID_QUERY_PARAMETERS_MESSAGE
   );
   if (!queryValidation.ok) {
     return queryValidation.response;
@@ -200,7 +203,7 @@ artifactDirRoutes.get(`${BASE}/:artifactDirId/file`, async (c) => {
     c,
     ArtifactFileQuerySchema,
     c.req.query(),
-    'Invalid query parameters'
+    INVALID_QUERY_PARAMETERS_MESSAGE
   );
   if (!queryValidation.ok) {
     return queryValidation.response;
@@ -241,7 +244,7 @@ artifactDirRoutes.get(`${BASE}/:artifactDirId/file/raw`, async (c) => {
     c,
     ArtifactRawFileQuerySchema,
     c.req.query(),
-    'Invalid query parameters'
+    INVALID_QUERY_PARAMETERS_MESSAGE
   );
   if (!queryValidation.ok) {
     return queryValidation.response;
@@ -282,7 +285,7 @@ artifactDirRoutes.post(`${BASE}/:artifactDirId/skills`, async (c) => {
       c,
       InstallArtifactSkillRequestSchema,
       rawBody,
-      'Invalid request body'
+      INVALID_REQUEST_BODY_MESSAGE
     );
     if (!validation.ok) {
       return validation.response;
@@ -336,7 +339,7 @@ artifactDirRoutes.patch(`${BASE}/:artifactDirId/path/rename`, async (c) => {
       c,
       RenameArtifactPathRequestSchema,
       rawBody,
-      'Invalid request body'
+      INVALID_REQUEST_BODY_MESSAGE
     );
     if (!validation.ok) {
       return validation.response;
@@ -375,7 +378,7 @@ artifactDirRoutes.delete(`${BASE}/:artifactDirId/path`, async (c) => {
     c,
     DeleteArtifactPathQuerySchema,
     c.req.query(),
-    'Invalid query parameters'
+    INVALID_QUERY_PARAMETERS_MESSAGE
   );
   if (!queryValidation.ok) {
     return queryValidation.response;

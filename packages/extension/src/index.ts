@@ -22,11 +22,7 @@ export {
 
 // SDK
 export { ChromeClient, createChromeClient, connect } from './sdk/index.js';
-export type {
-  ChromeClientOptions,
-  ConnectOptions,
-  GetPageMarkdownOptions,
-} from './sdk/index.js';
+export type { ChromeClientOptions, ConnectOptions, GetPageMarkdownOptions } from './sdk/index.js';
 
 // Server
 export { ChromeServer } from './native/server.js';

@@ -35,6 +35,10 @@ export interface WriteToolOptions {
   operations?: WriteOperations;
 }
 
+function toError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
 export function createWriteTool(
   cwd: string,
   options?: WriteToolOptions
@@ -66,7 +70,7 @@ export function createWriteTool(
           let aborted = false;
 
           // Set up abort handler
-          const onAbort = () => {
+          const onAbort = (): void => {
             aborted = true;
             reject(new Error('Operation aborted'));
           };
@@ -108,14 +112,14 @@ export function createWriteTool(
                 ],
                 details: undefined,
               });
-            } catch (error: any) {
+            } catch (error: unknown) {
               // Clean up abort handler
               if (signal) {
                 signal.removeEventListener('abort', onAbort);
               }
 
               if (!aborted) {
-                reject(error);
+                reject(toError(error));
               }
             }
           })();

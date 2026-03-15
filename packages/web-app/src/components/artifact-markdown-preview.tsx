@@ -226,7 +226,7 @@ function ArtifactMarkdownPreviewComponent({
         return (
           <>
             {/* Artifact markdown can reference dynamic file URLs that are not suitable for next/image. */}
-            { }
+            {}
             <img
               src={resolvedSrc}
               alt={alt ?? ''}

@@ -413,7 +413,7 @@ export class Session {
         artifactName: artifactMetadata.name,
         artifactDir: artifactDir.dirPath,
       }),
-      tools: Object.values(createAllTools(artifactDir.dirPath)) as AgentTool[],
+      tools: Object.values(createAllTools(artifactDir.dirPath)) as unknown as AgentTool[],
     };
   }
 

@@ -58,6 +58,10 @@ export interface FindToolOptions {
   operations?: FindOperations;
 }
 
+function toError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
 export function createFindTool(
   cwd: string,
   options?: FindToolOptions
@@ -80,7 +84,9 @@ export function createFindTool(
           return;
         }
 
-        const onAbort = () => reject(new Error('Operation aborted'));
+        const onAbort = (): void => {
+          reject(new Error('Operation aborted'));
+        };
         signal?.addEventListener('abort', onAbort, { once: true });
 
         (async () => {
@@ -271,9 +277,9 @@ export function createFindTool(
               content: [{ type: 'text', content: resultOutput }],
               details: Object.keys(details).length > 0 ? details : undefined,
             });
-          } catch (e: any) {
+          } catch (error: unknown) {
             signal?.removeEventListener('abort', onAbort);
-            reject(e);
+            reject(toError(error));
           }
         })();
       });

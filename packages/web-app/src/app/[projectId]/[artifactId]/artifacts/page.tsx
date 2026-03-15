@@ -1118,7 +1118,7 @@ export default function ArtifactFilesPage() {
             {selectedViewerKind === 'image' ? (
               <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-4">
                 {/* Artifact preview images are user-selected raw files, so next/image is not appropriate. */}
-                { }
+                {}
                 <img
                   src={selectedRawFileUrl ?? ''}
                   alt={selectedFilePath ?? ''}

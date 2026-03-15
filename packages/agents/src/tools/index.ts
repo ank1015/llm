@@ -6,8 +6,6 @@ import { createLsTool, lsTool } from './ls.js';
 import { createReadTool, type ReadToolOptions, readTool } from './read.js';
 import { createWriteTool, writeTool } from './write.js';
 
-import type { AgentTool } from '@ank1015/llm-sdk';
-
 export {
   type BashOperations,
   type BashSpawnContext,
@@ -76,8 +74,15 @@ export {
   writeTool,
 } from './write.js';
 
-/** Tool type (AgentTool from pi-ai) */
-export type Tool = AgentTool<any>;
+/** Tool type (concrete union of bundled tool definitions) */
+export type Tool =
+  | typeof readTool
+  | typeof bashTool
+  | typeof editTool
+  | typeof writeTool
+  | typeof grepTool
+  | typeof findTool
+  | typeof lsTool;
 
 // Default tools for full access mode (using process.cwd())
 export const codingTools: Tool[] = [readTool, bashTool, editTool, writeTool];

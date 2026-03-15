@@ -3,7 +3,6 @@ import type { ArtifactContext } from '@/lib/client-api';
 import { ThreadMarkdown } from '@/components/projects/thread/thread-markdown';
 import { getArtifactRawFileUrl } from '@/lib/client-api';
 
-
 type ArtifactMarkdownPreviewProps = {
   artifactCtx: ArtifactContext;
   children: string;

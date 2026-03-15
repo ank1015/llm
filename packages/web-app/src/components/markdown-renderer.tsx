@@ -139,7 +139,7 @@ const CHAT_COMPONENTS: Partial<Components> = {
   img: ({ src, alt }) => (
     <>
       {/* Markdown images come from dynamic remote or artifact URLs, so next/image is not appropriate. */}
-      { }
+      {}
       <img src={src} alt={alt ?? ''} className="my-3 max-w-full rounded-lg" />
     </>
   ),

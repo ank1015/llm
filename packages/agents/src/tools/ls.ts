@@ -52,6 +52,10 @@ export interface LsToolOptions {
   operations?: LsOperations;
 }
 
+function toError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
 export function createLsTool(cwd: string, options?: LsToolOptions): AgentTool<typeof lsSchema> {
   const ops = options?.operations ?? defaultLsOperations;
 
@@ -71,7 +75,9 @@ export function createLsTool(cwd: string, options?: LsToolOptions): AgentTool<ty
           return;
         }
 
-        const onAbort = () => reject(new Error('Operation aborted'));
+        const onAbort = (): void => {
+          reject(new Error('Operation aborted'));
+        };
         signal?.addEventListener('abort', onAbort, { once: true });
 
         (async () => {
@@ -96,8 +102,8 @@ export function createLsTool(cwd: string, options?: LsToolOptions): AgentTool<ty
             let entries: string[];
             try {
               entries = await ops.readdir(dirPath);
-            } catch (e: any) {
-              reject(new Error(`Cannot read directory: ${e.message}`));
+            } catch (error: unknown) {
+              reject(new Error(`Cannot read directory: ${toError(error).message}`));
               return;
             }
 
@@ -170,9 +176,9 @@ export function createLsTool(cwd: string, options?: LsToolOptions): AgentTool<ty
               content: [{ type: 'text', content: output }],
               details: Object.keys(details).length > 0 ? details : undefined,
             });
-          } catch (e: any) {
+          } catch (error: unknown) {
             signal?.removeEventListener('abort', onAbort);
-            reject(e);
+            reject(toError(error));
           }
         })();
       });

@@ -23,6 +23,7 @@ export const MAX_DIR_NAME = '.max';
 export const INSTALLED_SKILLS_DIR_NAME = 'skills';
 export const TEMP_DIR_NAME = 'temp';
 const TEMP_SCRIPTS_DIR_NAME = 'scripts';
+const PACKAGE_JSON_FILENAME = 'package.json';
 
 export interface SkillHelperProjectConfig {
   runtime: 'typescript';
@@ -418,7 +419,7 @@ async function ensureHelperTempProject(
 }
 
 async function ensureTempPackageJson(tempDir: string): Promise<void> {
-  const packageJsonPath = join(tempDir, 'package.json');
+  const packageJsonPath = join(tempDir, PACKAGE_JSON_FILENAME);
   const packageVersion = await readCurrentPackageVersion();
   const tsxVersion = await readCurrentTsxVersion();
 
@@ -529,13 +530,13 @@ function normalizeObjectRecord(value: unknown): Record<string, string> {
 }
 
 async function readCurrentPackageVersion(): Promise<string> {
-  const packageJsonPath = join(packageRoot, 'package.json');
+  const packageJsonPath = join(packageRoot, PACKAGE_JSON_FILENAME);
   const parsed = JSON.parse(await readFile(packageJsonPath, 'utf-8')) as { version?: string };
   return parsed.version ?? '0.0.3';
 }
 
 async function readCurrentTsxVersion(): Promise<string> {
-  const packageJsonPath = join(packageRoot, 'package.json');
+  const packageJsonPath = join(packageRoot, PACKAGE_JSON_FILENAME);
   const parsed = JSON.parse(await readFile(packageJsonPath, 'utf-8')) as {
     devDependencies?: Record<string, string>;
     dependencies?: Record<string, string>;
@@ -548,7 +549,7 @@ function findPackageRoot(startDir: string): string {
   let dir = startDir;
 
   while (true) {
-    if (existsSync(join(dir, 'package.json'))) {
+    if (existsSync(join(dir, PACKAGE_JSON_FILENAME))) {
       return dir;
     }
 

@@ -118,9 +118,9 @@ describe('skills runtime', () => {
       expect(tempPackageJson.devDependencies?.tsx).toBeTruthy();
       await expect(readFile(tempTsconfigPath, 'utf-8')).resolves.toContain('"include"');
       await expect(readFile(join(tempScriptsDir, '.gitkeep'), 'utf-8')).rejects.toThrow();
-      await expect(
-        realpath(join(tempDir, 'node_modules', '@ank1015', 'llm-agents'))
-      ).resolves.toBe(packageRoot);
+      await expect(realpath(join(tempDir, 'node_modules', '@ank1015', 'llm-agents'))).resolves.toBe(
+        packageRoot
+      );
 
       const markerPath = join(installResult.directory, 'marker.txt');
       await writeFile(markerPath, 'stale\n', 'utf-8');

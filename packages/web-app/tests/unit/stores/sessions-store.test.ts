@@ -4,7 +4,6 @@ import type { SessionSummaryDto } from '@ank1015/llm-app-contracts';
 
 import { useSessionsStore } from '@/stores/sessions-store';
 
-
 const SESSION_A: SessionSummaryDto = {
   createdAt: '2026-03-16T00:00:00.000Z',
   nodeCount: 2,

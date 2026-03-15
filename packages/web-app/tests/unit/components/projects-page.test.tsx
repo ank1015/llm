@@ -5,7 +5,6 @@ import type { ProjectDto } from '@ank1015/llm-app-contracts';
 
 import ProjectsPage from '@/app/page';
 
-
 const { listProjectsMock, routerPush } = vi.hoisted(() => ({
   listProjectsMock: vi.fn(),
   routerPush: vi.fn(),

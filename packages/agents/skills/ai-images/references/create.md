@@ -80,7 +80,9 @@ Pro model aspect ratios:
 - The returned value is:
 
 ```ts
-{ path: '/final/image/path.png' }
+{
+  path: '/final/image/path.png';
+}
 ```
 
 ## Example With Progress Updates

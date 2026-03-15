@@ -294,7 +294,7 @@ function ToolContentPreview({ entry }: { entry: WorkingToolEntry }) {
                 className="overflow-hidden rounded-md"
               >
                 {/* Tool outputs provide dynamic data URLs, so next/image is not a good fit here. */}
-                { }
+                {}
                 <img
                   src={`data:${image.mimeType};base64,${image.data}`}
                   alt=""

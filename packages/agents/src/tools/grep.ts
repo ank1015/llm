@@ -73,6 +73,16 @@ export interface GrepToolOptions {
   operations?: GrepOperations;
 }
 
+interface RipgrepEvent {
+  type?: string;
+  data?: {
+    line_number?: unknown;
+    path?: {
+      text?: string;
+    };
+  };
+}
+
 export function createGrepTool(
   cwd: string,
   options?: GrepToolOptions
@@ -112,7 +122,7 @@ export function createGrepTool(
         }
 
         let settled = false;
-        const settle = (fn: () => void) => {
+        const settle = (fn: () => void): void => {
           if (!settled) {
             settled = true;
             fn();
@@ -193,19 +203,19 @@ export function createGrepTool(
             let killedDueToLimit = false;
             const outputLines: string[] = [];
 
-            const cleanup = () => {
+            const cleanup = (): void => {
               rl.close();
               signal?.removeEventListener('abort', onAbort);
             };
 
-            const stopChild = (dueToLimit: boolean = false) => {
+            const stopChild = (dueToLimit: boolean = false): void => {
               if (!child.killed) {
                 killedDueToLimit = dueToLimit;
                 child.kill();
               }
             };
 
-            const onAbort = () => {
+            const onAbort = (): void => {
               aborted = true;
               stopChild();
             };
@@ -257,9 +267,9 @@ export function createGrepTool(
                 return;
               }
 
-              let event: any;
+              let event: RipgrepEvent;
               try {
-                event = JSON.parse(line);
+                event = JSON.parse(line) as RipgrepEvent;
               } catch {
                 return;
               }

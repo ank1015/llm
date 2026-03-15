@@ -60,6 +60,10 @@ export interface ReadToolOptions {
   operations?: ReadOperations;
 }
 
+function toError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
 export function createReadTool(
   cwd: string,
   options?: ReadToolOptions
@@ -93,7 +97,7 @@ export function createReadTool(
         let aborted = false;
 
         // Set up abort handler
-        const onAbort = () => {
+        const onAbort = (): void => {
           aborted = true;
           reject(new Error('Operation aborted'));
         };
@@ -236,14 +240,14 @@ export function createReadTool(
             }
 
             resolve({ content, details });
-          } catch (error: any) {
+          } catch (error: unknown) {
             // Clean up abort handler
             if (signal) {
               signal.removeEventListener('abort', onAbort);
             }
 
             if (!aborted) {
-              reject(error);
+              reject(toError(error));
             }
           }
         })();

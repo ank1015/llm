@@ -37,6 +37,9 @@ type ActivitySection = {
 /* ------------------------------------------------------------------ */
 
 const EMPTY_NODES: MessageNode[] = [];
+const THINKING_PARAGRAPH_TYPE = 'thinking-paragraph' as const;
+const PLAIN_FORMAT = 'plain' as const;
+const MARKDOWN_FORMAT = 'markdown' as const;
 
 type TurnMessages = {
   userMessageId: string | null;
@@ -100,10 +103,10 @@ function splitThinkingIntoItems(text: string, messageId: string, api: Api | null
     return [
       {
         id: `${messageId}-thinking-md`,
-        type: 'thinking-paragraph',
+        type: THINKING_PARAGRAPH_TYPE,
         title: '',
         body: text.trim(),
-        format: 'markdown',
+        format: MARKDOWN_FORMAT,
       },
     ];
   }
@@ -126,10 +129,10 @@ function splitThinkingIntoItems(text: string, messageId: string, api: Api | null
       items.push({
         id: `${messageId}-thinking-p${i}`,
 
-        type: 'thinking-paragraph',
+        type: THINKING_PARAGRAPH_TYPE,
         title,
         body,
-        format: 'plain',
+        format: PLAIN_FORMAT,
       });
       i += body ? 2 : 1;
     } else {
@@ -137,18 +140,18 @@ function splitThinkingIntoItems(text: string, messageId: string, api: Api | null
       if (newlineIdx === -1) {
         items.push({
           id: `${messageId}-thinking-p${i}`,
-          type: 'thinking-paragraph',
+          type: THINKING_PARAGRAPH_TYPE,
           title: para,
           body: '',
-          format: 'plain',
+          format: PLAIN_FORMAT,
         });
       } else {
         items.push({
           id: `${messageId}-thinking-p${i}`,
-          type: 'thinking-paragraph',
+          type: THINKING_PARAGRAPH_TYPE,
           title: para.slice(0, newlineIdx).trim(),
           body: para.slice(newlineIdx + 1).trim(),
-          format: 'plain',
+          format: PLAIN_FORMAT,
         });
       }
       i++;
@@ -337,7 +340,7 @@ function UrlPills({ urls }: { urls: string[] }) {
           className="bg-surface-secondary hover:bg-surface-tertiary inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs transition-colors"
         >
           {/* Favicon source is dynamic and external, so next/image is not a good fit here. */}
-          { }
+          {}
           <img
             src={`https://www.google.com/s2/favicons?domain=${getDomainFromUrl(url)}&sz=32`}
             alt=""

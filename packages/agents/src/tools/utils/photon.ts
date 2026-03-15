@@ -17,21 +17,41 @@ import { createRequire } from 'module';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 
+import type { PhotonImage as PhotonImageType } from '@silvia-odwyer/photon-node';
 import type { PathOrFileDescriptor } from 'fs';
 
+interface FsModule {
+  existsSync: (path: string) => boolean;
+  readFileSync: (
+    file: PathOrFileDescriptor,
+    options?: BufferEncoding | { encoding?: null; flag?: string } | null
+  ) => string | Buffer;
+}
+
 const require = createRequire(import.meta.url);
-const fs = require('fs') as typeof import('fs');
+const fs = require('fs') as FsModule;
 
 // Re-export types from the main package
-export type { PhotonImage as PhotonImageType } from '@silvia-odwyer/photon-node';
+export type { PhotonImageType };
 
-type ReadFileSync = typeof fs.readFileSync;
+type ReadFileSync = FsModule['readFileSync'];
 
+const PHOTON_PACKAGE_NAME = '@silvia-odwyer/photon-node';
 const WASM_FILENAME = 'photon_rs_bg.wasm';
 
 // Lazy-loaded photon module
-let photonModule: typeof import('@silvia-odwyer/photon-node') | null = null;
-let loadPromise: Promise<typeof import('@silvia-odwyer/photon-node') | null> | null = null;
+interface PhotonModule {
+  PhotonImage: {
+    new_from_byteslice(bytes: Uint8Array): PhotonImageType;
+  };
+  SamplingFilter: {
+    Lanczos3: number;
+  };
+  resize(image: PhotonImageType, width: number, height: number, filter: number): PhotonImageType;
+}
+
+let photonModule: PhotonModule | null = null;
+let loadPromise: Promise<PhotonModule | null> | null = null;
 
 function pathOrNull(file: PathOrFileDescriptor): string | null {
   if (typeof file === 'string') {
@@ -114,7 +134,7 @@ function patchPhotonWasmRead(): () => void {
  * Load the photon module asynchronously.
  * Returns cached module on subsequent calls.
  */
-export async function loadPhoton(): Promise<typeof import('@silvia-odwyer/photon-node') | null> {
+export async function loadPhoton(): Promise<PhotonModule | null> {
   if (photonModule) {
     return photonModule;
   }
@@ -126,7 +146,7 @@ export async function loadPhoton(): Promise<typeof import('@silvia-odwyer/photon
   loadPromise = (async () => {
     const restoreReadFileSync = patchPhotonWasmRead();
     try {
-      photonModule = await import('@silvia-odwyer/photon-node');
+      photonModule = (await import(PHOTON_PACKAGE_NAME)) as PhotonModule;
       return photonModule;
     } catch {
       photonModule = null;

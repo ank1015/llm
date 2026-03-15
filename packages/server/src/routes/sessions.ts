@@ -40,6 +40,8 @@ import type { Context } from 'hono';
 const BASE = '/projects/:projectId/artifacts/:artifactDirId/sessions';
 const HEARTBEAT_INTERVAL_MS = 15_000;
 const SESSION_NOT_FOUND_MESSAGE = 'Session not found';
+const INVALID_REQUEST_BODY_MESSAGE = 'Invalid request body';
+const MODEL_AND_API_REQUIRED_MESSAGE = 'modelId and api are required';
 
 export const sessionRoutes = new Hono();
 
@@ -104,7 +106,7 @@ sessionRoutes.post(BASE, async (c) => {
       c,
       CreateSessionRequestSchema,
       rawBody,
-      'Invalid request body'
+      INVALID_REQUEST_BODY_MESSAGE
     );
     if (!validation.ok) {
       return validation.response;
@@ -116,7 +118,7 @@ sessionRoutes.post(BASE, async (c) => {
   const api = body.api;
 
   if (!modelId || !api) {
-    return c.json({ error: 'modelId and api are required' }, 400);
+    return c.json({ error: MODEL_AND_API_REQUIRED_MESSAGE }, 400);
   }
 
   try {
@@ -201,7 +203,7 @@ sessionRoutes.post(`${BASE}/:sessionId/prompt`, async (c) => {
       c,
       SessionPromptRequestSchema,
       rawBody,
-      'Invalid request body'
+      INVALID_REQUEST_BODY_MESSAGE
     );
     if (!validation.ok) {
       return validation.response;
@@ -250,7 +252,7 @@ sessionRoutes.post(`${BASE}/:sessionId/generate-name`, async (c) => {
       c,
       GenerateSessionNameRequestSchema,
       rawBody,
-      'Invalid request body'
+      INVALID_REQUEST_BODY_MESSAGE
     );
     if (!validation.ok) {
       return validation.response;
@@ -283,7 +285,7 @@ sessionRoutes.patch(`${BASE}/:sessionId/name`, async (c) => {
       c,
       RenameSessionRequestSchema,
       rawBody,
-      'Invalid request body'
+      INVALID_REQUEST_BODY_MESSAGE
     );
     if (!validation.ok) {
       return validation.response;
@@ -479,7 +481,7 @@ sessionRoutes.post(`${BASE}/:sessionId/stream`, async (c) => {
       c,
       SessionPromptRequestSchema,
       rawBody,
-      'Invalid request body'
+      INVALID_REQUEST_BODY_MESSAGE
     );
     if (!validation.ok) {
       return validation.response;
@@ -521,7 +523,7 @@ sessionRoutes.post(`${BASE}/:sessionId/messages/:nodeId/retry/stream`, async (c)
       c,
       SessionTurnSettingsRequestSchema,
       rawBody,
-      'Invalid request body'
+      INVALID_REQUEST_BODY_MESSAGE
     );
     if (!validation.ok) {
       return validation.response;
@@ -567,7 +569,7 @@ sessionRoutes.post(`${BASE}/:sessionId/messages/:nodeId/edit/stream`, async (c) 
       c,
       SessionPromptRequestSchema,
       rawBody,
-      'Invalid request body'
+      INVALID_REQUEST_BODY_MESSAGE
     );
     if (!validation.ok) {
       return validation.response;

@@ -16,7 +16,7 @@ import type {
   ArtifactViewerKind,
 } from '@/components/projects/artifacts/artifact-file-viewer-shared';
 import type { DOMProps } from 'expo/dom';
-import type { CSSProperties, ReactNode } from 'react';
+import type { ComponentType, CSSProperties, ReactNode } from 'react';
 import type { Components } from 'react-markdown';
 
 import {
@@ -26,8 +26,6 @@ import {
   normalizeRelativePath,
   resolveMonacoLanguage,
 } from '@/components/projects/artifacts/artifact-file-viewer-shared';
-
-type MonacoEditorComponent = typeof import('@monaco-editor/react').default;
 
 type ArtifactFileViewerDomProps = {
   artifactFileBaseUrl: string;
@@ -42,6 +40,14 @@ type ArtifactFileViewerDomProps = {
   theme: ArtifactFileViewerTheme;
   truncated: boolean;
   viewerKind: ArtifactViewerKind;
+};
+
+type MonacoEditorProps = {
+  height: string;
+  language: string;
+  options: Record<string, unknown>;
+  theme: string;
+  value: string;
 };
 
 const GENERIC_PROTOCOL_RE = /^[a-zA-Z][a-zA-Z\d+.-]*:/;
@@ -342,7 +348,7 @@ function ArtifactCodeViewer({
   filePath: string;
   isDark: boolean;
 }) {
-  const [MonacoEditor, setMonacoEditor] = useState<MonacoEditorComponent | null>(null);
+  const [MonacoEditor, setMonacoEditor] = useState<ComponentType<MonacoEditorProps> | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const language = useMemo(() => resolveMonacoLanguage(filePath), [filePath]);
 
@@ -352,7 +358,7 @@ function ArtifactCodeViewer({
     void import('@monaco-editor/react')
       .then((module) => {
         if (!cancelled) {
-          setMonacoEditor(() => module.default);
+          setMonacoEditor(() => module.default as ComponentType<MonacoEditorProps>);
         }
       })
       .catch(() => {

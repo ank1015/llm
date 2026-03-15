@@ -26,10 +26,10 @@ import type {
 const CLI_API = 'codex' as const;
 const CLI_MODEL_ID = 'gpt-5.4' as const;
 const CLI_PROVIDER_OPTIONS: Record<string, unknown> = {
-    reasoning: {
-      effort: 'high',
-      summary: 'detailed',
-    },
+  reasoning: {
+    effort: 'high',
+    summary: 'detailed',
+  },
 };
 const EXIT_COMMANDS = new Set(['exit', 'quit', ':q']);
 
@@ -230,7 +230,9 @@ export async function runAgentCli(): Promise<void> {
     stdout.write(`\nPreparing agent for ${context.artifactDir}\n`);
     await addSkill('ai-images', context.artifactDir);
 
-    const tools = Object.values(createAllTools(context.artifactDir)) as AgentTool[];
+    // createAllTools returns concrete AgentTool specializations; Conversation expects
+    // the shared AgentTool interface, so we widen the union here for the CLI runtime.
+    const tools = Object.values(createAllTools(context.artifactDir)) as unknown as AgentTool[];
     const systemPrompt = await createSystemPrompt({
       ...context,
       ...createCliSystemPromptOverrides(context),
@@ -265,7 +267,9 @@ export async function runAgentCli(): Promise<void> {
     conversation.subscribe(createEventPrinter());
 
     stdout.write(`Session ${sessionId} ready.\n`);
-    stdout.write(`Using ${CLI_API}/${CLI_MODEL_ID} with directory-local tools in ${context.artifactDir}\n`);
+    stdout.write(
+      `Using ${CLI_API}/${CLI_MODEL_ID} with directory-local tools in ${context.artifactDir}\n`
+    );
     stdout.write('Type a prompt and press Enter. Type "exit" to quit.\n');
 
     while (true) {

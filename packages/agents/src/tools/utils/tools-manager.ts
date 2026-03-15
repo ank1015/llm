@@ -9,7 +9,13 @@ import chalk from 'chalk';
 
 import { APP_NAME, getBinDir } from './config.js';
 
+import type { ReadableStream as WebReadableStream } from 'stream/web';
+
 const TOOLS_DIR = getBinDir();
+
+function writeStatus(message: string): void {
+  process.stderr.write(`${message}\n`);
+}
 
 interface ToolConfig {
   name: string;
@@ -119,7 +125,7 @@ async function downloadFile(url: string, dest: string): Promise<void> {
   }
 
   const fileStream = createWriteStream(dest);
-  await finished(Readable.fromWeb(response.body as any).pipe(fileStream));
+  await finished(Readable.fromWeb(response.body as WebReadableStream).pipe(fileStream));
 }
 
 // Download and install a tool
@@ -220,25 +226,25 @@ export async function ensureTool(
   if (platform() === 'android') {
     const pkgName = TERMUX_PACKAGES[tool] ?? tool;
     if (!silent) {
-      console.log(chalk.yellow(`${config.name} not found. Install with: pkg install ${pkgName}`));
+      writeStatus(chalk.yellow(`${config.name} not found. Install with: pkg install ${pkgName}`));
     }
     return undefined;
   }
 
   // Tool not found - download it
   if (!silent) {
-    console.log(chalk.dim(`${config.name} not found. Downloading...`));
+    writeStatus(chalk.dim(`${config.name} not found. Downloading...`));
   }
 
   try {
     const path = await downloadTool(tool);
     if (!silent) {
-      console.log(chalk.dim(`${config.name} installed to ${path}`));
+      writeStatus(chalk.dim(`${config.name} installed to ${path}`));
     }
     return path;
   } catch (e) {
     if (!silent) {
-      console.log(
+      writeStatus(
         chalk.yellow(`Failed to download ${config.name}: ${e instanceof Error ? e.message : e}`)
       );
     }

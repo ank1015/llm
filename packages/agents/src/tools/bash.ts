@@ -114,7 +114,7 @@ const defaultBashOperations: BashOperations = {
       });
 
       // Handle abort signal - kill entire process tree
-      const onAbort = () => {
+      const onAbort = (): void => {
         if (child.pid) {
           killProcessTree(child.pid);
         }
@@ -215,7 +215,7 @@ export function createBashTool(
         // Keep more than we need so we have enough for truncation
         const maxChunksBytes = DEFAULT_MAX_BYTES * 2;
 
-        const handleData = (data: Buffer) => {
+        const handleData = (data: Buffer): void => {
           totalBytes += data.length;
 
           // Start writing to temp file once we exceed the threshold

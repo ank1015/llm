@@ -65,6 +65,9 @@ type RewritePreparation = {
   stagedMessages: MessageNode[];
 };
 
+const EMPTY_PROMPT_ERROR_MESSAGE = 'Prompt cannot be empty.';
+const STREAM_ALREADY_RUNNING_ERROR_MESSAGE = 'A stream is already running for this session.';
+
 type ChatStoreState = {
   activeSession: SessionRef | null;
   messagesBySession: Record<string, MessageNode[]>;
@@ -1017,11 +1020,11 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     const prompt = input.prompt.trim();
 
     if (prompt.length === 0) {
-      throw new Error('Prompt cannot be empty.');
+      throw new Error(EMPTY_PROMPT_ERROR_MESSAGE);
     }
 
     if (get().isStreamingBySession[key]) {
-      throw new Error('A stream is already running for this session.');
+      throw new Error(STREAM_ALREADY_RUNNING_ERROR_MESSAGE);
     }
 
     clearStreamAttachment(key);
@@ -1364,7 +1367,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     const key = getSessionKey(session);
 
     if (get().isStreamingBySession[key]) {
-      throw new Error('A stream is already running for this session.');
+      throw new Error(STREAM_ALREADY_RUNNING_ERROR_MESSAGE);
     }
 
     const rewrite = prepareRewriteState({
@@ -1785,11 +1788,11 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     const prompt = input.prompt.trim();
 
     if (prompt.length === 0) {
-      throw new Error('Prompt cannot be empty.');
+      throw new Error(EMPTY_PROMPT_ERROR_MESSAGE);
     }
 
     if (get().isStreamingBySession[key]) {
-      throw new Error('A stream is already running for this session.');
+      throw new Error(STREAM_ALREADY_RUNNING_ERROR_MESSAGE);
     }
 
     const rewrite = prepareRewriteState({

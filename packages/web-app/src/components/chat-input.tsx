@@ -566,6 +566,11 @@ function PromptInputWithActions() {
     setMentionState(mention);
   };
 
+  const syncMentionFromTextarea = (textarea: HTMLTextAreaElement): void => {
+    textareaElementRef.current = textarea;
+    syncActiveMention(textarea.value, textarea.selectionStart);
+  };
+
   useEffect(() => {
     void loadProjectFileIndex(projectId).catch(() => {
       // Mention search can still fallback to server query.
@@ -660,22 +665,8 @@ function PromptInputWithActions() {
     });
   };
 
-  const handleTextareaSelection = (event: React.SyntheticEvent<HTMLTextAreaElement>) => {
-    const textarea = event.currentTarget;
-    textareaElementRef.current = textarea;
-    syncActiveMention(textarea.value, textarea.selectionStart);
-  };
-
-  const handleTextareaChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const textarea = event.currentTarget;
-    textareaElementRef.current = textarea;
-    syncActiveMention(textarea.value, textarea.selectionStart);
-  };
-
-  const handleTextareaKeyUp = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    const textarea = event.currentTarget;
-    textareaElementRef.current = textarea;
-    syncActiveMention(textarea.value, textarea.selectionStart);
+  const handleTextareaInteraction = (event: { currentTarget: HTMLTextAreaElement }): void => {
+    syncMentionFromTextarea(event.currentTarget);
   };
 
   const handleTextareaKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -938,11 +929,11 @@ function PromptInputWithActions() {
           data-chat-composer-textarea=""
           placeholder="Ask me anything..."
           className="min-h-[30px] px-0 py-2 text-sm"
-          onChange={handleTextareaChange}
-          onSelect={handleTextareaSelection}
-          onClick={handleTextareaSelection}
-          onFocus={handleTextareaSelection}
-          onKeyUp={handleTextareaKeyUp}
+          onChange={handleTextareaInteraction}
+          onSelect={handleTextareaInteraction}
+          onClick={handleTextareaInteraction}
+          onFocus={handleTextareaInteraction}
+          onKeyUp={handleTextareaInteraction}
           onKeyDown={handleTextareaKeyDown}
         />
       </div>

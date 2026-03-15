@@ -4,7 +4,6 @@ import type { ArtifactDirOverviewDto, SessionSummaryDto } from '@ank1015/llm-app
 
 import { useSidebarStore } from '@/stores/sidebar-store';
 
-
 const SESSION: SessionSummaryDto = {
   createdAt: '2026-03-16T00:00:00.000Z',
   nodeCount: 1,

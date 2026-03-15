@@ -134,6 +134,7 @@ export interface ImageResult {
 
 type ImageMethod = 'create' | 'edit';
 type ImageStage = ImageUpdate['stage'];
+type ResolvedImageModel = NonNullable<ReturnType<typeof getModel>>;
 
 interface LoadedImageSource {
   fileName: string;
@@ -142,17 +143,19 @@ interface LoadedImageSource {
   size: number;
 }
 
+const JPEG_MIME_TYPE = 'image/jpeg';
+
 const MIME_TYPE_TO_EXTENSION: Record<string, string> = {
   'image/gif': 'gif',
-  'image/jpeg': 'jpg',
+  [JPEG_MIME_TYPE]: 'jpg',
   'image/png': 'png',
   'image/webp': 'webp',
 };
 
 const EXTENSION_TO_MIME_TYPE: Record<string, string> = {
   '.gif': 'image/gif',
-  '.jpeg': 'image/jpeg',
-  '.jpg': 'image/jpeg',
+  '.jpeg': JPEG_MIME_TYPE,
+  '.jpg': JPEG_MIME_TYPE,
   '.png': 'image/png',
   '.webp': 'image/webp',
 };
@@ -338,7 +341,7 @@ async function loadImageSource(source: string, index: number): Promise<LoadedIma
   return isHttpUrl(source) ? loadRemoteImageSource(source, index) : loadLocalImageSource(source);
 }
 
-function resolveImageModel(provider: ImageProvider) {
+function resolveImageModel(provider: ImageProvider): ResolvedImageModel {
   if (provider.model === 'gpt-5.4') {
     const model = getModel('openai', provider.model);
     if (!model) {
@@ -619,7 +622,8 @@ async function runImageRequest(
     );
 
     for await (const event of eventStream) {
-      const stage = getEventImageStage(event);
+      // This request only streams from validated OpenAI or Google image providers.
+      const stage = getEventImageStage(event as BaseAssistantEvent<'openai' | 'google'>);
       if (!stage) continue;
 
       if (stage === 'partial' && event.type === 'image_frame') {

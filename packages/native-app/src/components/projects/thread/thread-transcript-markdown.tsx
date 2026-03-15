@@ -210,6 +210,14 @@ class ThreadTranscriptRenderer extends Renderer implements RendererInterface {
     super();
   }
 
+  private renderInlineText(content: string | ReactNode[], styles?: TextStyle): ReactNode {
+    return (
+      <AppText key={this.getKey()} selectable style={styles}>
+        {content}
+      </AppText>
+    );
+  }
+
   override paragraph(children: ReactNode[], styles?: ViewStyle): ReactNode {
     return (
       <View key={this.getKey()} style={styles}>
@@ -240,11 +248,7 @@ class ThreadTranscriptRenderer extends Renderer implements RendererInterface {
   }
 
   override heading(text: string | ReactNode[], styles?: TextStyle, _depth?: number): ReactNode {
-    return (
-      <AppText key={this.getKey()} selectable style={styles}>
-        {text}
-      </AppText>
-    );
+    return this.renderInlineText(text, styles);
   }
 
   override code(
@@ -277,35 +281,19 @@ class ThreadTranscriptRenderer extends Renderer implements RendererInterface {
   }
 
   override text(text: string | ReactNode[], styles?: TextStyle): ReactNode {
-    return (
-      <AppText key={this.getKey()} selectable style={styles}>
-        {text}
-      </AppText>
-    );
+    return this.renderInlineText(text, styles);
   }
 
   override strong(children: string | ReactNode[], styles?: TextStyle): ReactNode {
-    return (
-      <AppText key={this.getKey()} selectable style={styles}>
-        {children}
-      </AppText>
-    );
+    return this.renderInlineText(children, styles);
   }
 
   override em(children: string | ReactNode[], styles?: TextStyle): ReactNode {
-    return (
-      <AppText key={this.getKey()} selectable style={styles}>
-        {children}
-      </AppText>
-    );
+    return this.renderInlineText(children, styles);
   }
 
   override del(children: string | ReactNode[], styles?: TextStyle): ReactNode {
-    return (
-      <AppText key={this.getKey()} selectable style={styles}>
-        {children}
-      </AppText>
-    );
+    return this.renderInlineText(children, styles);
   }
 
   override codespan(text: string, styles?: TextStyle): ReactNode {
