@@ -4,6 +4,9 @@ All notable changes to this package will be documented in this file.
 
 ## Unreleased
 
+- fixed a startup crash in the bundled skills loader caused by package-root detection reading `PACKAGE_JSON_FILENAME` before initialization
+- added a `tsx`-based regression test covering direct skills-module startup for the local CLI/runtime path
+
 ## 0.0.3 - 2026-03-15
 
 - added a local CLI agent runner backed by `Conversation`, the file keys adapter, and an in-memory session manager

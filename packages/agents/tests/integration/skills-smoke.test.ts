@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
@@ -35,6 +35,28 @@ describe('helper-backed skill exports', () => {
     expect(bundledSkills).toHaveLength(1);
     expect(bundledSkills[0]?.name).toBe('ai-images');
     expect(bundledSkills[0]?.path).toBe(join(packageRoot, 'skills', 'ai-images', 'SKILL.md'));
+  });
+
+  it('loads the skills module through tsx without top-level initialization errors', () => {
+    const tsxPath = join(
+      packageRoot,
+      'node_modules',
+      '.bin',
+      process.platform === 'win32' ? 'tsx.cmd' : 'tsx'
+    );
+    const skillsModuleUrl = pathToFileURL(join(packageRoot, 'src', 'agents', 'skills', 'index.ts'));
+    const result = spawnSync(
+      tsxPath,
+      ['--eval', `import(${JSON.stringify(skillsModuleUrl.href)}).then(() => console.log('ok'));`],
+      {
+        cwd: packageRoot,
+        encoding: 'utf-8',
+      }
+    );
+
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe('ok');
+    expect(result.stderr.trim()).toBe('');
   });
 });
 
