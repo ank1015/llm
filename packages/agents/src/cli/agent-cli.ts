@@ -229,6 +229,7 @@ export async function runAgentCli(): Promise<void> {
 
     stdout.write(`\nPreparing agent for ${context.artifactDir}\n`);
     await addSkill('ai-images', context.artifactDir);
+    await addSkill('web', context.artifactDir);
 
     // createAllTools returns concrete AgentTool specializations; Conversation expects
     // the shared AgentTool interface, so we widen the union here for the CLI runtime.

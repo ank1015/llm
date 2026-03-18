@@ -27,6 +27,7 @@ The dry-run tarball should include:
 
 - clean `dist/`
 - `skills/ai-images/**`
+- `skills/web/**`
 - `README.md`
 - `CHANGELOG.md`
 - `LICENSE`
