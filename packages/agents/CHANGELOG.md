@@ -4,6 +4,7 @@ All notable changes to this package will be documented in this file.
 
 ## Unreleased
 
+- added a dev-only `skill:tester` CLI that builds the local package stack and prepares a reusable `packages/agents/.skill-tester/` workspace for bundled skill iteration without publishing `@ank1015/llm-agents`
 - refreshed the reusable `.max/temp` helper workspace on every helper-backed skill install so `@ank1015/llm-agents`, `tsx`, and the temp node-module links do not stay stale across package updates
 
 ## 0.0.4 - 2026-03-18

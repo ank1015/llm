@@ -2,46 +2,24 @@
 
 import { realpath, stat } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
-import { stdin, stdout } from 'node:process';
 import { createInterface } from 'node:readline/promises';
 import { pathToFileURL } from 'node:url';
-
-import { Conversation, createSessionManager, getModel } from '@ank1015/llm-sdk';
-import { createFileKeysAdapter, InMemorySessionsAdapter } from '@ank1015/llm-sdk-adapters';
 
 import { addSkill } from '../agents/skills/index.js';
 import { createSystemPrompt } from '../agents/system-prompt.js';
 import { createAllTools } from '../tools/index.js';
 
-import type {
-  AgentEvent,
-  AgentTool,
-  Api,
-  BaseAssistantEvent,
-  BaseAssistantMessage,
-  Message,
-  Provider,
-} from '@ank1015/llm-sdk';
+import { isReadlineInterruptError, runInteractiveCliSession } from './shared.js';
 
-const CLI_API = 'codex' as const;
-const CLI_MODEL_ID = 'gpt-5.4' as const;
-const CLI_PROVIDER_OPTIONS: Record<string, unknown> = {
-  reasoning: {
-    effort: 'high',
-    summary: 'detailed',
-  },
-};
-const EXIT_COMMANDS = new Set(['exit', 'quit', ':q']);
+import type { AgentTool } from '@ank1015/llm-sdk';
+
+export { extractAssistantText, isExitCommand } from './shared.js';
 
 export interface CliDirectoryContext {
   projectName: string;
   projectDir: string;
   artifactName: string;
   artifactDir: string;
-}
-
-export function isExitCommand(input: string): boolean {
-  return EXIT_COMMANDS.has(input.trim().toLowerCase());
 }
 
 export function resolveCliDirectoryContext(directory: string): CliDirectoryContext {
@@ -87,49 +65,6 @@ function createCliSystemPromptOverrides(context: CliDirectoryContext): {
   };
 }
 
-export function extractAssistantText(message: BaseAssistantMessage<Api>): string {
-  const textParts: string[] = [];
-  let sawNonTextContent = false;
-
-  for (const block of message.content) {
-    if (block.type !== 'response') {
-      continue;
-    }
-
-    for (const item of block.content) {
-      if (item.type === 'text') {
-        textParts.push(item.content);
-      } else {
-        sawNonTextContent = true;
-      }
-    }
-  }
-
-  if (textParts.length > 0) {
-    return textParts.join('\n\n').trim();
-  }
-
-  if (sawNonTextContent) {
-    return '[assistant returned non-text content]';
-  }
-
-  return '';
-}
-
-function isReadlineInterruptError(error: unknown): boolean {
-  return (
-    error instanceof Error &&
-    'code' in error &&
-    (error.code === 'ERR_USE_AFTER_CLOSE' || error.code === 'ABORT_ERR')
-  );
-}
-
-function isAssistantStreamEvent(
-  message: Message | BaseAssistantEvent<Api>
-): message is BaseAssistantEvent<Api> {
-  return 'type' in message;
-}
-
 async function resolveExistingDirectory(directoryInput: string): Promise<CliDirectoryContext> {
   const requestedPath = directoryInput.trim() || process.cwd();
   const resolvedPath = resolve(requestedPath);
@@ -141,79 +76,8 @@ async function resolveExistingDirectory(directoryInput: string): Promise<CliDire
   return resolveCliDirectoryContext(await realpath(resolvedPath));
 }
 
-function createEventPrinter() {
-  let sawAssistantText = false;
-  let assistantLineOpen = false;
-
-  return (event: AgentEvent): void => {
-    switch (event.type) {
-      case 'message_start': {
-        if (event.messageType === 'assistant') {
-          sawAssistantText = false;
-          assistantLineOpen = true;
-          stdout.write('\nassistant> ');
-        }
-        break;
-      }
-      case 'message_update': {
-        if (
-          event.messageType === 'assistant' &&
-          isAssistantStreamEvent(event.message) &&
-          event.message.type === 'text_delta'
-        ) {
-          sawAssistantText = true;
-          stdout.write(event.message.delta);
-        }
-        break;
-      }
-      case 'tool_execution_start': {
-        if (assistantLineOpen) {
-          stdout.write('\n');
-          assistantLineOpen = false;
-        }
-        stdout.write(`[tool:${event.toolName}] running\n`);
-        break;
-      }
-      case 'tool_execution_end': {
-        stdout.write(`[tool:${event.toolName}] ${event.isError ? 'failed' : 'done'}\n`);
-        break;
-      }
-      case 'message_end': {
-        if (event.messageType === 'assistant') {
-          if (!sawAssistantText) {
-            const text = extractAssistantText(event.message as BaseAssistantMessage<Api>);
-            if (text) {
-              stdout.write(text);
-            }
-          }
-          stdout.write('\n');
-          sawAssistantText = false;
-          assistantLineOpen = false;
-        }
-        break;
-      }
-    }
-  };
-}
-
 export async function runAgentCli(): Promise<void> {
-  const readline = createInterface({ input: stdin, output: stdout });
-  let conversation: Conversation | undefined;
-  let isRunning = false;
-
-  const handleSigint = (): void => {
-    if (isRunning && conversation) {
-      stdout.write('\nAborting current run...\n');
-      conversation.abort();
-      return;
-    }
-
-    stdout.write('\nExiting.\n');
-    readline.close();
-    process.exit(0);
-  };
-
-  process.on('SIGINT', handleSigint);
+  const readline = createInterface({ input: process.stdin, output: process.stdout });
 
   try {
     let directoryInput: string;
@@ -225,96 +89,33 @@ export async function runAgentCli(): Promise<void> {
       }
       throw error;
     }
+
     const context = await resolveExistingDirectory(directoryInput);
 
-    stdout.write(`\nPreparing agent for ${context.artifactDir}\n`);
+    process.stdout.write(`\nPreparing agent for ${context.artifactDir}\n`);
     await addSkill('ai-images', context.artifactDir);
     await addSkill('web', context.artifactDir);
 
-    // createAllTools returns concrete AgentTool specializations; Conversation expects
-    // the shared AgentTool interface, so we widen the union here for the CLI runtime.
+    // createAllTools returns concrete AgentTool specializations; the shared CLI
+    // session runner expects the widened AgentTool interface.
     const tools = Object.values(createAllTools(context.artifactDir)) as unknown as AgentTool[];
     const systemPrompt = await createSystemPrompt({
       ...context,
       ...createCliSystemPromptOverrides(context),
     });
-    const model = getModel(CLI_API, CLI_MODEL_ID);
-    if (!model) {
-      throw new Error(`Model "${CLI_MODEL_ID}" not found for API "${CLI_API}"`);
-    }
 
-    const keysAdapter = createFileKeysAdapter();
-    const sessionManager = createSessionManager(new InMemorySessionsAdapter());
-    const { sessionId, header } = await sessionManager.createSession({
+    await runInteractiveCliSession({
       projectName: context.projectName,
       sessionName: `${context.artifactName} CLI Session`,
+      workingDir: context.artifactDir,
+      systemPrompt,
+      tools,
+      introLines: [
+        `Using codex/gpt-5.4 with directory-local tools in ${context.artifactDir}`,
+        'Type a prompt and press Enter. Type "exit" to quit.',
+      ],
     });
-
-    let currentLeafNodeId = header.id;
-
-    conversation = new Conversation({
-      keysAdapter,
-      streamAssistantMessage: true,
-      initialState: {
-        tools,
-      },
-    });
-    conversation.setProvider({
-      model,
-      providerOptions: CLI_PROVIDER_OPTIONS,
-    } as Provider<Api>);
-    conversation.setSystemPrompt(systemPrompt);
-    conversation.setTools(tools);
-    conversation.subscribe(createEventPrinter());
-
-    stdout.write(`Session ${sessionId} ready.\n`);
-    stdout.write(
-      `Using ${CLI_API}/${CLI_MODEL_ID} with directory-local tools in ${context.artifactDir}\n`
-    );
-    stdout.write('Type a prompt and press Enter. Type "exit" to quit.\n');
-
-    while (true) {
-      let promptText: string;
-      try {
-        promptText = await readline.question('\nyou> ');
-      } catch (error) {
-        if (isReadlineInterruptError(error)) {
-          break;
-        }
-        throw error;
-      }
-      if (!promptText.trim()) {
-        continue;
-      }
-      if (isExitCommand(promptText)) {
-        break;
-      }
-
-      isRunning = true;
-      try {
-        await conversation.prompt(promptText, undefined, async (message: Message) => {
-          const { node } = await sessionManager.appendMessage({
-            projectName: context.projectName,
-            path: '',
-            sessionId,
-            parentId: currentLeafNodeId,
-            branch: 'main',
-            message,
-            api: CLI_API,
-            modelId: CLI_MODEL_ID,
-            providerOptions: CLI_PROVIDER_OPTIONS,
-          });
-          currentLeafNodeId = node.id;
-        });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        stdout.write(`\nerror> ${message}\n`);
-      } finally {
-        isRunning = false;
-      }
-    }
   } finally {
-    process.off('SIGINT', handleSigint);
     readline.close();
   }
 }
