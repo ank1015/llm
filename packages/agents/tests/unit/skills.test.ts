@@ -53,7 +53,7 @@ async function createArtifactDir(): Promise<string> {
 }
 
 describe('skills runtime', () => {
-  it('exports the current skill APIs and ai-image helpers', async () => {
+  it('exports the current skill APIs and helper-backed helpers', async () => {
     const agents = await import('../../src/index.js');
 
     expect(typeof agents.addSkill).toBe('function');
@@ -77,7 +77,7 @@ describe('skills runtime', () => {
       .map((entry) => entry.name)
       .sort();
 
-    expect(registryNames).toEqual(['ai-images']);
+    expect(registryNames).toEqual(['ai-images', 'web']);
     expect(registryNames).toEqual(skillFolders);
 
     for (const skill of bundledSkills) {
@@ -89,46 +89,48 @@ describe('skills runtime', () => {
   });
 
   it('installs bundled skills into artifact-local .max state and replaces existing copies', async () => {
-    const artifactDir = await createArtifactDir();
+    for (const skillName of ['ai-images', 'web'] as const) {
+      const artifactDir = await createArtifactDir();
 
-    try {
-      const installResult = await addSkill('ai-images', artifactDir);
-      const resolvedArtifactDir = await realpath(artifactDir);
-      const tempDir = join(resolvedArtifactDir, '.max', 'temp');
-      const tempPackageJsonPath = join(tempDir, 'package.json');
-      const tempTsconfigPath = join(tempDir, 'tsconfig.json');
-      const tempScriptsDir = join(tempDir, 'scripts');
-      expect(installResult.artifactDir).toBe(resolvedArtifactDir);
-      expect(installResult.directory).toBe(
-        join(resolvedArtifactDir, '.max', 'skills', 'ai-images')
-      );
-      expect(installResult.path).toBe(
-        join(resolvedArtifactDir, '.max', 'skills', 'ai-images', 'SKILL.md')
-      );
-      expect(installResult.helperProject).toEqual({
-        runtime: 'typescript',
-        package: '@ank1015/llm-agents',
-      });
+      try {
+        const installResult = await addSkill(skillName, artifactDir);
+        const resolvedArtifactDir = await realpath(artifactDir);
+        const tempDir = join(resolvedArtifactDir, '.max', 'temp');
+        const tempPackageJsonPath = join(tempDir, 'package.json');
+        const tempTsconfigPath = join(tempDir, 'tsconfig.json');
+        const tempScriptsDir = join(tempDir, 'scripts');
+        expect(installResult.artifactDir).toBe(resolvedArtifactDir);
+        expect(installResult.directory).toBe(
+          join(resolvedArtifactDir, '.max', 'skills', skillName)
+        );
+        expect(installResult.path).toBe(
+          join(resolvedArtifactDir, '.max', 'skills', skillName, 'SKILL.md')
+        );
+        expect(installResult.helperProject).toEqual({
+          runtime: 'typescript',
+          package: '@ank1015/llm-agents',
+        });
 
-      const tempPackageJson = JSON.parse(await readFile(tempPackageJsonPath, 'utf-8')) as {
-        dependencies?: Record<string, string>;
-        devDependencies?: Record<string, string>;
-      };
-      expect(tempPackageJson.dependencies?.['@ank1015/llm-agents']).toBeTruthy();
-      expect(tempPackageJson.devDependencies?.tsx).toBeTruthy();
-      await expect(readFile(tempTsconfigPath, 'utf-8')).resolves.toContain('"include"');
-      await expect(readFile(join(tempScriptsDir, '.gitkeep'), 'utf-8')).rejects.toThrow();
-      await expect(realpath(join(tempDir, 'node_modules', '@ank1015', 'llm-agents'))).resolves.toBe(
-        packageRoot
-      );
+        const tempPackageJson = JSON.parse(await readFile(tempPackageJsonPath, 'utf-8')) as {
+          dependencies?: Record<string, string>;
+          devDependencies?: Record<string, string>;
+        };
+        expect(tempPackageJson.dependencies?.['@ank1015/llm-agents']).toBeTruthy();
+        expect(tempPackageJson.devDependencies?.tsx).toBeTruthy();
+        await expect(readFile(tempTsconfigPath, 'utf-8')).resolves.toContain('"include"');
+        await expect(readFile(join(tempScriptsDir, '.gitkeep'), 'utf-8')).rejects.toThrow();
+        await expect(
+          realpath(join(tempDir, 'node_modules', '@ank1015', 'llm-agents'))
+        ).resolves.toBe(packageRoot);
 
-      const markerPath = join(installResult.directory, 'marker.txt');
-      await writeFile(markerPath, 'stale\n', 'utf-8');
+        const markerPath = join(installResult.directory, 'marker.txt');
+        await writeFile(markerPath, 'stale\n', 'utf-8');
 
-      await addSkill('ai-images', artifactDir);
-      await expect(readFile(markerPath, 'utf-8')).rejects.toThrow();
-    } finally {
-      await rm(artifactDir, { recursive: true, force: true });
+        await addSkill(skillName, artifactDir);
+        await expect(readFile(markerPath, 'utf-8')).rejects.toThrow();
+      } finally {
+        await rm(artifactDir, { recursive: true, force: true });
+      }
     }
   });
 
@@ -139,9 +141,10 @@ describe('skills runtime', () => {
       expect(await listInstalledSkills(artifactDir)).toEqual([]);
 
       await addSkill('ai-images', artifactDir);
+      await addSkill('web', artifactDir);
 
       const installed = await listInstalledSkills(artifactDir);
-      expect(installed.map((skill) => skill.name)).toEqual(['ai-images']);
+      expect(installed.map((skill) => skill.name)).toEqual(['ai-images', 'web']);
       expect(
         installed.every((skill) => skill.path.startsWith(join(artifactDir, '.max', 'skills')))
       ).toBe(true);
@@ -154,11 +157,11 @@ describe('skills runtime', () => {
     const artifactDir = await createArtifactDir();
 
     try {
-      await addSkill('ai-images', artifactDir);
+      await addSkill('web', artifactDir);
 
-      const deleted = await deleteSkill('ai-images', artifactDir);
+      const deleted = await deleteSkill('web', artifactDir);
 
-      expect(deleted.name).toBe('ai-images');
+      expect(deleted.name).toBe('web');
       expect(deleted.deleted).toBe(true);
       expect(await listInstalledSkills(artifactDir)).toEqual([]);
     } finally {
@@ -178,9 +181,11 @@ describe('skills runtime', () => {
       });
       expect(emptyPrompt).toContain('- none installed');
       expect(emptyPrompt).not.toContain('ai-images');
+      expect(emptyPrompt).not.toContain('web');
       expect(emptyPrompt).toContain('.max/temp');
 
       await addSkill('ai-images', artifactDir);
+      await addSkill('web', artifactDir);
       const installedPrompt = await createSystemPrompt({
         projectName: 'media',
         projectDir: '/tmp/project',
@@ -191,7 +196,9 @@ describe('skills runtime', () => {
       expect(installedPrompt).toContain(
         join(artifactDir, '.max', 'skills', 'ai-images', 'SKILL.md')
       );
+      expect(installedPrompt).toContain(join(artifactDir, '.max', 'skills', 'web', 'SKILL.md'));
       expect(installedPrompt).toContain('ai-images');
+      expect(installedPrompt).toContain('web');
       expect(installedPrompt).not.toContain('browser-use');
       expect(installedPrompt).not.toContain('llm-use');
       expect(installedPrompt).not.toContain('pptx');
@@ -296,6 +303,70 @@ describe('skills runtime', () => {
     expect(editRaw).toContain('[choose-model.md](choose-model.md)');
     expect(createRaw).toContain("import { createImage } from '@ank1015/llm-agents';");
     expect(editRaw).toContain("import { editImage } from '@ank1015/llm-agents';");
+  });
+
+  it('documents the required web reading order', async () => {
+    const skillPath = join(packageRoot, 'skills', 'web', 'SKILL.md');
+    const apiPath = join(packageRoot, 'skills', 'web', 'references', 'api.md');
+    const workflowPath = join(packageRoot, 'skills', 'web', 'references', 'workflow.md');
+    const readPath = join(packageRoot, 'skills', 'web', 'references', 'read.md');
+    const interactPath = join(packageRoot, 'skills', 'web', 'references', 'interact.md');
+    const debugPath = join(packageRoot, 'skills', 'web', 'references', 'debug.md');
+    const browserStatePath = join(packageRoot, 'skills', 'web', 'references', 'browser-state.md');
+    const downloadsPath = join(packageRoot, 'skills', 'web', 'references', 'downloads.md');
+    const recipesPath = join(packageRoot, 'skills', 'web', 'references', 'recipes.md');
+
+    const [
+      skillRaw,
+      apiRaw,
+      workflowRaw,
+      readRaw,
+      interactRaw,
+      debugRaw,
+      browserStateRaw,
+      downloadsRaw,
+      recipesRaw,
+    ] = await Promise.all([
+      readFile(skillPath, 'utf-8'),
+      readFile(apiPath, 'utf-8'),
+      readFile(workflowPath, 'utf-8'),
+      readFile(readPath, 'utf-8'),
+      readFile(interactPath, 'utf-8'),
+      readFile(debugPath, 'utf-8'),
+      readFile(browserStatePath, 'utf-8'),
+      readFile(downloadsPath, 'utf-8'),
+      readFile(recipesPath, 'utf-8'),
+    ]);
+
+    expect(skillRaw).toContain('## Required Reading Order');
+    expect(skillRaw).toContain('[references/api.md](references/api.md)');
+    expect(skillRaw).toContain('[references/workflow.md](references/workflow.md)');
+    expect(skillRaw).toContain('[references/read.md](references/read.md)');
+    expect(skillRaw).toContain('[references/interact.md](references/interact.md)');
+    expect(skillRaw).toContain('[references/debug.md](references/debug.md)');
+    expect(skillRaw).toContain('[references/browser-state.md](references/browser-state.md)');
+    expect(skillRaw).toContain('[references/downloads.md](references/downloads.md)');
+    expect(skillRaw).toContain('[references/recipes.md](references/recipes.md)');
+    expect(skillRaw).toContain('## Main Helpers');
+    expect(apiRaw).toContain('## Top-Level Helpers');
+    expect(apiRaw).toContain(
+      'function connectWeb(options?: ConnectWebOptions): Promise<WebBrowser>;'
+    );
+    expect(apiRaw).toContain('fn: (browser: WebBrowser) => Promise<T>');
+    expect(apiRaw).toContain('waitFor(options: WebWaitForOptions): Promise<void>;');
+    expect(apiRaw).toContain('captureNetwork<T>(');
+    expect(apiRaw).toContain(
+      'cdp<T = unknown>(method: string, params?: Record<string, unknown>): Promise<T>;'
+    );
+    expect(workflowRaw).toContain('## Default Algorithm');
+    expect(workflowRaw).toContain('Use `withWebBrowser(...)` by default.');
+    expect(readRaw).toContain("import { withWebBrowser } from '@ank1015/llm-agents';");
+    expect(interactRaw).toContain('For most web app interactions, combine:');
+    expect(debugRaw).toContain('tab.captureNetwork(fn, options?)');
+    expect(browserStateRaw).toContain('browser.closeOtherTabs');
+    expect(downloadsRaw).toContain('tab.uploadFiles(selector, paths)');
+    expect(recipesRaw).toContain("import { withWebBrowser } from '@ank1015/llm-agents';");
+    expect(recipesRaw).toContain('const browser = await connectWeb({ launch: true });');
   });
 });
 

@@ -28,6 +28,7 @@ src/
     agent-cli.ts        — Local directory-scoped CLI agent runner
   helpers/
     ai-image/           — Helper-backed skill code for image generation/editing
+    web/                — Helper-backed browser session and tab/debugger helpers
   tools/
     index.ts            — Tool exports and shared entrypoint
     *.ts                — Core general-purpose tools (read, write, edit, bash, grep, find, ls)
@@ -36,6 +37,8 @@ skills/
   registry.json         — Discoverability metadata for bundled skills
   ai-images/            — Helper-backed bundled skill
     references/         — Model-selection plus task-specific image references
+  web/                  — Helper-backed bundled browser skill
+    references/         — API, workflow, and task-specific browser references
 docs/
   vision.md             — Package philosophy
   adding-skills.md      — Skill authoring conventions
@@ -49,6 +52,6 @@ tests/
 
 - Exposes the general-purpose tool layer used by the monorepo's agent runtime.
 - Owns bundled skill packaging and installation under `.max/skills/`.
-- Owns helper-backed skill APIs exported from `@ank1015/llm-agents`.
+- Owns helper-backed skill APIs exported from `@ank1015/llm-agents`, including AI image and web/browser helpers.
 - Supports a reusable `.max/temp/` TypeScript workspace for helper-backed skills.
 - Includes a local CLI runner for temporary directory-scoped agent sessions.

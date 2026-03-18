@@ -13,6 +13,7 @@ import {
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+const PACKAGE_JSON_FILENAME = 'package.json';
 const currentFileDir = dirname(fileURLToPath(import.meta.url));
 const packageRoot = findPackageRoot(currentFileDir);
 const bundledSkillsDir = join(packageRoot, 'skills');
@@ -23,7 +24,6 @@ export const MAX_DIR_NAME = '.max';
 export const INSTALLED_SKILLS_DIR_NAME = 'skills';
 export const TEMP_DIR_NAME = 'temp';
 const TEMP_SCRIPTS_DIR_NAME = 'scripts';
-const PACKAGE_JSON_FILENAME = 'package.json';
 
 export interface SkillHelperProjectConfig {
   runtime: 'typescript';
@@ -532,7 +532,7 @@ function normalizeObjectRecord(value: unknown): Record<string, string> {
 async function readCurrentPackageVersion(): Promise<string> {
   const packageJsonPath = join(packageRoot, PACKAGE_JSON_FILENAME);
   const parsed = JSON.parse(await readFile(packageJsonPath, 'utf-8')) as { version?: string };
-  return parsed.version ?? '0.0.3';
+  return parsed.version ?? '0.0.4';
 }
 
 async function readCurrentTsxVersion(): Promise<string> {

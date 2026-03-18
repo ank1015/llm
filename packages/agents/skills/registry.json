@@ -6,5 +6,13 @@
       "runtime": "typescript",
       "package": "@ank1015/llm-agents"
     }
+  },
+  {
+    "name": "web",
+    "description": "Use a managed browser helper to read websites, interact with web apps, inspect network activity, manage tabs, and handle downloads or uploads.",
+    "helperProject": {
+      "runtime": "typescript",
+      "package": "@ank1015/llm-agents"
+    }
   }
 ]

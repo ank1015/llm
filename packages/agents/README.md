@@ -7,7 +7,7 @@ This package is the home of:
 - general-purpose agent tools for file exploration, reading, editing, writing, and shell execution
 - system-prompt construction for the monorepo's general-purpose agent
 - bundled skill packaging and installation
-- helper-backed skill APIs such as AI image generation/editing
+- helper-backed skill APIs such as AI image generation/editing and browser automation/debugging
 - a local CLI runner for directory-scoped agent sessions
 
 ## What It Exports
@@ -24,6 +24,11 @@ The current public surface is organized around four areas:
 - helper-backed skill APIs
   - `createImage()`
   - `editImage()`
+  - `connectWeb()`
+  - `withWebBrowser()`
+  - `WebBrowser`
+  - `WebTab`
+  - `WebDebuggerSession`
 
 ```ts
 import {
@@ -31,6 +36,7 @@ import {
   createAllTools,
   createImage,
   createSystemPrompt,
+  connectWeb,
   listBundledSkills,
 } from '@ank1015/llm-agents';
 ```
@@ -58,11 +64,14 @@ Skills follow an overview-first structure:
 - `SKILL.md` is the overview and navigation layer
 - `references/` holds task-specific details that should only be read when needed
 
-The current bundled skill is:
+The current bundled skills are:
 
 - `ai-images`
   - overview: [skills/ai-images/SKILL.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/ai-images/SKILL.md)
   - task-specific references for model choice, image creation, and image editing
+- `web`
+  - overview: [skills/web/SKILL.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/web/SKILL.md)
+  - task-specific references for reading pages, interacting with web apps, network/debug flows, browser-state work, and downloads/uploads
 
 ## Helper-Backed Temp Workspace
 
@@ -80,17 +89,25 @@ That workspace is intended for one-off helper scripts and includes:
 This lets the agent write and run short TypeScript scripts without needing to bootstrap a fresh
 project every time.
 
-## AI Image Helpers
+## Helper-Backed Skill APIs
 
-The first helper-backed skill is `ai-images`.
+The current helper-backed skills are `ai-images` and `web`.
 
 Import the helpers from the package root:
 
 ```ts
-import { createImage, editImage } from '@ank1015/llm-agents';
+import {
+  WebBrowser,
+  WebDebuggerSession,
+  WebTab,
+  connectWeb,
+  createImage,
+  editImage,
+  withWebBrowser,
+} from '@ank1015/llm-agents';
 ```
 
-These helpers:
+The AI image helpers:
 
 - use the package's skill-oriented abstractions instead of lower-level provider wiring
 - work with the default file keys adapter automatically
@@ -101,6 +118,25 @@ See the skill docs for the task-specific API guidance:
 - [choose-model.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/ai-images/references/choose-model.md)
 - [create.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/ai-images/references/create.md)
 - [edit.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/ai-images/references/edit.md)
+
+The web helpers:
+
+- hide the lower-level `@ank1015/llm-extension` transport details behind a managed browser session
+- expose browser, tab, debugger, download, screenshot, and upload helpers through `@ank1015/llm-agents`
+- emphasize `evaluate(...)`, readiness checks, and verification over brittle site-specific abstractions
+- are documented with an API reference first, then a workflow guide, then task-specific references
+
+See the web skill docs for the task-specific guidance:
+
+- [SKILL.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/web/SKILL.md)
+- [api.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/web/references/api.md)
+- [workflow.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/web/references/workflow.md)
+- [read.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/web/references/read.md)
+- [interact.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/web/references/interact.md)
+- [debug.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/web/references/debug.md)
+- [browser-state.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/web/references/browser-state.md)
+- [downloads.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/web/references/downloads.md)
+- [recipes.md](/Users/notacoder/Desktop/agents/llm/packages/agents/skills/web/references/recipes.md)
 
 ## Local CLI
 
@@ -113,7 +149,7 @@ pnpm --filter @ank1015/llm-agents agent:cli
 The CLI:
 
 - asks which directory Max should work in
-- installs the `ai-images` skill into that directory's `.max/skills/`
+- installs the `ai-images` and `web` skills into that directory's `.max/skills/`
 - uses the file keys adapter for credentials
 - uses `codex` / `gpt-5.4` with the package's general-purpose tools
 
@@ -121,6 +157,7 @@ The CLI:
 
 - [docs/vision.md](/Users/notacoder/Desktop/agents/llm/packages/agents/docs/vision.md)
 - [docs/adding-skills.md](/Users/notacoder/Desktop/agents/llm/packages/agents/docs/adding-skills.md)
+- [docs/web-skill-spec.md](/Users/notacoder/Desktop/agents/llm/packages/agents/docs/web-skill-spec.md)
 - [docs/testing.md](/Users/notacoder/Desktop/agents/llm/packages/agents/docs/testing.md)
 
 ## Commands
