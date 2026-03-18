@@ -56,6 +56,7 @@
     "access": "public"
   },
   "dependencies": {
+    "@ank1015/llm-extension": "workspace:^",
     "@ank1015/llm-sdk": "workspace:^",
     "@ank1015/llm-sdk-adapters": "workspace:^",
     "@silvia-odwyer/photon-node": "^0.3.4",
