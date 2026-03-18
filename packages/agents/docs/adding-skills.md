@@ -138,3 +138,28 @@ normal project folder.
 
 Skill docs do not need to explain how `.max/temp/` is prepared; that behavior belongs in the system
 prompt and package docs.
+
+## Monorepo Skill Testing
+
+When iterating on a bundled skill inside this package, prefer the monorepo-local tester flow:
+
+```bash
+pnpm --filter @ank1015/llm-agents skill:tester -- <skill-name>
+```
+
+That workflow installs the requested skill into `packages/agents/.skill-tester/skills/` and reuses
+`packages/agents/.skill-tester/temp/` for helper-backed scripts, while keeping the real bundled
+skill and helper source under `skills/` and `src/helpers/`.
+
+For quick non-interactive checks, pass a prompt directly:
+
+```bash
+pnpm --filter @ank1015/llm-agents skill:tester -- <skill-name> --prompt "Inspect the installed skill and summarize how it is meant to be used."
+```
+
+In one-shot mode, the tester runs the prompt once, waits for the agent to finish, saves the full
+conversation transcript, prints the final agent response, and exits.
+
+Saved tester transcripts are written under `packages/agents/.sessions/skill-tester/`, which makes
+it easy to inspect how the agent used the installed skill and helper-backed temp workspace after the
+run completes.

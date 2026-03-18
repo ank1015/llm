@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -131,6 +131,92 @@ describe('skills runtime', () => {
       } finally {
         await rm(artifactDir, { recursive: true, force: true });
       }
+    }
+  });
+
+  it('refreshes the temp helper workspace versions and node module links on reinstall', async () => {
+    const artifactDir = await createArtifactDir();
+    const staleDir = await mkdtemp(join(tmpdir(), 'llm-agents-stale-temp-'));
+
+    try {
+      await addSkill('web', artifactDir);
+
+      const resolvedArtifactDir = await realpath(artifactDir);
+      const tempDir = join(resolvedArtifactDir, '.max', 'temp');
+      const tempPackageJsonPath = join(tempDir, 'package.json');
+      const packageJson = JSON.parse(
+        await readFile(join(packageRoot, 'package.json'), 'utf-8')
+      ) as {
+        version?: string;
+        devDependencies?: Record<string, string>;
+        dependencies?: Record<string, string>;
+      };
+      const expectedTsxVersion =
+        packageJson.devDependencies?.tsx ?? packageJson.dependencies?.tsx ?? '^4.19.0';
+      const agentsLinkPath = join(tempDir, 'node_modules', '@ank1015', 'llm-agents');
+      const tsxLinkPath = join(tempDir, 'node_modules', 'tsx');
+      const tsxBinPath = join(
+        tempDir,
+        'node_modules',
+        '.bin',
+        process.platform === 'win32' ? 'tsx.cmd' : 'tsx'
+      );
+
+      await writeFile(
+        tempPackageJsonPath,
+        `${JSON.stringify(
+          {
+            name: 'max-temp',
+            private: true,
+            type: 'module',
+            dependencies: {
+              '@ank1015/llm-agents': '0.0.0-stale',
+            },
+            devDependencies: {
+              tsx: '0.0.0-stale',
+            },
+          },
+          null,
+          2
+        )}\n`,
+        'utf-8'
+      );
+
+      await rm(agentsLinkPath, { recursive: true, force: true });
+      await rm(tsxLinkPath, { recursive: true, force: true });
+      await rm(tsxBinPath, { force: true });
+      await mkdir(agentsLinkPath, { recursive: true });
+      await mkdir(tsxLinkPath, { recursive: true });
+      await writeFile(tsxBinPath, 'stale\n', 'utf-8');
+
+      await addSkill('ai-images', artifactDir);
+
+      const refreshedPackageJson = JSON.parse(await readFile(tempPackageJsonPath, 'utf-8')) as {
+        dependencies?: Record<string, string>;
+        devDependencies?: Record<string, string>;
+      };
+
+      expect(refreshedPackageJson.dependencies?.['@ank1015/llm-agents']).toBe(
+        packageJson.version ?? '0.0.4'
+      );
+      expect(refreshedPackageJson.devDependencies?.tsx).toBe(expectedTsxVersion);
+      await expect(realpath(agentsLinkPath)).resolves.toBe(packageRoot);
+      await expect(realpath(tsxLinkPath)).resolves.toBe(
+        await realpath(join(packageRoot, 'node_modules', 'tsx'))
+      );
+      await expect(realpath(tsxBinPath)).resolves.toBe(
+        await realpath(
+          join(
+            packageRoot,
+            'node_modules',
+            '.bin',
+            process.platform === 'win32' ? 'tsx.cmd' : 'tsx'
+          )
+        )
+      );
+    } finally {
+      await rm(staleDir, { recursive: true, force: true });
+      await rm(artifactDir, { recursive: true, force: true });
     }
   });
 

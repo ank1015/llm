@@ -4,8 +4,9 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 
+import { runSkillTesterBuild } from '../../src/agents/skills/tester.js';
 import {
   IMAGE_MODEL_IDS,
   WebBrowser,
@@ -22,6 +23,10 @@ import {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const packageRoot = resolve(__dirname, '../..');
+
+beforeAll(async () => {
+  await runSkillTesterBuild();
+}, 600_000);
 
 describe('helper-backed skill exports', () => {
   it('exposes the ai-image and web helper functions from the package root', () => {

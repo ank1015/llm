@@ -153,6 +153,25 @@ The CLI:
 - uses the file keys adapter for credentials
 - uses `codex` / `gpt-5.4` with the package's general-purpose tools
 
+This remains the normal artifact-style flow.
+
+## Skill Tester
+
+For monorepo-local bundled skill iteration without publishing the package, run:
+
+```bash
+pnpm --filter @ank1015/llm-agents skill:tester -- <skill-name>
+```
+
+The skill tester:
+
+- auto-builds the local package stack with `pnpm build:packages`
+- uses a fixed disposable workspace at `packages/agents/.skill-tester/`
+- installs only the requested skill into `.skill-tester/skills/`
+- prepares `.skill-tester/temp/` as the helper-backed TypeScript workspace
+- keeps the source of truth in `packages/agents/skills/` and `packages/agents/src/helpers/`
+- roots the agent tools in `.skill-tester/`, so source edits outside that workspace should be explicit
+
 ## Docs
 
 - [docs/vision.md](/Users/notacoder/Desktop/agents/llm/packages/agents/docs/vision.md)
@@ -164,6 +183,7 @@ The CLI:
 
 - `pnpm build`
 - `pnpm agent:cli`
+- `pnpm skill:tester -- <skill-name>`
 - `pnpm test`
 - `pnpm test:unit`
 - `pnpm test:integration`
