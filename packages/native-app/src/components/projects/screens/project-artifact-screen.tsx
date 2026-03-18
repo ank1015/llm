@@ -1,5 +1,5 @@
 import { Link, useLocalSearchParams } from 'expo-router';
-import { Skeleton, Tabs, useThemeColor } from 'heroui-native';
+import { Menu, Skeleton, Spinner, Tabs, useThemeColor, useToast } from 'heroui-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Pressable,
@@ -10,10 +10,18 @@ import {
 } from 'react-native';
 
 import { AppText } from '@/components/app-text';
+import { PlusIcon } from '@/components/icons/plus';
 import { ProjectArtifactExplorer } from '@/components/projects/artifacts/project-artifact-explorer';
 import { ProjectPromptComposer } from '@/components/projects/composer/project-prompt-composer';
 import { useProjectShell } from '@/components/projects/layout/project-shell-context';
+import { SkillIcon } from '@/components/projects/skills/skill-icons';
 import { ScreenScrollView } from '@/components/screen-scroll-view';
+import {
+  installArtifactSkill,
+  listBundledSkills,
+  listInstalledArtifactSkills,
+  type BundledSkillDto,
+} from '@/lib/client-api';
 import { useSidebarStore } from '@/stores';
 import { appLayout, appSpacing, appTabsStyles, appTypography } from '@/styles/ui';
 
@@ -29,10 +37,19 @@ function ArtifactChatSkeletonRow({ index }: { index: number }) {
   );
 }
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
+  }
+
+  return 'Something went wrong.';
+}
+
 export function ProjectArtifactScreen() {
   const params = useLocalSearchParams<{ artifactId?: string | string[] }>();
   const artifactId = Array.isArray(params.artifactId) ? params.artifactId[0] : params.artifactId;
   const { projectId, refreshOverview } = useProjectShell();
+  const { toast } = useToast();
   const artifact = useSidebarStore(
     (state) => state.artifactDirs.find((entry) => entry.id === artifactId) ?? null
   );
@@ -41,10 +58,16 @@ export function ProjectArtifactScreen() {
   const error = useSidebarStore((state) => state.error);
   const [activeTab, setActiveTab] = useState('chats');
   const [composerHeight, setComposerHeight] = useState(0);
+  const [isSkillsMenuOpen, setIsSkillsMenuOpen] = useState(false);
+  const [bundledSkills, setBundledSkills] = useState<BundledSkillDto[]>([]);
+  const [installedSkillNames, setInstalledSkillNames] = useState<Set<string>>(new Set());
+  const [isSkillsLoading, setIsSkillsLoading] = useState(false);
+  const [skillsError, setSkillsError] = useState<string | null>(null);
+  const [installingSkillName, setInstallingSkillName] = useState<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const wasRefreshingRef = useRef(false);
   const { height: windowHeight } = useWindowDimensions();
-  const [mutedColor] = useThemeColor(['muted']);
+  const [foregroundColor, mutedColor] = useThemeColor(['foreground', 'muted']);
   const composerInset = activeTab === 'chats' ? composerHeight + appSpacing.sm : 0;
   const endSpacerHeight = Math.round(windowHeight * 0.4);
   const shouldShowChatSkeletons = !artifact && !error && (isLoading || isRefreshing);
@@ -62,6 +85,15 @@ export function ProjectArtifactScreen() {
     wasRefreshingRef.current = isRefreshing;
   }, [isRefreshing]);
 
+  useEffect(() => {
+    setIsSkillsMenuOpen(false);
+    setBundledSkills([]);
+    setInstalledSkillNames(new Set());
+    setIsSkillsLoading(false);
+    setSkillsError(null);
+    setInstallingSkillName(null);
+  }, [artifactId, projectId]);
+
   const sessions = useMemo(() => {
     if (!artifact) {
       return [];
@@ -74,41 +106,200 @@ export function ProjectArtifactScreen() {
       return rightTimestamp - leftTimestamp;
     });
   }, [artifact]);
+
+  const installableSkills = useMemo(
+    () => bundledSkills.filter((skill) => !installedSkillNames.has(skill.name)),
+    [bundledSkills, installedSkillNames]
+  );
+
+  const loadSkills = async (): Promise<void> => {
+    if (!artifactId) {
+      return;
+    }
+
+    setIsSkillsLoading(true);
+    setSkillsError(null);
+
+    try {
+      const [bundled, installed] = await Promise.all([
+        listBundledSkills(),
+        listInstalledArtifactSkills({ projectId, artifactId }),
+      ]);
+
+      setBundledSkills(bundled);
+      setInstalledSkillNames(new Set(installed.map((skill) => skill.name)));
+    } catch (skillError) {
+      const message = getErrorMessage(skillError);
+      setSkillsError(message);
+      toast.show({
+        variant: 'danger',
+        label: 'Could not load skills',
+        description: message,
+      });
+    } finally {
+      setIsSkillsLoading(false);
+    }
+  };
+
+  const handleSkillsMenuOpenChange = (open: boolean) => {
+    setIsSkillsMenuOpen(open);
+    if (open) {
+      void loadSkills();
+    }
+  };
+
+  const handleInstallSkill = async (skillName: string) => {
+    if (!artifactId || installingSkillName) {
+      return;
+    }
+
+    setInstallingSkillName(skillName);
+
+    try {
+      const installedSkill = await installArtifactSkill(
+        { projectId, artifactId },
+        {
+          skillName,
+        }
+      );
+
+      setInstalledSkillNames((current) => {
+        const next = new Set(current);
+        next.add(installedSkill.name);
+        return next;
+      });
+      setIsSkillsMenuOpen(false);
+      toast.show({
+        label: 'Skill installed',
+        description: `${installedSkill.name} is now available in this artifact.`,
+      });
+    } catch (installError) {
+      toast.show({
+        variant: 'danger',
+        label: 'Install failed',
+        description: getErrorMessage(installError),
+      });
+    } finally {
+      setInstallingSkillName(null);
+    }
+  };
+
   return (
     <View className="flex-1 bg-background">
       <Tabs className="flex-1" onValueChange={setActiveTab} value={activeTab} variant="primary">
         <View className="px-5" style={{ paddingTop: appSpacing.lg, paddingBottom: appSpacing.sm }}>
           {/* Artifact header intentionally remains commented out for now. */}
           <View className={appLayout.artifactTabsSection}>
-            <Tabs.List className={appTabsStyles.artifactList}>
-              <Tabs.Indicator className={appTabsStyles.artifactIndicator} />
-              <Tabs.Trigger className={appTabsStyles.artifactTrigger} value="chats">
-                {({ isSelected }) => (
-                  <Tabs.Label
-                    className={
-                      isSelected
-                        ? appTypography.artifactTabActiveLabel
-                        : appTypography.artifactTabInactiveLabel
-                    }
+            <View className="flex-row items-center justify-between gap-3">
+              <Tabs.List className={appTabsStyles.artifactList}>
+                <Tabs.Indicator className={appTabsStyles.artifactIndicator} />
+                <Tabs.Trigger className={appTabsStyles.artifactTrigger} value="chats">
+                  {({ isSelected }) => (
+                    <Tabs.Label
+                      className={
+                        isSelected
+                          ? appTypography.artifactTabActiveLabel
+                          : appTypography.artifactTabInactiveLabel
+                      }
+                    >
+                      Chats
+                    </Tabs.Label>
+                  )}
+                </Tabs.Trigger>
+                <Tabs.Trigger className={appTabsStyles.artifactTrigger} value="artifacts">
+                  {({ isSelected }) => (
+                    <Tabs.Label
+                      className={
+                        isSelected
+                          ? appTypography.artifactTabActiveLabel
+                          : appTypography.artifactTabInactiveLabel
+                      }
+                    >
+                      Artifacts
+                    </Tabs.Label>
+                  )}
+                </Tabs.Trigger>
+              </Tabs.List>
+
+              <Menu isOpen={isSkillsMenuOpen} onOpenChange={handleSkillsMenuOpenChange}>
+                <Menu.Trigger asChild>
+                  <Pressable
+                    accessibilityLabel="Add skill"
+                    android_ripple={{ color: 'transparent' }}
+                    className="size-10 items-center justify-center rounded-full"
+                    style={{ borderCurve: 'continuous' }}
                   >
-                    Chats
-                  </Tabs.Label>
-                )}
-              </Tabs.Trigger>
-              <Tabs.Trigger className={appTabsStyles.artifactTrigger} value="artifacts">
-                {({ isSelected }) => (
-                  <Tabs.Label
-                    className={
-                      isSelected
-                        ? appTypography.artifactTabActiveLabel
-                        : appTypography.artifactTabInactiveLabel
-                    }
+                    {installingSkillName ? (
+                      <Spinner size="sm" />
+                    ) : (
+                      <PlusIcon color={foregroundColor} size={18} />
+                    )}
+                  </Pressable>
+                </Menu.Trigger>
+
+                <Menu.Portal>
+                  <Menu.Overlay />
+                  <Menu.Content
+                    align="end"
+                    className="bg-default"
+                    offset={10}
+                    placement="bottom"
+                    presentation="popover"
+                    width={260}
                   >
-                    Artifacts
-                  </Tabs.Label>
-                )}
-              </Tabs.Trigger>
-            </Tabs.List>
+                    <Menu.Label className="px-3 pb-2 pt-1 text-sm font-semibold text-muted">
+                      Skills
+                    </Menu.Label>
+
+                    {isSkillsLoading ? (
+                      <View className="px-3 pb-2">
+                        <Menu.Item isDisabled>
+                          <Spinner size="sm" />
+                          <Menu.ItemTitle className="text-[15px] text-foreground">
+                            Loading skills...
+                          </Menu.ItemTitle>
+                        </Menu.Item>
+                      </View>
+                    ) : skillsError ? (
+                      <View className="px-3 pb-2">
+                        <Menu.Item isDisabled>
+                          <Menu.ItemTitle className="text-[15px] text-danger">
+                            {skillsError}
+                          </Menu.ItemTitle>
+                        </Menu.Item>
+                      </View>
+                    ) : installableSkills.length === 0 ? (
+                      <View className="px-3 pb-2">
+                        <Menu.Item isDisabled>
+                          <Menu.ItemTitle className="text-[15px] text-muted">
+                            All skills installed
+                          </Menu.ItemTitle>
+                        </Menu.Item>
+                      </View>
+                    ) : (
+                      <View className="px-2 pb-2">
+                        {installableSkills.map((skill) => (
+                          <Menu.Item
+                            key={skill.name}
+                            id={skill.name}
+                            isDisabled={Boolean(installingSkillName)}
+                            shouldCloseOnSelect={false}
+                            onPress={() => {
+                              void handleInstallSkill(skill.name);
+                            }}
+                          >
+                            <SkillIcon color={foregroundColor} skillName={skill.name} size={18} />
+                            <Menu.ItemTitle className="text-[15px] text-foreground">
+                              {skill.name}
+                            </Menu.ItemTitle>
+                          </Menu.Item>
+                        ))}
+                      </View>
+                    )}
+                  </Menu.Content>
+                </Menu.Portal>
+              </Menu>
+            </View>
           </View>
         </View>
 
