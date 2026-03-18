@@ -13,6 +13,7 @@ import {
 import { prepareSkillTesterWorkspace } from '../../src/agents/skills/tester.js';
 import {
   createSkillTesterSystemPromptOverrides,
+  parseSkillTesterCliArgs,
   resolveSkillTesterTargetSkill,
 } from '../../src/cli/skill-tester.js';
 
@@ -62,6 +63,30 @@ describe('skill tester helpers', () => {
     );
     expect(resolveSkillTesterTargetSkill(['web'])).toBe('web');
     expect(resolveSkillTesterTargetSkill(['--', 'web'])).toBe('web');
+  });
+
+  it('parses one-shot prompt flags for non-interactive runs', () => {
+    expect(
+      parseSkillTesterCliArgs(['web', '--prompt', 'Inspect the installed helper flow.'])
+    ).toEqual({
+      skillName: 'web',
+      prompt: 'Inspect the installed helper flow.',
+    });
+    expect(parseSkillTesterCliArgs(['--', 'web', '--prompt=Summarize the skill setup.'])).toEqual({
+      skillName: 'web',
+      prompt: 'Summarize the skill setup.',
+    });
+    expect(parseSkillTesterCliArgs(['-p', 'List the installed files.', 'ai-images'])).toEqual({
+      skillName: 'ai-images',
+      prompt: 'List the installed files.',
+    });
+  });
+
+  it('rejects missing or repeated one-shot prompt values', () => {
+    expect(() => parseSkillTesterCliArgs(['web', '--prompt'])).toThrow(/Missing prompt text/);
+    expect(() => parseSkillTesterCliArgs(['web', '--prompt', 'one', '--prompt', 'two'])).toThrow(
+      /at most one prompt value/i
+    );
   });
 
   it('fails unknown skills before attempting the local build', async () => {

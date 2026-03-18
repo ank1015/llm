@@ -12,6 +12,11 @@ import { runInteractiveCliSession } from './shared.js';
 import type { WorkspaceInstalledSkillEntry } from '../agents/skills/runtime.js';
 import type { AgentTool } from '@ank1015/llm-sdk';
 
+export interface SkillTesterCliArgs {
+  skillName: string;
+  prompt?: string;
+}
+
 export interface SkillTesterContext {
   skillName: string;
   packageRoot: string;
@@ -21,27 +26,57 @@ export interface SkillTesterContext {
   installedSkills: WorkspaceInstalledSkillEntry[];
 }
 
-export function resolveSkillTesterTargetSkill(argv: string[]): string {
+export function parseSkillTesterCliArgs(argv: string[]): SkillTesterCliArgs {
   const args = argv
     .map((value) => value.trim())
     .filter((value) => value.length > 0 && value !== '--');
 
-  if (args.length === 0) {
+  const positionalArgs: string[] = [];
+  let prompt: string | undefined;
+
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (!arg) {
+      continue;
+    }
+
+    const promptFlag = parseSkillTesterPromptFlag({
+      args,
+      index,
+      currentPrompt: prompt,
+    });
+    if (promptFlag) {
+      prompt = promptFlag.prompt;
+      index = promptFlag.nextIndex;
+      continue;
+    }
+
+    positionalArgs.push(arg);
+  }
+
+  if (positionalArgs.length === 0) {
     throw new Error(
-      'Missing skill name. Usage: pnpm --filter @ank1015/llm-agents skill:tester -- <skill-name>'
+      'Missing skill name. Usage: pnpm --filter @ank1015/llm-agents skill:tester -- <skill-name> [--prompt "your prompt"]'
     );
   }
 
-  if (args.length > 1) {
-    throw new Error(`Expected exactly one skill name. Received: ${args.join(', ')}`);
+  if (positionalArgs.length > 1) {
+    throw new Error(`Expected exactly one skill name. Received: ${positionalArgs.join(', ')}`);
   }
 
-  const skillName = args[0];
+  const skillName = positionalArgs[0];
   if (!skillName) {
     throw new Error('Missing skill name.');
   }
 
-  return skillName;
+  return {
+    skillName,
+    ...(prompt !== undefined ? { prompt } : {}),
+  };
+}
+
+export function resolveSkillTesterTargetSkill(argv: string[]): string {
+  return parseSkillTesterCliArgs(argv).skillName;
 }
 
 export function createSkillTesterSystemPromptOverrides({
@@ -103,7 +138,7 @@ ${availableSkills}
 }
 
 export async function runSkillTesterCli(argv: string[] = process.argv.slice(2)): Promise<void> {
-  const skillName = resolveSkillTesterTargetSkill(argv);
+  const { skillName, prompt } = parseSkillTesterCliArgs(argv);
   const prepared = await prepareSkillTesterWorkspace(skillName);
   const tools = Object.values(createAllTools(prepared.layout.rootDir)) as unknown as AgentTool[];
   const systemPrompt = await createSystemPrompt({
@@ -120,19 +155,98 @@ export async function runSkillTesterCli(argv: string[] = process.argv.slice(2)):
     }),
   });
 
-  await runInteractiveCliSession({
+  const result = await runInteractiveCliSession({
     projectName: basename(prepared.packageRoot),
     sessionName: `${skillName} Skill Tester Session`,
     sessionArchiveSubdir: 'skill-tester',
     workingDir: prepared.layout.rootDir,
     systemPrompt,
     tools,
-    introLines: [
-      `Testing bundled skill "${skillName}" in ${prepared.layout.rootDir}`,
-      `Using source package at ${prepared.packageRoot}`,
-      'Type a prompt and press Enter. Type "exit" to quit.',
-    ],
+    ...(prompt !== undefined ? { oneShotPrompt: prompt } : {}),
+    introLines:
+      prompt === undefined
+        ? [
+            `Testing bundled skill "${skillName}" in ${prepared.layout.rootDir}`,
+            `Using source package at ${prepared.packageRoot}`,
+            'Type a prompt and press Enter. Type "exit" to quit.',
+          ]
+        : [
+            `Testing bundled skill "${skillName}" in ${prepared.layout.rootDir}`,
+            `Using source package at ${prepared.packageRoot}`,
+            'Running one-shot prompt and exiting when the agent finishes.',
+          ],
   });
+
+  if (prompt !== undefined) {
+    process.stdout.write('\nFinal response:\n');
+    process.stdout.write(`${result.finalResponse ?? '[assistant returned no text response]'}\n`);
+  }
+}
+
+function resolveSkillTesterPromptValue(
+  currentPrompt: string | undefined,
+  rawValue: string,
+  flag: string
+): string {
+  if (currentPrompt !== undefined) {
+    throw new Error('Expected at most one prompt value.');
+  }
+
+  const promptValue = rawValue.trim();
+  if (promptValue.length === 0) {
+    throw new Error(`Missing prompt text for ${flag}.`);
+  }
+
+  return promptValue;
+}
+
+function parseSkillTesterPromptFlag({
+  args,
+  index,
+  currentPrompt,
+}: {
+  args: string[];
+  index: number;
+  currentPrompt: string | undefined;
+}): { prompt: string; nextIndex: number } | undefined {
+  const arg = args[index];
+  if (!arg) {
+    return undefined;
+  }
+
+  if (arg === '--prompt' || arg === '-p') {
+    const promptValue = args[index + 1];
+    if (!promptValue) {
+      throw new Error(
+        'Missing prompt text for --prompt. Usage: pnpm --filter @ank1015/llm-agents skill:tester -- <skill-name> --prompt "your prompt"'
+      );
+    }
+
+    return {
+      prompt: resolveSkillTesterPromptValue(currentPrompt, promptValue, '--prompt'),
+      nextIndex: index + 1,
+    };
+  }
+
+  if (arg.startsWith('--prompt=')) {
+    return {
+      prompt: resolveSkillTesterPromptValue(
+        currentPrompt,
+        arg.slice('--prompt='.length),
+        '--prompt'
+      ),
+      nextIndex: index,
+    };
+  }
+
+  if (arg.startsWith('-p=')) {
+    return {
+      prompt: resolveSkillTesterPromptValue(currentPrompt, arg.slice('-p='.length), '-p'),
+      nextIndex: index,
+    };
+  }
+
+  return undefined;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

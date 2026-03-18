@@ -34,6 +34,12 @@ export interface RunInteractiveCliSessionOptions {
   systemPrompt: string;
   tools: AgentTool[];
   introLines?: string[];
+  oneShotPrompt?: string;
+}
+
+export interface CliSessionRunResult {
+  finalResponse?: string;
+  sessionTranscriptPath?: string;
 }
 
 export function isExitCommand(input: string): boolean {
@@ -69,6 +75,29 @@ export function extractAssistantText(message: BaseAssistantMessage<Api>): string
   return '';
 }
 
+export function extractLatestAssistantResponse(messages: Message[]): string | undefined {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (!message || message.role !== 'assistant') {
+      continue;
+    }
+
+    const assistantMessage = message as BaseAssistantMessage<Api>;
+    const text = extractAssistantText(assistantMessage);
+    if (text) {
+      return text;
+    }
+
+    if (assistantMessage.errorMessage) {
+      return assistantMessage.errorMessage;
+    }
+
+    return '[assistant returned no text response]';
+  }
+
+  return undefined;
+}
+
 export function isReadlineInterruptError(error: unknown): boolean {
   return (
     error instanceof Error &&
@@ -85,11 +114,15 @@ export async function runInteractiveCliSession({
   systemPrompt,
   tools,
   introLines,
-}: RunInteractiveCliSessionOptions): Promise<void> {
-  const readline = createInterface({ input: stdin, output: stdout });
+  oneShotPrompt,
+}: RunInteractiveCliSessionOptions): Promise<CliSessionRunResult> {
+  const readline =
+    oneShotPrompt === undefined ? createInterface({ input: stdin, output: stdout }) : undefined;
   let conversation: Conversation | undefined;
   let isRunning = false;
   let sessionId: string | undefined;
+  let sessionTranscriptPath: string | undefined;
+  let finalResponse: string | undefined;
 
   const handleSigint = (): void => {
     if (isRunning && conversation) {
@@ -99,7 +132,7 @@ export async function runInteractiveCliSession({
     }
 
     stdout.write('\nExiting.\n');
-    readline.close();
+    readline?.close();
   };
 
   process.on('SIGINT', handleSigint);
@@ -117,57 +150,75 @@ export async function runInteractiveCliSession({
 
     let currentLeafNodeId = createdSession.header.id;
 
-    conversation = new Conversation({
+    const activeConversation = new Conversation({
       keysAdapter,
       streamAssistantMessage: true,
       initialState: {
         tools,
       },
     });
-    conversation.setProvider({
+    conversation = activeConversation;
+    activeConversation.setProvider({
       model,
       providerOptions: CLI_PROVIDER_OPTIONS,
     } as Provider<Api>);
-    conversation.setSystemPrompt(systemPrompt);
-    conversation.setTools(tools);
-    conversation.subscribe(createEventPrinter());
+    activeConversation.setSystemPrompt(systemPrompt);
+    activeConversation.setTools(tools);
+    if (oneShotPrompt === undefined) {
+      activeConversation.subscribe(createEventPrinter());
+    }
 
     stdout.write(`Session ${sessionId} ready.\n`);
     printIntroLines(workingDir, introLines);
 
-    while (true) {
-      const promptText = await readPromptText(readline);
-      if (promptText === undefined) {
-        break;
-      }
-      if (!promptText.trim()) {
-        continue;
-      }
-      if (isExitCommand(promptText)) {
-        break;
-      }
-
-      isRunning = true;
-      try {
-        await conversation.prompt(promptText, undefined, async (message: Message) => {
-          currentLeafNodeId = await appendSessionMessage({
+    if (oneShotPrompt !== undefined) {
+      finalResponse = await runOneShotPrompt({
+        promptText: oneShotPrompt,
+        onRunningChange: (running) => {
+          isRunning = running;
+        },
+        executePrompt: async (promptText) => {
+          ({ currentLeafNodeId, finalResponse } = await runPromptTurn({
+            conversation: activeConversation,
+            promptText,
             sessionManager,
             projectName,
             sessionId: createdSessionId,
-            parentId: currentLeafNodeId,
-            message,
-          });
-        });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        stdout.write(`\nerror> ${message}\n`);
-      } finally {
-        isRunning = false;
+            currentLeafNodeId,
+          }));
+
+          return finalResponse;
+        },
+      });
+    } else {
+      if (!readline) {
+        throw new Error('Interactive CLI readline is unavailable.');
       }
+
+      await runInteractivePromptLoop({
+        readline,
+        onRunningChange: (running) => {
+          isRunning = running;
+        },
+        executePrompt: async (promptText) => {
+          ({ currentLeafNodeId } = await runPromptTurn({
+            conversation: activeConversation,
+            promptText,
+            sessionManager,
+            projectName,
+            sessionId: createdSessionId,
+            currentLeafNodeId,
+          }));
+        },
+        onError: (error) => {
+          const message = error instanceof Error ? error.message : String(error);
+          stdout.write(`\nerror> ${message}\n`);
+        },
+      });
     }
   } finally {
     process.off('SIGINT', handleSigint);
-    const transcriptPath = await saveSessionTranscript({
+    sessionTranscriptPath = await saveSessionTranscript({
       conversation,
       projectName,
       sessionId,
@@ -175,10 +226,66 @@ export async function runInteractiveCliSession({
       sessionArchiveSubdir,
       workingDir,
     });
-    if (transcriptPath) {
-      stdout.write(`Saved session transcript to ${transcriptPath}\n`);
+    if (sessionTranscriptPath) {
+      stdout.write(`Saved session transcript to ${sessionTranscriptPath}\n`);
     }
-    readline.close();
+    readline?.close();
+  }
+
+  return {
+    ...(finalResponse !== undefined ? { finalResponse } : {}),
+    ...(sessionTranscriptPath !== undefined ? { sessionTranscriptPath } : {}),
+  };
+}
+
+async function runOneShotPrompt({
+  promptText,
+  onRunningChange,
+  executePrompt,
+}: {
+  promptText: string;
+  onRunningChange: (running: boolean) => void;
+  executePrompt: (promptText: string) => Promise<string | undefined>;
+}): Promise<string | undefined> {
+  onRunningChange(true);
+  try {
+    return await executePrompt(promptText);
+  } finally {
+    onRunningChange(false);
+  }
+}
+
+async function runInteractivePromptLoop({
+  readline,
+  onRunningChange,
+  executePrompt,
+  onError,
+}: {
+  readline: ReturnType<typeof createInterface>;
+  onRunningChange: (running: boolean) => void;
+  executePrompt: (promptText: string) => Promise<void>;
+  onError: (error: unknown) => void;
+}): Promise<void> {
+  while (true) {
+    const promptText = await readPromptText(readline);
+    if (promptText === undefined) {
+      break;
+    }
+    if (!promptText.trim()) {
+      continue;
+    }
+    if (isExitCommand(promptText)) {
+      break;
+    }
+
+    onRunningChange(true);
+    try {
+      await executePrompt(promptText);
+    } catch (error) {
+      onError(error);
+    } finally {
+      onRunningChange(false);
+    }
   }
 }
 
@@ -253,6 +360,38 @@ async function readPromptText(
     }
     throw error;
   }
+}
+
+async function runPromptTurn({
+  conversation,
+  promptText,
+  sessionManager,
+  projectName,
+  sessionId,
+  currentLeafNodeId,
+}: {
+  conversation: Conversation;
+  promptText: string;
+  sessionManager: ReturnType<typeof createSessionManager>;
+  projectName: string;
+  sessionId: string;
+  currentLeafNodeId: string;
+}): Promise<{ currentLeafNodeId: string; finalResponse?: string }> {
+  const newMessages = await conversation.prompt(promptText, undefined, async (message: Message) => {
+    currentLeafNodeId = await appendSessionMessage({
+      sessionManager,
+      projectName,
+      sessionId,
+      parentId: currentLeafNodeId,
+      message,
+    });
+  });
+  const finalResponse = extractLatestAssistantResponse(newMessages);
+
+  return {
+    currentLeafNodeId,
+    ...(finalResponse !== undefined ? { finalResponse } : {}),
+  };
 }
 
 async function appendSessionMessage({
