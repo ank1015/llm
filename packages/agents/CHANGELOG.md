@@ -4,6 +4,8 @@ All notable changes to this package will be documented in this file.
 
 ## Unreleased
 
+- refreshed the reusable `.max/temp` helper workspace on every helper-backed skill install so `@ank1015/llm-agents`, `tsx`, and the temp node-module links do not stay stale across package updates
+
 ## 0.0.4 - 2026-03-18
 
 - added a managed web helper API built on `@ank1015/llm-extension`, including browser, tab, debugger, download, screenshot, markdown, and upload helpers

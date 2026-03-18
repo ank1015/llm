@@ -2,6 +2,7 @@ import { existsSync } from 'fs';
 import {
   access,
   cp,
+  lstat,
   mkdir,
   readFile,
   readdir,
@@ -191,9 +192,9 @@ async function ensureArtifactNodeModulesLink(nodeModulesDir: string): Promise<vo
     throw new Error(`Bundled skill runtime dependencies are missing: ${packageNodeModulesDir}`);
   }
 
-  if (await pathExists(nodeModulesDir)) {
+  if (await pathEntryExists(nodeModulesDir)) {
     const [existingRealPath, packageRealPath] = await Promise.all([
-      realpath(nodeModulesDir),
+      realpath(nodeModulesDir).catch(() => undefined),
       realpath(packageNodeModulesDir),
     ]);
     if (existingRealPath === packageRealPath) {
@@ -435,12 +436,8 @@ async function ensureTempPackageJson(tempDir: string): Promise<void> {
   const dependencies = normalizeObjectRecord(current.dependencies);
   const devDependencies = normalizeObjectRecord(current.devDependencies);
 
-  if (!dependencies['@ank1015/llm-agents']) {
-    dependencies['@ank1015/llm-agents'] = packageVersion;
-  }
-  if (!devDependencies.tsx) {
-    devDependencies.tsx = tsxVersion;
-  }
+  dependencies['@ank1015/llm-agents'] = packageVersion;
+  devDependencies.tsx = tsxVersion;
 
   const nextPackageJson = {
     name: typeof current.name === 'string' ? current.name : 'max-temp',
@@ -504,8 +501,17 @@ async function ensureSymlink(
   targetPath: string,
   type: 'dir' | 'file'
 ): Promise<void> {
-  if (await pathExists(linkPath)) {
-    return;
+  if (await pathEntryExists(linkPath)) {
+    const [existingRealPath, targetRealPath] = await Promise.all([
+      realpath(linkPath).catch(() => undefined),
+      realpath(targetPath),
+    ]);
+
+    if (existingRealPath === targetRealPath) {
+      return;
+    }
+
+    await rm(linkPath, { recursive: true, force: true });
   }
 
   await symlink(
@@ -543,6 +549,15 @@ async function readCurrentTsxVersion(): Promise<string> {
   };
 
   return parsed.devDependencies?.tsx ?? parsed.dependencies?.tsx ?? '^4.19.0';
+}
+
+async function pathEntryExists(path: string): Promise<boolean> {
+  try {
+    await lstat(path);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function findPackageRoot(startDir: string): string {
