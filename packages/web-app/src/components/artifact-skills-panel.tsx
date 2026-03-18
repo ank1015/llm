@@ -1,20 +1,23 @@
 'use client';
 
 import {
-  Bot,
+  ChevronRight,
+  FileText,
   CircleAlert,
-  FileSpreadsheet,
   Globe2,
   Loader2,
   Plus,
-  Presentation,
+  Search,
+  Settings2,
   Sparkles,
+  WandSparkles,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import type { BundledSkillDto, InstalledSkillDto } from '@/lib/client-api';
 
+import { SkillIcon } from '@/components/skill-icon';
 import {
   CommandDialog,
   CommandEmpty,
@@ -33,31 +36,29 @@ import {
 const SKILL_TOOLTIP_CLASS_NAME =
   'border-border bg-popover text-popover-foreground shadow-xs border [&_svg]:fill-popover [&_svg]:bg-popover';
 
+type CommandMenuView = 'root' | 'skills';
+
+const MOCK_COMMAND_ITEMS = [
+  { label: 'Search files', value: 'search-files', icon: Search },
+  { label: 'Prompt library', value: 'prompt-library', icon: FileText },
+  { label: 'Quick actions', value: 'quick-actions', icon: WandSparkles },
+  { label: 'Artifact settings', value: 'artifact-settings', icon: Settings2 },
+  { label: 'Web tools', value: 'web-tools', icon: Globe2 },
+  { label: 'Automation', value: 'automation', icon: Sparkles },
+] as const;
+
 function sortSkillsByName<T extends { name: string }>(skills: T[]): T[] {
   return [...skills].sort((left, right) => left.name.localeCompare(right.name));
-}
-
-function getSkillIcon(skillName: string): typeof Globe2 {
-  switch (skillName) {
-    case 'browser-use':
-      return Globe2;
-    case 'llm-use':
-      return Bot;
-    case 'pptx':
-      return Presentation;
-    case 'xlsx':
-      return FileSpreadsheet;
-    default:
-      return Sparkles;
-  }
 }
 
 export function ArtifactSkillsPanel({
   projectId,
   artifactId,
+  enableCommandMenu = false,
 }: {
   projectId: string;
   artifactId: string;
+  enableCommandMenu?: boolean;
 }) {
   const [installedSkills, setInstalledSkills] = useState<InstalledSkillDto[]>([]);
   const [isInstalledSkillsLoading, setIsInstalledSkillsLoading] = useState(true);
@@ -68,10 +69,23 @@ export function ArtifactSkillsPanel({
   const [isBundledSkillsLoading, setIsBundledSkillsLoading] = useState(false);
   const [bundledSkillsError, setBundledSkillsError] = useState<string | null>(null);
 
+  const [isCommandMenuOpen, setIsCommandMenuOpen] = useState(false);
+  const [commandMenuView, setCommandMenuView] = useState<CommandMenuView>('root');
+  const [commandSearch, setCommandSearch] = useState('');
+  const [commandSelection, setCommandSelection] = useState('');
   const [isInstallDialogOpen, setIsInstallDialogOpen] = useState(false);
   const [installingSkillName, setInstallingSkillName] = useState<string | null>(null);
   const [skillSearch, setSkillSearch] = useState('');
+  const [skillSelection, setSkillSelection] = useState('');
   const bundledSkillsRequestIdRef = useRef(0);
+
+  const resetCommandMenuState = useCallback(() => {
+    setCommandMenuView('root');
+    setCommandSearch('');
+    setCommandSelection('');
+    setSkillSearch('');
+    setSkillSelection('');
+  }, []);
 
   useEffect(() => {
     bundledSkillsRequestIdRef.current += 1;
@@ -81,10 +95,38 @@ export function ArtifactSkillsPanel({
     setBundledSkills(null);
     setIsBundledSkillsLoading(false);
     setBundledSkillsError(null);
+    setIsCommandMenuOpen(false);
+    resetCommandMenuState();
     setIsInstallDialogOpen(false);
     setInstallingSkillName(null);
-    setSkillSearch('');
-  }, [artifactId, projectId]);
+  }, [artifactId, projectId, resetCommandMenuState]);
+
+  useEffect(() => {
+    if (!enableCommandMenu) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const isCommandShortcut =
+        (event.metaKey || event.ctrlKey) &&
+        !event.altKey &&
+        !event.shiftKey &&
+        event.key.toLowerCase() === 'k';
+
+      if (!isCommandShortcut) {
+        return;
+      }
+
+      event.preventDefault();
+      resetCommandMenuState();
+      setIsCommandMenuOpen(true);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [enableCommandMenu, resetCommandMenuState]);
 
   useEffect(() => {
     let isCancelled = false;
@@ -170,6 +212,65 @@ export function ArtifactSkillsPanel({
     }
   };
 
+  const handleCommandMenuChange = (open: boolean) => {
+    setIsCommandMenuOpen(open);
+    if (!open) {
+      resetCommandMenuState();
+    }
+  };
+
+  const handlePrimaryActionClick = () => {
+    if (enableCommandMenu) {
+      resetCommandMenuState();
+      setIsCommandMenuOpen(true);
+      return;
+    }
+
+    handleInstallDialogChange(true);
+  };
+
+  const handleOpenSkillsMenu = () => {
+    setCommandMenuView('skills');
+    setCommandSearch('');
+    setCommandSelection('');
+    setSkillSearch('');
+    setSkillSelection('');
+    void loadBundledSkills();
+  };
+
+  const handleReturnToRootMenu = () => {
+    setCommandMenuView('root');
+    setSkillSearch('');
+    setSkillSelection('');
+    setCommandSelection('');
+  };
+
+  useEffect(() => {
+    if (!enableCommandMenu || !isCommandMenuOpen || commandMenuView === 'root') {
+      return;
+    }
+
+    const handleNestedEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      handleReturnToRootMenu();
+    };
+
+    window.addEventListener('keydown', handleNestedEscape, true);
+    return () => {
+      window.removeEventListener('keydown', handleNestedEscape, true);
+    };
+  }, [commandMenuView, enableCommandMenu, isCommandMenuOpen]);
+
+  const handleMockCommandSelect = (label: string) => {
+    toast.message(`${label} is coming soon.`);
+  };
+
   const handleInstallSkill = async (skillName: string) => {
     if (isInstallBusy) {
       return;
@@ -185,8 +286,14 @@ export function ArtifactSkillsPanel({
         return sortSkillsByName(next);
       });
       setInstalledSkillsError(null);
-      setIsInstallDialogOpen(false);
-      setSkillSearch('');
+      if (enableCommandMenu) {
+        setIsCommandMenuOpen(false);
+        resetCommandMenuState();
+      } else {
+        setIsInstallDialogOpen(false);
+        setSkillSearch('');
+        setSkillSelection('');
+      }
       toast.success(`Installed ${installedSkill.name}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to install skill.';
@@ -208,6 +315,29 @@ export function ArtifactSkillsPanel({
   } else if (skillSearch.trim().length > 0) {
     commandEmptyMessage = `No skills match "${skillSearch.trim()}".`;
   }
+
+  const activeSearch = commandMenuView === 'skills' ? skillSearch : commandSearch;
+  const activeSelection = commandMenuView === 'skills' ? skillSelection : commandSelection;
+
+  const handleActiveSearchChange = (nextValue: string) => {
+    if (commandMenuView === 'skills') {
+      setSkillSearch(nextValue);
+      setSkillSelection('');
+      return;
+    }
+
+    setCommandSearch(nextValue);
+    setCommandSelection('');
+  };
+
+  const handleActiveSelectionChange = (nextValue: string) => {
+    if (commandMenuView === 'skills') {
+      setSkillSelection(nextValue);
+      return;
+    }
+
+    setCommandSelection(nextValue);
+  };
 
   return (
     <>
@@ -234,13 +364,11 @@ export function ArtifactSkillsPanel({
           </Tooltip>
         ) : (
           installedSkills.map((skill) => {
-            const SkillIcon = getSkillIcon(skill.name);
-
             return (
               <Tooltip key={skill.name}>
                 <TooltipTrigger asChild>
                   <span className="text-muted-foreground flex size-5 items-center justify-center">
-                    <SkillIcon className="size-3.5" />
+                    <SkillIcon skillName={skill.name} size={14} className="text-muted-foreground" />
                   </span>
                 </TooltipTrigger>
                 <TooltipContent sideOffset={8} className={SKILL_TOOLTIP_CLASS_NAME}>
@@ -255,10 +383,10 @@ export function ArtifactSkillsPanel({
           <TooltipTrigger asChild>
             <button
               type="button"
-              onClick={() => handleInstallDialogChange(true)}
+              onClick={handlePrimaryActionClick}
               disabled={isInstallBusy}
               className="text-muted-foreground hover:text-foreground disabled:text-muted-foreground/60 flex size-5 cursor-pointer items-center justify-center transition-colors disabled:cursor-default"
-              aria-label="Add skill"
+              aria-label={enableCommandMenu ? 'Open command menu' : 'Add skill'}
             >
               {isInstallBusy ? (
                 <Loader2 className="size-3.5 animate-spin" />
@@ -268,56 +396,162 @@ export function ArtifactSkillsPanel({
             </button>
           </TooltipTrigger>
           <TooltipContent sideOffset={8} className={SKILL_TOOLTIP_CLASS_NAME}>
-            Add skill
+            {enableCommandMenu ? 'Open menu' : 'Add skill'}
           </TooltipContent>
         </Tooltip>
       </div>
 
-      <CommandDialog
-        open={isInstallDialogOpen}
-        onOpenChange={handleInstallDialogChange}
-        title="Add skill"
-        description="Search and add a skill for this artifact."
-        className="bg-home-page border-home-border sm:max-w-xl"
-      >
-        <CommandInput
-          value={skillSearch}
-          onValueChange={setSkillSearch}
-          placeholder="Search available skills..."
-        />
-        <CommandList>
-          <CommandEmpty>{commandEmptyMessage}</CommandEmpty>
-          {installableSkills.length > 0 ? (
-            <CommandGroup heading="Available skills">
-              {installableSkills.map((skill) => {
-                const SkillIcon = getSkillIcon(skill.name);
-
+      {enableCommandMenu ? (
+        <CommandDialog
+          open={isCommandMenuOpen}
+          onOpenChange={handleCommandMenuChange}
+          title="Command menu"
+          description="Search artifact actions."
+          className="bg-home-page border-home-border sm:max-w-md"
+          overlayClassName="bg-black/30 backdrop-blur-[1px]"
+          commandProps={{
+            loop: true,
+            value: activeSelection,
+            onValueChange: handleActiveSelectionChange,
+          }}
+        >
+          <CommandInput
+            value={activeSearch}
+            onValueChange={handleActiveSearchChange}
+            placeholder={
+              commandMenuView === 'skills' ? 'Search available skills...' : 'Search commands...'
+            }
+          />
+          <div className="text-muted-foreground flex items-center gap-1 px-3 py-2 text-[11px] font-medium">
+            {commandMenuView === 'skills' ? (
+              <>
+                <button
+                  type="button"
+                  onClick={handleReturnToRootMenu}
+                  className="hover:text-foreground cursor-pointer transition-colors"
+                >
+                  Artifact Options
+                </button>
+                <ChevronRight className="size-2.5" />
+                <span className="text-foreground">Add Skills</span>
+              </>
+            ) : (
+              <>
+                <span>Artifact Options</span>
+                <ChevronRight className="size-2.5" />
+              </>
+            )}
+          </div>
+          <CommandList className="max-h-72 overflow-y-auto p-2">
+            <CommandEmpty>
+              {commandMenuView === 'skills' ? commandEmptyMessage : 'No commands found.'}
+            </CommandEmpty>
+            {commandMenuView === 'skills' ? (
+              installableSkills.map((skill) => {
                 return (
                   <CommandItem
                     key={skill.name}
-                    value={`${skill.name} ${skill.description}`}
+                    value={skill.name}
+                    keywords={[skill.description]}
                     disabled={isInstallBusy}
                     onSelect={() => void handleInstallSkill(skill.name)}
+                    className="mb-1 gap-2 rounded-xl px-2.5 py-2 text-[13px] last:mb-0"
                   >
                     {installingSkillName === skill.name ? (
-                      <Loader2 className="size-4 animate-spin" />
-                    ) : null}
-                    <div className="flex min-w-0 flex-1 flex-col">
-                      <span className="flex items-center gap-2 truncate font-medium">
-                        <SkillIcon className="size-4 text-muted-foreground" />
-                        {skill.name}
-                      </span>
-                      <span className="text-muted-foreground line-clamp-2 text-xs">
-                        {skill.description}
-                      </span>
-                    </div>
+                      <Loader2 className="size-3 animate-spin text-muted-foreground" />
+                    ) : (
+                      <SkillIcon
+                        skillName={skill.name}
+                        size={15}
+                        className="text-muted-foreground"
+                      />
+                    )}
+                    <span className="truncate font-medium">{skill.name}</span>
                   </CommandItem>
                 );
-              })}
-            </CommandGroup>
-          ) : null}
-        </CommandList>
-      </CommandDialog>
+              })
+            ) : (
+              <>
+                <CommandItem
+                  value="skills"
+                  onSelect={handleOpenSkillsMenu}
+                  className="mb-1 gap-2 rounded-xl px-2.5 py-2 text-[13px] last:mb-0"
+                >
+                  <Plus className="size-3 text-muted-foreground" />
+                  <span>Skills</span>
+                </CommandItem>
+                {MOCK_COMMAND_ITEMS.map((item) => {
+                  const Icon = item.icon;
+
+                  return (
+                    <CommandItem
+                      key={item.value}
+                      value={item.value}
+                      onSelect={() => handleMockCommandSelect(item.label)}
+                      className="mb-1 gap-2 rounded-xl px-2.5 py-2 text-[13px] last:mb-0"
+                    >
+                      <Icon className="size-3 text-muted-foreground" />
+                      <span>{item.label}</span>
+                    </CommandItem>
+                  );
+                })}
+              </>
+            )}
+          </CommandList>
+        </CommandDialog>
+      ) : (
+        <CommandDialog
+          open={isInstallDialogOpen}
+          onOpenChange={handleInstallDialogChange}
+          title="Add skill"
+          description="Search and add a skill for this artifact."
+          className="bg-home-page border-home-border sm:max-w-xl"
+          commandProps={{
+            loop: true,
+            value: skillSelection,
+            onValueChange: setSkillSelection,
+          }}
+        >
+          <CommandInput
+            value={skillSearch}
+            onValueChange={(nextValue) => {
+              setSkillSearch(nextValue);
+              setSkillSelection('');
+            }}
+            placeholder="Search available skills..."
+          />
+          <CommandList className="max-h-72 overflow-y-auto p-2">
+            <CommandEmpty>{commandEmptyMessage}</CommandEmpty>
+            {installableSkills.length > 0 ? (
+              <CommandGroup heading="Available skills">
+                {installableSkills.map((skill) => {
+                  return (
+                    <CommandItem
+                      key={skill.name}
+                      value={skill.name}
+                      keywords={[skill.description]}
+                      disabled={isInstallBusy}
+                      onSelect={() => void handleInstallSkill(skill.name)}
+                      className="mb-1 gap-2 rounded-xl px-2.5 py-2 text-[13px] last:mb-0"
+                    >
+                      {installingSkillName === skill.name ? (
+                        <Loader2 className="size-3 animate-spin text-muted-foreground" />
+                      ) : (
+                        <SkillIcon
+                          skillName={skill.name}
+                          size={15}
+                          className="text-muted-foreground"
+                        />
+                      )}
+                      <span className="truncate font-medium">{skill.name}</span>
+                    </CommandItem>
+                  );
+                })}
+              </CommandGroup>
+            ) : null}
+          </CommandList>
+        </CommandDialog>
+      )}
     </>
   );
 }

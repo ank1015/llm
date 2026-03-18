@@ -38,7 +38,11 @@ export default function ArtifactPage() {
           <Folder size={18} className="text-muted-foreground" />
           <h1 className="text-foreground text-lg font-medium">{artifact.name}</h1>
           <div className="flex-1" />
-          <ArtifactSkillsPanel projectId={projectId} artifactId={artifactId} />
+          <ArtifactSkillsPanel
+            projectId={projectId}
+            artifactId={artifactId}
+            enableCommandMenu={true}
+          />
         </div>
 
         {/* Thread list */}

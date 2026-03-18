@@ -16,8 +16,10 @@
   },
   "dependencies": {
     "@ank1015/llm-app-contracts": "workspace:^",
-    "@ank1015/llm-types": "workspace:^",
     "@ank1015/llm-core": "workspace:^",
+    "@ank1015/llm-types": "workspace:^",
+    "@hugeicons/core-free-icons": "^4.0.0",
+    "@hugeicons/react": "^1.1.6",
     "@monaco-editor/react": "^4.7.0",
     "@radix-ui/react-avatar": "^1.1.11",
     "@radix-ui/react-collapsible": "^1.1.12",
