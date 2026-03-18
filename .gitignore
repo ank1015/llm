@@ -32,4 +32,5 @@ npm-debug.log*
 pnpm-debug.log*
 
 packages/agents/.skill-tester/
+packages/agents/.sessions/
 .agents

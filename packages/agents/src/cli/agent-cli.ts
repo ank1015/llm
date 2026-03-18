@@ -107,6 +107,7 @@ export async function runAgentCli(): Promise<void> {
     await runInteractiveCliSession({
       projectName: context.projectName,
       sessionName: `${context.artifactName} CLI Session`,
+      sessionArchiveSubdir: 'agent-cli',
       workingDir: context.artifactDir,
       systemPrompt,
       tools,

@@ -123,6 +123,7 @@ export async function runSkillTesterCli(argv: string[] = process.argv.slice(2)):
   await runInteractiveCliSession({
     projectName: basename(prepared.packageRoot),
     sessionName: `${skillName} Skill Tester Session`,
+    sessionArchiveSubdir: 'skill-tester',
     workingDir: prepared.layout.rootDir,
     systemPrompt,
     tools,

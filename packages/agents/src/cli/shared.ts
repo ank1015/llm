@@ -4,6 +4,8 @@ import { createInterface } from 'node:readline/promises';
 import { Conversation, createSessionManager, getModel } from '@ank1015/llm-sdk';
 import { createFileKeysAdapter, InMemorySessionsAdapter } from '@ank1015/llm-sdk-adapters';
 
+import { saveCliSessionMarkdown } from './session-markdown.js';
+
 import type {
   AgentEvent,
   AgentTool,
@@ -27,6 +29,7 @@ const EXIT_COMMANDS = new Set(['exit', 'quit', ':q']);
 export interface RunInteractiveCliSessionOptions {
   projectName: string;
   sessionName: string;
+  sessionArchiveSubdir: string;
   workingDir: string;
   systemPrompt: string;
   tools: AgentTool[];
@@ -77,6 +80,7 @@ export function isReadlineInterruptError(error: unknown): boolean {
 export async function runInteractiveCliSession({
   projectName,
   sessionName,
+  sessionArchiveSubdir,
   workingDir,
   systemPrompt,
   tools,
@@ -85,6 +89,7 @@ export async function runInteractiveCliSession({
   const readline = createInterface({ input: stdin, output: stdout });
   let conversation: Conversation | undefined;
   let isRunning = false;
+  let sessionId: string | undefined;
 
   const handleSigint = (): void => {
     if (isRunning && conversation) {
@@ -95,7 +100,6 @@ export async function runInteractiveCliSession({
 
     stdout.write('\nExiting.\n');
     readline.close();
-    process.exit(0);
   };
 
   process.on('SIGINT', handleSigint);
@@ -104,12 +108,14 @@ export async function runInteractiveCliSession({
     const model = resolveCliModel();
     const keysAdapter = createFileKeysAdapter();
     const sessionManager = createSessionManager(new InMemorySessionsAdapter());
-    const { sessionId, header } = await sessionManager.createSession({
+    const createdSession = await sessionManager.createSession({
       projectName,
       sessionName,
     });
+    sessionId = createdSession.sessionId;
+    const createdSessionId = createdSession.sessionId;
 
-    let currentLeafNodeId = header.id;
+    let currentLeafNodeId = createdSession.header.id;
 
     conversation = new Conversation({
       keysAdapter,
@@ -147,7 +153,7 @@ export async function runInteractiveCliSession({
           currentLeafNodeId = await appendSessionMessage({
             sessionManager,
             projectName,
-            sessionId,
+            sessionId: createdSessionId,
             parentId: currentLeafNodeId,
             message,
           });
@@ -161,6 +167,17 @@ export async function runInteractiveCliSession({
     }
   } finally {
     process.off('SIGINT', handleSigint);
+    const transcriptPath = await saveSessionTranscript({
+      conversation,
+      projectName,
+      sessionId,
+      sessionName,
+      sessionArchiveSubdir,
+      workingDir,
+    });
+    if (transcriptPath) {
+      stdout.write(`Saved session transcript to ${transcriptPath}\n`);
+    }
     readline.close();
   }
 }
@@ -317,6 +334,41 @@ function handleMessageEnd(
     assistantLineOpen: false,
     sawAssistantText: false,
   };
+}
+
+async function saveSessionTranscript({
+  conversation,
+  projectName,
+  sessionId,
+  sessionName,
+  sessionArchiveSubdir,
+  workingDir,
+}: {
+  conversation: Conversation | undefined;
+  projectName: string;
+  sessionId: string | undefined;
+  sessionName: string;
+  sessionArchiveSubdir: string;
+  workingDir: string;
+}): Promise<string | undefined> {
+  if (!conversation || !sessionId) {
+    return undefined;
+  }
+
+  try {
+    return await saveCliSessionMarkdown({
+      sessionId,
+      sessionName,
+      projectName,
+      workingDir,
+      archiveSubdir: sessionArchiveSubdir,
+      messages: conversation.state.messages,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    stdout.write(`warning> Failed to save session transcript: ${message}\n`);
+    return undefined;
+  }
 }
 
 function isAssistantStreamEvent(
