@@ -532,7 +532,7 @@ function normalizeObjectRecord(value: unknown): Record<string, string> {
 async function readCurrentPackageVersion(): Promise<string> {
   const packageJsonPath = join(packageRoot, PACKAGE_JSON_FILENAME);
   const parsed = JSON.parse(await readFile(packageJsonPath, 'utf-8')) as { version?: string };
-  return parsed.version ?? '0.0.3';
+  return parsed.version ?? '0.0.4';
 }
 
 async function readCurrentTsxVersion(): Promise<string> {

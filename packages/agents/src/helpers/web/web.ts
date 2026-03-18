@@ -1,7 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, extname, resolve } from 'node:path';
 
-
 import { connectManagedChromeBridge } from './transport.js';
 
 import type { ManagedChromeBridge, ConnectWebTransportOptions } from './transport.js';
@@ -169,6 +168,7 @@ const DEFAULT_WAIT_TIMEOUT_MS = 30_000;
 const DEFAULT_WAIT_POLL_MS = 250;
 const DEFAULT_NETWORK_SETTLE_MS = 1_500;
 const BROWSER_CLOSE_TIMEOUT_MS = 5_000;
+const TABS_REMOVE_METHOD = 'tabs.remove';
 
 interface RuntimeEvaluateResult {
   result?: {
@@ -286,7 +286,7 @@ export class WebBrowser {
       return;
     }
 
-    await this.chrome('tabs.remove', normalizedIds);
+    await this.chrome(TABS_REMOVE_METHOD, normalizedIds);
   }
 
   async closeOtherTabs(
@@ -299,7 +299,7 @@ export class WebBrowser {
     const idsToClose = tabs.filter((tab) => !keep.has(tab.id)).map((tab) => tab.id);
 
     if (idsToClose.length > 0) {
-      await this.chrome('tabs.remove', idsToClose);
+      await this.chrome(TABS_REMOVE_METHOD, idsToClose);
     }
   }
 
@@ -401,7 +401,7 @@ export class WebTab {
   }
 
   async close(): Promise<void> {
-    await this.#browser.chrome('tabs.remove', this.id);
+    await this.#browser.chrome(TABS_REMOVE_METHOD, this.id);
   }
 
   async waitForLoad(options?: { timeoutMs?: number }): Promise<WebTabInfo> {

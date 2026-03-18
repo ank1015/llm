@@ -2,9 +2,9 @@
 
 ## Status
 
-Proposed helper-backed bundled skill for `@ank1015/llm-agents`.
+Implemented helper-backed browser API and bundled skill for `@ank1015/llm-agents`.
 
-This document captures the intended public API, skill behavior, and design rationale for a new
+This document captures the implemented public API, skill behavior, and design rationale for the
 `web` skill that gives the general-purpose agent a practical, reusable browser capability layer
 without exposing `@ank1015/llm-extension` directly.
 
@@ -94,9 +94,9 @@ The `web` skill should be a helper-backed skill because:
 - process cleanup should be handled by the helper layer instead of every temp script
 - the skill will need examples and recipes that assume a stable exported API
 
-## Proposed Helper Exports
+## Helper Exports
 
-The helper-backed API should be exported from `@ank1015/llm-agents`.
+The helper-backed API is exported from `@ank1015/llm-agents`.
 
 ### Top-Level Exports
 

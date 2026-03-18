@@ -5,6 +5,6 @@
 - [adding-skills.md](/Users/notacoder/Desktop/agents/llm/packages/agents/docs/adding-skills.md)
   - how to add docs-only and helper-backed skills
 - [web-skill-spec.md](/Users/notacoder/Desktop/agents/llm/packages/agents/docs/web-skill-spec.md)
-  - proposed helper-backed browser skill, API shape, and teaching strategy
+  - web helper design notes, API shape, and documentation strategy
 - [testing.md](/Users/notacoder/Desktop/agents/llm/packages/agents/docs/testing.md)
   - package-local validation commands and expectations

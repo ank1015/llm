@@ -11,7 +11,7 @@ import {
 
 describe('@ank1015/llm-agents', () => {
   it('exports package version', () => {
-    expect(VERSION).toBe('0.0.3');
+    expect(VERSION).toBe('0.0.4');
   });
 
   it('exports the web helper surface from the package root', () => {

@@ -124,6 +124,7 @@ The web helpers:
 - hide the lower-level `@ank1015/llm-extension` transport details behind a managed browser session
 - expose browser, tab, debugger, download, screenshot, and upload helpers through `@ank1015/llm-agents`
 - emphasize `evaluate(...)`, readiness checks, and verification over brittle site-specific abstractions
+- are documented with an API reference first, then a workflow guide, then task-specific references
 
 See the web skill docs for the task-specific guidance:
 
@@ -156,6 +157,7 @@ The CLI:
 
 - [docs/vision.md](/Users/notacoder/Desktop/agents/llm/packages/agents/docs/vision.md)
 - [docs/adding-skills.md](/Users/notacoder/Desktop/agents/llm/packages/agents/docs/adding-skills.md)
+- [docs/web-skill-spec.md](/Users/notacoder/Desktop/agents/llm/packages/agents/docs/web-skill-spec.md)
 - [docs/testing.md](/Users/notacoder/Desktop/agents/llm/packages/agents/docs/testing.md)
 
 ## Commands

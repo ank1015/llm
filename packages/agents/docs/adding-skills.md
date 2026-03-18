@@ -20,7 +20,7 @@ skills/<skill-name>/
 Rules:
 
 - `SKILL.md` is the overview only.
-- `references/` holds task-specific details, option tables, examples, and deeper guidance.
+- `references/` holds API details, workflow guidance, task-specific details, option tables, examples, and deeper guidance.
 - Keep references one level deep from `SKILL.md`.
 - The skill name in frontmatter must match the folder name and the registry entry.
 
@@ -35,6 +35,10 @@ Rules:
 
 Do not put detailed request shapes, every option, or long examples into `SKILL.md` unless they are
 absolutely core to every use of the skill.
+
+For helper-backed skills with a non-trivial public API, prefer putting the exact helper signatures,
+option types, return shapes, and behavior notes in a dedicated reference file such as
+`references/api.md` instead of crowding `SKILL.md`.
 
 ## Registry Convention
 
@@ -117,12 +121,12 @@ Put this in skill docs:
 
 - when to use the helper
 - which function to call
+- exact helper signatures and behavior notes when the agent needs them to use the helper correctly
 - which reference file to read next
 - task-specific request patterns
 - model-specific options and examples
 
-Do not duplicate detailed API descriptions in both places unless the duplication is necessary to
-prevent misuse.
+Keep exact API references in `references/` rather than duplicating them inside `SKILL.md`.
 
 ## Temp Workspace Behavior
 
