@@ -2,6 +2,11 @@
 
 All notable changes to this package will be documented in this file.
 
+## UNRELEASED
+
+- added `MiniMax-M2.7` and `MiniMax-M2.7-highspeed` to the MiniMax model catalog with their provider pricing metadata
+- updated MiniMax unit and live integration coverage to exercise the new model ids
+
 ## 0.0.2 - 2026-03-15
 
 - refreshed `README.md`, `AGENTS.md`, and `ADDING_PROVIDER.md` to match the current provider layout and model catalog structure
