@@ -9,14 +9,15 @@ import type { Context, Model } from '@ank1015/llm-types';
 describe('MiniMax Complete Integration', () => {
   let model: Model<'minimax'>;
   const apiKey = process.env.MINIMAX_API_KEY;
+  const testModelId = 'MiniMax-M2.7' as const;
 
   beforeAll(() => {
     if (!apiKey) {
       throw new Error('MINIMAX_API_KEY environment variable is required for integration tests');
     }
-    const testModel = getModel('minimax', 'MiniMax-M2.5-highspeed');
+    const testModel = getModel('minimax', testModelId);
     if (!testModel) {
-      throw new Error('Test model MiniMax-M2.5-highspeed not found');
+      throw new Error(`Test model ${testModelId} not found`);
     }
     model = testModel;
   });

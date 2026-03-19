@@ -101,6 +101,14 @@ describe('getModel', () => {
       expect(model?.api).toBe('kimi');
       expect(model?.id).toBe('kimi-k2.5');
     });
+
+    it('should return MiniMax model', () => {
+      const model = getModel('minimax', 'MiniMax-M2.7-highspeed');
+
+      expect(model).toBeDefined();
+      expect(model?.api).toBe('minimax');
+      expect(model?.id).toBe('MiniMax-M2.7-highspeed');
+    });
   });
 
   describe('model properties', () => {
@@ -135,6 +143,17 @@ describe('getModel', () => {
       const model = getModel('openai', 'gpt-5.4');
 
       expect(model?.maxTokens).toBeGreaterThan(0);
+    });
+
+    it('should preserve MiniMax M2.7 pricing', () => {
+      const model = getModel('minimax', 'MiniMax-M2.7');
+
+      expect(model?.cost).toEqual({
+        input: 0.3,
+        output: 1.2,
+        cacheRead: 0.06,
+        cacheWrite: 0.375,
+      });
     });
   });
 
@@ -209,6 +228,13 @@ describe('getModels', () => {
 
       expect(models.length).toBeGreaterThan(0);
       expect(models.every((m) => m.api === 'kimi')).toBe(true);
+    });
+
+    it('should return all MiniMax models', () => {
+      const models = getModels('minimax');
+
+      expect(models.length).toBeGreaterThan(0);
+      expect(models.every((m) => m.api === 'minimax')).toBe(true);
     });
   });
 
