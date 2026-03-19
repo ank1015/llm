@@ -4,7 +4,6 @@ import type { Api, BaseAssistantMessage, MessageNode, ToolResultMessage } from '
 
 import { buildWorkingTraceModel } from '@/lib/messages/working-trace';
 
-
 function createAssistantMessage(input: {
   id: string;
   api?: Api;
@@ -72,6 +71,23 @@ function createAssistantNode(message: BaseAssistantMessage<Api>): MessageNode {
   };
 }
 
+function createStreamingAssistant(
+  assistant: BaseAssistantMessage<Api>
+): Omit<BaseAssistantMessage<Api>, 'message'> {
+  return {
+    role: assistant.role,
+    id: assistant.id,
+    api: assistant.api,
+    model: assistant.model,
+    errorMessage: assistant.errorMessage,
+    timestamp: assistant.timestamp,
+    duration: assistant.duration,
+    stopReason: assistant.stopReason,
+    content: assistant.content,
+    usage: assistant.usage,
+  };
+}
+
 function createToolResultMessage(input: {
   id: string;
   toolCallId: string;
@@ -101,7 +117,7 @@ describe('buildWorkingTraceModel', () => {
         },
       ],
     });
-    const { message: _nativeMessage, ...streamingAssistant } = assistant;
+    const streamingAssistant = createStreamingAssistant(assistant);
 
     const model = buildWorkingTraceModel({
       cotMessages: [],
@@ -142,7 +158,7 @@ describe('buildWorkingTraceModel', () => {
         },
       ],
     });
-    const { message: _nativeMessage, ...streamingAssistant } = assistant;
+    const streamingAssistant = createStreamingAssistant(assistant);
 
     const model = buildWorkingTraceModel({
       cotMessages: [],

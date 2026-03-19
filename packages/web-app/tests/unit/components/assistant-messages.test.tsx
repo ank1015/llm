@@ -5,7 +5,6 @@ import type { Api, BaseAssistantMessage, MessageNode } from '@ank1015/llm-types'
 
 import { AssistantMessages } from '@/components/assistant-messages';
 
-
 function createAssistantMessage(input: {
   id: string;
   api?: Api;
@@ -72,6 +71,23 @@ function createAssistantNode(message: BaseAssistantMessage<Api>): MessageNode {
   };
 }
 
+function createStreamingAssistant(
+  assistant: BaseAssistantMessage<Api>
+): Omit<BaseAssistantMessage<Api>, 'message'> {
+  return {
+    role: assistant.role,
+    id: assistant.id,
+    api: assistant.api,
+    model: assistant.model,
+    errorMessage: assistant.errorMessage,
+    timestamp: assistant.timestamp,
+    duration: assistant.duration,
+    stopReason: assistant.stopReason,
+    content: assistant.content,
+    usage: assistant.usage,
+  };
+}
+
 describe('AssistantMessages', () => {
   it('renders a unified non-collapsible streaming assistant surface', () => {
     const assistant = createAssistantMessage({
@@ -93,7 +109,7 @@ describe('AssistantMessages', () => {
         },
       ],
     });
-    const { message: _nativeMessage, ...streamingAssistant } = assistant;
+    const streamingAssistant = createStreamingAssistant(assistant);
 
     render(
       <AssistantMessages

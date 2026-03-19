@@ -40,13 +40,14 @@ export function ContextUsageIndicator({ totalTokens }: ContextUsageIndicatorProp
   const modelId = useChatSettingsStore((state) => state.modelId);
 
   const selectedModel = useMemo(() => getModel(api, modelId as never), [api, modelId]);
+  const resolvedTotalTokens = Math.max(0, totalTokens);
 
   const usage = useMemo(() => {
-    if (!selectedModel || selectedModel.contextWindow <= 0 || totalTokens <= 0) {
+    if (!selectedModel || selectedModel.contextWindow <= 0) {
       return null;
     }
 
-    const rawUtilization = totalTokens / selectedModel.contextWindow;
+    const rawUtilization = resolvedTotalTokens / selectedModel.contextWindow;
     const clampedUtilization = Math.max(0, Math.min(rawUtilization, 1));
 
     return {
@@ -55,13 +56,13 @@ export function ContextUsageIndicator({ totalTokens }: ContextUsageIndicatorProp
       strokeColor: getStrokeColor(rawUtilization),
       strokeDasharray: `${clampedUtilization * CIRCUMFERENCE} ${CIRCUMFERENCE}`,
     };
-  }, [selectedModel, totalTokens]);
+  }, [resolvedTotalTokens, selectedModel]);
 
   if (!usage) {
     return null;
   }
 
-  const usedTokensLabel = tokenFormatter.format(totalTokens);
+  const usedTokensLabel = tokenFormatter.format(resolvedTotalTokens);
   const contextWindowLabel = tokenFormatter.format(usage.contextWindow);
   const percentUsedLabel = percentFormatter.format(usage.rawUtilization * 100);
 

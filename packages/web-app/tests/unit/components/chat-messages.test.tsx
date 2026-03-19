@@ -6,7 +6,6 @@ import type { Api, BaseAssistantMessage, MessageNode, UserMessage } from '@ank10
 import { ChatMessages } from '@/components/chat-messages';
 import { useChatStore } from '@/stores/chat-store';
 
-
 vi.mock('next/navigation', () => ({
   useParams: () => ({
     projectId: 'project-1',
@@ -93,8 +92,19 @@ function createStreamingAssistant(input: {
     },
     message: {} as never,
   };
-  const { message: _nativeMessage, ...streamingAssistant } = assistant;
-  return streamingAssistant;
+
+  return {
+    role: assistant.role,
+    id: assistant.id,
+    api: assistant.api,
+    model: assistant.model,
+    errorMessage: assistant.errorMessage,
+    timestamp: assistant.timestamp,
+    duration: assistant.duration,
+    stopReason: assistant.stopReason,
+    content: assistant.content,
+    usage: assistant.usage,
+  };
 }
 
 describe('ChatMessages', () => {
