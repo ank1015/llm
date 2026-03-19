@@ -24,11 +24,13 @@ Use the generic web workflow instead when:
 - Top N mail overview
   - read [fetchNPosts.md](fetchNPosts.md)
   - script: `scripts/gmail/fetch-n-mails.mjs`
+  - behavior: prints Markdown, saves raw JSON to temp, and paginates with Gmail's `Older` button when needed
 
 ## How To Choose
 
 - If the user says things like "show me the top 5 mails", "summarize the first few Gmail
-  messages", or "get an inbox overview", use the built-in mail-overview script first.
+  messages", "get an inbox overview", or "show me the top 80 Gmail mails", use the built-in
+  mail-overview script first.
 - If the user asks to draft, send, search, label, archive, or inspect a specific thread, use the
   generic browser workflow for now.
 - If the script returns `login-required` or `inbox-unavailable`, fall back to direct browser
