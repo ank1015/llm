@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { runComposeDraftCli } from '../helpers/web/scripts/gmail/compose-draft.js';
 import { runFetchNMailsCli } from '../helpers/web/scripts/gmail/fetch-n-mails.js';
 import { runSearchInboxCli } from '../helpers/web/scripts/gmail/search-inbox.js';
 import { isMainModule } from '../utils/is-main-module.js';
@@ -10,7 +11,11 @@ export interface WebTaskCliArgs {
   commandArgs: string[];
 }
 
-const WEB_TASK_COMMANDS = ['gmail fetch-n-mails', 'gmail search-inbox'] as const;
+const WEB_TASK_COMMANDS = [
+  'gmail fetch-n-mails',
+  'gmail search-inbox',
+  'gmail compose-draft',
+] as const;
 
 export function parseWebTaskCliArgs(argv: string[]): WebTaskCliArgs {
   const args = argv.filter((value) => value.trim().length > 0);
@@ -44,6 +49,11 @@ export async function runWebTaskCli(argv: string[] = process.argv.slice(2)): Pro
     return;
   }
 
+  if (area === 'gmail' && command === 'compose-draft') {
+    await runComposeDraftCli(commandArgs);
+    return;
+  }
+
   throw new Error(`Unknown web task command: ${area} ${command}\n\n${createWebTaskUsage()}`);
 }
 
@@ -57,7 +67,8 @@ Available commands:
 Examples:
   web-task gmail fetch-n-mails --count 5
   web-task gmail fetch-n-mails --count 10 --no-launch
-  web-task gmail search-inbox --query "digitalocean" --count 5`;
+  web-task gmail search-inbox --query "digitalocean" --count 5
+  web-task gmail compose-draft --to "person@example.com" --subject "Hello" --body "Draft body"`;
 }
 
 if (isMainModule(import.meta.url)) {
