@@ -12,7 +12,8 @@ Use the built-in Gmail script when:
 
 - the user wants a quick overview of the top visible inbox messages
 - the user wants to search the inbox for words and get matching messages back
-- the task is read-only and matches a supported Gmail action exactly
+- the user wants to compose a new Gmail draft, optionally attach local files, or send a well-scoped email
+- the task matches a supported Gmail action exactly
 
 Use the generic web workflow instead when:
 
@@ -30,6 +31,10 @@ Use the generic web workflow instead when:
   - read [searchInbox.md](searchInbox.md)
   - script: `scripts/gmail/search-inbox.mjs`
   - behavior: searches Gmail with an inbox-scoped query, prints Markdown, saves raw JSON to temp, and paginates with Gmail's `Next results` control when needed
+- Compose email
+  - read [composeEmail.md](composeEmail.md)
+  - script: `scripts/gmail/compose-email.mjs`
+  - behavior: creates a Gmail draft by default, can send with `--send`, accepts local attachment paths, and saves raw JSON to temp
 
 ## How To Choose
 
@@ -39,7 +44,9 @@ Use the generic web workflow instead when:
 - If the user says things like "search Gmail for digitalocean", "find inbox mails about invoices",
   "show the top 10 Gmail results for support", or "search my inbox for <words>", use the inbox
   search script first.
-- If the user asks to draft, send, label, archive, or inspect a specific thread, use the generic
-  browser workflow for now.
+- If the user says things like "draft an email to...", "compose a Gmail message", "attach this file
+  and prepare an email", or "send this Gmail message", use the compose email script first.
+- If the user asks to label, archive, reply inside an existing thread, or inspect a specific thread,
+  use the generic browser workflow for now.
 - If the script returns `login-required` or `inbox-unavailable`, fall back to direct browser
   inspection and verify the current Gmail state.
