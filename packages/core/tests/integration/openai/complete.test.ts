@@ -9,16 +9,17 @@ import type { Context, Model } from '@ank1015/llm-types';
 describe('OpenAI Complete Integration', () => {
   let model: Model<'openai'>;
   const apiKey = process.env.OPENAI_API_KEY;
+  const testModelId = 'gpt-5.4' as const;
 
   beforeAll(() => {
     if (!apiKey) {
       throw new Error('OPENAI_API_KEY environment variable is required for integration tests');
     }
 
-    // Use a fast, cheap model for testing
-    const testModel = getModel('openai', 'gpt-5-nano');
+    // Use a model this project can access reliably for the main suite
+    const testModel = getModel('openai', testModelId);
     if (!testModel) {
-      throw new Error('Test model gpt-5-nano not found');
+      throw new Error(`Test model ${testModelId} not found`);
     }
     model = testModel;
   });

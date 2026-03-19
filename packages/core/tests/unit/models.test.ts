@@ -55,6 +55,22 @@ describe('getModel', () => {
       expect(model?.id).toBe('gpt-5.4');
     });
 
+    it('should return OpenAI nano model', () => {
+      const model = getModel('openai', 'gpt-5.4-nano');
+
+      expect(model).toBeDefined();
+      expect(model?.api).toBe('openai');
+      expect(model?.id).toBe('gpt-5.4-nano');
+    });
+
+    it('should return OpenAI mini model', () => {
+      const model = getModel('openai', 'gpt-5.4-mini');
+
+      expect(model).toBeDefined();
+      expect(model?.api).toBe('openai');
+      expect(model?.id).toBe('gpt-5.4-mini');
+    });
+
     it('should return Codex model', () => {
       const model = getModel('codex', 'gpt-5.3-codex');
 
@@ -153,6 +169,28 @@ describe('getModel', () => {
         output: 1.2,
         cacheRead: 0.06,
         cacheWrite: 0.375,
+      });
+    });
+
+    it('should preserve OpenAI GPT-5.4 Mini pricing', () => {
+      const model = getModel('openai', 'gpt-5.4-mini');
+
+      expect(model?.cost).toEqual({
+        input: 0.75,
+        output: 4.5,
+        cacheRead: 0.075,
+        cacheWrite: 0,
+      });
+    });
+
+    it('should preserve OpenAI GPT-5.4 Nano pricing', () => {
+      const model = getModel('openai', 'gpt-5.4-nano');
+
+      expect(model?.cost).toEqual({
+        input: 0.2,
+        output: 1.25,
+        cacheRead: 0.02,
+        cacheWrite: 0,
       });
     });
   });
