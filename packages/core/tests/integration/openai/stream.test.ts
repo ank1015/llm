@@ -9,16 +9,17 @@ import type { BaseAssistantEvent, Context, Model } from '@ank1015/llm-types';
 describe('OpenAI Stream Integration', () => {
   let model: Model<'openai'>;
   const apiKey = process.env.OPENAI_API_KEY;
+  const testModelId = 'gpt-5.4' as const;
 
   beforeAll(() => {
     if (!apiKey) {
       throw new Error('OPENAI_API_KEY environment variable is required for integration tests');
     }
 
-    // Use a fast, cheap model for testing
-    const testModel = getModel('openai', 'gpt-5-nano');
+    // Use a model this project can access reliably for the main suite
+    const testModel = getModel('openai', testModelId);
     if (!testModel) {
-      throw new Error('Test model gpt-5-nano not found');
+      throw new Error(`Test model ${testModelId} not found`);
     }
     model = testModel;
   });
@@ -390,6 +391,84 @@ describe('OpenAI Stream Integration', () => {
       if (thinkingStart) {
         const thinkingEnd = events.find((e) => e.type === 'thinking_end');
         expect(thinkingEnd).toBeDefined();
+      }
+    }, 30000);
+  });
+
+  describe('model coverage', () => {
+    it('should surface whether gpt-5.4-mini is currently supported', async () => {
+      const miniModel = getModel('openai', 'gpt-5.4-mini');
+      if (!miniModel) {
+        throw new Error('Test model gpt-5.4-mini not found');
+      }
+
+      const context: Context = {
+        messages: [
+          {
+            role: 'user',
+            id: 'test-openai-mini-1',
+            content: [{ type: 'text', content: 'Reply with mini ok.' }],
+          },
+        ],
+      };
+
+      const stream = streamOpenAI(miniModel, context, { apiKey }, 'test-msg-openai-mini-1');
+      const events: BaseAssistantEvent<'openai'>[] = [];
+      for await (const event of stream) {
+        events.push(event);
+      }
+
+      const result = await stream.result();
+      console.log('[openai/stream] gpt-5.4-mini stopReason:', result.stopReason);
+      console.log('[openai/stream] gpt-5.4-mini errorMessage:', result.errorMessage);
+
+      expect(result.model.id).toBe('gpt-5.4-mini');
+      expect(['stop', 'toolUse', 'error']).toContain(result.stopReason);
+
+      if (result.stopReason === 'error') {
+        expect(events.some((event) => event.type === 'error')).toBe(true);
+        expect(result.errorMessage).toBeDefined();
+      } else {
+        expect(events.some((event) => event.type === 'done')).toBe(true);
+        expect(result.usage.totalTokens).toBeGreaterThan(0);
+      }
+    }, 30000);
+
+    it('should surface whether gpt-5.4-nano is currently supported', async () => {
+      const nanoModel = getModel('openai', 'gpt-5.4-nano');
+      if (!nanoModel) {
+        throw new Error('Test model gpt-5.4-nano not found');
+      }
+
+      const context: Context = {
+        messages: [
+          {
+            role: 'user',
+            id: 'test-openai-nano-1',
+            content: [{ type: 'text', content: 'Reply with nano ok.' }],
+          },
+        ],
+      };
+
+      const stream = streamOpenAI(nanoModel, context, { apiKey }, 'test-msg-openai-nano-1');
+      const events: BaseAssistantEvent<'openai'>[] = [];
+      for await (const event of stream) {
+        events.push(event);
+      }
+
+      const result = await stream.result();
+      console.log('[openai/stream] gpt-5.4-nano stopReason:', result.stopReason);
+      console.log('[openai/stream] gpt-5.4-nano errorMessage:', result.errorMessage);
+
+      expect(result.model.id).toBe('gpt-5.4-nano');
+      expect(['stop', 'toolUse', 'error']).toContain(result.stopReason);
+
+      if (result.stopReason === 'error') {
+        expect(events.some((event) => event.type === 'error')).toBe(true);
+        expect(result.errorMessage).toBeDefined();
+      } else {
+        expect(events.some((event) => event.type === 'done')).toBe(true);
+        expect(result.usage.totalTokens).toBeGreaterThan(0);
       }
     }, 30000);
   });

@@ -20,6 +20,23 @@ export const codexModels = {
     maxTokens: 128000,
     tools: ['function_calling'],
   } satisfies Model<'codex'>,
+  'gpt-5.4-mini': {
+    id: 'gpt-5.4-mini',
+    name: 'GPT-5.4 Mini',
+    api: 'codex',
+    baseUrl: codexBaseUrl,
+    reasoning: true,
+    input: ['text', 'image', 'file'],
+    cost: {
+      input: 0.75,
+      output: 4.5,
+      cacheRead: 0.075,
+      cacheWrite: 0,
+    },
+    contextWindow: 400000,
+    maxTokens: 128000,
+    tools: ['function_calling'],
+  } satisfies Model<'codex'>,
   'gpt-5.3-codex': {
     id: 'gpt-5.3-codex',
     name: 'GPT-5.3 Codex',
