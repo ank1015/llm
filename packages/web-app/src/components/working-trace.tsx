@@ -23,7 +23,7 @@ import { cn } from '@/lib/utils';
 
 type WorkingTraceProps = {
   model: WorkingTraceModel;
-  live: boolean;
+  presentation: 'streaming' | 'completed';
   label: string;
 };
 
@@ -374,7 +374,44 @@ function ToolTraceItem({ entry }: { entry: WorkingToolEntry }) {
   );
 }
 
-function TraceContent({ item }: { item: Exclude<WorkingTraceItem, WorkingToolEntry> }) {
+function TraceContent({
+  item,
+  presentation,
+}: {
+  item: Exclude<WorkingTraceItem, WorkingToolEntry>;
+  presentation: WorkingTraceProps['presentation'];
+}) {
+  if (presentation === 'streaming') {
+    if (item.type === 'assistant_note') {
+      return (
+        <div className="min-w-0 pb-4">
+          <ChatMarkdown className="text-foreground">{item.body}</ChatMarkdown>
+        </div>
+      );
+    }
+
+    if (item.format === 'markdown') {
+      return (
+        <div className="min-w-0 pb-4">
+          <ChatMarkdown className="text-foreground">{item.body}</ChatMarkdown>
+        </div>
+      );
+    }
+
+    return (
+      <div className="min-w-0 pb-4">
+        {item.title && (
+          <p className="text-foreground text-[15px] font-medium leading-[1.8]">{item.title}</p>
+        )}
+        {item.body && (
+          <p className="text-foreground whitespace-pre-wrap text-[15px] leading-[1.8]">
+            {item.body}
+          </p>
+        )}
+      </div>
+    );
+  }
+
   if (item.type === 'assistant_note') {
     return (
       <div className="min-w-0 pb-4">
@@ -405,16 +442,55 @@ function TraceContent({ item }: { item: Exclude<WorkingTraceItem, WorkingToolEnt
   );
 }
 
-function TraceItemView({ item }: { item: WorkingTraceItem }) {
+function TraceItemView({
+  item,
+  presentation,
+}: {
+  item: WorkingTraceItem;
+  presentation: WorkingTraceProps['presentation'];
+}) {
   if (item.type === 'tool') {
     return <ToolTraceItem entry={item} />;
   }
 
-  return <TraceContent item={item} />;
+  return <TraceContent item={item} presentation={presentation} />;
 }
 
-export function WorkingTrace({ model, live, label }: WorkingTraceProps) {
+function TraceItems({
+  model,
+  presentation,
+}: {
+  model: WorkingTraceModel;
+  presentation: WorkingTraceProps['presentation'];
+}) {
+  if (model.items.length === 0) {
+    return <p className="text-muted-foreground text-[12px]">No working details captured.</p>;
+  }
+
+  return (
+    <div>
+      {model.items.map((item) => (
+        <TraceItemView key={item.id} item={item} presentation={presentation} />
+      ))}
+    </div>
+  );
+}
+
+export function WorkingTrace({ model, presentation, label }: WorkingTraceProps) {
   const [isOpen, setIsOpen] = useState(false);
+
+  if (presentation === 'streaming') {
+    return (
+      <div className="ml-[2%] max-w-[96%]">
+        <div className="flex items-center gap-1 text-left text-sm">
+          <TextShimmer className="font-medium cursor-default">{label}</TextShimmer>
+        </div>
+        <div className="pt-3">
+          <TraceItems model={model} presentation={presentation} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -424,7 +500,7 @@ export function WorkingTrace({ model, live, label }: WorkingTraceProps) {
             type="button"
             className="flex items-center gap-1 text-left text-sm transition-opacity hover:opacity-80"
           >
-            <TextShimmer className="font-medium" stop={!live}>
+            <TextShimmer className="font-medium" stop>
               {label}
             </TextShimmer>
             <ChevronRight
@@ -437,15 +513,7 @@ export function WorkingTrace({ model, live, label }: WorkingTraceProps) {
         </CollapsibleTrigger>
         <CollapsibleContent>
           <div className="pt-3">
-            {model.items.length > 0 ? (
-              <div>
-                {model.items.map((item) => (
-                  <TraceItemView key={item.id} item={item} />
-                ))}
-              </div>
-            ) : (
-              <p className="text-muted-foreground text-[12px]">No working details captured.</p>
-            )}
+            <TraceItems model={model} presentation={presentation} />
           </div>
         </CollapsibleContent>
       </div>

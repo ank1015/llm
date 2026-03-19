@@ -142,10 +142,14 @@ export function AssistantMessages({
 
   return (
     <div className="group/assistant flex w-full flex-col gap-3">
-      <WorkingTrace model={traceModel} live={isStreamingTurn} label={label} />
+      <WorkingTrace
+        model={traceModel}
+        presentation={isStreamingTurn ? 'streaming' : 'completed'}
+        label={label}
+      />
 
       {/* Final assistant response */}
-      {displayText && (
+      {!isStreamingTurn && displayText && (
         <div className="max-w-[96%] ml-[2%]" data-streaming={isStreamingTurn ? 'true' : 'false'}>
           <ChatMarkdown className="text-foreground">{displayText}</ChatMarkdown>
         </div>
