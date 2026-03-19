@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { runFetchNMailsCli } from '../helpers/web/scripts/gmail/fetch-n-mails.js';
+import { runSearchInboxCli } from '../helpers/web/scripts/gmail/search-inbox.js';
 import { isMainModule } from '../utils/is-main-module.js';
 
 export interface WebTaskCliArgs {
@@ -9,7 +10,7 @@ export interface WebTaskCliArgs {
   commandArgs: string[];
 }
 
-const WEB_TASK_COMMANDS = ['gmail fetch-n-mails'] as const;
+const WEB_TASK_COMMANDS = ['gmail fetch-n-mails', 'gmail search-inbox'] as const;
 
 export function parseWebTaskCliArgs(argv: string[]): WebTaskCliArgs {
   const args = argv.filter((value) => value.trim().length > 0);
@@ -38,6 +39,11 @@ export async function runWebTaskCli(argv: string[] = process.argv.slice(2)): Pro
     return;
   }
 
+  if (area === 'gmail' && command === 'search-inbox') {
+    await runSearchInboxCli(commandArgs);
+    return;
+  }
+
   throw new Error(`Unknown web task command: ${area} ${command}\n\n${createWebTaskUsage()}`);
 }
 
@@ -50,7 +56,8 @@ Available commands:
 
 Examples:
   web-task gmail fetch-n-mails --count 5
-  web-task gmail fetch-n-mails --count 10 --no-launch`;
+  web-task gmail fetch-n-mails --count 10 --no-launch
+  web-task gmail search-inbox --query "digitalocean" --count 5`;
 }
 
 if (isMainModule(import.meta.url)) {
