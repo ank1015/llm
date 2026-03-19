@@ -79,6 +79,14 @@ describe('getModel', () => {
       expect(model?.id).toBe('gpt-5.3-codex');
     });
 
+    it('should return Codex mini model', () => {
+      const model = getModel('codex', 'gpt-5.4-mini');
+
+      expect(model).toBeDefined();
+      expect(model?.api).toBe('codex');
+      expect(model?.id).toBe('gpt-5.4-mini');
+    });
+
     it('should return Claude Code model', () => {
       const model = getModel('claude-code', 'claude-haiku-4-5');
 
@@ -190,6 +198,17 @@ describe('getModel', () => {
         input: 0.2,
         output: 1.25,
         cacheRead: 0.02,
+        cacheWrite: 0,
+      });
+    });
+
+    it('should preserve Codex GPT-5.4 Mini pricing', () => {
+      const model = getModel('codex', 'gpt-5.4-mini');
+
+      expect(model?.cost).toEqual({
+        input: 0.75,
+        output: 4.5,
+        cacheRead: 0.075,
         cacheWrite: 0,
       });
     });

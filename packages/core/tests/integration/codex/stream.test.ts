@@ -228,6 +228,36 @@ describe('Codex Stream Integration', () => {
     }, 60000);
   });
 
+  describe('model coverage', () => {
+    it('should support gpt-5.4-mini', async () => {
+      const miniModel = getModel('codex', 'gpt-5.4-mini');
+      if (!miniModel) {
+        throw new Error('Test model gpt-5.4-mini not found');
+      }
+
+      const context: Context = {
+        messages: [
+          {
+            role: 'user',
+            id: 'codex-stream-mini-1',
+            content: [{ type: 'text', content: 'Reply with mini ok.' }],
+          },
+        ],
+      };
+
+      const stream = streamCodex(miniModel, context, getOptions(), 'codex-stream-msg-mini-1');
+      for await (const _ of stream) {
+        // consume
+      }
+
+      const result = await stream.result();
+
+      expect(result.model.id).toBe('gpt-5.4-mini');
+      expect(result.stopReason).not.toBe('error');
+      expect(result.usage.totalTokens).toBeGreaterThan(0);
+    }, 45000);
+  });
+
   describe('error handling', () => {
     it('should emit error for invalid api key', async () => {
       const context: Context = {
