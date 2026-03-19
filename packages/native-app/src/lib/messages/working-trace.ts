@@ -164,10 +164,32 @@ function splitThinkingIntoItems(
   return items;
 }
 
-function extractAssistantResponseText(
+function getFinalResponseStartIndex(message: Pick<BaseAssistantMessage<Api>, 'content'>): number {
+  let index = message.content.length - 1;
+
+  while (index >= 0) {
+    const block = message.content[index];
+    if (!block || block.type !== 'response') {
+      break;
+    }
+
+    index -= 1;
+  }
+
+  const startIndex = index + 1;
+  return startIndex < message.content.length ? startIndex : -1;
+}
+
+function extractTerminalAssistantResponseText(
   message: Pick<BaseAssistantMessage<Api>, 'content'>
 ): string | null {
+  const finalResponseStartIndex = getFinalResponseStartIndex(message);
+  if (finalResponseStartIndex === -1) {
+    return null;
+  }
+
   const responseText = message.content
+    .slice(finalResponseStartIndex)
     .filter(
       (
         block
@@ -347,8 +369,8 @@ function applyToolResult(entry: WorkingToolEntry, result: ToolResultState): void
 function appendAssistantMessageToTrace(input: {
   message: Pick<BaseAssistantMessage<Api>, 'id' | 'content'>;
   api: Api | null;
-  isFinalCandidate: boolean;
   isLiveTurn: boolean;
+  finalResponseStartIndex: number | null;
   items: WorkingTraceItem[];
   toolEntriesById: Map<string, WorkingToolEntry>;
   finalResponseParts: string[];
@@ -379,7 +401,7 @@ function appendAssistantMessageToTrace(input: {
         continue;
       }
 
-      if (input.isFinalCandidate) {
+      if (input.finalResponseStartIndex !== null && index >= input.finalResponseStartIndex) {
         input.finalResponseParts.push(text);
         continue;
       }
@@ -432,11 +454,16 @@ export function buildWorkingTraceModel(input: BuildWorkingTraceInput): WorkingTr
 
   for (const message of input.cotMessages) {
     if (message.role === 'assistant') {
+      const finalResponseStartIndex =
+        !input.isStreamingTurn && message.id === finalAssistantId
+          ? getFinalResponseStartIndex(message)
+          : -1;
+
       appendAssistantMessageToTrace({
         message,
         api: input.api,
-        isFinalCandidate: message.id === finalAssistantId,
         isLiveTurn: input.isStreamingTurn,
+        finalResponseStartIndex: finalResponseStartIndex >= 0 ? finalResponseStartIndex : null,
         items,
         toolEntriesById,
         finalResponseParts,
@@ -465,11 +492,16 @@ export function buildWorkingTraceModel(input: BuildWorkingTraceInput): WorkingTr
   }
 
   for (const assistant of liveEndedAssistants) {
+    const finalResponseStartIndex =
+      !input.isStreamingTurn && assistant.id === finalAssistantId
+        ? getFinalResponseStartIndex(assistant)
+        : -1;
+
     appendAssistantMessageToTrace({
       message: assistant,
       api: input.api,
-      isFinalCandidate: assistant.id === finalAssistantId,
       isLiveTurn: input.isStreamingTurn,
+      finalResponseStartIndex: finalResponseStartIndex >= 0 ? finalResponseStartIndex : null,
       items,
       toolEntriesById,
       finalResponseParts,
@@ -485,8 +517,8 @@ export function buildWorkingTraceModel(input: BuildWorkingTraceInput): WorkingTr
     appendAssistantMessageToTrace({
       message: input.streamingAssistant,
       api: input.api,
-      isFinalCandidate: false,
       isLiveTurn: true,
+      finalResponseStartIndex: null,
       items,
       toolEntriesById,
       finalResponseParts,
@@ -540,12 +572,14 @@ export function buildWorkingTraceModel(input: BuildWorkingTraceInput): WorkingTr
 
   const assistantNodeResponse =
     persistedFinalAssistant && finalResponseParts.length === 0
-      ? extractAssistantResponseText(persistedFinalAssistant)
+      ? extractTerminalAssistantResponseText(persistedFinalAssistant)
       : null;
 
   return {
     items,
-    finalResponseText: finalResponseParts.join('\n\n').trim() || assistantNodeResponse,
+    finalResponseText: input.isStreamingTurn
+      ? null
+      : finalResponseParts.join('\n\n').trim() || assistantNodeResponse,
   };
 }
 

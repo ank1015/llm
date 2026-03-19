@@ -24,8 +24,8 @@ const StyledFeather = withUniwind(Feather);
 
 type ThreadWorkingTraceProps = {
   label: string;
-  live: boolean;
   model: WorkingTraceModel;
+  presentation: 'streaming' | 'completed';
 };
 
 function renderUnknownArgs(args: unknown): string | null {
@@ -355,7 +355,44 @@ function ToolTraceItem({ entry }: { entry: WorkingToolEntry }) {
   );
 }
 
-function TraceContent({ item }: { item: Exclude<WorkingTraceItem, WorkingToolEntry> }) {
+function TraceContent({
+  item,
+  presentation,
+}: {
+  item: Exclude<WorkingTraceItem, WorkingToolEntry>;
+  presentation: ThreadWorkingTraceProps['presentation'];
+}) {
+  if (presentation === 'streaming') {
+    if (item.type === 'assistant_note') {
+      return (
+        <View className="w-full pb-3">
+          <ThreadTranscriptMarkdown>{item.body}</ThreadTranscriptMarkdown>
+        </View>
+      );
+    }
+
+    if (item.format === 'markdown') {
+      return (
+        <View className="w-full pb-3">
+          <ThreadTranscriptMarkdown>{item.body}</ThreadTranscriptMarkdown>
+        </View>
+      );
+    }
+
+    return (
+      <View className="w-full gap-1 pb-3">
+        {item.title ? (
+          <AppText className="text-[15px] font-medium leading-7 text-foreground">
+            {item.title}
+          </AppText>
+        ) : null}
+        {item.body ? (
+          <AppText className="text-[15px] leading-7 text-foreground">{item.body}</AppText>
+        ) : null}
+      </View>
+    );
+  }
+
   if (item.type === 'assistant_note') {
     return (
       <View className="w-full pb-3">
@@ -386,16 +423,55 @@ function TraceContent({ item }: { item: Exclude<WorkingTraceItem, WorkingToolEnt
   );
 }
 
-function TraceItemView({ item }: { item: WorkingTraceItem }) {
+function TraceItemView({
+  item,
+  presentation,
+}: {
+  item: WorkingTraceItem;
+  presentation: ThreadWorkingTraceProps['presentation'];
+}) {
   if (item.type === 'tool') {
     return <ToolTraceItem entry={item} />;
   }
 
-  return <TraceContent item={item} />;
+  return <TraceContent item={item} presentation={presentation} />;
 }
 
-export function ThreadWorkingTrace({ label, live, model }: ThreadWorkingTraceProps) {
+function TraceItems({
+  model,
+  presentation,
+}: {
+  model: WorkingTraceModel;
+  presentation: ThreadWorkingTraceProps['presentation'];
+}) {
+  if (model.items.length === 0) {
+    return <AppText className="text-[12px] text-muted">No working details captured.</AppText>;
+  }
+
+  return (
+    <View className="w-full gap-1">
+      {model.items.map((item) => (
+        <TraceItemView key={item.id} item={item} presentation={presentation} />
+      ))}
+    </View>
+  );
+}
+
+export function ThreadWorkingTrace({ label, model, presentation }: ThreadWorkingTraceProps) {
   const [isOpen, setIsOpen] = useState(false);
+
+  if (presentation === 'streaming') {
+    return (
+      <View className="w-full gap-3">
+        <View className="flex-row items-center gap-1.5 self-start">
+          <AppText className="text-[14px] font-medium text-foreground">{label}</AppText>
+          <StyledFeather className="text-foreground/70" name="loader" size={14} />
+        </View>
+
+        <TraceItems model={model} presentation={presentation} />
+      </View>
+    );
+  }
 
   return (
     <View className="w-full gap-3">
@@ -409,7 +485,6 @@ export function ThreadWorkingTrace({ label, live, model }: ThreadWorkingTracePro
         }}
       >
         <AppText className="text-[14px] font-medium text-foreground">{label}</AppText>
-        {live ? <StyledFeather className="text-foreground/70" name="loader" size={14} /> : null}
         <StyledFeather
           className="text-muted"
           name={isOpen ? 'chevron-down' : 'chevron-right'}
@@ -417,17 +492,7 @@ export function ThreadWorkingTrace({ label, live, model }: ThreadWorkingTracePro
         />
       </Pressable>
 
-      {isOpen ? (
-        model.items.length > 0 ? (
-          <View className="w-full gap-1">
-            {model.items.map((item) => (
-              <TraceItemView key={item.id} item={item} />
-            ))}
-          </View>
-        ) : (
-          <AppText className="text-[12px] text-muted">No working details captured.</AppText>
-        )
-      ) : null}
+      {isOpen ? <TraceItems model={model} presentation={presentation} /> : null}
     </View>
   );
 }

@@ -6,7 +6,7 @@ import type { Api, BaseAssistantMessage, MessageNode } from '@ank1015/llm-sdk';
 import { AppText } from '@/components/app-text';
 import { ThreadAssistantMessages } from '@/components/projects/thread/thread-assistant-messages';
 import { ThreadUserMessage } from '@/components/projects/thread/thread-user-message';
-import { groupMessageNodesIntoTurns } from '@/lib/messages/chat-turns';
+import { groupMessageNodesIntoTurns, resolveAssistantTraceApi } from '@/lib/messages/chat-turns';
 import { getBranchNavigatorState, type BranchNavigatorState } from '@/lib/messages/session-tree';
 
 const EMPTY_STREAMING_ASSISTANT: Omit<BaseAssistantMessage<Api>, 'message'> | null = null;
@@ -43,7 +43,7 @@ const MessageTurnRow = memo(function MessageTurnRow({
       ) : null}
 
       <ThreadAssistantMessages
-        api={(turn.assistantNode?.api as Api | undefined) ?? 'openai'}
+        api={resolveAssistantTraceApi({ assistantNode: turn.assistantNode, streamingAssistant })}
         assistantNode={turn.assistantNode}
         cotMessages={turn.cotMessages}
         isStreamingTurn={isStreamingTurn}

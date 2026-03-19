@@ -108,7 +108,11 @@ const MessageTurnRow = memo(function MessageTurnRow({
         assistantNode={turn.assistantNode}
         isStreamingTurn={isStreamingTurn}
         streamingAssistant={isStreamingTurn ? streamingAssistant : null}
-        api={(turn.assistantNode?.api as Api | undefined) ?? 'openai'}
+        api={
+          (turn.assistantNode?.api as Api | undefined) ??
+          (streamingAssistant?.api as Api | undefined) ??
+          'openai'
+        }
         userTimestamp={
           typeof turn.userNode?.message.timestamp === 'number'
             ? turn.userNode.message.timestamp

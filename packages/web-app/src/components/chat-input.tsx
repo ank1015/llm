@@ -26,6 +26,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { generateSessionName } from '@/lib/client-api';
+import { resolveComposerContextUsageTotalTokens } from '@/lib/messages/composer-context-usage';
 import { cn } from '@/lib/utils';
 import {
   useArtifactFilesStore,
@@ -56,10 +57,6 @@ type MentionRange = {
   start: number;
   end: number;
   query: string;
-};
-
-type MessageTurn = {
-  assistantNode: MessageNode | null;
 };
 
 function isAbortError(error: unknown): boolean {
@@ -289,77 +286,6 @@ function buildFileLabel(entry: ProjectFileIndexEntry): string {
   return dir.length > 0 ? `${entry.artifactName}/${dir}` : entry.artifactName;
 }
 
-function groupIntoTurns(nodes: MessageNode[]): MessageTurn[] {
-  const turns: MessageTurn[] = [];
-  let index = 0;
-
-  if (index < nodes.length && nodes[index]?.message.role !== 'user') {
-    const betweenNodes: MessageNode[] = [];
-    while (index < nodes.length && nodes[index]?.message.role !== 'user') {
-      const node = nodes[index];
-      if (node) {
-        betweenNodes.push(node);
-      }
-      index += 1;
-    }
-
-    turns.push({
-      assistantNode:
-        betweenNodes.length > 0 &&
-        betweenNodes[betweenNodes.length - 1]?.message.role === 'assistant'
-          ? (betweenNodes[betweenNodes.length - 1] ?? null)
-          : null,
-    });
-  }
-
-  while (index < nodes.length) {
-    index += 1;
-
-    const betweenNodes: MessageNode[] = [];
-    while (index < nodes.length && nodes[index]?.message.role !== 'user') {
-      const node = nodes[index];
-      if (node) {
-        betweenNodes.push(node);
-      }
-      index += 1;
-    }
-
-    turns.push({
-      assistantNode:
-        betweenNodes.length > 0 &&
-        betweenNodes[betweenNodes.length - 1]?.message.role === 'assistant'
-          ? (betweenNodes[betweenNodes.length - 1] ?? null)
-          : null,
-    });
-  }
-
-  return turns;
-}
-
-function getPersistentContextUsageTotalTokens(
-  nodes: MessageNode[],
-  isSessionStreaming: boolean
-): number | null {
-  const turns = groupIntoTurns(nodes);
-  const latestAssistantTurnIndex = turns.reduce(
-    (latestIndex, turn, index) => (turn.assistantNode ? index : latestIndex),
-    -1
-  );
-  const persistentActionTurnIndex =
-    isSessionStreaming && turns.length > 0 ? turns.length - 1 : latestAssistantTurnIndex;
-
-  if (persistentActionTurnIndex < 0) {
-    return null;
-  }
-
-  const assistantNode = turns[persistentActionTurnIndex]?.assistantNode;
-  if (assistantNode?.message.role === 'assistant' && assistantNode.message.usage.totalTokens > 0) {
-    return assistantNode.message.usage.totalTokens;
-  }
-
-  return null;
-}
-
 function ComposerMetaBar() {
   const { projectId, artifactId, threadId } = useParams<{
     projectId: string;
@@ -378,9 +304,21 @@ function ComposerMetaBar() {
 
     return state.messagesBySession[currentSession.sessionId] ?? EMPTY_MESSAGE_NODES;
   });
-  const persistentContextUsageTotalTokens = useMemo(
-    () => getPersistentContextUsageTotalTokens(visibleMessages, isStreaming),
-    [visibleMessages, isStreaming]
+  const streamingAssistant = useChatStore((state) => {
+    if (!currentSession) {
+      return null;
+    }
+
+    return state.streamingAssistantBySession[currentSession.sessionId] ?? null;
+  });
+  const contextUsageTotalTokens = useMemo(
+    () =>
+      resolveComposerContextUsageTotalTokens({
+        nodes: visibleMessages,
+        isSessionStreaming: isStreaming,
+        streamingAssistant,
+      }),
+    [isStreaming, streamingAssistant, visibleMessages]
   );
 
   if (!currentSession) {
@@ -390,9 +328,7 @@ function ComposerMetaBar() {
   return (
     <div className="mb-2 flex w-full items-center justify-between px-1">
       <div className="flex min-w-0 items-center">
-        {persistentContextUsageTotalTokens !== null ? (
-          <ContextUsageIndicator totalTokens={persistentContextUsageTotalTokens} />
-        ) : null}
+        <ContextUsageIndicator totalTokens={contextUsageTotalTokens} />
       </div>
 
       <ArtifactSkillsPanel projectId={projectId} artifactId={artifactId} />
