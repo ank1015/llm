@@ -1,4 +1,4 @@
-import type { Message, MessageNode } from '@ank1015/llm-sdk';
+import type { Api, BaseAssistantMessage, Message, MessageNode } from '@ank1015/llm-sdk';
 
 export type MessageTurn = {
   userMessageId: string | null;
@@ -6,6 +6,17 @@ export type MessageTurn = {
   cotMessages: Message[];
   assistantNode: MessageNode | null;
 };
+
+export function resolveAssistantTraceApi(input: {
+  assistantNode: MessageNode | null;
+  streamingAssistant?: Omit<BaseAssistantMessage<Api>, 'message'> | null;
+}): Api {
+  return (
+    (input.assistantNode?.api as Api | undefined) ??
+    (input.streamingAssistant?.api as Api | undefined) ??
+    'openai'
+  );
+}
 
 export function groupMessageNodesIntoTurns(nodes: MessageNode[]): MessageTurn[] {
   const turns: MessageTurn[] = [];

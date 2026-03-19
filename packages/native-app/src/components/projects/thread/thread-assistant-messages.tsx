@@ -116,10 +116,14 @@ export function ThreadAssistantMessages({
   return (
     <View className="w-full gap-4">
       <View className="w-full max-w-[96%]">
-        <ThreadWorkingTrace label={label} live={isStreamingTurn} model={traceModel} />
+        <ThreadWorkingTrace
+          label={label}
+          model={traceModel}
+          presentation={isStreamingTurn ? 'streaming' : 'completed'}
+        />
       </View>
 
-      {displayText ? (
+      {!isStreamingTurn && displayText ? (
         <>
           <View className="w-full max-w-[96%]">
             <ThreadTranscriptMarkdown>{displayText}</ThreadTranscriptMarkdown>
