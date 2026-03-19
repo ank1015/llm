@@ -1,9 +1,6 @@
 #!/usr/bin/env node
 
-import {
-  fetchNMails,
-  parseFetchNMailsCliArgs,
-} from '../helpers/web/scripts/gmail/fetch-n-mails.js';
+import { runFetchNMailsCli } from '../helpers/web/scripts/gmail/fetch-n-mails.js';
 import { isMainModule } from '../utils/is-main-module.js';
 
 export interface WebTaskCliArgs {
@@ -37,9 +34,7 @@ export async function runWebTaskCli(argv: string[] = process.argv.slice(2)): Pro
   const { area, command, commandArgs } = parseWebTaskCliArgs(argv);
 
   if (area === 'gmail' && command === 'fetch-n-mails') {
-    const options = parseFetchNMailsCliArgs(commandArgs);
-    const result = await fetchNMails(options);
-    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+    await runFetchNMailsCli(commandArgs);
     return;
   }
 
