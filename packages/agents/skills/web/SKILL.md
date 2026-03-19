@@ -21,13 +21,15 @@ Use this skill when the user wants to:
 1. Read this file first.
 2. Read [references/api.md](references/api.md) for the helper exports, method signatures, option types, return types, and behavior notes.
 3. Read [references/workflow.md](references/workflow.md) for the general algorithm, helper-selection rules, and verification strategy.
-4. If the task is mostly about reading or extracting information from a page, read [references/read.md](references/read.md).
-5. If the task needs page interactions or user-like actions inside a web app, read [references/interact.md](references/interact.md).
-6. If the task needs network inspection, screenshots, or Chrome DevTools Protocol access, read [references/debug.md](references/debug.md).
-7. If the task is mostly about tabs, windows, navigation state, or browser cleanup, read [references/browser-state.md](references/browser-state.md).
-8. If the task involves downloads or file uploads, read [references/downloads.md](references/downloads.md).
-9. Read [references/recipes.md](references/recipes.md) only when you need a copyable end-to-end pattern or the task combines multiple modes.
-10. Use only the references that match the current task.
+4. If the task matches a common website script for a supported site, read that site's index first:
+   - Gmail: [references/gmail/index.md](references/gmail/index.md)
+5. If the task is mostly about reading or extracting information from a page, read [references/read.md](references/read.md).
+6. If the task needs page interactions or user-like actions inside a web app, read [references/interact.md](references/interact.md).
+7. If the task needs network inspection, screenshots, or Chrome DevTools Protocol access, read [references/debug.md](references/debug.md).
+8. If the task is mostly about tabs, windows, navigation state, or browser cleanup, read [references/browser-state.md](references/browser-state.md).
+9. If the task involves downloads or file uploads, read [references/downloads.md](references/downloads.md).
+10. Read [references/recipes.md](references/recipes.md) only when you need a copyable end-to-end pattern or the task combines multiple modes.
+11. Use only the references that match the current task.
 
 ## Main Helpers
 
@@ -58,9 +60,25 @@ The helper surface is organized into three layers:
 
 Use [references/api.md](references/api.md) as the full reference for signatures and return types.
 
+## Common Website Scripts
+
+Many repeated tasks on common websites can be handled through ready-to-run scripts instead of
+rebuilding the page understanding flow from scratch each time.
+
+Use these website-specific references when the task exactly matches one of the built-in actions. If
+the built-in action does not fit, fall back to the generic browser workflow and use the helper
+primitives directly.
+
+Currently available website references:
+
+- Gmail
+  - read [references/gmail/index.md](references/gmail/index.md)
+
 ## Important Constraints
 
 - Prefer `evaluate(...)` plus verification over brittle one-size-fits-all DOM helpers.
+- Prefer a built-in website script when it exactly matches the task. Prefer the generic browser
+  flow when the task is new, unusual, or the built-in script is too narrow.
 - Treat `web.chrome(...)` and `WebDebuggerSession.cdp(...)` as escape hatches when the higher-level helpers are not enough.
 - `WebBrowser.close()` closes the helper session. It does not close Chrome itself, so verification tabs can stay open after the script exits.
 - The agent should use this skill through `@ank1015/llm-agents` only. Do not import `@ank1015/llm-extension` directly from task scripts.
@@ -74,4 +92,5 @@ Use [references/api.md](references/api.md) as the full reference for signatures 
 - Read [references/debug.md](references/debug.md) for network capture, screenshots, debugger events, and raw CDP work.
 - Read [references/browser-state.md](references/browser-state.md) for tab reuse, cleanup, navigation, and raw Chrome API access.
 - Read [references/downloads.md](references/downloads.md) for waiting on downloads and pushing local files into file inputs.
+- Read [references/gmail/index.md](references/gmail/index.md) for Gmail-specific built-in actions and their dedicated references.
 - Read [references/recipes.md](references/recipes.md) for compact end-to-end templates that combine several helpers.
