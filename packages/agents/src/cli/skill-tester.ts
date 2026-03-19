@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
 import { basename } from 'node:path';
-import { pathToFileURL } from 'node:url';
 
 import { prepareSkillTesterWorkspace } from '../agents/skills/tester.js';
 import { createSystemPrompt } from '../agents/system-prompt.js';
 import { createAllTools } from '../tools/index.js';
+import { isMainModule } from '../utils/is-main-module.js';
 
 import { runInteractiveCliSession } from './shared.js';
 
@@ -249,6 +249,6 @@ function parseSkillTesterPromptFlag({
   return undefined;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isMainModule(import.meta.url)) {
   void runSkillTesterCli();
 }
