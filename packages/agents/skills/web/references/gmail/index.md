@@ -11,6 +11,7 @@ task that we already support with a script.
 Use the built-in Gmail script when:
 
 - the user wants a quick overview of the top visible inbox messages
+- the user wants to search the inbox for words and get matching messages back
 - the task is read-only and matches a supported Gmail action exactly
 
 Use the generic web workflow instead when:
@@ -25,13 +26,20 @@ Use the generic web workflow instead when:
   - read [fetchNPosts.md](fetchNPosts.md)
   - script: `scripts/gmail/fetch-n-mails.mjs`
   - behavior: prints Markdown, saves raw JSON to temp, and paginates with Gmail's `Older` button when needed
+- Search inbox
+  - read [searchInbox.md](searchInbox.md)
+  - script: `scripts/gmail/search-inbox.mjs`
+  - behavior: searches Gmail with an inbox-scoped query, prints Markdown, saves raw JSON to temp, and paginates with Gmail's `Next results` control when needed
 
 ## How To Choose
 
 - If the user says things like "show me the top 5 mails", "summarize the first few Gmail
   messages", "get an inbox overview", or "show me the top 80 Gmail mails", use the built-in
   mail-overview script first.
-- If the user asks to draft, send, search, label, archive, or inspect a specific thread, use the
-  generic browser workflow for now.
+- If the user says things like "search Gmail for digitalocean", "find inbox mails about invoices",
+  "show the top 10 Gmail results for support", or "search my inbox for <words>", use the inbox
+  search script first.
+- If the user asks to draft, send, label, archive, or inspect a specific thread, use the generic
+  browser workflow for now.
 - If the script returns `login-required` or `inbox-unavailable`, fall back to direct browser
   inspection and verify the current Gmail state.
