@@ -89,6 +89,16 @@ export interface GoogleSelectOption {
   label: string;
 }
 
+export interface GoogleSearchNextPageCandidate {
+  id: string | null;
+  text: string;
+  ariaLabel: string | null;
+  href: string | null;
+  inResultsFooter: boolean;
+  inNavigationRegion: boolean;
+  inPaginationTable: boolean;
+}
+
 interface ResolvedGoogleSearchOptions {
   allWords: string;
   exactPhrase: string;
@@ -122,12 +132,20 @@ interface GoogleSearchPageSnapshot {
   noResults: boolean;
   captcha: boolean;
   candidates: GoogleSearchCandidateBlock[];
+  nextPageUrl: string | null;
   nextPageAvailable: boolean;
+}
+
+interface GoogleSearchPageSnapshotPayload extends Omit<
+  GoogleSearchPageSnapshot,
+  'nextPageUrl' | 'nextPageAvailable'
+> {
+  nextPageCandidates: GoogleSearchNextPageCandidate[];
 }
 
 type GoogleSearchTab = Pick<
   WebTab,
-  'waitForLoad' | 'waitFor' | 'waitForIdle' | 'evaluate' | 'close'
+  'goto' | 'waitForLoad' | 'waitFor' | 'waitForIdle' | 'evaluate' | 'close'
 >;
 
 const DEFAULT_RESULT_COUNT = 10;
@@ -135,7 +153,8 @@ const MAX_RESULT_COUNT = 100;
 const GOOGLE_ADVANCED_SEARCH_URL = 'https://www.google.com/advanced_search';
 const GOOGLE_SEARCH_RESULTS_SELECTOR = '#search';
 const GOOGLE_RESULT_BLOCK_SELECTOR = '#search .MjjYud';
-const GOOGLE_NEXT_PAGE_SELECTOR = 'a#pnnext, a[aria-label*="Next"], a[aria-label*="next"]';
+const GOOGLE_PAGINATION_ROOT_SELECTOR =
+  '#botstuff, #foot, nav, [role="navigation"], table[role="presentation"]';
 
 export async function searchGoogle(options: GoogleSearchOptions): Promise<GoogleSearchResult> {
   const resolvedOptions = resolveGoogleSearchOptions(options);
@@ -163,6 +182,7 @@ export async function searchGoogle(options: GoogleSearchOptions): Promise<Google
               noResults: false,
               captcha: true,
               candidates: [],
+              nextPageUrl: null,
               nextPageAvailable: false,
             } satisfies GoogleSearchPageSnapshot,
             finalSnapshot: {
@@ -171,6 +191,7 @@ export async function searchGoogle(options: GoogleSearchOptions): Promise<Google
               noResults: false,
               captcha: true,
               candidates: [],
+              nextPageUrl: null,
               nextPageAvailable: false,
             } satisfies GoogleSearchPageSnapshot,
             pagesVisited: 0,
@@ -214,6 +235,7 @@ export async function searchGoogle(options: GoogleSearchOptions): Promise<Google
           const firstResultKey = buildGoogleFirstResultKey(pageResults);
           const nextSnapshot = await goToNextGoogleResultsPage(
             tab,
+            snapshot.nextPageUrl,
             snapshot.page.url,
             firstResultKey
           );
@@ -806,6 +828,69 @@ function canonicalizeGoogleSearchResultUrl(rawUrl: string): string {
   }
 }
 
+export function isGoogleSearchPaginationUrl(
+  rawUrl: string | null | undefined,
+  pageUrl: string
+): boolean {
+  if (!rawUrl) {
+    return false;
+  }
+
+  try {
+    const currentPageUrl = new URL(pageUrl);
+    const resolvedUrl = new URL(rawUrl, currentPageUrl);
+    if (resolvedUrl.origin !== currentPageUrl.origin) {
+      return false;
+    }
+
+    if (resolvedUrl.pathname !== '/search') {
+      return false;
+    }
+
+    return resolvedUrl.searchParams.has('start') || resolvedUrl.searchParams.get('sa') === 'N';
+  } catch {
+    return false;
+  }
+}
+
+export function pickGoogleSearchNextPageCandidate(
+  candidates: readonly GoogleSearchNextPageCandidate[],
+  pageUrl: string
+): GoogleSearchNextPageCandidate | undefined {
+  const dedupedCandidates = new Map<string, GoogleSearchNextPageCandidate>();
+  for (const candidate of candidates) {
+    const key = [
+      candidate.href || '',
+      candidate.id || '',
+      normalizeGoogleSearchText(candidate.text),
+      normalizeGoogleSearchText(candidate.ariaLabel || ''),
+    ].join('|');
+    if (!dedupedCandidates.has(key)) {
+      dedupedCandidates.set(key, candidate);
+    }
+  }
+
+  const scoredCandidates = Array.from(dedupedCandidates.values())
+    .filter((candidate) => {
+      const text = normalizeGoogleSearchText(candidate.text);
+      const ariaLabel = normalizeGoogleSearchText(candidate.ariaLabel || '');
+      const looksLikeNextControl =
+        candidate.id === 'pnnext' || text === 'next' || /\bnext\b/.test(ariaLabel);
+      return looksLikeNextControl && isGoogleSearchPaginationUrl(candidate.href, pageUrl);
+    })
+    .map((candidate) => ({
+      candidate,
+      score:
+        (candidate.id === 'pnnext' ? 100 : 0) +
+        (candidate.inResultsFooter ? 20 : 0) +
+        (candidate.inPaginationTable ? 10 : 0) +
+        (candidate.inNavigationRegion ? 5 : 0),
+    }))
+    .sort((left, right) => right.score - left.score);
+
+  return scoredCandidates[0]?.candidate;
+}
+
 function appendUniqueGoogleSearchResults(
   target: GoogleSearchResultItem[],
   seenKeys: Set<string>,
@@ -1071,7 +1156,7 @@ async function waitForGoogleSearchResultsReady(
 async function readGoogleSearchPageSnapshot(
   tab: GoogleSearchTab
 ): Promise<GoogleSearchPageSnapshot> {
-  return await tab.evaluate<GoogleSearchPageSnapshot>(
+  const snapshot = await tab.evaluate<GoogleSearchPageSnapshotPayload>(
     `(() => {
       const normalize = (value) => (value || '').replace(/\\s+/g, ' ').trim();
       const bodyText = normalize(document.body?.innerText || '');
@@ -1113,8 +1198,44 @@ async function readGoogleSearchPageSnapshot(
           text: normalize(block.innerText || block.textContent || ''),
         };
       });
+      const paginationRoots = Array.from(
+        document.querySelectorAll(${JSON.stringify(GOOGLE_PAGINATION_ROOT_SELECTOR)})
+      );
+      const paginationAnchors =
+        paginationRoots.length > 0
+          ? paginationRoots.flatMap((root) => Array.from(root.querySelectorAll('a[href]')))
+          : Array.from(document.querySelectorAll('a[href]'));
+      const seenPaginationKeys = new Set();
+      const nextPageCandidates = paginationAnchors.flatMap((anchor) => {
+        if (!(anchor instanceof HTMLAnchorElement)) {
+          return [];
+        }
 
-      const nextLink = document.querySelector(${JSON.stringify(GOOGLE_NEXT_PAGE_SELECTOR)});
+        const key = [
+          anchor.href,
+          anchor.id || '',
+          normalize(anchor.textContent || ''),
+          normalize(anchor.getAttribute('aria-label') || ''),
+        ].join('|');
+        if (seenPaginationKeys.has(key)) {
+          return [];
+        }
+
+        seenPaginationKeys.add(key);
+        return [
+          {
+            id: anchor.id || null,
+            text: normalize(anchor.textContent || ''),
+            ariaLabel: normalize(anchor.getAttribute('aria-label') || '') || null,
+            href: anchor.href || anchor.getAttribute('href'),
+            inResultsFooter: Boolean(anchor.closest('#botstuff') || anchor.closest('#foot')),
+            inNavigationRegion: Boolean(
+              anchor.closest('nav') || anchor.closest('[role="navigation"]')
+            ),
+            inPaginationTable: Boolean(anchor.closest('table[role="presentation"]')),
+          },
+        ];
+      });
 
       return {
         page: {
@@ -1130,71 +1251,37 @@ async function readGoogleSearchPageSnapshot(
           /unusual traffic|verify you(?:'|’)re human|not a robot/i.test(bodyText)
         ),
         candidates,
-        nextPageAvailable: nextLink instanceof HTMLAnchorElement,
+        nextPageCandidates,
       };
     })()`,
     {
       returnByValue: true,
     }
   );
+
+  const nextPageCandidate = pickGoogleSearchNextPageCandidate(
+    snapshot.nextPageCandidates,
+    snapshot.page.url
+  );
+
+  return {
+    ...snapshot,
+    nextPageUrl: nextPageCandidate?.href ?? null,
+    nextPageAvailable: Boolean(nextPageCandidate?.href),
+  };
 }
 
 async function goToNextGoogleResultsPage(
   tab: GoogleSearchTab,
+  nextPageUrl: string | null,
   previousPageUrl: string,
   previousFirstResultKey: string | null
 ): Promise<GoogleSearchPageSnapshot | null> {
-  const clicked = await tab.evaluate<boolean>(
-    `(() => {
-      const nextLink = document.querySelector(${JSON.stringify(GOOGLE_NEXT_PAGE_SELECTOR)});
-      if (!(nextLink instanceof HTMLAnchorElement)) {
-        return false;
-      }
-
-      const rect = nextLink.getBoundingClientRect();
-      const eventInit = {
-        bubbles: true,
-        cancelable: true,
-        composed: true,
-        view: window,
-        clientX: rect.left + rect.width / 2,
-        clientY: rect.top + rect.height / 2,
-        button: 0,
-        buttons: 1,
-      };
-
-      nextLink.focus();
-      nextLink.dispatchEvent(
-        new PointerEvent('pointerdown', {
-          ...eventInit,
-          pointerId: 1,
-          pointerType: 'mouse',
-          isPrimary: true,
-        })
-      );
-      nextLink.dispatchEvent(new MouseEvent('mousedown', eventInit));
-      nextLink.dispatchEvent(
-        new PointerEvent('pointerup', {
-          ...eventInit,
-          pointerId: 1,
-          pointerType: 'mouse',
-          isPrimary: true,
-        })
-      );
-      nextLink.dispatchEvent(new MouseEvent('mouseup', eventInit));
-      nextLink.dispatchEvent(new MouseEvent('click', eventInit));
-      return true;
-    })()`,
-    {
-      returnByValue: true,
-      userGesture: true,
-    }
-  );
-
-  if (!clicked) {
+  if (!nextPageUrl) {
     return null;
   }
 
+  await tab.goto(nextPageUrl, { active: true });
   await tab.waitFor({
     predicate: `window.location.href !== ${JSON.stringify(previousPageUrl)}`,
     timeoutMs: 30_000,

@@ -77,6 +77,116 @@ scripts/google/search.mjs
 At least one query-like filter must be provided, such as `--query`, `--exact-phrase`,
 `--any-words`, `--none-words`, a numeric range, or `--site`.
 
+## Accepted Predefined Values
+
+For fields with a fixed Google-controlled menu, the script matches either:
+
+- the visible Google label, such as `English` or `last 24 hours`
+- the raw Google value, such as `lang_en` or `d`
+
+Use the visible label when possible. That is usually the easiest option for the agent to infer from
+the user request.
+
+Smaller fixed menus are listed below.
+
+### `--last-update`
+
+- `anytime`
+  - raw value: `all`
+- `last 24 hours`
+  - raw value: `d`
+- `upto a week ago`
+  - raw value: `w`
+- `upto a month ago`
+  - raw value: `m`
+- `upto a year ago`
+  - raw value: `y`
+
+### `--terms-appearing`
+
+- `anywhere in the page`
+  - raw value: `any`
+- `in the title of the page`
+  - raw value: `title`
+- `in the text of the page`
+  - raw value: `body`
+- `in the URL of the page`
+  - raw value: `url`
+- `in links to the page`
+  - raw value: `links`
+
+### `--file-type`
+
+- `any format`
+  - raw value: empty / omitted
+- `Adobe Acrobat PDF (.pdf)`
+  - raw value: `pdf`
+- `Adobe Postscript (.ps)`
+  - raw value: `ps`
+- `Autodesk DWF (.dwf)`
+  - raw value: `dwf`
+- `Google Earth KML (.kml)`
+  - raw value: `kml`
+- `Google Earth KMZ (.kmz)`
+  - raw value: `kmz`
+- `Microsoft Excel (.xls)`
+  - raw value: `xls`
+- `Microsoft PowerPoint (.ppt)`
+  - raw value: `ppt`
+- `Microsoft Word (.doc)`
+  - raw value: `doc`
+- `Rich Text Format (.rtf)`
+  - raw value: `rtf`
+- `Shockwave Flash (.swf)`
+  - raw value: `swf`
+
+### `--usage-rights`
+
+- `not filtered by licence`
+  - raw value: empty / omitted
+- `free to use or share`
+  - raw value: `f`
+- `free to use or share, even commercially`
+  - raw value: `fc`
+- `free to use share or modify`
+  - raw value: `fm`
+- `free to use, share or modify, even commercially`
+  - raw value: `fmc`
+
+### `--language`
+
+Google exposes a larger language list here. Prefer the visible label from the page, such as:
+
+- `English`
+  - raw value: `lang_en`
+- `Hindi`
+  - raw value: `lang_hi`
+- `Japanese`
+  - raw value: `lang_ja`
+- `Spanish`
+  - raw value: `lang_es`
+- `French`
+  - raw value: `lang_fr`
+
+The menu currently contains many more languages than the examples above. If the user names a
+language directly, pass that label.
+
+### `--region`
+
+Google exposes a large region list here as well. Prefer the visible label from the page, such as:
+
+- `India`
+  - raw value: `countryIN`
+- `United States`
+  - raw value: `countryUS`
+- `United Kingdom`
+  - raw value: `countryGB`
+- `Japan`
+  - raw value: `countryJP`
+
+The region list is much larger than the examples above. If the user names a country or region
+directly, pass that label.
+
 ## Output Behavior
 
 Stdout is a Markdown summary, not raw JSON.
@@ -152,7 +262,7 @@ The saved JSON file has this high-level shape:
 
 - The script opens `https://www.google.com/advanced_search` first and fills the form from the page
   itself instead of constructing a direct search URL.
-- It supports both free-text fields and real `<select>`-based advanced filters by matching either
+- It supports both free-text fields and Google-controlled advanced-filter menus by matching either
   the raw Google option value or the visible label.
 - It extracts candidate result blocks from the Google results page and filters out sponsored and
   internal Google search blocks before returning results.

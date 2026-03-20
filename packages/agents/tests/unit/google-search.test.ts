@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   findGoogleSelectOptionMatch,
+  isGoogleSearchPaginationUrl,
   parseGoogleSearchCliArgs,
+  pickGoogleSearchNextPageCandidate,
   renderGoogleSearchMarkdown,
   resolveGoogleSearchOptions,
   selectOrganicGoogleSearchResults,
@@ -10,6 +12,7 @@ import {
 
 import type {
   GoogleSearchCandidateBlock,
+  GoogleSearchNextPageCandidate,
   GoogleSelectOption,
 } from '../../src/helpers/web/scripts/google/search.js';
 
@@ -180,6 +183,54 @@ describe('google search helpers', () => {
         textSnippet: 'OpenAI Wikipedia summary',
       },
     ]);
+  });
+
+  it('prefers the real Google pager over unrelated next controls', () => {
+    const candidates: GoogleSearchNextPageCandidate[] = [
+      {
+        id: null,
+        text: '54:12 Advice for the Next Gen of Engineers',
+        ariaLabel: 'From 54 minutes, 12 seconds, Advice for the Next Gen of Engineers. 17 of 20.',
+        href: 'https://www.youtube.com/watch?v=S1rQngjpUdI&t=3252',
+        inResultsFooter: false,
+        inNavigationRegion: false,
+        inPaginationTable: false,
+      },
+      {
+        id: 'pnnext',
+        text: 'Next',
+        ariaLabel: null,
+        href: 'https://www.google.com/search?q=openai+codex&start=10&sa=N',
+        inResultsFooter: true,
+        inNavigationRegion: false,
+        inPaginationTable: true,
+      },
+    ];
+
+    expect(
+      pickGoogleSearchNextPageCandidate(candidates, 'https://www.google.com/search?q=openai+codex')
+    ).toEqual(candidates[1]);
+  });
+
+  it('only treats Google search pagination URLs as next-page links', () => {
+    expect(
+      isGoogleSearchPaginationUrl(
+        'https://www.google.com/search?q=openai+codex&start=10&sa=N',
+        'https://www.google.com/search?q=openai+codex'
+      )
+    ).toBe(true);
+    expect(
+      isGoogleSearchPaginationUrl(
+        'https://www.google.com/search?q=openai+codex',
+        'https://www.google.com/search?q=openai+codex'
+      )
+    ).toBe(false);
+    expect(
+      isGoogleSearchPaginationUrl(
+        'https://www.youtube.com/watch?v=S1rQngjpUdI&t=3252',
+        'https://www.google.com/search?q=openai+codex'
+      )
+    ).toBe(false);
   });
 
   it('renders a readable markdown summary with the saved JSON path', () => {
