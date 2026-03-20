@@ -5,6 +5,7 @@ import { runFetchNMailsCli } from '../helpers/web/scripts/gmail/fetch-n-mails.js
 import { runGetEmailCli } from '../helpers/web/scripts/gmail/get-email.js';
 import { runReplyToEmailCli } from '../helpers/web/scripts/gmail/reply-to-email.js';
 import { runSearchInboxCli } from '../helpers/web/scripts/gmail/search-inbox.js';
+import { runGoogleSearchCli } from '../helpers/web/scripts/google/search.js';
 import { isMainModule } from '../utils/is-main-module.js';
 
 export interface WebTaskCliArgs {
@@ -14,6 +15,7 @@ export interface WebTaskCliArgs {
 }
 
 const WEB_TASK_COMMANDS = [
+  'google search',
   'gmail fetch-n-mails',
   'gmail search-inbox',
   'gmail get-email',
@@ -42,6 +44,11 @@ export function parseWebTaskCliArgs(argv: string[]): WebTaskCliArgs {
 
 export async function runWebTaskCli(argv: string[] = process.argv.slice(2)): Promise<void> {
   const { area, command, commandArgs } = parseWebTaskCliArgs(argv);
+
+  if (area === 'google' && command === 'search') {
+    await runGoogleSearchCli(commandArgs);
+    return;
+  }
 
   if (area === 'gmail' && command === 'fetch-n-mails') {
     await runFetchNMailsCli(commandArgs);
@@ -79,6 +86,8 @@ Available commands:
   ${WEB_TASK_COMMANDS.join('\n  ')}
 
 Examples:
+  web-task google search --query "openai" --count 5
+  web-task google search --query "sdk" --site openai.com --language English --count 10
   web-task gmail fetch-n-mails --count 5
   web-task gmail fetch-n-mails --count 10 --no-launch
   web-task gmail search-inbox --query "digitalocean" --count 5
