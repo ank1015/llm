@@ -23,6 +23,7 @@ Use this skill when the user wants to:
 3. Read [references/workflow.md](references/workflow.md) for the general algorithm, helper-selection rules, and verification strategy.
 4. If the task matches a common website script for a supported site, read that site's index first:
    - Gmail: [references/gmail/index.md](references/gmail/index.md)
+   - Google: [references/google/index.md](references/google/index.md)
 5. If the task is mostly about reading or extracting information from a page, read [references/read.md](references/read.md).
 6. If the task needs page interactions or user-like actions inside a web app, read [references/interact.md](references/interact.md).
 7. If the task needs network inspection, screenshots, or Chrome DevTools Protocol access, read [references/debug.md](references/debug.md).
@@ -73,6 +74,8 @@ Currently available website references:
 
 - Gmail
   - read [references/gmail/index.md](references/gmail/index.md)
+- Google
+  - read [references/google/index.md](references/google/index.md)
 
 ## Important Constraints
 
@@ -93,4 +96,5 @@ Currently available website references:
 - Read [references/browser-state.md](references/browser-state.md) for tab reuse, cleanup, navigation, and raw Chrome API access.
 - Read [references/downloads.md](references/downloads.md) for waiting on downloads and pushing local files into file inputs.
 - Read [references/gmail/index.md](references/gmail/index.md) for Gmail-specific built-in actions and their dedicated references.
+- Read [references/google/index.md](references/google/index.md) for Google-specific built-in actions and their dedicated references.
 - Read [references/recipes.md](references/recipes.md) for compact end-to-end templates that combine several helpers.
