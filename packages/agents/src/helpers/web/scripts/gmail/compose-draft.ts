@@ -4,6 +4,10 @@ import { basename, join, resolve } from 'node:path';
 
 import { isMainModule } from '../../../../utils/is-main-module.js';
 import { withWebBrowser } from '../../web.js';
+import {
+  GOOGLE_HUMAN_VERIFICATION_PREDICATE,
+  waitForGoogleHumanVerificationIfNeeded,
+} from '../shared/human-verification.js';
 
 import type { WebTab } from '../../web.js';
 
@@ -96,6 +100,12 @@ const GMAIL_TO_SELECTOR = 'input[aria-label="To recipients"]';
 const GMAIL_SUBJECT_SELECTOR = 'input[name="subjectbox"]';
 const GMAIL_BODY_SELECTOR = 'div[aria-label="Message Body"]';
 const GMAIL_FILE_INPUT_SELECTOR = 'input[type="file"][name="Filedata"]';
+const GMAIL_COMPOSE_READY_PREDICATE = `Boolean(
+  document.querySelector(${JSON.stringify(GMAIL_TO_SELECTOR)}) ||
+  document.querySelector(${JSON.stringify(GMAIL_BODY_SELECTOR)}) ||
+  document.querySelector('input[type="email"]') ||
+  document.querySelector('input[type="password"]')
+)`;
 
 type GmailComposeTab = Pick<
   WebTab,
@@ -391,17 +401,24 @@ async function waitForComposeReady(tab: GmailComposeTab): Promise<void> {
   await tab.waitFor({ selector: 'body' });
   await tab.waitFor({
     predicate: `Boolean(
-      document.querySelector(${JSON.stringify(GMAIL_TO_SELECTOR)}) ||
-      document.querySelector(${JSON.stringify(GMAIL_BODY_SELECTOR)}) ||
-      document.querySelector('input[type="email"]') ||
-      document.querySelector('input[type="password"]')
+      ${GMAIL_COMPOSE_READY_PREDICATE} ||
+      ${GOOGLE_HUMAN_VERIFICATION_PREDICATE}
     )`,
     timeoutMs: GMAIL_COMPOSE_READY_TIMEOUT_MS,
+  });
+  await waitForGoogleHumanVerificationIfNeeded(tab, {
+    readyPredicate: GMAIL_COMPOSE_READY_PREDICATE,
+    label: 'Gmail verification',
   });
   await tab.waitForIdle(1_500);
 }
 
 async function readComposeSnapshot(tab: GmailComposeTab): Promise<GmailComposeSnapshot> {
+  await waitForGoogleHumanVerificationIfNeeded(tab, {
+    readyPredicate: GMAIL_COMPOSE_READY_PREDICATE,
+    label: 'Gmail verification',
+  });
+
   return await tab.evaluate<GmailComposeSnapshot>(
     `(() => {
       const normalize = (value) => (value || '').replace(/\\s+/g, ' ').trim();

@@ -4,6 +4,10 @@ import { basename, join, parse, resolve } from 'node:path';
 
 import { isMainModule } from '../../../../utils/is-main-module.js';
 import { withWebBrowser } from '../../web.js';
+import {
+  GOOGLE_HUMAN_VERIFICATION_PREDICATE,
+  waitForGoogleHumanVerificationIfNeeded,
+} from '../shared/human-verification.js';
 
 import type { WebBrowser, WebDownloadInfo, WebTab } from '../../web.js';
 
@@ -103,6 +107,13 @@ const SHOW_TRIMMED_CONTENT_SELECTORS = [
   'span[role="link"][data-tooltip*="View entire message"]',
   'span[role="link"][aria-label*="View entire message"]',
 ];
+const GMAIL_THREAD_READY_PREDICATE = `Boolean(
+  document.querySelector('h2.hP') ||
+  document.querySelector('.adn.ads') ||
+  document.querySelector('[data-message-id]') ||
+  document.querySelector('input[type="email"]') ||
+  document.querySelector('input[type="password"]')
+)`;
 
 const DOWNLOAD_WAIT_TIMEOUT_MS = 60_000;
 const DOWNLOAD_WAIT_POLL_MS = 250;
@@ -426,13 +437,14 @@ async function waitForThreadReady(tab: GmailThreadTab): Promise<void> {
   await tab.waitFor({ selector: 'body' });
   await tab.waitFor({
     predicate: `Boolean(
-      document.querySelector('h2.hP') ||
-      document.querySelector('.adn.ads') ||
-      document.querySelector('[data-message-id]') ||
-      document.querySelector('input[type="email"]') ||
-      document.querySelector('input[type="password"]')
+      ${GMAIL_THREAD_READY_PREDICATE} ||
+      ${GOOGLE_HUMAN_VERIFICATION_PREDICATE}
     )`,
     timeoutMs: 30_000,
+  });
+  await waitForGoogleHumanVerificationIfNeeded(tab, {
+    readyPredicate: GMAIL_THREAD_READY_PREDICATE,
+    label: 'Gmail verification',
   });
   await tab.waitForIdle(1_500);
 }
@@ -462,6 +474,11 @@ async function expandTrimmedContent(tab: GmailThreadTab): Promise<void> {
 }
 
 async function readThreadSnapshot(tab: GmailThreadTab): Promise<GmailThreadSnapshot> {
+  await waitForGoogleHumanVerificationIfNeeded(tab, {
+    readyPredicate: GMAIL_THREAD_READY_PREDICATE,
+    label: 'Gmail verification',
+  });
+
   const script = [
     '(() => {',
     `const threadMessageSelectors = ${JSON.stringify(THREAD_MESSAGE_SELECTORS)};`,

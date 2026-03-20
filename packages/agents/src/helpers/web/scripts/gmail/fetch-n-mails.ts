@@ -4,6 +4,10 @@ import { join } from 'node:path';
 
 import { isMainModule } from '../../../../utils/is-main-module.js';
 import { withWebBrowser } from '../../web.js';
+import {
+  GOOGLE_HUMAN_VERIFICATION_PREDICATE,
+  waitForGoogleHumanVerificationIfNeeded,
+} from '../shared/human-verification.js';
 
 import type { WebTab } from '../../web.js';
 
@@ -61,6 +65,12 @@ const INBOX_ROW_SELECTORS = [
   '.UI table tr.zA',
   '[role="main"] [role="row"]',
 ];
+const GMAIL_INBOX_READY_PREDICATE = `Boolean(
+  document.querySelector('tr.zA') ||
+  document.querySelector('[role="main"]') ||
+  document.querySelector('input[type="email"]') ||
+  document.querySelector('input[type="password"]')
+)`;
 
 export async function fetchNMails(options: FetchNMailsOptions = {}): Promise<FetchNMailsResult> {
   const resolvedOptions = resolveOptions(options);
@@ -111,13 +121,23 @@ export async function fetchNMails(options: FetchNMailsOptions = {}): Promise<Fet
             break;
           }
 
+          const previousFirstMailSignature = snapshot.firstMailSignature;
           const movedToOlderPage = await goToOlderInboxPage(tab, snapshot.firstMailSignature);
           if (!movedToOlderPage) {
-            break;
+            const verificationWait = await waitForGoogleHumanVerificationIfNeeded(tab, {
+              readyPredicate: GMAIL_INBOX_READY_PREDICATE,
+              label: 'Gmail verification',
+            });
+            if (!verificationWait.required) {
+              break;
+            }
           }
 
           await tab.waitForIdle(1_000);
           snapshot = await readInboxPageSnapshot(tab);
+          if (snapshot.firstMailSignature === previousFirstMailSignature) {
+            break;
+          }
           if (snapshot.status !== 'ok') {
             break;
           }
@@ -188,17 +208,24 @@ async function waitForInboxReady(tab: GmailFetchTab): Promise<void> {
   await tab.waitFor({ selector: 'body' });
   await tab.waitFor({
     predicate: `Boolean(
-      document.querySelector('tr.zA') ||
-      document.querySelector('[role="main"]') ||
-      document.querySelector('input[type="email"]') ||
-      document.querySelector('input[type="password"]')
+      ${GMAIL_INBOX_READY_PREDICATE} ||
+      ${GOOGLE_HUMAN_VERIFICATION_PREDICATE}
     )`,
     timeoutMs: 30_000,
+  });
+  await waitForGoogleHumanVerificationIfNeeded(tab, {
+    readyPredicate: GMAIL_INBOX_READY_PREDICATE,
+    label: 'Gmail verification',
   });
   await tab.waitForIdle(1_500);
 }
 
 async function readInboxPageSnapshot(tab: GmailFetchTab): Promise<GmailInboxPageSnapshot> {
+  await waitForGoogleHumanVerificationIfNeeded(tab, {
+    readyPredicate: GMAIL_INBOX_READY_PREDICATE,
+    label: 'Gmail verification',
+  });
+
   return await tab.evaluate<GmailInboxPageSnapshot>(
     `(() => {
       const inboxRowSelectors = ${JSON.stringify(INBOX_ROW_SELECTORS)};

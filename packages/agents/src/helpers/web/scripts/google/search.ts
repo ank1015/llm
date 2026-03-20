@@ -4,6 +4,10 @@ import { join } from 'node:path';
 
 import { isMainModule } from '../../../../utils/is-main-module.js';
 import { withWebBrowser } from '../../web.js';
+import {
+  GOOGLE_HUMAN_VERIFICATION_PREDICATE,
+  waitForGoogleHumanVerificationIfNeeded,
+} from '../shared/human-verification.js';
 
 import type { WebTab } from '../../web.js';
 
@@ -155,6 +159,14 @@ const GOOGLE_SEARCH_RESULTS_SELECTOR = '#search';
 const GOOGLE_RESULT_BLOCK_SELECTOR = '#search .MjjYud';
 const GOOGLE_PAGINATION_ROOT_SELECTOR =
   '#botstuff, #foot, nav, [role="navigation"], table[role="presentation"]';
+const GOOGLE_ADVANCED_SEARCH_READY_PREDICATE = `Boolean(
+  document.querySelector('form[action="/search"]') ||
+  document.querySelector('form[action="https://www.google.com/search"]')
+)`;
+const GOOGLE_SEARCH_RESULTS_READY_PREDICATE = `Boolean(
+  document.querySelector(${JSON.stringify(GOOGLE_SEARCH_RESULTS_SELECTOR)}) ||
+  /did not match any documents|no results found for/i.test((document.body?.innerText || ''))
+)`;
 
 export async function searchGoogle(options: GoogleSearchOptions): Promise<GoogleSearchResult> {
   const resolvedOptions = resolveGoogleSearchOptions(options);
@@ -920,11 +932,17 @@ async function waitForGoogleAdvancedSearchReady(tab: GoogleSearchTab): Promise<v
   await tab.waitFor({ selector: 'body' });
   await tab.waitFor({
     predicate: `Boolean(
-      document.querySelector('form[action="/search"]') ||
-      document.querySelector('form[action="https://www.google.com/search"]') ||
-      document.querySelector('form[action*="sorry"]') ||
-      document.querySelector('iframe[title*="reCAPTCHA"]')
+      ${GOOGLE_ADVANCED_SEARCH_READY_PREDICATE} ||
+      ${GOOGLE_HUMAN_VERIFICATION_PREDICATE}
     )`,
+    timeoutMs: 30_000,
+  });
+  await waitForGoogleHumanVerificationIfNeeded(tab, {
+    readyPredicate: GOOGLE_ADVANCED_SEARCH_READY_PREDICATE,
+    label: 'Google advanced search verification',
+  });
+  await tab.waitFor({
+    predicate: GOOGLE_ADVANCED_SEARCH_READY_PREDICATE,
     timeoutMs: 30_000,
   });
   await tab.waitForIdle(1_000);
@@ -942,11 +960,20 @@ async function applyGoogleAdvancedSearchForm(
       const selectedOptions = {};
 
       const bodyText = normalize(document.body?.innerText || '');
-      const captcha = Boolean(
-        document.querySelector('form[action*="sorry"]') ||
-        document.querySelector('iframe[title*="reCAPTCHA"]') ||
-        /unusual traffic|verify you(?:'|’)re human|not a robot/i.test(bodyText)
-      );
+      const captcha = Boolean(${GOOGLE_HUMAN_VERIFICATION_PREDICATE});
+
+      if (captcha) {
+        return {
+          page: {
+            title: document.title,
+            url: window.location.href,
+            route: \`\${window.location.pathname}\${window.location.search}\${window.location.hash}\`,
+          },
+          captcha,
+          selectedOptions,
+          errors,
+        };
+      }
 
       const fillTextInput = (name, value) => {
         const input = document.querySelector(\`input[name="\${name}"]\`);
@@ -1138,13 +1165,17 @@ async function waitForGoogleSearchResultsReady(
   await tab.waitFor({ selector: 'body' });
   await tab.waitFor({
     predicate: `Boolean(
-      document.querySelector(${JSON.stringify(GOOGLE_SEARCH_RESULTS_SELECTOR)}) ||
-      document.querySelector('form[action*="sorry"]') ||
-      document.querySelector('iframe[title*="reCAPTCHA"]') ||
-      /did not match any documents|no results found for|unusual traffic|verify you(?:'|’)re human|not a robot/i.test(
-        (document.body?.innerText || '')
-      )
+      ${GOOGLE_SEARCH_RESULTS_READY_PREDICATE} ||
+      ${GOOGLE_HUMAN_VERIFICATION_PREDICATE}
     )`,
+    timeoutMs: 30_000,
+  });
+  await waitForGoogleHumanVerificationIfNeeded(tab, {
+    readyPredicate: GOOGLE_SEARCH_RESULTS_READY_PREDICATE,
+    label: 'Google search verification',
+  });
+  await tab.waitFor({
+    predicate: GOOGLE_SEARCH_RESULTS_READY_PREDICATE,
     timeoutMs: 30_000,
   });
   await tab.waitForLoad({ timeoutMs: 30_000 });
@@ -1245,11 +1276,7 @@ async function readGoogleSearchPageSnapshot(
         },
         resultStats: normalize(document.querySelector('#result-stats')?.textContent || '') || null,
         noResults: /did not match any documents|no results found for/i.test(bodyText),
-        captcha: Boolean(
-          document.querySelector('form[action*="sorry"]') ||
-          document.querySelector('iframe[title*="reCAPTCHA"]') ||
-          /unusual traffic|verify you(?:'|’)re human|not a robot/i.test(bodyText)
-        ),
+        captcha: ${GOOGLE_HUMAN_VERIFICATION_PREDICATE},
         candidates,
         nextPageCandidates,
       };

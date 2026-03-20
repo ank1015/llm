@@ -4,6 +4,10 @@ import { basename, join, resolve } from 'node:path';
 
 import { isMainModule } from '../../../../utils/is-main-module.js';
 import { withWebBrowser } from '../../web.js';
+import {
+  GOOGLE_HUMAN_VERIFICATION_PREDICATE,
+  waitForGoogleHumanVerificationIfNeeded,
+} from '../shared/human-verification.js';
 
 import { normalizeGmailThreadUrl } from './get-email.js';
 
@@ -77,6 +81,23 @@ const GMAIL_SEND_TIMEOUT_MS = 20_000;
 const GMAIL_REPLY_BODY_SELECTOR =
   'div[aria-label="Message Body"][role="textbox"], [role="textbox"][aria-label="Message Body"]';
 const GMAIL_FILE_INPUT_SELECTOR = 'input[type="file"][name="Filedata"]';
+const GMAIL_THREAD_READY_PREDICATE = `Boolean(
+  document.querySelector('h2.hP') ||
+  document.querySelector('.adn.ads') ||
+  document.querySelector('[data-message-id]') ||
+  document.querySelector('input[type="email"]') ||
+  document.querySelector('input[type="password"]')
+)`;
+const GMAIL_REPLY_READY_PREDICATE = `Boolean(
+  document.querySelector(${JSON.stringify(GMAIL_REPLY_BODY_SELECTOR)}) ||
+  document.querySelector(${JSON.stringify(GMAIL_FILE_INPUT_SELECTOR)}) ||
+  document.querySelector('input[type="email"]') ||
+  document.querySelector('input[type="password"]')
+)`;
+const GMAIL_REPLY_SNAPSHOT_READY_PREDICATE = `Boolean(
+  ${GMAIL_THREAD_READY_PREDICATE} ||
+  ${GMAIL_REPLY_READY_PREDICATE}
+)`;
 
 const SHOW_TRIMMED_CONTENT_SELECTORS = [
   '[aria-label="Show trimmed content"]',
@@ -303,13 +324,14 @@ async function waitForThreadReady(tab: GmailReplyTab): Promise<void> {
   await tab.waitFor({ selector: 'body' });
   await tab.waitFor({
     predicate: `Boolean(
-      document.querySelector('h2.hP') ||
-      document.querySelector('.adn.ads') ||
-      document.querySelector('[data-message-id]') ||
-      document.querySelector('input[type="email"]') ||
-      document.querySelector('input[type="password"]')
+      ${GMAIL_THREAD_READY_PREDICATE} ||
+      ${GOOGLE_HUMAN_VERIFICATION_PREDICATE}
     )`,
     timeoutMs: GMAIL_THREAD_READY_TIMEOUT_MS,
+  });
+  await waitForGoogleHumanVerificationIfNeeded(tab, {
+    readyPredicate: GMAIL_THREAD_READY_PREDICATE,
+    label: 'Gmail verification',
   });
   await tab.waitForIdle(1_500);
 }
@@ -401,12 +423,14 @@ async function openReplyComposer(tab: GmailReplyTab, subject: string): Promise<b
 
   await tab.waitFor({
     predicate: `Boolean(
-      document.querySelector(${JSON.stringify(GMAIL_REPLY_BODY_SELECTOR)}) ||
-      document.querySelector(${JSON.stringify(GMAIL_FILE_INPUT_SELECTOR)}) ||
-      document.querySelector('input[type="email"]') ||
-      document.querySelector('input[type="password"]')
+      ${GMAIL_REPLY_READY_PREDICATE} ||
+      ${GOOGLE_HUMAN_VERIFICATION_PREDICATE}
     )`,
     timeoutMs: GMAIL_REPLY_READY_TIMEOUT_MS,
+  });
+  await waitForGoogleHumanVerificationIfNeeded(tab, {
+    readyPredicate: GMAIL_REPLY_READY_PREDICATE,
+    label: 'Gmail verification',
   });
   await tab.waitForIdle(1_000);
 
@@ -415,6 +439,11 @@ async function openReplyComposer(tab: GmailReplyTab, subject: string): Promise<b
 }
 
 async function readReplySnapshot(tab: GmailReplyTab): Promise<GmailReplySnapshot> {
+  await waitForGoogleHumanVerificationIfNeeded(tab, {
+    readyPredicate: GMAIL_REPLY_SNAPSHOT_READY_PREDICATE,
+    label: 'Gmail verification',
+  });
+
   return await tab.evaluate<GmailReplySnapshot>(
     `(() => {
       const normalize = (value) => (value || '').replace(/\\s+/g, ' ').trim();
