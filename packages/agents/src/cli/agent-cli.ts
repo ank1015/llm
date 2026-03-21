@@ -3,11 +3,11 @@
 import { realpath, stat } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
 import { createInterface } from 'node:readline/promises';
-import { pathToFileURL } from 'node:url';
 
 import { addSkill } from '../agents/skills/index.js';
 import { createSystemPrompt } from '../agents/system-prompt.js';
 import { createAllTools } from '../tools/index.js';
+import { isMainModule } from '../utils/is-main-module.js';
 
 import { isReadlineInterruptError, runInteractiveCliSession } from './shared.js';
 
@@ -121,6 +121,6 @@ export async function runAgentCli(): Promise<void> {
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isMainModule(import.meta.url)) {
   void runAgentCli();
 }

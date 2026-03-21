@@ -4,10 +4,15 @@ All notable changes to this package will be documented in this file.
 
 ## Unreleased
 
+## 0.0.5 - 2026-03-21
+
 - added a dev-only `skill:tester` CLI that builds the local package stack and prepares a reusable `packages/agents/.skill-tester/` workspace for bundled skill iteration without publishing `@ank1015/llm-agents`
 - added markdown session transcript archiving for both `agent:cli` and `skill:tester` under `packages/agents/.sessions/`
 - added a one-shot `--prompt` mode to `skill:tester` so a bundled skill can be exercised non-interactively, then saved and inspected from the archived session transcript
 - refreshed the reusable `.max/temp` helper workspace on every helper-backed skill install so `@ank1015/llm-agents`, `tsx`, and the temp node-module links do not stay stale across package updates
+- added Gmail-specific `web` skill workflows for inbox overviews, inbox search, reading threads, composing drafts, and replying to emails
+- added a Google-specific `web` skill workflow for Advanced Search, including advanced filters, organic-result extraction, pagination, and bundled skill references
+- added shared human-verification waiting so Google and Gmail web scripts can pause for manual CAPTCHA completion and resume after the human finishes verification
 
 ## 0.0.4 - 2026-03-18
 

@@ -33,4 +33,5 @@ pnpm-debug.log*
 
 packages/agents/.skill-tester/
 packages/agents/.sessions/
+packages/agents/temp/
 .agents
