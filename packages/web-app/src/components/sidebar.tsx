@@ -6,16 +6,12 @@ import {
   Folder,
   FolderPlus,
   LayoutGrid,
-  LifeBuoy,
   Loader2,
-  LogOut,
   MessageSquare,
   MessageSquarePlus,
   PanelLeft,
   Pencil,
   Settings,
-  Smile,
-  SparklesIcon,
   Trash2,
 } from 'lucide-react';
 import Image from 'next/image';
@@ -25,7 +21,6 @@ import { memo, useEffect, useRef, useState } from 'react';
 import type { ArtifactDirOverviewDto, SessionSummaryDto } from '@/lib/client-api';
 import type { FC, FormEvent, ReactNode } from 'react';
 
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -38,12 +33,8 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -665,74 +656,31 @@ const NewArtifactDialog: FC<{
 };
 
 // ---------------------------------------------------------------------------
-// AccountMenu
+// SettingsButton
 // ---------------------------------------------------------------------------
 
-const AccountMenu: FC<{ collapsed?: boolean }> = ({ collapsed }) => {
+const SettingsButton: FC<{ collapsed?: boolean }> = ({ collapsed }) => {
+  const openSettings = useUiStore((state) => state.openSettings);
+
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          className={cn(
-            'group flex h-10 w-full items-center whitespace-nowrap rounded-lg pl-[5px] pr-3 text-sm text-foreground hover:bg-home-hover',
-            !collapsed && 'cursor-pointer gap-2'
-          )}
-        >
-          <Avatar className="size-6">
-            <AvatarFallback className="bg-muted-foreground/20 text-[10px] font-medium">
-              SU
-            </AvatarFallback>
-          </Avatar>
-          {!collapsed && <span className="flex-1 text-left text-[14px]">sugarkid</span>}
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent side="top" align="start" className="w-[240px]">
-        <div className="flex items-center gap-3 px-2 py-2">
-          <Avatar className="size-8">
-            <AvatarFallback className="bg-muted-foreground/20 text-xs font-medium">
-              SU
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex flex-col">
-            <span className="text-sm font-medium">sugarkid</span>
-            <span className="text-muted-foreground text-xs">@sugarkid</span>
-          </div>
-        </div>
-        <DropdownMenuSeparator />
-        <DropdownMenuGroup>
-          <DropdownMenuItem>
-            <SparklesIcon />
-            Upgrade plan
-          </DropdownMenuItem>
-          <DropdownMenuItem>
-            <Smile />
-            Personalization
-          </DropdownMenuItem>
-          <DropdownMenuItem>
-            <Settings />
-            Settings
-          </DropdownMenuItem>
-        </DropdownMenuGroup>
-        <DropdownMenuSeparator />
-        <DropdownMenuGroup>
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger>
-              <LifeBuoy />
-              Help
-            </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent>
-              <DropdownMenuItem>Documentation</DropdownMenuItem>
-              <DropdownMenuItem>Support</DropdownMenuItem>
-              <DropdownMenuItem>Feedback</DropdownMenuItem>
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
-          <DropdownMenuItem>
-            <LogOut />
-            Log out
-          </DropdownMenuItem>
-        </DropdownMenuGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <button
+      type="button"
+      onClick={(event) => {
+        event.stopPropagation();
+        openSettings('keys');
+      }}
+      aria-label="Open settings"
+      title="Settings"
+      className={cn(
+        'group flex h-10 w-full cursor-pointer items-center whitespace-nowrap rounded-lg pl-[8px] pr-3 text-sm text-foreground transition-colors hover:bg-home-hover',
+        collapsed ? 'justify-center px-0' : 'gap-2'
+      )}
+    >
+      <span className="text-muted-foreground shrink-0">
+        <Settings size={18} strokeWidth={1.8} />
+      </span>
+      {!collapsed && <span className="flex-1 text-left text-[14px]">Settings</span>}
+    </button>
   );
 };
 
@@ -821,10 +769,10 @@ function SidebarComponent() {
         onNewArtifact={() => setIsNewArtifactOpen(true)}
       />
 
-      {/* Account menu — pinned to bottom */}
+      {/* Settings trigger — pinned to bottom */}
       {!isSidebarCollapsed && <div className="border-home-border mx-2 border-t" />}
       <div className="px-2 pt-2 pb-3">
-        <AccountMenu collapsed={isSidebarCollapsed} />
+        <SettingsButton collapsed={isSidebarCollapsed} />
       </div>
 
       <NewArtifactDialog

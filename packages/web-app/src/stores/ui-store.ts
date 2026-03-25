@@ -48,7 +48,7 @@ const initialState = {
   sideDrawer: { open: false, title: '', renderContent: () => null, badge: undefined },
   isMobileSidebarOpen: false,
   isSettingsOpen: false,
-  activeSettingsTab: 'general' as SettingsTab,
+  activeSettingsTab: 'keys' as SettingsTab,
   renameSessionId: null as string | null,
   deleteSessionId: null as string | null,
 };
@@ -90,7 +90,7 @@ export const useUiStore = create<UiStoreState>((set) => ({
   openSettings: (tab) =>
     set({
       isSettingsOpen: true,
-      activeSettingsTab: tab ?? 'general',
+      activeSettingsTab: tab ?? 'keys',
     }),
 
   closeSettings: () => set({ isSettingsOpen: false }),

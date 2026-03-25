@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 
 import { Header } from '@/components/header';
+import { SettingsDialog } from '@/components/settings-dialog';
 import { SideDrawer } from '@/components/side-drawer';
 import { Sidebar } from '@/components/sidebar';
 
@@ -14,6 +15,7 @@ export default function ProjectLayout({ children }: { children: ReactNode }) {
         <Header />
         <main className="relative flex-1 min-h-0 min-w-0 overflow-hidden">{children}</main>
       </div>
+      <SettingsDialog />
       <SideDrawer />
     </div>
   );
