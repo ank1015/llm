@@ -275,6 +275,47 @@ describe('Conversation Execution', () => {
       expect(events.filter((e) => e.type === 'turn_start')).toHaveLength(1);
     });
 
+    it('should allow prompting with a fully constructed user message', async () => {
+      const mockKeysAdapter = createMockKeysAdapter();
+      const conversation = new Conversation({ keysAdapter: mockKeysAdapter });
+      conversation.setProvider({ model: mockModel, providerOptions: {} });
+
+      const userMessage = {
+        role: 'user' as const,
+        id: 'user-custom-1',
+        timestamp: Date.now(),
+        content: [
+          { type: 'text' as const, content: 'Inspect this saved attachment' },
+          {
+            type: 'text' as const,
+            content: 'Attachment "report.pdf" was saved to "/tmp/report.pdf".',
+            metadata: {
+              hiddenFromUI: true,
+              kind: 'saved-attachment-path',
+            },
+          },
+          {
+            type: 'file' as const,
+            data: 'JVBERi0xLjQK',
+            mimeType: 'application/pdf',
+            filename: 'report.pdf',
+          },
+        ],
+      };
+
+      const callback = vi.fn(async () => undefined);
+      await conversation.promptMessage(userMessage, callback);
+
+      expect(core.runAgentLoop).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.arrayContaining([userMessage]),
+        expect.any(Function),
+        expect.any(Object),
+        expect.any(Object)
+      );
+      expect(callback).toHaveBeenCalledWith(userMessage);
+    });
+
     it('should call external callback for messages appended during the run', async () => {
       const mockKeysAdapter = createMockKeysAdapter();
       const conversation = new Conversation({ keysAdapter: mockKeysAdapter });
@@ -309,6 +350,51 @@ describe('Conversation Execution', () => {
           throw new Error('persist failed');
         })
       ).rejects.toThrow('persist failed');
+    });
+
+    it('flushes the external callback queue before surfacing runner errors', async () => {
+      const mockKeysAdapter = createMockKeysAdapter();
+      const conversation = new Conversation({ keysAdapter: mockKeysAdapter });
+      conversation.setProvider({ model: mockModel, providerOptions: {} });
+
+      let releasePersistence!: () => void;
+      const callback = vi.fn(
+        () =>
+          new Promise<void>((resolve) => {
+            releasePersistence = resolve;
+          })
+      );
+
+      vi.mocked(core.runAgentLoop).mockResolvedValue({
+        messages: [],
+        totalCost: 0,
+        aborted: false,
+        error: 'provider rejected attachment',
+      });
+
+      let capturedError: unknown;
+      const handledPromptPromise = conversation
+        .prompt('Hello', undefined, callback)
+        .catch((error: unknown) => {
+          capturedError = error;
+        });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(callback).toHaveBeenCalledTimes(1);
+
+      let settled = false;
+      void handledPromptPromise.finally(() => {
+        settled = true;
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(settled).toBe(false);
+
+      releasePersistence();
+
+      await handledPromptPromise;
+      expect(capturedError).toBeInstanceOf(Error);
+      expect((capturedError as Error).message).toBe('provider rejected attachment');
     });
 
     it('should update state.isStreaming during execution', async () => {
