@@ -104,6 +104,10 @@ function buildImageGenerationReferenceItem(providerItemId: string): ResponseInpu
   } as ResponseInputItem;
 }
 
+function buildFileDataUrl(data: string, mimeType: string): string {
+  return `data:${mimeType};base64,${data}`;
+}
+
 export function buildOpenAIMessages(model: Model<'openai'>, context: Context): ResponseInput {
   const openAIMessages: ResponseInput = [];
   if (context.systemPrompt) {
@@ -132,7 +136,7 @@ export function buildOpenAIMessages(model: Model<'openai'>, context: Context): R
           contents.push({
             type: 'input_file',
             filename: contentItem.filename,
-            file_data: contentItem.data,
+            file_data: buildFileDataUrl(contentItem.data, contentItem.mimeType),
           });
         }
       }
@@ -169,13 +173,14 @@ export function buildOpenAIMessages(model: Model<'openai'>, context: Context): R
         } else if (contentItem.type === 'file' && model.input.includes('file')) {
           toolOutputs.push({
             type: 'input_file',
-            file_data: contentItem.data,
+            filename: contentItem.filename,
+            file_data: buildFileDataUrl(contentItem.data, contentItem.mimeType),
           });
           hasFile = true;
         }
       }
       if (!hasText && (hasImg || hasFile)) {
-        toolOutputs.push({
+        toolOutputs.unshift({
           type: 'input_text',
           text: message.isError ? '[TOOL ERROR] (see attached)' : '(see attached)',
         });
