@@ -5,9 +5,12 @@ import {
   ArtifactFileQuerySchema,
   BundledSkillDtoSchema,
   DeleteArtifactSkillResponseSchema,
+  KeysListResponseSchema,
   InstalledSkillDtoSchema,
   ProjectDtoSchema,
+  ReloadKeyResponseSchema,
   SessionPromptRequestSchema,
+  SetKeyRequestSchema,
   SessionSummaryDtoSchema,
   StreamConflictResponseSchema,
   UpdateProjectImageRequestSchema,
@@ -115,6 +118,38 @@ describe('app contracts', () => {
         ok: true,
         skillName: 'ai-images',
         deleted: true,
+      })
+    ).toBe(true);
+  });
+
+  it('accepts key management requests and responses', () => {
+    expect(
+      Value.Check(KeysListResponseSchema, {
+        providers: [
+          {
+            api: 'codex',
+            hasKey: true,
+            credentials: {
+              apiKey: 'abcd****wxyz',
+            },
+          },
+          {
+            api: 'google',
+            hasKey: false,
+          },
+        ],
+      })
+    ).toBe(true);
+
+    expect(
+      Value.Check(SetKeyRequestSchema, {
+        key: 'sk-test',
+      })
+    ).toBe(true);
+
+    expect(
+      Value.Check(ReloadKeyResponseSchema, {
+        ok: true,
       })
     ).toBe(true);
   });
