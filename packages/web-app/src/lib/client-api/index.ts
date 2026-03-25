@@ -36,6 +36,7 @@ export {
   renameArtifactPath,
 } from './projects';
 export type { ArtifactContext } from './projects';
+export { clearKey, getKeyDetails, listKeys, reloadKey, setKey } from './keys';
 export {
   createSession,
   deleteSession,
@@ -54,8 +55,12 @@ export type {
   BundledSkillDto,
   CancelSessionRunResponse,
   DeleteArtifactPathResponse,
+  DeleteKeyResponse,
   DeleteSessionResponse,
   InstalledSkillDto,
+  KeyProviderDetailsResponse,
+  KeyProviderStatusDto,
+  KeysListResponse,
   LiveRunSummaryDto,
   ModelSelection,
   ProjectDto,
@@ -63,10 +68,13 @@ export type {
   ProjectFileIndexResult,
   ProjectOverviewDto,
   ReasoningLevel,
+  ReloadKeyResponse,
   RenameArtifactPathResponse,
   SessionMessagesResponse,
   SessionNameResponse,
   SessionRef,
+  SetKeyRequest,
+  SetKeyResponse,
   SessionTreeResponse,
   StreamAgentEventData,
   StreamConflictResponse,
