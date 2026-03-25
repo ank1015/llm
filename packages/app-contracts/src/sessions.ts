@@ -65,9 +65,23 @@ export const SessionTreeResponseSchema = Type.Object(
 );
 export type SessionTreeResponse = Static<typeof SessionTreeResponseSchema>;
 
+export const SessionAttachmentInputSchema = Type.Object(
+  {
+    id: Type.String(),
+    type: Type.Union([Type.Literal('image'), Type.Literal('file')]),
+    fileName: Type.String(),
+    mimeType: Type.String(),
+    size: Type.Optional(Type.Number()),
+    content: Type.String(),
+  },
+  { additionalProperties: false }
+);
+export type SessionAttachmentInput = Static<typeof SessionAttachmentInputSchema>;
+
 export const SessionPromptRequestSchema = Type.Object(
   {
     message: Type.Optional(Type.String()),
+    attachments: Type.Optional(Type.Array(SessionAttachmentInputSchema)),
     leafNodeId: Type.Optional(Type.String()),
     api: Type.Optional(ApiSchema),
     modelId: Type.Optional(Type.String()),
@@ -78,6 +92,7 @@ export const SessionPromptRequestSchema = Type.Object(
 );
 export interface SessionPromptRequest {
   message?: string;
+  attachments?: SessionAttachmentInput[];
   leafNodeId?: string;
   api?: Api;
   modelId?: string;
