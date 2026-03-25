@@ -49,8 +49,9 @@ function resolvePromptInput(
   body: SessionPromptRequest | undefined
 ): { error: string } | { input: PromptInput } {
   const message = body?.message?.trim() ?? '';
-  if (!message) {
-    return { error: 'message is required' };
+  const attachments = body?.attachments ?? [];
+  if (message.length === 0 && attachments.length === 0) {
+    return { error: 'message or attachments are required' };
   }
 
   const api = body?.api;
@@ -67,6 +68,7 @@ function resolvePromptInput(
   return {
     input: {
       message,
+      ...(attachments.length > 0 ? { attachments } : {}),
       ...(leafNodeId ? { leafNodeId } : {}),
       ...(hasProviderOverride && api ? { api, modelId } : {}),
       ...(reasoningLevel ? { reasoningLevel } : {}),
@@ -577,10 +579,14 @@ sessionRoutes.post(`${BASE}/:sessionId/messages/:nodeId/edit/stream`, async (c) 
   }
 
   const body = rawBody as SessionPromptRequest | undefined;
-  const resolvedPromptInput = resolvePromptInput(body);
-  if ('error' in resolvedPromptInput) {
-    return c.json({ error: resolvedPromptInput.error }, 400);
+  if ((body?.attachments?.length ?? 0) > 0) {
+    return c.json({ error: 'attachments are not supported when editing a message' }, 400);
   }
+  const resolvedTurnSettings = resolveTurnSettings(body);
+  if ('error' in resolvedTurnSettings) {
+    return c.json({ error: resolvedTurnSettings.error }, 400);
+  }
+  const message = body?.message?.trim() ?? '';
 
   let session: Session;
   try {
@@ -598,7 +604,10 @@ sessionRoutes.post(`${BASE}/:sessionId/messages/:nodeId/edit/stream`, async (c) 
     execute: async (options) => {
       const newMessages = await session.streamEditFromUserMessage(
         nodeId,
-        resolvedPromptInput.input,
+        {
+          ...resolvedTurnSettings.input,
+          message,
+        },
         options
       );
       return { messageCount: newMessages.length };

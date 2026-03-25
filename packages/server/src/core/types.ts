@@ -3,7 +3,7 @@
  * These represent the shapes stored on disk as metadata.json files.
  */
 
-import type { Api } from '@ank1015/llm-sdk';
+import type { Api, Attachment } from '@ank1015/llm-sdk';
 
 /** Metadata stored in each project's metadata.json (lives in dataPath) */
 export interface ProjectMetadata {
@@ -161,6 +161,8 @@ export type ReasoningLevel = 'low' | 'medium' | 'high' | 'xhigh';
 export interface PromptInput {
   /** The user's message text */
   message: string;
+  /** Optional inline image/pdf attachments for the user message */
+  attachments?: Attachment[];
   /** Optional visible leaf node to continue from instead of persisted active branch */
   leafNodeId?: string;
   /** Optional per-turn API override */

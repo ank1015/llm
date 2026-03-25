@@ -24,6 +24,9 @@ vi.mock('@ank1015/llm-sdk', async (importOriginal) => {
       setSystemPrompt: vi.fn(),
       replaceMessages: vi.fn(),
       prompt: mockPrompt,
+      promptMessage: vi.fn((message: unknown, callback?: (msg: unknown) => Promise<void>) =>
+        mockPrompt(message, undefined, callback)
+      ),
     })),
     getModel: vi.fn().mockReturnValue({
       id: 'claude-sonnet-4-5',
@@ -210,7 +213,14 @@ describe('Session', () => {
 
       const messages = await session.prompt({ message: 'Hello' });
 
-      expect(mockPrompt).toHaveBeenCalledWith('Hello');
+      expect(mockPrompt).toHaveBeenCalledWith(
+        expect.objectContaining({
+          role: 'user',
+          content: [{ type: 'text', content: 'Hello' }],
+        }),
+        undefined,
+        undefined
+      );
       expect(messages).toHaveLength(2);
     });
 
