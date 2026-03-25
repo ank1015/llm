@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 
 import { artifactDirRoutes } from './routes/artifact-dirs.js';
+import { keyRoutes } from './routes/keys.js';
 import { projectRoutes } from './routes/projects.js';
 import { sessionRoutes } from './routes/sessions.js';
 import { skillRoutes } from './routes/skills.js';
@@ -28,6 +29,7 @@ export function createApp(): Hono {
 
   app.route('/api', projectRoutes);
   app.route('/api', artifactDirRoutes);
+  app.route('/api', keyRoutes);
   app.route('/api', sessionRoutes);
   app.route('/api', skillRoutes);
 
