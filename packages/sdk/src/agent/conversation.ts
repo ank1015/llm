@@ -29,6 +29,7 @@ import type {
   Provider,
   QueuedMessage,
   AgentTool,
+  UserMessage,
 } from '@ank1015/llm-types';
 
 export interface ConversationOptions {
@@ -306,6 +307,22 @@ export class Conversation {
     return newMessages;
   }
 
+  async promptMessage(
+    userMessage: UserMessage,
+    externalCallback?: ConversationExternalCallback
+  ): Promise<Message[]> {
+    if (this._state.isStreaming) {
+      throw new ConversationBusyError();
+    }
+
+    if (!this._state.provider || !this._state.provider.model) {
+      throw new ModelNotConfiguredError();
+    }
+
+    const newMessages = await this._runAgentLoop(userMessage, externalCallback);
+    return newMessages;
+  }
+
   async continue(externalCallback?: ConversationExternalCallback): Promise<Message[]> {
     if (this._state.isStreaming) {
       throw new ConversationBusyError();
@@ -500,6 +517,14 @@ export class Conversation {
       await callbackQueue.flush();
       return result.messages;
     } catch (e) {
+      try {
+        await callbackQueue.flush();
+      } catch (callbackError) {
+        this._state.error =
+          callbackError instanceof Error ? callbackError.message : String(callbackError);
+        throw callbackError;
+      }
+
       this._state.error = e instanceof Error ? e.message : String(e);
       throw e;
     } finally {
@@ -542,6 +567,14 @@ export class Conversation {
       await callbackQueue.flush();
       return result.messages;
     } catch (e) {
+      try {
+        await callbackQueue.flush();
+      } catch (callbackError) {
+        this._state.error =
+          callbackError instanceof Error ? callbackError.message : String(callbackError);
+        throw callbackError;
+      }
+
       this._state.error = e instanceof Error ? e.message : String(e);
       throw e;
     } finally {

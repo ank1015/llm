@@ -113,4 +113,63 @@ describe('conversation client-api', () => {
       name: StreamConflictError.name,
     });
   });
+
+  it('includes attachments in the stream request body', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        createEventStreamResponse([
+          'event: done\ndata: {"ok":true,"sessionId":"session-1","runId":"run-1","status":"completed","messageCount":1}\n\n',
+        ])
+      );
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { streamConversation } = await import('@/lib/client-api/conversation');
+
+    await streamConversation({
+      api: 'openai',
+      artifactId: 'artifact-1',
+      attachments: [
+        {
+          id: 'file-1',
+          type: 'file',
+          fileName: 'report.pdf',
+          mimeType: 'application/pdf',
+          size: 42,
+          content: 'JVBERi0xLjQK',
+        },
+      ],
+      message: '',
+      modelId: 'gpt-5.4',
+      projectId: 'project-1',
+      reasoningLevel: 'high',
+      sessionId: 'session-1',
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(
+        '/api/projects/project-1/artifacts/artifact-1/sessions/session-1/stream'
+      ),
+      expect.objectContaining({
+        body: JSON.stringify({
+          message: '',
+          attachments: [
+            {
+              id: 'file-1',
+              type: 'file',
+              fileName: 'report.pdf',
+              mimeType: 'application/pdf',
+              size: 42,
+              content: 'JVBERi0xLjQK',
+            },
+          ],
+          api: 'openai',
+          modelId: 'gpt-5.4',
+          reasoningLevel: 'high',
+        }),
+        method: 'POST',
+      })
+    );
+  });
 });

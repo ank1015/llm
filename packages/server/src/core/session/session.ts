@@ -11,6 +11,12 @@ import { Project } from '../project/project.js';
 import { ensureDir, readMetadata, writeMetadata, pathExists, removeDir } from '../storage/fs.js';
 import { createProviderOptions } from '../utils.js';
 
+import {
+  buildPromptUserMessage,
+  cloneUserMessage,
+  rewriteUserMessageVisibleText,
+} from './user-message.js';
+
 import type {
   CreateSessionOptions,
   PromptInput,
@@ -20,7 +26,6 @@ import type {
 import type {
   AgentEvent,
   AgentTool,
-  Attachment,
   Api,
   BaseAssistantMessage,
   ConversationExternalCallback,
@@ -297,15 +302,18 @@ export class Session {
       agentConfig,
       streamAssistantMessage: false,
     });
-    const newMessages = await conversation.prompt(input.message);
-    await this.saveMessages(newMessages, {
+    const userMessage = await this.createPromptUserMessage(input);
+    const newMessages = await conversation.promptMessage(userMessage);
+    const allNewMessages =
+      newMessages[0]?.role === 'user' ? newMessages : [userMessage, ...newMessages];
+    await this.saveMessages(allNewMessages, {
       execution,
       branch: context.branch,
       initialParentId: context.leafNodeId,
       activateBranchOnFirstPersist: context.branch !== context.persistedActiveBranch,
     });
 
-    return newMessages;
+    return allNewMessages;
   }
 
   /**
@@ -322,13 +330,14 @@ export class Session {
       this.loadPathContext(input.leafNodeId),
       this.loadAgentConfig(),
     ]);
+    const userMessage = await this.createPromptUserMessage(input);
 
     return this.runStreamingPrompt(
       {
         execution,
         existingMessages: context.messageNodes.map((node) => node.message),
         agentConfig,
-        promptText: input.message,
+        userMessage,
         persistence: {
           execution,
           branch: context.branch,
@@ -522,10 +531,13 @@ export class Session {
       throw new Error('Cannot rewrite the root session node');
     }
 
-    const payload = this.extractUserPromptPayload(
-      targetNode.message as UserMessage,
-      input.messageOverride
-    );
+    const baseUserMessage =
+      input.messageOverride !== undefined
+        ? rewriteUserMessageVisibleText(targetNode.message as UserMessage, input.messageOverride)
+        : cloneUserMessage(targetNode.message as UserMessage);
+    if (baseUserMessage.content.length === 0) {
+      throw new Error('Edited message cannot be empty');
+    }
     const parentPathNodes = this.getMessagePathNodesToNode(context.tree, targetNode.parentId);
     const branch = this.createBranchName(input.branchPrefix);
 
@@ -534,8 +546,7 @@ export class Session {
         execution,
         existingMessages: parentPathNodes.map((node) => node.message),
         agentConfig,
-        promptText: payload.text,
-        attachments: payload.attachments,
+        userMessage: baseUserMessage,
         persistence: {
           execution,
           branch,
@@ -555,8 +566,7 @@ export class Session {
       execution: SessionExecutionConfig;
       existingMessages: Message[];
       agentConfig: { systemPrompt: string; tools: AgentTool[] };
-      promptText: string;
-      attachments?: Attachment[];
+      userMessage: UserMessage;
       persistence: PersistenceConfig;
     },
     options: StreamRunOptions
@@ -574,14 +584,21 @@ export class Session {
     };
     if (options.signal) {
       options.signal.addEventListener('abort', abortListener, { once: true });
+      if (options.signal.aborted) {
+        abortListener();
+      }
+    }
+
+    if (options.signal?.aborted) {
+      unsubscribe();
+      if (options.signal) {
+        options.signal.removeEventListener('abort', abortListener);
+      }
+      return Promise.reject(new Error('aborted'));
     }
 
     return conversation
-      .prompt(
-        input.promptText,
-        input.attachments,
-        this.createPersistenceCallback(input.persistence).callback
-      )
+      .promptMessage(input.userMessage, this.createPersistenceCallback(input.persistence).callback)
       .finally(() => {
         unsubscribe();
         if (options.signal) {
@@ -708,6 +725,18 @@ export class Session {
     );
   }
 
+  private async createPromptUserMessage(
+    input: Pick<PromptInput, 'message' | 'attachments'>
+  ): Promise<UserMessage> {
+    const artifactDir = await ArtifactDir.getById(this.projectId, this.artifactDirId);
+
+    return buildPromptUserMessage({
+      artifactDir: artifactDir.dirPath,
+      message: input.message,
+      ...(input.attachments ? { attachments: input.attachments } : {}),
+    });
+  }
+
   private isLeafNode(tree: StoredSession, nodeId: string): boolean {
     return !tree.nodes.some((node) => node.parentId === nodeId);
   }
@@ -735,49 +764,6 @@ export class Session {
     }
 
     return lineage.reverse();
-  }
-
-  private extractUserPromptPayload(
-    message: UserMessage,
-    messageOverride?: string
-  ): { text: string; attachments: Attachment[] } {
-    const textBlocks: string[] = [];
-    const attachments: Attachment[] = [];
-
-    for (const [index, block] of message.content.entries()) {
-      if (block.type === 'text') {
-        textBlocks.push(block.content);
-        continue;
-      }
-
-      if (block.type === 'image') {
-        const size = typeof block.metadata?.size === 'number' ? block.metadata.size : undefined;
-        attachments.push({
-          id: `${message.id}:image:${index}`,
-          type: 'image',
-          fileName: String(block.metadata?.fileName ?? `image-${index}`),
-          mimeType: block.mimeType,
-          content: block.data,
-          ...(size !== undefined ? { size } : {}),
-        });
-        continue;
-      }
-
-      const size = typeof block.metadata?.size === 'number' ? block.metadata.size : undefined;
-      attachments.push({
-        id: `${message.id}:file:${index}`,
-        type: 'file',
-        fileName: block.filename,
-        mimeType: block.mimeType,
-        content: block.data,
-        ...(size !== undefined ? { size } : {}),
-      });
-    }
-
-    return {
-      text: messageOverride ?? textBlocks.join('\n'),
-      attachments,
-    };
   }
 
   private createBranchName(prefix: 'retry' | 'edit'): string {

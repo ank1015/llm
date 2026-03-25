@@ -1,6 +1,15 @@
 'use client';
 
-import { Check, ChevronLeft, ChevronRight, Copy, Pencil, RefreshCw } from 'lucide-react';
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  ExternalLink,
+  FileText,
+  Pencil,
+  RefreshCw,
+} from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
@@ -10,7 +19,8 @@ import { ChatMarkdown } from './markdown-renderer';
 import type { BranchNavigatorState } from '@/lib/messages/session-tree';
 import type { MessageNode, UserMessage } from '@ank1015/llm-types';
 
-import { getTextFromUserMessage } from '@/lib/messages/utils';
+import { getArtifactRawFileUrl } from '@/lib/client-api';
+import { getTextFromUserMessage, hasVisibleAttachmentInUserMessage } from '@/lib/messages/utils';
 import { useChatSettingsStore, useChatStore, useComposerStore } from '@/stores';
 
 function isAbortError(error: unknown): boolean {
@@ -37,6 +47,30 @@ function focusComposer(): void {
   });
 }
 
+function formatAttachmentSize(size: unknown): string | null {
+  if (typeof size !== 'number' || !Number.isFinite(size) || size <= 0) {
+    return null;
+  }
+
+  if (size < 1024) {
+    return `${size} B`;
+  }
+
+  if (size < 1024 * 1024) {
+    return `${(size / 1024).toFixed(1)} KB`;
+  }
+
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function getAttachmentMetadataValue(
+  metadata: Record<string, unknown> | undefined,
+  key: string
+): string | null {
+  const value = metadata?.[key];
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
 export const UserMessageComponent = ({
   userNode,
   branchState,
@@ -51,6 +85,12 @@ export const UserMessageComponent = ({
   }>();
   const userMessage = userNode.message as UserMessage;
   const text = getTextFromUserMessage(userMessage);
+  const hasVisibleAttachments = hasVisibleAttachmentInUserMessage(userMessage);
+  const attachmentBlocks = userMessage.content.filter(
+    (block): block is Extract<UserMessage['content'][number], { type: 'image' | 'file' }> => {
+      return block.type === 'image' || block.type === 'file';
+    }
+  );
   const [copied, setCopied] = useState(false);
   const beginEdit = useComposerStore((state) => state.beginEdit);
   const retryFromNode = useChatStore((state) => state.retryFromNode);
@@ -75,15 +115,16 @@ export const UserMessageComponent = ({
   }, [text]);
 
   const handleEdit = useCallback(() => {
-    if (!text || !threadId) return;
+    if (!threadId) return;
 
     beginEdit({
       session: { sessionId: threadId },
       targetNodeId: userNode.id,
       originalText: text,
+      hasFixedAttachments: hasVisibleAttachments,
     });
     focusComposer();
-  }, [beginEdit, text, threadId, userNode.id]);
+  }, [beginEdit, hasVisibleAttachments, text, threadId, userNode.id]);
 
   const handleRetry = useCallback(async () => {
     if (!threadId || isStreaming) return;
@@ -136,6 +177,67 @@ export const UserMessageComponent = ({
 
   return (
     <div className="group/user flex w-full flex-col items-end gap-1">
+      {attachmentBlocks.length > 0 ? (
+        <div className="flex w-full max-w-[70%] flex-col items-end gap-2">
+          {attachmentBlocks.map((block, index) => {
+            const fileName =
+              getAttachmentMetadataValue(block.metadata, 'originalFileName') ??
+              getAttachmentMetadataValue(block.metadata, 'fileName') ??
+              (block.type === 'file' ? block.filename : `image-${index + 1}`);
+            const artifactRelativePath = getAttachmentMetadataValue(
+              block.metadata,
+              'artifactRelativePath'
+            );
+            const attachmentHref = artifactRelativePath
+              ? getArtifactRawFileUrl(
+                  { projectId, artifactId },
+                  {
+                    path: artifactRelativePath,
+                  }
+                )
+              : `data:${block.mimeType};base64,${block.data}`;
+            const sizeLabel = formatAttachmentSize(block.metadata?.size);
+
+            if (block.type === 'image') {
+              return (
+                <a
+                  key={`${userMessage.id}-attachment-${index}`}
+                  href={attachmentHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="overflow-hidden rounded-2xl border border-white/10 bg-white/4"
+                >
+                  <img
+                    src={`data:${block.mimeType};base64,${block.data}`}
+                    alt={fileName}
+                    className="max-h-80 w-auto max-w-full object-cover"
+                  />
+                </a>
+              );
+            }
+
+            return (
+              <a
+                key={`${userMessage.id}-attachment-${index}`}
+                href={attachmentHref}
+                target="_blank"
+                rel="noreferrer"
+                className="bg-home-hover hover:bg-home-hover/80 text-foreground flex w-full items-center gap-3 rounded-2xl border border-white/10 px-4 py-3 transition-colors"
+              >
+                <FileText className="size-5 shrink-0 text-red-300" />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium">{fileName}</div>
+                  <div className="text-muted-foreground text-xs">
+                    PDF{sizeLabel ? ` • ${sizeLabel}` : ''}
+                  </div>
+                </div>
+                <ExternalLink className="text-muted-foreground size-4 shrink-0" />
+              </a>
+            );
+          })}
+        </div>
+      ) : null}
+
       {text && (
         <div className="bg-home-hover text-foreground max-w-[70%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-[15px] leading-relaxed">
           <ChatMarkdown>{text}</ChatMarkdown>
@@ -154,7 +256,7 @@ export const UserMessageComponent = ({
         <button
           type="button"
           onClick={handleEdit}
-          disabled={!text || isStreaming}
+          disabled={isStreaming}
           className="text-muted-foreground hover:text-foreground disabled:text-muted-foreground/40 cursor-pointer rounded p-1 transition-colors disabled:cursor-default"
           aria-label="Edit message"
         >

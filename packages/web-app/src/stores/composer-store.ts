@@ -15,6 +15,7 @@ type ComposerSnapshot = {
 type ComposerEditState = {
   targetNodeId: string;
   originalText: string;
+  hasFixedAttachments: boolean;
   previousDraft: string;
   previousAttachments: Attachment[];
 };
@@ -35,7 +36,12 @@ type ComposerStoreState = {
   clearAttachments: (session?: SessionRef) => void;
   markSubmitted: (session?: SessionRef) => void;
   getSnapshot: (session?: SessionRef) => ComposerSnapshot;
-  beginEdit: (input: { session?: SessionRef; targetNodeId: string; originalText: string }) => void;
+  beginEdit: (input: {
+    session?: SessionRef;
+    targetNodeId: string;
+    originalText: string;
+    hasFixedAttachments?: boolean;
+  }) => void;
   cancelEdit: (session?: SessionRef) => void;
   clearEditState: (session?: SessionRef) => void;
   resetSessionComposer: (session: SessionRef) => void;
@@ -315,7 +321,7 @@ export const useComposerStore = create<ComposerStoreState>()(
         };
       },
 
-      beginEdit: ({ session, targetNodeId, originalText }) => {
+      beginEdit: ({ session, targetNodeId, originalText, hasFixedAttachments = false }) => {
         const resolvedSession = resolveSessionRef(session, get().activeSession);
         if (!resolvedSession) {
           return;
@@ -348,6 +354,7 @@ export const useComposerStore = create<ComposerStoreState>()(
               [key]: {
                 targetNodeId,
                 originalText,
+                hasFixedAttachments,
                 previousDraft,
                 previousAttachments,
               },
@@ -436,13 +443,26 @@ export const useComposerStore = create<ComposerStoreState>()(
     }),
     {
       name: 'web-app-composer-store',
-      version: 1,
+      version: 2,
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         draftsBySession: state.draftsBySession,
-        attachmentsBySession: state.attachmentsBySession,
         isDirtyBySession: state.isDirtyBySession,
       }),
+      migrate: (persistedState) => {
+        const state =
+          persistedState && typeof persistedState === 'object'
+            ? (persistedState as Partial<typeof initialState>)
+            : {};
+
+        return {
+          draftsBySession: state.draftsBySession ?? {},
+          attachmentsBySession: {},
+          isDirtyBySession: state.isDirtyBySession ?? {},
+          activeSession: null,
+          editStateBySession: {},
+        };
+      },
     }
   )
 );

@@ -70,6 +70,7 @@ export type {
   ReasoningLevel,
   ReloadKeyResponse,
   RenameArtifactPathResponse,
+  SessionAttachmentInput,
   SessionMessagesResponse,
   SessionNameResponse,
   SessionRef,

@@ -10,6 +10,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const packageRoot = path.resolve(__dirname, '..');
 const codexAuthPath = path.join(process.env.HOME || '', '.codex', 'auth.json');
 const imageFixturePath = path.join(packageRoot, 'tests', 'utils', 'test.jpg');
+const pdfFixturePath = path.join(packageRoot, 'tests', 'utils', 'research-paper.pdf');
 
 function hasEnv(...names) {
   return names.every((name) => Boolean(process.env[name]));
@@ -48,6 +49,11 @@ const suites = [
     enabled: hasEnv('ANTHROPIC_API_KEY'),
   },
   {
+    label: 'Anthropic file input',
+    file: 'tests/integration/anthropic/file.test.ts',
+    enabled: hasEnv('ANTHROPIC_API_KEY') && fs.existsSync(pdfFixturePath),
+  },
+  {
     label: 'Anthropic stream',
     file: 'tests/integration/anthropic/stream.test.ts',
     enabled: hasEnv('ANTHROPIC_API_KEY'),
@@ -62,6 +68,13 @@ const suites = [
     ),
   },
   {
+    label: 'Claude Code file input',
+    file: 'tests/integration/claude-code/file.test.ts',
+    enabled:
+      hasEnv('CLAUDE_CODE_OAUTH_TOKEN', 'CLAUDE_CODE_BETA_FLAG', 'CLAUDE_CODE_BILLING_HEADER') &&
+      fs.existsSync(pdfFixturePath),
+  },
+  {
     label: 'Claude Code stream',
     file: 'tests/integration/claude-code/stream.test.ts',
     enabled: hasEnv(
@@ -74,6 +87,11 @@ const suites = [
     label: 'Codex complete',
     file: 'tests/integration/codex/complete.test.ts',
     enabled: hasCodexAuth(),
+  },
+  {
+    label: 'Codex file input',
+    file: 'tests/integration/codex/file.test.ts',
+    enabled: hasCodexAuth() && fs.existsSync(pdfFixturePath),
   },
   {
     label: 'Codex stream',
@@ -104,6 +122,11 @@ const suites = [
     label: 'Google complete',
     file: 'tests/integration/google/complete.test.ts',
     enabled: hasEnv('GEMINI_API_KEY'),
+  },
+  {
+    label: 'Google file input',
+    file: 'tests/integration/google/file.test.ts',
+    enabled: hasEnv('GEMINI_API_KEY') && fs.existsSync(pdfFixturePath),
   },
   {
     label: 'Google image generation',
@@ -139,6 +162,11 @@ const suites = [
     label: 'OpenAI complete',
     file: 'tests/integration/openai/complete.test.ts',
     enabled: hasEnv('OPENAI_API_KEY'),
+  },
+  {
+    label: 'OpenAI file input',
+    file: 'tests/integration/openai/file.test.ts',
+    enabled: hasEnv('OPENAI_API_KEY') && fs.existsSync(pdfFixturePath),
   },
   {
     label: 'OpenAI image generation',

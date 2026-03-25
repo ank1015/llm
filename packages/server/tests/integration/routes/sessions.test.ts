@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -37,6 +37,9 @@ vi.mock('@ank1015/llm-sdk', async (importOriginal) => {
       setSystemPrompt: vi.fn(),
       replaceMessages: vi.fn(),
       prompt: mockPrompt,
+      promptMessage: vi.fn((message: unknown, callback?: (msg: unknown) => Promise<void>) =>
+        mockPrompt(message, undefined, callback)
+      ),
       subscribe: mockSubscribe,
       abort: mockAbort,
     })),
@@ -64,6 +67,14 @@ let dataRoot: string;
 const PROJECT = 'test-project';
 const ARTIFACT = 'research';
 const BASE = `/api/projects/${PROJECT}/artifacts/${ARTIFACT}/sessions`;
+const PDF_ATTACHMENT = {
+  id: 'pdf-1',
+  type: 'file' as const,
+  fileName: 'research-paper.pdf',
+  mimeType: 'application/pdf',
+  size: 8,
+  content: Buffer.from('%PDF-test').toString('base64'),
+};
 
 beforeEach(async () => {
   resetAgentMocks();
@@ -423,7 +434,74 @@ describe('Session Routes', () => {
 
       expect(res.status).toBe(400);
       const body = await res.json();
-      expect(body.error).toBe('message is required');
+      expect(body.error).toBe('message or attachments are required');
+    });
+
+    it('should allow attachment-only prompts and persist uploaded files into the artifact', async () => {
+      const mockAssistantMsg = {
+        role: 'assistant' as const,
+        id: 'asst-attachment-prompt',
+        api: 'anthropic',
+        model: { id: 'claude-sonnet-4-5', api: 'anthropic' },
+        content: [{ type: 'response', content: [{ type: 'text', content: 'Loaded the PDF.' }] }],
+        usage: {
+          input: 10,
+          output: 5,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 15,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        },
+        stopReason: 'stop' as const,
+        timestamp: Date.now(),
+        duration: 100,
+        message: {},
+      };
+      mockPrompt.mockResolvedValue([mockAssistantMsg]);
+
+      const created = await createSession();
+
+      const res = await post(`${BASE}/${created.id}/prompt`, {
+        attachments: [PDF_ATTACHMENT],
+      });
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toHaveLength(2);
+      expect(body[0]?.role).toBe('user');
+
+      const userBlocks = body[0]?.content ?? [];
+      expect(
+        userBlocks.some(
+          (block: { type: string; metadata?: Record<string, unknown> }) =>
+            block.type === 'text' && block.metadata?.hiddenFromUI === true
+        )
+      ).toBe(true);
+      expect(
+        userBlocks.some(
+          (block: { type: string; metadata?: Record<string, unknown> }) =>
+            block.type === 'file' &&
+            block.metadata?.artifactRelativePath === '.max/user-artifacts/research-paper.pdf'
+        )
+      ).toBe(true);
+      expect(
+        await readFile(
+          join(projectsRoot, PROJECT, ARTIFACT, '.max', 'user-artifacts', 'research-paper.pdf'),
+          'utf-8'
+        )
+      ).toBe('%PDF-test');
+
+      const savedRes = await get(`${BASE}/${created.id}/messages`);
+      const savedBody = await savedRes.json();
+      expect(
+        savedBody[0]?.message?.content?.some((block: { type: string }) => block.type === 'file')
+      ).toBe(true);
+      expect(
+        savedBody[0]?.message?.content?.some(
+          (block: { type: string; metadata?: Record<string, unknown> }) =>
+            block.type === 'text' && block.metadata?.hiddenFromUI === true
+        )
+      ).toBe(true);
     });
 
     it('should return 400 when api or modelId override is incomplete', async () => {
@@ -737,7 +815,7 @@ describe('Session Routes', () => {
 
       expect(res.status).toBe(400);
       const body = await res.json();
-      expect(body.error).toBe('message is required');
+      expect(body.error).toBe('message or attachments are required');
     });
 
     it('should return 400 when api or modelId override is incomplete', async () => {
@@ -757,6 +835,67 @@ describe('Session Routes', () => {
       const res = await post(`${BASE}/nonexistent/stream`, { message: 'Hello' });
 
       expect(res.status).toBe(404);
+    });
+
+    it('should stream attachment-only prompts and persist uploaded files into the artifact', async () => {
+      const mockAssistantMsg = {
+        role: 'assistant',
+        id: 'asst-stream-attachment',
+        api: 'anthropic',
+        model: { id: 'claude-sonnet-4-5', api: 'anthropic' },
+        content: [{ type: 'response', content: [{ type: 'text', content: 'PDF loaded' }] }],
+        usage: {
+          input: 10,
+          output: 5,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 15,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        },
+        stopReason: 'stop',
+        timestamp: Date.now(),
+        duration: 100,
+        message: {},
+      };
+
+      mockPrompt.mockImplementationOnce(
+        async (
+          userMessage: { role: string; content: Array<{ type: string }> },
+          _attachments: unknown,
+          callback: (msg: unknown) => Promise<void>
+        ) => {
+          await callback(userMessage);
+          await callback(mockAssistantMsg);
+          return [userMessage, mockAssistantMsg];
+        }
+      );
+
+      const created = await createSession();
+
+      const res = await post(`${BASE}/${created.id}/stream`, {
+        attachments: [PDF_ATTACHMENT],
+      });
+
+      expect(res.status).toBe(200);
+      const events = parseSseEvents(await res.text());
+      expect(events.some((event) => event.event === 'done')).toBe(true);
+
+      const savedRes = await get(`${BASE}/${created.id}/messages`);
+      const savedBody = await savedRes.json();
+      const userBlocks = savedBody[0]?.message?.content ?? [];
+      expect(
+        userBlocks.some(
+          (block: { type: string; metadata?: Record<string, unknown> }) =>
+            block.type === 'file' &&
+            block.metadata?.artifactRelativePath === '.max/user-artifacts/research-paper.pdf'
+        )
+      ).toBe(true);
+      expect(
+        await readFile(
+          join(projectsRoot, PROJECT, ARTIFACT, '.max', 'user-artifacts', 'research-paper.pdf'),
+          'utf-8'
+        )
+      ).toBe('%PDF-test');
     });
 
     it('should return SSE stream with ready, agent_event, node_persisted, and done events', async () => {
@@ -1435,15 +1574,109 @@ describe('Session Routes', () => {
       expect(history[3]?.message.id).toBe('asst-leaf-edit');
     });
 
-    it('should reject empty edit messages before streaming starts', async () => {
+    it('should reject new attachments when editing a message', async () => {
       const created = await createSession();
       const res = await post(`${BASE}/${created.id}/messages/missing/edit/stream`, {
-        message: '',
+        message: 'Edited text',
+        attachments: [PDF_ATTACHMENT],
       });
 
       expect(res.status).toBe(400);
       const body = await res.json();
-      expect(body.error).toBe('message is required');
+      expect(body.error).toBe('attachments are not supported when editing a message');
+    });
+
+    it('should edit an attachment-only user message without duplicating persisted files', async () => {
+      const created = await createSession();
+      const originalAssistantMsg = {
+        role: 'assistant',
+        id: 'asst-attachment-original',
+        api: 'anthropic',
+        model: { id: 'claude-sonnet-4-5', api: 'anthropic' },
+        content: [
+          { type: 'response', content: [{ type: 'text', content: 'Original attachment turn' }] },
+        ],
+        usage: {
+          input: 10,
+          output: 5,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 15,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        },
+        stopReason: 'stop',
+        timestamp: Date.now(),
+        duration: 100,
+        message: {},
+      };
+      mockPrompt.mockResolvedValueOnce([originalAssistantMsg]);
+
+      await post(`${BASE}/${created.id}/prompt`, { attachments: [PDF_ATTACHMENT] });
+      const historyRes = await get(`${BASE}/${created.id}/messages`);
+      const history = await historyRes.json();
+      const userNodeId = history[0]?.id as string;
+      const initialFiles = await readdir(
+        join(projectsRoot, PROJECT, ARTIFACT, '.max', 'user-artifacts')
+      );
+
+      const editedAssistantMsg = {
+        role: 'assistant',
+        id: 'asst-attachment-edited',
+        api: 'anthropic',
+        model: { id: 'claude-sonnet-4-5', api: 'anthropic' },
+        content: [
+          { type: 'response', content: [{ type: 'text', content: 'Edited attachment turn' }] },
+        ],
+        usage: {
+          input: 10,
+          output: 5,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 15,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        },
+        stopReason: 'stop',
+        timestamp: Date.now(),
+        duration: 100,
+        message: {},
+      };
+      mockPrompt.mockImplementationOnce(
+        async (
+          userMessage: {
+            role: string;
+            content: Array<{ type: string; metadata?: Record<string, unknown> }>;
+          },
+          _attachments: unknown,
+          callback: (msg: unknown) => Promise<void>
+        ) => {
+          await callback(userMessage);
+          await callback(editedAssistantMsg);
+          return [userMessage, editedAssistantMsg];
+        }
+      );
+
+      const res = await post(`${BASE}/${created.id}/messages/${userNodeId}/edit/stream`, {
+        message: '',
+      });
+
+      expect(res.status).toBe(200);
+      await res.text();
+
+      const updatedHistoryRes = await get(`${BASE}/${created.id}/messages`);
+      const updatedHistory = await updatedHistoryRes.json();
+      const editedBlocks = updatedHistory[0]?.message?.content ?? [];
+      expect(
+        editedBlocks.some(
+          (block: { type: string; metadata?: Record<string, unknown> }) =>
+            block.type === 'text' && block.metadata?.hiddenFromUI === true
+        )
+      ).toBe(true);
+      expect(editedBlocks.some((block: { type: string }) => block.type === 'file')).toBe(true);
+
+      const finalFiles = await readdir(
+        join(projectsRoot, PROJECT, ARTIFACT, '.max', 'user-artifacts')
+      );
+      expect(finalFiles).toEqual(initialFiles);
     });
 
     it('should emit an SSE error when retry target is not a user node', async () => {

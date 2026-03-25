@@ -3,6 +3,7 @@ import { apiRequestJson, SERVER_BASE } from './http';
 import type {
   CancelSessionRunResponse,
   LiveRunSummaryDto,
+  SessionAttachmentInput,
   SessionMessagesResponse,
   SessionPromptRequest,
   SessionTreeResponse,
@@ -154,6 +155,7 @@ export class StreamConflictError extends Error {
 export type StreamRequest = ArtifactContext & {
   sessionId: string;
   message: string;
+  attachments?: SessionAttachmentInput[];
 } & TurnSettings &
   VisibleLeafSelection;
 
@@ -293,6 +295,7 @@ export async function streamConversation(
       method: 'POST',
       body: {
         message: request.message,
+        ...(request.attachments?.length ? { attachments: request.attachments } : {}),
         ...(request.leafNodeId ? { leafNodeId: request.leafNodeId } : {}),
         api: request.api,
         modelId: request.modelId,

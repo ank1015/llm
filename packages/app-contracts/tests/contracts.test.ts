@@ -112,6 +112,30 @@ describe('app contracts', () => {
     ).toBe(false);
   });
 
+  it('accepts prompt attachments for image and pdf inputs', () => {
+    expect(
+      Value.Check(SessionPromptRequestSchema, {
+        attachments: [
+          {
+            id: 'image-1',
+            type: 'image',
+            fileName: 'photo.png',
+            mimeType: 'image/png',
+            size: 1234,
+            content: 'iVBORw0KGgoAAAANSUhEUgAAAAUA',
+          },
+          {
+            id: 'file-1',
+            type: 'file',
+            fileName: 'report.pdf',
+            mimeType: 'application/pdf',
+            content: 'JVBERi0xLjQKJcfs...',
+          },
+        ],
+      })
+    ).toBe(true);
+  });
+
   it('accepts the cleaned delete skill response', () => {
     expect(
       Value.Check(DeleteArtifactSkillResponseSchema, {

@@ -173,7 +173,7 @@ describe('OpenAI Utils', () => {
         expect((result[0] as any).content).toContainEqual({
           type: 'input_file',
           filename: 'doc.pdf',
-          file_data: 'pdfdata',
+          file_data: 'data:application/pdf;base64,pdfdata',
         });
       });
 
@@ -304,7 +304,7 @@ describe('OpenAI Utils', () => {
         const context: Context = { messages: [toolResult] };
 
         const result = buildOpenAIMessages(mockModel, context);
-        expect((result[0] as any).output).toContainEqual({
+        expect((result[0] as any).output[0]).toEqual({
           type: 'input_text',
           text: '[TOOL ERROR] (see attached)',
         });
@@ -325,9 +325,14 @@ describe('OpenAI Utils', () => {
         const context: Context = { messages: [toolResult] };
 
         const result = buildOpenAIMessages(mockModel, context);
+        expect((result[0] as any).output[0]).toEqual({
+          type: 'input_text',
+          text: '(see attached)',
+        });
         expect((result[0] as any).output).toContainEqual({
           type: 'input_file',
-          file_data: 'filedata',
+          filename: 'report.pdf',
+          file_data: 'data:application/pdf;base64,filedata',
         });
       });
     });
