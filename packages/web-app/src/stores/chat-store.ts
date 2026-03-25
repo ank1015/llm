@@ -15,6 +15,7 @@ import type {
 } from '@/lib/client-api';
 import type {
   AgentEvent,
+  Attachment,
   Api,
   BaseAssistantEvent,
   BaseAssistantMessage,
@@ -33,6 +34,7 @@ import {
   streamRetryConversation,
 } from '@/lib/client-api';
 import { getVisiblePathNodes, sortMessageNodesChronologically } from '@/lib/messages/session-tree';
+import { getTextFromUserMessage, rewriteUserMessageText } from '@/lib/messages/utils';
 
 type PendingPrompt = {
   id: string;
@@ -106,6 +108,7 @@ type ChatStoreState = {
       prompt: string;
       projectId: string;
       artifactId: string;
+      attachments?: Attachment[];
     } & TurnSettings
   ) => Promise<void>;
   retryFromNode: (input: RetryStreamInput) => Promise<void>;
@@ -168,6 +171,23 @@ function createPendingPrompt(prompt: string): PendingPrompt {
     createdAt: Date.now(),
     status: 'pending',
   };
+}
+
+function getPendingPromptLabel(prompt: string, attachments?: Attachment[]): string {
+  const trimmed = prompt.trim();
+  if (trimmed.length > 0) {
+    return trimmed;
+  }
+
+  if (!attachments || attachments.length === 0) {
+    return '';
+  }
+
+  if (attachments.length === 1) {
+    return attachments[0]?.fileName ?? 'Attachment';
+  }
+
+  return `${attachments.length} attachments`;
 }
 
 function toIsoTimestamp(value: unknown): string {
@@ -254,15 +274,6 @@ function createOptimisticNode(input: {
   };
 }
 
-function getTextFromUserMessage(message: UserMessage): string {
-  return message.content
-    .filter((block): block is Extract<UserMessage['content'][number], { type: 'text' }> => {
-      return block.type === 'text';
-    })
-    .map((block) => block.content)
-    .join('\n');
-}
-
 function createOptimisticUserMessage(message: UserMessage, textOverride?: string): UserMessage {
   if (textOverride === undefined) {
     return {
@@ -272,18 +283,7 @@ function createOptimisticUserMessage(message: UserMessage, textOverride?: string
     };
   }
 
-  const nonTextBlocks = message.content.filter((block) => block.type !== 'text');
-  const nextContent =
-    textOverride.length > 0
-      ? [{ type: 'text' as const, content: textOverride }, ...nonTextBlocks]
-      : nonTextBlocks;
-
-  return {
-    ...message,
-    id: `optimistic:${message.id}:edit`,
-    timestamp: Date.now(),
-    content: nextContent,
-  };
+  return rewriteUserMessageText(message, textOverride);
 }
 
 function prepareRewriteState(input: {
@@ -1018,8 +1018,9 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     const session: SessionRef = { sessionId: input.sessionId };
     const key = getSessionKey(session);
     const prompt = input.prompt.trim();
+    const attachments = input.attachments ?? [];
 
-    if (prompt.length === 0) {
+    if (prompt.length === 0 && attachments.length === 0) {
       throw new Error(EMPTY_PROMPT_ERROR_MESSAGE);
     }
 
@@ -1029,7 +1030,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
 
     clearStreamAttachment(key);
 
-    const pending = createPendingPrompt(prompt);
+    const pending = createPendingPrompt(getPendingPromptLabel(prompt, attachments));
     const controller = new AbortController();
     streamAbortControllers.set(key, {
       runId: `pending:${pending.id}`,
@@ -1076,6 +1077,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
         {
           sessionId: input.sessionId,
           message: prompt,
+          ...(attachments.length > 0 ? { attachments } : {}),
           projectId: input.projectId,
           artifactId: input.artifactId,
           api: input.api,

@@ -1,8 +1,41 @@
-import type { Api, BaseAssistantMessage, UserMessage } from '@ank1015/llm-types';
+import type {
+  Api,
+  BaseAssistantMessage,
+  Content,
+  TextContent,
+  UserMessage,
+} from '@ank1015/llm-types';
+
+function isVisibleUserTextBlock(block: Content[number]): block is TextContent {
+  return block.type === 'text' && block.metadata?.hiddenFromUI !== true;
+}
 
 export function getTextFromUserMessage(msg: UserMessage): string {
-  const textContentBlocks = msg.content.filter((c) => c.type === 'text');
-  return textContentBlocks.map((t) => t.content).join('\n');
+  return msg.content
+    .filter(isVisibleUserTextBlock)
+    .map((t) => t.content)
+    .join('\n');
+}
+
+export function hasVisibleAttachmentInUserMessage(msg: UserMessage): boolean {
+  return msg.content.some((block) => block.type === 'image' || block.type === 'file');
+}
+
+export function rewriteUserMessageText(message: UserMessage, textOverride: string): UserMessage {
+  const preservedBlocks = message.content.filter(
+    (block) => block.type !== 'text' || block.metadata?.hiddenFromUI === true
+  );
+  const nextContent =
+    textOverride.length > 0
+      ? ([{ type: 'text', content: textOverride }, ...preservedBlocks] as UserMessage['content'])
+      : preservedBlocks;
+
+  return {
+    ...message,
+    id: `optimistic:${message.id}:edit`,
+    timestamp: Date.now(),
+    content: nextContent,
+  };
 }
 
 export function getTextFromBaseAssistantMessage(

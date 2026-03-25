@@ -1,6 +1,16 @@
 'use client';
 
-import { ArrowUp, ChevronDown, File, Folder, Plus, Square } from 'lucide-react';
+import {
+  ArrowUp,
+  ChevronDown,
+  File,
+  FileText,
+  Folder,
+  ImageIcon,
+  Plus,
+  Square,
+  X,
+} from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -15,7 +25,7 @@ import {
 } from './prompt-input';
 
 import type { ProjectFileIndexEntry, ReasoningLevel, SessionRef } from '@/lib/client-api';
-import type { MessageNode } from '@ank1015/llm-types';
+import type { Attachment, MessageNode } from '@ank1015/llm-types';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -46,6 +56,9 @@ const MENTION_SEARCH_LIMIT = 80;
 const MENTION_DROPDOWN_LIMIT = 20;
 const MENTION_SEARCH_DEBOUNCE_MS = 120;
 const EMPTY_MESSAGE_NODES: MessageNode[] = [];
+const EMPTY_ATTACHMENTS: Attachment[] = [];
+const PDF_MIME_TYPE = 'application/pdf';
+const ATTACHMENT_ACCEPT = `image/*,${PDF_MIME_TYPE}`;
 
 type ComposerDropdownOption = {
   value: string;
@@ -68,6 +81,65 @@ function isAbortError(error: unknown): boolean {
     return error.name === 'AbortError' || error.message.toLowerCase().includes('abort');
   }
   return false;
+}
+
+function isSupportedAttachmentFile(file: File): boolean {
+  if (file.type === PDF_MIME_TYPE) {
+    return true;
+  }
+
+  return file.type.startsWith('image/');
+}
+
+function formatAttachmentSize(size: number | undefined): string | null {
+  if (typeof size !== 'number' || !Number.isFinite(size) || size <= 0) {
+    return null;
+  }
+
+  if (size < 1024) {
+    return `${size} B`;
+  }
+
+  if (size < 1024 * 1024) {
+    return `${(size / 1024).toFixed(1)} KB`;
+  }
+
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function getAttachmentSessionFallbackName(attachments: Attachment[]): string {
+  if (attachments.length === 1) {
+    return attachments[0]?.fileName ?? 'Attachment';
+  }
+
+  return `${attachments.length} attachments`;
+}
+
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+
+  return btoa(binary);
+}
+
+async function toAttachment(file: File): Promise<Attachment> {
+  const content = arrayBufferToBase64(await file.arrayBuffer());
+
+  return {
+    id:
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    type: file.type === PDF_MIME_TYPE ? 'file' : 'image',
+    fileName: file.name,
+    mimeType: file.type || (file.name.toLowerCase().endsWith('.pdf') ? PDF_MIME_TYPE : ''),
+    size: file.size,
+    content,
+  };
 }
 
 function getBasename(path: string): string {
@@ -394,12 +466,15 @@ function ComposerDropdownControl({
 
 function PromptInputWithActions() {
   const [localInput, setLocalInput] = useState('');
+  const [localAttachments, setLocalAttachments] = useState<Attachment[]>([]);
   const [activeMention, setActiveMention] = useState<MentionRange | null>(null);
   const [mentionResults, setMentionResults] = useState<ProjectFileIndexEntry[]>([]);
   const [mentionLoading, setMentionLoading] = useState(false);
   const [mentionError, setMentionError] = useState<string | null>(null);
   const [highlightedMentionIndex, setHighlightedMentionIndex] = useState(0);
+  const [isDragActive, setIsDragActive] = useState(false);
   const textareaElementRef = useRef<HTMLTextAreaElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const activeMentionRef = useRef<MentionRange | null>(null);
   const mentionRequestIdRef = useRef(0);
 
@@ -429,11 +504,20 @@ function PromptInputWithActions() {
 
     return state.editStateBySession[currentSession.sessionId] ?? null;
   });
+  const composerAttachments = useComposerStore((state) => {
+    if (!currentSession) {
+      return EMPTY_ATTACHMENTS;
+    }
+
+    return state.attachmentsBySession[currentSession.sessionId] ?? EMPTY_ATTACHMENTS;
+  });
+  const addAttachment = useComposerStore((state) => state.addAttachment);
   const setDraft = useComposerStore((state) => state.setDraft);
   const clearAttachments = useComposerStore((state) => state.clearAttachments);
   const clearEditState = useComposerStore((state) => state.clearEditState);
   const cancelEdit = useComposerStore((state) => state.cancelEdit);
   const markSubmitted = useComposerStore((state) => state.markSubmitted);
+  const removeAttachment = useComposerStore((state) => state.removeAttachment);
 
   const startStream = useChatStore((state) => state.startStream);
   const editFromNode = useChatStore((state) => state.editFromNode);
@@ -458,6 +542,7 @@ function PromptInputWithActions() {
   const loadProjectFileIndex = useArtifactFilesStore((state) => state.loadProjectFileIndex);
   const searchProjectFiles = useArtifactFilesStore((state) => state.searchProjectFiles);
   const input = currentSession ? composerInput : localInput;
+  const attachments = currentSession ? composerAttachments : localAttachments;
   const isEditing = currentSession !== null && editState !== null;
 
   const isMentionOpen = activeMention !== null;
@@ -580,6 +665,68 @@ function PromptInputWithActions() {
     setLocalInput(nextValue);
   };
 
+  const handleAttachmentAdd = (attachment: Attachment) => {
+    if (currentSession) {
+      addAttachment({
+        session: currentSession,
+        attachment,
+      });
+      return;
+    }
+
+    setLocalAttachments((prev) => {
+      if (prev.some((candidate) => candidate.id === attachment.id)) {
+        return prev;
+      }
+
+      return [...prev, attachment];
+    });
+  };
+
+  const handleAttachmentRemove = (attachmentId: string) => {
+    if (currentSession) {
+      removeAttachment({
+        session: currentSession,
+        attachmentId,
+      });
+      return;
+    }
+
+    setLocalAttachments((prev) => prev.filter((attachment) => attachment.id !== attachmentId));
+  };
+
+  const handleAttachmentFiles = async (files: FileList | File[]) => {
+    const nextFiles = Array.from(files);
+    if (nextFiles.length === 0) {
+      return;
+    }
+
+    const supported = nextFiles.filter(isSupportedAttachmentFile);
+    const rejected = nextFiles.filter((file) => !isSupportedAttachmentFile(file));
+
+    if (rejected.length > 0) {
+      toast.error('Only images and PDFs are supported.', {
+        id: 'composer-attachment-type-error',
+      });
+    }
+
+    try {
+      const nextAttachments = await Promise.all(supported.map((file) => toAttachment(file)));
+      for (const attachment of nextAttachments) {
+        handleAttachmentAdd(attachment);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to read attachment.';
+      toast.error(message, {
+        id: 'composer-attachment-read-error',
+      });
+    } finally {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
   const handleMentionSelect = (entry: ProjectFileIndexEntry) => {
     if (!activeMention) {
       return;
@@ -669,7 +816,9 @@ function PromptInputWithActions() {
 
   const handleSubmit = async () => {
     const trimmed = input.trim();
-    if (trimmed === '' || isStreaming) return;
+    const canSubmit =
+      trimmed.length > 0 || attachments.length > 0 || (isEditing && editState?.hasFixedAttachments);
+    if (!canSubmit || isStreaming) return;
 
     try {
       if (currentSession && editState) {
@@ -696,10 +845,13 @@ function PromptInputWithActions() {
       }
 
       let session: SessionRef | undefined = currentSession ?? undefined;
+      const submittedAttachments = attachments;
+      const initialSessionName =
+        trimmed.length > 0 ? 'New chat' : getAttachmentSessionFallbackName(submittedAttachments);
 
       if (!session) {
         const created = await createSession(ctx, {
-          sessionName: 'New chat',
+          sessionName: initialSessionName,
           api: selectedApi,
           modelId: selectedModelId,
         });
@@ -709,7 +861,7 @@ function PromptInputWithActions() {
         // Optimistically add the new thread to the sidebar immediately
         sidebarAddSession(artifactId, {
           sessionId: created.sessionId,
-          sessionName: 'New chat',
+          sessionName: initialSessionName,
           createdAt: new Date().toISOString(),
           updatedAt: null,
           nodeCount: 0,
@@ -719,16 +871,18 @@ function PromptInputWithActions() {
         await loadMessages({ session: ref, projectId, artifactId, force: true });
         session = ref;
 
-        void generateSessionName(ctx, {
-          sessionId: created.sessionId,
-          query: trimmed,
-        })
-          .then((result) => {
-            sidebarRenameSession(created.sessionId, result.sessionName);
+        if (trimmed.length > 0) {
+          void generateSessionName(ctx, {
+            sessionId: created.sessionId,
+            query: trimmed,
           })
-          .catch(() => {
-            // Naming failed silently — keep "New chat"
-          });
+            .then((result) => {
+              sidebarRenameSession(created.sessionId, result.sessionName);
+            })
+            .catch(() => {
+              // Naming failed silently — keep initial session name
+            });
+        }
       }
 
       if (!session) {
@@ -739,12 +893,14 @@ function PromptInputWithActions() {
         markSubmitted(currentSession);
       } else {
         setLocalInput('');
+        setLocalAttachments([]);
       }
       setMentionState(null);
 
       await startStream({
         sessionId: session.sessionId,
         prompt: trimmed,
+        ...(submittedAttachments.length > 0 ? { attachments: submittedAttachments } : {}),
         projectId,
         artifactId,
         api: selectedApi,
@@ -791,14 +947,63 @@ function PromptInputWithActions() {
     }
   };
 
+  const handleFileInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!event.target.files || isEditing) {
+      return;
+    }
+
+    void handleAttachmentFiles(event.target.files);
+  };
+
+  const handleComposerDrop: React.DragEventHandler<HTMLDivElement> = (event) => {
+    event.preventDefault();
+    setIsDragActive(false);
+
+    if (isEditing) {
+      return;
+    }
+
+    const files = event.dataTransfer.files;
+    if (!files || files.length === 0) {
+      return;
+    }
+
+    void handleAttachmentFiles(files);
+  };
+
   return (
     <PromptInput
       value={input}
       onValueChange={handleInputChange}
       isLoading={isStreaming}
       onSubmit={handleSubmit}
-      className="relative w-full max-w-(--breakpoint-md)"
+      onDragEnter={isEditing ? undefined : () => setIsDragActive(true)}
+      onDragLeave={isEditing ? undefined : () => setIsDragActive(false)}
+      onDragOver={
+        isEditing
+          ? undefined
+          : (event) => {
+              event.preventDefault();
+              if (!isDragActive) {
+                setIsDragActive(true);
+              }
+            }
+      }
+      onDrop={isEditing ? undefined : handleComposerDrop}
+      className={cn(
+        'relative w-full max-w-(--breakpoint-md)',
+        isDragActive && 'ring-2 ring-white/20 ring-offset-0'
+      )}
     >
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={ATTACHMENT_ACCEPT}
+        multiple
+        className="hidden"
+        onChange={handleFileInputChange}
+      />
+
       {isEditing ? (
         <div className="text-muted-foreground flex items-center justify-between px-1 pb-1 text-[11px]">
           <span>Editing earlier message</span>
@@ -816,6 +1021,72 @@ function PromptInputWithActions() {
           >
             Cancel
           </button>
+        </div>
+      ) : null}
+
+      {attachments.length > 0 ? (
+        <div className="mb-2 flex flex-wrap gap-2 px-1">
+          {attachments.map((attachment) => {
+            const sizeLabel = formatAttachmentSize(attachment.size);
+            const dataUrl = `data:${attachment.mimeType};base64,${attachment.content}`;
+
+            if (attachment.type === 'image') {
+              return (
+                <div
+                  key={attachment.id}
+                  className="bg-home-hover relative overflow-hidden rounded-2xl border border-white/10"
+                >
+                  <img src={dataUrl} alt={attachment.fileName} className="h-24 w-24 object-cover" />
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-black/55 px-2 py-1">
+                    <div className="truncate text-[11px] font-medium text-white">
+                      {attachment.fileName}
+                    </div>
+                  </div>
+                  {!isEditing ? (
+                    <button
+                      type="button"
+                      onClick={() => handleAttachmentRemove(attachment.id)}
+                      className="absolute top-1 right-1 inline-flex size-6 items-center justify-center rounded-full bg-black/55 text-white transition-colors hover:bg-black/70"
+                      aria-label={`Remove ${attachment.fileName}`}
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  ) : null}
+                </div>
+              );
+            }
+
+            return (
+              <div
+                key={attachment.id}
+                className="bg-home-hover text-foreground flex min-w-[220px] items-center gap-3 rounded-2xl border border-white/10 px-3 py-2"
+              >
+                <FileText className="size-5 shrink-0 text-red-300" />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium">{attachment.fileName}</div>
+                  <div className="text-muted-foreground text-xs">
+                    PDF{sizeLabel ? ` • ${sizeLabel}` : ''}
+                  </div>
+                </div>
+                {!isEditing ? (
+                  <button
+                    type="button"
+                    onClick={() => handleAttachmentRemove(attachment.id)}
+                    className="text-muted-foreground hover:text-foreground inline-flex size-7 items-center justify-center rounded-full transition-colors"
+                    aria-label={`Remove ${attachment.fileName}`}
+                  >
+                    <X className="size-4" />
+                  </button>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+
+      {isDragActive && !isEditing ? (
+        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-3xl border border-dashed border-white/25 bg-black/30 text-sm text-white backdrop-blur-sm">
+          Drop images or PDFs to attach
         </div>
       ) : null}
 
@@ -876,14 +1147,26 @@ function PromptInputWithActions() {
 
       <PromptInputActions className="flex items-center justify-between gap-2 pt-4">
         <div className="flex items-center gap-0.5">
-          <PromptInputAction tooltip="Add">
-            <button
-              type="button"
-              className="text-muted-foreground hover:text-foreground hover:bg-home-hover inline-flex size-7 items-center justify-center rounded-md transition-colors"
-            >
-              <Plus className="size-4" />
-            </button>
-          </PromptInputAction>
+          {!isEditing ? (
+            <PromptInputAction tooltip="Add attachment">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="text-muted-foreground hover:text-foreground hover:bg-home-hover inline-flex size-7 items-center justify-center rounded-md transition-colors"
+              >
+                <Plus className="size-4" />
+              </button>
+            </PromptInputAction>
+          ) : editState?.hasFixedAttachments ? (
+            <PromptInputAction tooltip="Attachments stay fixed while editing">
+              <span className="text-muted-foreground inline-flex h-7 items-center gap-1 rounded-md px-2 text-[12px]">
+                <ImageIcon className="size-3.5" />
+                Fixed files
+              </span>
+            </PromptInputAction>
+          ) : (
+            <span className="h-7" aria-hidden="true" />
+          )}
 
           <ComposerDropdownControl
             label="Select model"
