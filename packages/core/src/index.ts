@@ -4,7 +4,7 @@
  * Core SDK for LLM interactions.
  */
 
-export const VERSION = '0.0.2';
+export const VERSION = '0.0.4';
 
 // Models
 export { MODELS, getProviders, getModel, getModels, calculateCost } from './models/index.js';
