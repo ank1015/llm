@@ -1,6 +1,6 @@
 {
   "name": "@ank1015/llm-types",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Shared contracts and provider-native types for @ank1015/llm",
   "type": "module",
   "main": "./dist/index.js",
@@ -22,7 +22,9 @@
     "dev": "tsc --watch",
     "typecheck": "tsc --noEmit",
     "lint": "echo 'No linter configured yet'",
-    "clean": "rm -rf dist *.tsbuildinfo"
+    "clean": "rm -rf dist *.tsbuildinfo",
+    "prepack": "pnpm run build",
+    "prepublishOnly": "node ../../scripts/ensure-pnpm-publish.mjs"
   },
   "keywords": [
     "contracts",
