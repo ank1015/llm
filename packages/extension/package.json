@@ -1,6 +1,6 @@
 {
   "name": "@ank1015/llm-extension",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "description": "Chrome RPC bridge with a Manifest V3 extension, native messaging host, and Node client",
   "type": "module",
   "main": "./dist/index.js",
@@ -39,7 +39,8 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.chrome.json",
     "lint": "eslint src tests esbuild.config.ts",
     "clean": "rm -rf dist coverage *.tsbuildinfo",
-    "prepack": "pnpm run build"
+    "prepack": "pnpm run build",
+    "prepublishOnly": "node ../../scripts/ensure-pnpm-publish.mjs"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^2.1.0",
