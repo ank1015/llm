@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -11,7 +14,11 @@ import {
 
 describe('@ank1015/llm-agents', () => {
   it('exports package version', () => {
-    expect(VERSION).toBe('0.0.4');
+    const packageJson = JSON.parse(
+      readFileSync(join(import.meta.dirname, '../../package.json'), 'utf8')
+    ) as { version: string };
+
+    expect(VERSION).toBe(packageJson.version);
   });
 
   it('exports the web helper surface from the package root', () => {

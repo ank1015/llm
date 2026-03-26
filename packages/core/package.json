@@ -1,6 +1,6 @@
 {
   "name": "@ank1015/llm-core",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Stateless multi-provider LLM runtime with normalized streaming events and preserved native responses",
   "type": "module",
   "main": "./dist/index.js",
@@ -28,7 +28,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src tests scripts vitest.config.ts vitest.setup.ts",
     "clean": "rm -rf dist coverage *.tsbuildinfo",
-    "prepack": "pnpm run build"
+    "prepack": "pnpm run build",
+    "prepublishOnly": "node ../../scripts/ensure-pnpm-publish.mjs"
   },
   "devDependencies": {
     "vitest": "^2.1.0"

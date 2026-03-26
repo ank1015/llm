@@ -1,6 +1,6 @@
 {
   "name": "@ank1015/llm-sdk",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Opinionated SDK layer over @ank1015/llm-core with credential resolution, conversations, and session helpers",
   "type": "module",
   "main": "./dist/index.js",
@@ -28,7 +28,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src tests vitest.config.ts",
     "clean": "rm -rf dist coverage *.tsbuildinfo",
-    "prepack": "pnpm run build"
+    "prepack": "pnpm run build",
+    "prepublishOnly": "node ../../scripts/ensure-pnpm-publish.mjs"
   },
   "keywords": [
     "llm",

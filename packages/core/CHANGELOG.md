@@ -4,6 +4,11 @@ All notable changes to this package will be documented in this file.
 
 ## UNRELEASED
 
+## 0.0.4 - 2026-03-26
+
+- added a publish-time guard that rejects `npm publish` so public releases keep workspace dependencies rewritten correctly
+- synced the exported `VERSION` constant with the package version and added regression coverage against the package manifest
+
 ## 0.0.3 - 2026-03-26
 
 - added `MiniMax-M2.7` and `MiniMax-M2.7-highspeed` to the MiniMax model catalog with their provider pricing metadata
