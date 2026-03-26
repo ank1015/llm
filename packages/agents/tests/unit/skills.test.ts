@@ -6,13 +6,16 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import {
+  USE_LLMS_MODEL_IDS,
   addSkill,
+  createManagedConversation,
   createImage,
   createSystemPrompt,
   deleteSkill,
   editImage,
   listBundledSkills,
   listInstalledSkills,
+  streamLlm,
 } from '../../src/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -62,8 +65,13 @@ describe('skills runtime', () => {
     expect(typeof agents.listInstalledSkills).toBe('function');
     expect(typeof agents.createImage).toBe('function');
     expect(typeof agents.editImage).toBe('function');
+    expect(typeof agents.streamLlm).toBe('function');
+    expect(typeof agents.createManagedConversation).toBe('function');
     expect(agents.createImage).toBe(createImage);
     expect(agents.editImage).toBe(editImage);
+    expect(agents.streamLlm).toBe(streamLlm);
+    expect(agents.createManagedConversation).toBe(createManagedConversation);
+    expect(agents.USE_LLMS_MODEL_IDS).toBe(USE_LLMS_MODEL_IDS);
     expect('setupSkills' in agents).toBe(false);
     expect('setUpSkills' in agents).toBe(false);
   });
@@ -77,7 +85,7 @@ describe('skills runtime', () => {
       .map((entry) => entry.name)
       .sort();
 
-    expect(registryNames).toEqual(['ai-images', 'web']);
+    expect(registryNames).toEqual(['ai-images', 'use-llms', 'web']);
     expect(registryNames).toEqual(skillFolders);
 
     for (const skill of bundledSkills) {
@@ -89,7 +97,7 @@ describe('skills runtime', () => {
   });
 
   it('installs bundled skills into artifact-local .max state and replaces existing copies', async () => {
-    for (const skillName of ['ai-images', 'web'] as const) {
+    for (const skillName of ['ai-images', 'use-llms', 'web'] as const) {
       const artifactDir = await createArtifactDir();
 
       try {
@@ -227,10 +235,11 @@ describe('skills runtime', () => {
       expect(await listInstalledSkills(artifactDir)).toEqual([]);
 
       await addSkill('ai-images', artifactDir);
+      await addSkill('use-llms', artifactDir);
       await addSkill('web', artifactDir);
 
       const installed = await listInstalledSkills(artifactDir);
-      expect(installed.map((skill) => skill.name)).toEqual(['ai-images', 'web']);
+      expect(installed.map((skill) => skill.name)).toEqual(['ai-images', 'use-llms', 'web']);
       expect(
         installed.every((skill) => skill.path.startsWith(join(artifactDir, '.max', 'skills')))
       ).toBe(true);
@@ -267,10 +276,12 @@ describe('skills runtime', () => {
       });
       expect(emptyPrompt).toContain('- none installed');
       expect(emptyPrompt).not.toContain('ai-images');
+      expect(emptyPrompt).not.toContain('use-llms');
       expect(emptyPrompt).not.toContain('web');
       expect(emptyPrompt).toContain('.max/temp');
 
       await addSkill('ai-images', artifactDir);
+      await addSkill('use-llms', artifactDir);
       await addSkill('web', artifactDir);
       const installedPrompt = await createSystemPrompt({
         projectName: 'media',
@@ -282,8 +293,12 @@ describe('skills runtime', () => {
       expect(installedPrompt).toContain(
         join(artifactDir, '.max', 'skills', 'ai-images', 'SKILL.md')
       );
+      expect(installedPrompt).toContain(
+        join(artifactDir, '.max', 'skills', 'use-llms', 'SKILL.md')
+      );
       expect(installedPrompt).toContain(join(artifactDir, '.max', 'skills', 'web', 'SKILL.md'));
       expect(installedPrompt).toContain('ai-images');
+      expect(installedPrompt).toContain('use-llms');
       expect(installedPrompt).toContain('web');
       expect(installedPrompt).not.toContain('browser-use');
       expect(installedPrompt).not.toContain('llm-use');
@@ -453,6 +468,80 @@ describe('skills runtime', () => {
     expect(downloadsRaw).toContain('tab.uploadFiles(selector, paths)');
     expect(recipesRaw).toContain("import { withWebBrowser } from '@ank1015/llm-agents';");
     expect(recipesRaw).toContain('const browser = await connectWeb({ launch: true });');
+  });
+
+  it('documents the required use-llms reading order', async () => {
+    const skillPath = join(packageRoot, 'skills', 'use-llms', 'SKILL.md');
+    const typesPath = join(packageRoot, 'skills', 'use-llms', 'references', 'types.md');
+    const streamPath = join(packageRoot, 'skills', 'use-llms', 'references', 'stream.md');
+    const conversationPath = join(
+      packageRoot,
+      'skills',
+      'use-llms',
+      'references',
+      'conversation.md'
+    );
+    const modelSelectionPath = join(
+      packageRoot,
+      'skills',
+      'use-llms',
+      'references',
+      'model-selection.md'
+    );
+
+    const [skillRaw, typesRaw, streamRaw, conversationRaw, modelSelectionRaw] = await Promise.all([
+      readFile(skillPath, 'utf-8'),
+      readFile(typesPath, 'utf-8'),
+      readFile(streamPath, 'utf-8'),
+      readFile(conversationPath, 'utf-8'),
+      readFile(modelSelectionPath, 'utf-8'),
+    ]);
+
+    expect(skillRaw).toContain('## Required Reading Order');
+    expect(skillRaw).toContain('[references/types.md](references/types.md)');
+    expect(skillRaw).toContain('[references/stream.md](references/stream.md)');
+    expect(skillRaw).toContain('[references/conversation.md](references/conversation.md)');
+    expect(skillRaw).toContain('[references/model-selection.md](references/model-selection.md)');
+    expect(skillRaw).toContain('one off or conversational way');
+    expect(skillRaw).toContain(
+      "import { createManagedConversation, streamLlm } from '@ank1015/llm-agents';"
+    );
+    expect(typesRaw).toContain('## Content Blocks');
+    expect(typesRaw).toContain('## Message Shapes');
+    expect(typesRaw).toContain('## Assistant Message Shape');
+    expect(typesRaw).toContain('## Stream Return Type');
+    expect(typesRaw).toContain('## Conversation Event Shape');
+    expect(typesRaw).toContain('## Conversation Return Types');
+    expect(typesRaw).toContain('## Session Data Shapes');
+    expect(typesRaw).toContain('interface UserMessage');
+    expect(typesRaw).toContain('interface BaseAssistantMessage');
+    expect(streamRaw).toContain(
+      "import { buildUserMessage, streamLlm } from '@ank1015/llm-agents';"
+    );
+    expect(streamRaw).toContain('thinkingLevel');
+    expect(streamRaw).toContain('tools?: Tool[]');
+    expect(conversationRaw).toContain(
+      "import { buildUserMessage, createManagedConversation } from '@ank1015/llm-agents';"
+    );
+    expect(conversationRaw).toContain('thinkingLevel');
+    expect(conversationRaw).toContain("sessions?: 'file' | 'memory';");
+    expect(conversationRaw).toContain('tools?: AgentTool[]');
+    expect(conversationRaw).toContain('## What Sessions Are');
+    expect(conversationRaw).toContain('## Prompt Input Types');
+    expect(conversationRaw).toContain('~/.llm/sessions/<projectName>/<path>/<sessionId>.jsonl');
+    expect(conversationRaw).toContain('## Session Modes');
+    expect(modelSelectionRaw).toContain('gpt-5.4');
+    expect(modelSelectionRaw).toContain('gpt-5.4-mini');
+    expect(modelSelectionRaw).toContain(
+      'If the user explicitly names one of the supported model IDs, use that model.'
+    );
+    expect(skillRaw).not.toContain('@ank1015/llm-sdk');
+    expect(streamRaw).not.toContain('@ank1015/llm-sdk');
+    expect(skillRaw).not.toContain('codex');
+    expect(streamRaw).not.toContain('codex');
+    expect(conversationRaw).not.toContain('codex');
+    expect(modelSelectionRaw).not.toContain('codex');
+    expect(typesRaw).not.toContain("sessions: 'file' | 'memory' | adapter");
   });
 });
 

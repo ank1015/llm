@@ -9,14 +9,17 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { runSkillTesterBuild } from '../../src/agents/skills/tester.js';
 import {
   IMAGE_MODEL_IDS,
+  USE_LLMS_MODEL_IDS,
   WebBrowser,
   WebDebuggerSession,
   WebTab,
   addSkill,
   connectWeb,
+  createManagedConversation,
   createImage,
   editImage,
   listBundledSkills,
+  streamLlm,
   withWebBrowser,
 } from '../../src/index.js';
 
@@ -32,6 +35,8 @@ describe('helper-backed skill exports', () => {
   it('exposes the ai-image and web helper functions from the package root', () => {
     expect(typeof createImage).toBe('function');
     expect(typeof editImage).toBe('function');
+    expect(typeof streamLlm).toBe('function');
+    expect(typeof createManagedConversation).toBe('function');
     expect(typeof connectWeb).toBe('function');
     expect(typeof withWebBrowser).toBe('function');
     expect(typeof WebBrowser).toBe('function');
@@ -42,15 +47,23 @@ describe('helper-backed skill exports', () => {
       'gemini-3.1-flash-image-preview',
       'gemini-3-pro-image-preview',
     ]);
+    expect(USE_LLMS_MODEL_IDS).toEqual(['gpt-5.4', 'gpt-5.4-mini']);
   });
 
   it('lists the bundled helper-backed skills', async () => {
     const bundledSkills = await listBundledSkills();
 
-    expect(bundledSkills).toHaveLength(2);
-    expect(bundledSkills.map((skill) => skill.name).sort()).toEqual(['ai-images', 'web']);
+    expect(bundledSkills).toHaveLength(3);
+    expect(bundledSkills.map((skill) => skill.name).sort()).toEqual([
+      'ai-images',
+      'use-llms',
+      'web',
+    ]);
     expect(bundledSkills.find((skill) => skill.name === 'ai-images')?.path).toBe(
       join(packageRoot, 'skills', 'ai-images', 'SKILL.md')
+    );
+    expect(bundledSkills.find((skill) => skill.name === 'use-llms')?.path).toBe(
+      join(packageRoot, 'skills', 'use-llms', 'SKILL.md')
     );
     expect(bundledSkills.find((skill) => skill.name === 'web')?.path).toBe(
       join(packageRoot, 'skills', 'web', 'SKILL.md')
@@ -128,6 +141,44 @@ describe('bundled skill docs', () => {
     expect(debugReference).toContain('## Recommended Network Workflow');
     expect(downloadsReference).toContain('## Upload Workflow');
   });
+
+  it('keeps the use-llms overview and focused references in sync', async () => {
+    const [overview, typesReference, streamReference, conversationReference, modelSelectionRef] =
+      await Promise.all([
+        readFile(join(packageRoot, 'skills', 'use-llms', 'SKILL.md'), 'utf-8'),
+        readFile(join(packageRoot, 'skills', 'use-llms', 'references', 'types.md'), 'utf-8'),
+        readFile(join(packageRoot, 'skills', 'use-llms', 'references', 'stream.md'), 'utf-8'),
+        readFile(join(packageRoot, 'skills', 'use-llms', 'references', 'conversation.md'), 'utf-8'),
+        readFile(
+          join(packageRoot, 'skills', 'use-llms', 'references', 'model-selection.md'),
+          'utf-8'
+        ),
+      ]);
+
+    expect(overview).toContain('## When To Use');
+    expect(overview).toContain('## Required Reading Order');
+    expect(overview).toContain('## Main Helpers');
+    expect(typesReference).toContain('## Content Blocks');
+    expect(typesReference).toContain('## Message Shapes');
+    expect(typesReference).toContain('## Assistant Message Shape');
+    expect(typesReference).toContain('## Stream Return Type');
+    expect(typesReference).toContain('## Conversation Return Types');
+    expect(streamReference).toContain('## Request Shape');
+    expect(streamReference).toContain('## Result Handling');
+    expect(conversationReference).toContain('## What Sessions Are');
+    expect(conversationReference).toContain('## Prompt Input Types');
+    expect(conversationReference).toContain('## Session Modes');
+    expect(conversationReference).toContain('## Important Behavior');
+    expect(conversationReference).toContain(
+      '~/.llm/sessions/<projectName>/<path>/<sessionId>.jsonl'
+    );
+    expect(modelSelectionRef).toContain('## Supported Model IDs');
+    expect(modelSelectionRef).toContain('## Default Rule');
+    expect(overview).not.toContain('codex');
+    expect(streamReference).not.toContain('@ank1015/llm-sdk');
+    expect(conversationReference).not.toContain('codex');
+    expect(modelSelectionRef).not.toContain('codex');
+  });
 });
 
 describe('helper-backed temp workspace', () => {
@@ -159,6 +210,39 @@ describe('helper-backed temp workspace', () => {
 
       expect(result.status).toBe(0);
       expect(result.stdout.trim()).toBe('function,function,function,function,function');
+    } finally {
+      await rm(artifactDir, { recursive: true, force: true });
+    }
+  });
+
+  it('prepares the use-llms helper-backed workspace for temp scripts', async () => {
+    const artifactDir = await mkdtemp(join(tmpdir(), 'llm-agents-use-llms-smoke-'));
+
+    try {
+      await addSkill('use-llms', artifactDir);
+
+      const tempDir = join(artifactDir, '.max', 'temp');
+      const scriptPath = join(tempDir, 'scripts', 'use-llms-smoke.ts');
+      const tsxPath = join(
+        tempDir,
+        'node_modules',
+        '.bin',
+        process.platform === 'win32' ? 'tsx.cmd' : 'tsx'
+      );
+
+      await writeFile(
+        scriptPath,
+        "import { USE_LLMS_MODEL_IDS, buildUserMessage, createManagedConversation, streamLlm } from '@ank1015/llm-agents';\nconst conversation = createManagedConversation({ modelId: 'gpt-5.4-mini' });\nconst message = buildUserMessage('hello');\nconsole.log([typeof streamLlm, typeof createManagedConversation, USE_LLMS_MODEL_IDS.join('|'), message.role, typeof conversation.prompt].join(','));\n",
+        'utf-8'
+      );
+
+      const result = spawnSync(tsxPath, [scriptPath], {
+        cwd: tempDir,
+        encoding: 'utf-8',
+      });
+
+      expect(result.status).toBe(0);
+      expect(result.stdout.trim()).toBe('function,function,gpt-5.4|gpt-5.4-mini,user,function');
     } finally {
       await rm(artifactDir, { recursive: true, force: true });
     }
