@@ -4,6 +4,8 @@ All notable changes to this package will be documented in this file.
 
 ## Unreleased
 
+## 0.0.7 - 2026-03-27
+
 - added the helper-backed `use-llms` bundled skill with `streamLlm()` and `createManagedConversation()` plus package-root exports for the common message, conversation, and session types it relies on
 - documented one-off, conversational, session, and assistant-text extraction workflows for `use-llms` so bundled skill users can call LLMs from `@ank1015/llm-agents` without dropping into lower-level packages
 - added unit, smoke, and live integration coverage for the `use-llms` helper surface, bundled skill docs, and skill-tester temp workspace flow
