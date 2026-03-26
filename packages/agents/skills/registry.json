@@ -14,5 +14,13 @@
       "runtime": "typescript",
       "package": "@ank1015/llm-agents"
     }
+  },
+  {
+    "name": "use-llms",
+    "description": "Use the skill to call LLMs in a one off or conversational way.",
+    "helperProject": {
+      "runtime": "typescript",
+      "package": "@ank1015/llm-agents"
+    }
   }
 ]

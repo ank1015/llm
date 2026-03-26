@@ -1,4 +1,4 @@
-import { BrowserIcon, Image03Icon } from '@hugeicons/core-free-icons';
+import { AiBrain03Icon, BrowserIcon, Image03Icon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Sparkles } from 'lucide-react';
 
@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 
 export const SKILL_ICON_MAP: Record<string, IconSvgElement> = {
   'ai-images': Image03Icon,
+  'use-llms': AiBrain03Icon,
   web: BrowserIcon,
 };
 
