@@ -4,6 +4,13 @@ All notable changes to this package will be documented in this file.
 
 ## Unreleased
 
+## 0.0.6 - 2026-03-26
+
+- republished the package with pnpm so published dependency metadata no longer leaks `workspace:` ranges to npm consumers
+- added a publish-time guard that rejects `npm publish` for this package so future releases keep workspace dependencies rewritten correctly
+- synced the exported `VERSION` constant with the package version and added a regression test that reads the package manifest
+- fixed package-root imports and helper skill dependency setup so the published package works outside the monorepo
+
 ## 0.0.5 - 2026-03-21
 
 - added a dev-only `skill:tester` CLI that builds the local package stack and prepares a reusable `packages/agents/.skill-tester/` workspace for bundled skill iteration without publishing `@ank1015/llm-agents`
