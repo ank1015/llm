@@ -11,16 +11,16 @@ import {
   symlink,
   writeFile,
 } from 'node:fs/promises';
-import { dirname, join, relative, resolve } from 'node:path';
+import { basename, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const PACKAGE_JSON_FILENAME = 'package.json';
 const currentFileDir = dirname(fileURLToPath(import.meta.url));
 const packageRoot = findPackageRoot(currentFileDir);
-const monorepoRoot = findMonorepoRoot(packageRoot);
+let monorepoRoot: string | null | undefined;
 const bundledSkillsDir = join(packageRoot, 'skills');
 const bundledRegistryPath = join(bundledSkillsDir, 'registry.json');
-const packageNodeModulesDir = join(packageRoot, 'node_modules');
+const packageNodeModulesDir = resolvePackageNodeModulesDir(packageRoot);
 
 export const MAX_DIR_NAME = '.max';
 export const INSTALLED_SKILLS_DIR_NAME = 'skills';
@@ -77,6 +77,11 @@ export function getAgentsPackageRoot(): string {
 }
 
 export function getAgentsMonorepoRoot(): string {
+  monorepoRoot ??= findMonorepoRoot(packageRoot);
+  if (!monorepoRoot) {
+    throw new Error('The skill tester is only available from an @ank1015/llm monorepo checkout.');
+  }
+
   return monorepoRoot;
 }
 
@@ -584,7 +589,7 @@ function normalizeObjectRecord(value: unknown): Record<string, string> {
 async function readCurrentPackageVersion(): Promise<string> {
   const packageJsonPath = join(packageRoot, PACKAGE_JSON_FILENAME);
   const parsed = JSON.parse(await readFile(packageJsonPath, 'utf-8')) as { version?: string };
-  return parsed.version ?? '0.0.4';
+  return parsed.version ?? '0.0.6';
 }
 
 async function readCurrentTsxVersion(): Promise<string> {
@@ -628,7 +633,28 @@ function findPackageRoot(startDir: string): string {
   }
 }
 
-function findMonorepoRoot(startDir: string): string {
+function resolvePackageNodeModulesDir(packageRootPath: string): string {
+  return findNearestNodeModulesDir(packageRootPath) ?? join(packageRootPath, 'node_modules');
+}
+
+function findNearestNodeModulesDir(startDir: string): string | undefined {
+  let dir = startDir;
+
+  while (true) {
+    if (basename(dir) === 'node_modules') {
+      return dir;
+    }
+
+    const parentDir = dirname(dir);
+    if (parentDir === dir) {
+      return undefined;
+    }
+
+    dir = parentDir;
+  }
+}
+
+function findMonorepoRoot(startDir: string): string | null {
   let dir = startDir;
 
   while (true) {
@@ -638,7 +664,7 @@ function findMonorepoRoot(startDir: string): string {
 
     const parentDir = dirname(dir);
     if (parentDir === dir) {
-      throw new Error(`Unable to locate monorepo root from ${startDir}`);
+      return null;
     }
 
     dir = parentDir;
