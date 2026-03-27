@@ -6,6 +6,7 @@ import { Header } from '@/components/header';
 import { SettingsDialog } from '@/components/settings-dialog';
 import { SideDrawer } from '@/components/side-drawer';
 import { Sidebar } from '@/components/sidebar';
+import { ArtifactTerminalDock } from '@/components/terminal-dock';
 
 export default function ProjectLayout({ children }: { children: ReactNode }) {
   return (
@@ -14,6 +15,7 @@ export default function ProjectLayout({ children }: { children: ReactNode }) {
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <Header />
         <main className="relative flex-1 min-h-0 min-w-0 overflow-hidden">{children}</main>
+        <ArtifactTerminalDock />
       </div>
       <SettingsDialog />
       <SideDrawer />
