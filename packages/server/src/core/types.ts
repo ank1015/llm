@@ -23,7 +23,7 @@ export interface ProjectMetadata {
 
 /** Metadata stored in each artifact directory's metadata.json */
 export interface ArtifactDirMetadata {
-  /** Unique identifier (used as directory name) */
+  /** Unique identifier slug (used as the directory name and route id) */
   id: string;
   /** Human-readable name (e.g. "research", "app", "assets") */
   name: string;

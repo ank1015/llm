@@ -12,6 +12,11 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import { setConfig } from '../../../src/core/config.js';
 import {
+  resetSessionRunRegistry,
+  sessionRunRegistry,
+} from '../../../src/core/session/run-registry.js';
+import { pathExists } from '../../../src/core/storage/fs.js';
+import {
   mockAddSkill,
   mockDeleteSkill,
   mockListInstalledSkills,
@@ -28,6 +33,7 @@ const BASE = `/api/projects/${PROJECT}/artifacts`;
 
 beforeEach(async () => {
   resetAgentMocks();
+  resetSessionRunRegistry();
   projectsRoot = await mkdtemp(join(tmpdir(), 'test-projects-'));
   dataRoot = await mkdtemp(join(tmpdir(), 'test-data-'));
   setConfig({ projectsRoot, dataRoot });
@@ -41,6 +47,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  resetSessionRunRegistry();
   await rm(projectsRoot, { recursive: true, force: true });
   await rm(dataRoot, { recursive: true, force: true });
 });
@@ -55,6 +62,14 @@ function post(path: string, body: unknown) {
 
 function get(path: string) {
   return app.request(path);
+}
+
+function patch(path: string, body: unknown) {
+  return app.request(path, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
 }
 
 function del(path: string) {
@@ -133,6 +148,160 @@ describe('Artifact Dir Routes', () => {
       const res = await get(`${BASE}/nonexistent`);
 
       expect(res.status).toBe(404);
+    });
+  });
+
+  describe('PATCH /api/projects/:projectId/artifacts/:artifactDirId/name', () => {
+    it('renames the artifact slug, moves its directories, and keeps sessions reachable', async () => {
+      await post(BASE, { name: 'Research' });
+      await writeFile(join(projectsRoot, PROJECT, 'research', 'README.md'), '# renamed');
+
+      const createSessionRes = await post(`${BASE}/research/sessions`, {
+        name: 'Rename Me',
+        api: 'anthropic',
+        modelId: 'claude-sonnet-4-5',
+      });
+      expect(createSessionRes.status).toBe(201);
+      const createdSession = await createSessionRes.json();
+
+      const res = await patch(`${BASE}/research/name`, { name: 'Renamed Artifact' });
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(Value.Check(ArtifactDirDtoSchema, body)).toBe(true);
+      expect(body.id).toBe('renamed-artifact');
+      expect(body.name).toBe('Renamed Artifact');
+
+      expect(await pathExists(join(projectsRoot, PROJECT, 'research'))).toBe(false);
+      expect(await pathExists(join(projectsRoot, PROJECT, 'renamed-artifact'))).toBe(true);
+      expect(await pathExists(join(projectsRoot, PROJECT, 'renamed-artifact', 'README.md'))).toBe(
+        true
+      );
+
+      expect(await pathExists(join(dataRoot, PROJECT, 'artifacts', 'research'))).toBe(false);
+      expect(await pathExists(join(dataRoot, PROJECT, 'artifacts', 'renamed-artifact'))).toBe(true);
+      expect(
+        await pathExists(
+          join(
+            dataRoot,
+            PROJECT,
+            'artifacts',
+            'renamed-artifact',
+            'sessions',
+            PROJECT,
+            `${createdSession.id}.jsonl`
+          )
+        )
+      ).toBe(true);
+
+      expect((await get(`${BASE}/research`)).status).toBe(404);
+      expect((await get(`${BASE}/renamed-artifact`)).status).toBe(200);
+
+      const sessionsRes = await get(`${BASE}/renamed-artifact/sessions`);
+      expect(sessionsRes.status).toBe(200);
+      expect(await sessionsRes.json()).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            sessionId: createdSession.id,
+            sessionName: 'Rename Me',
+          }),
+        ])
+      );
+
+      const overviewRes = await get(`/api/projects/${PROJECT}/overview`);
+      expect(overviewRes.status).toBe(200);
+      const overview = await overviewRes.json();
+      expect(overview.artifactDirs).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: 'renamed-artifact',
+            name: 'Renamed Artifact',
+            sessions: expect.arrayContaining([
+              expect.objectContaining({
+                sessionId: createdSession.id,
+              }),
+            ]),
+          }),
+        ])
+      );
+
+      const fileIndexRes = await get(`/api/projects/${PROJECT}/file-index`);
+      expect(fileIndexRes.status).toBe(200);
+      const fileIndex = await fileIndexRes.json();
+      expect(fileIndex.files).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            artifactId: 'renamed-artifact',
+            artifactPath: 'renamed-artifact/',
+          }),
+          expect.objectContaining({
+            artifactId: 'renamed-artifact',
+            path: 'README.md',
+            artifactPath: 'renamed-artifact/README.md',
+          }),
+        ])
+      );
+    });
+
+    it('keeps the slug when the new display name normalizes to the same artifact id', async () => {
+      await post(BASE, { name: 'Research' });
+
+      const res = await patch(`${BASE}/research/name`, { name: 'Research!!!' });
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.id).toBe('research');
+      expect(body.name).toBe('Research!!!');
+      expect(await pathExists(join(projectsRoot, PROJECT, 'research'))).toBe(true);
+      expect(await pathExists(join(dataRoot, PROJECT, 'artifacts', 'research'))).toBe(true);
+    });
+
+    it('returns 409 when renaming to an existing artifact slug', async () => {
+      await post(BASE, { name: 'Research' });
+      await post(BASE, { name: 'Docs' });
+
+      const res = await patch(`${BASE}/research/name`, { name: 'Docs' });
+
+      expect(res.status).toBe(409);
+      expect(await res.json()).toEqual({
+        error: 'Artifact directory "Docs" already exists in this project',
+      });
+    });
+
+    it('returns 409 when the artifact has an active live run', async () => {
+      await post(BASE, { name: 'Research' });
+      const createSessionRes = await post(`${BASE}/research/sessions`, {
+        name: 'Running Session',
+        api: 'anthropic',
+        modelId: 'claude-sonnet-4-5',
+      });
+      const createdSession = await createSessionRes.json();
+      const sessionKey = `${PROJECT}:research:${createdSession.id}`;
+
+      const started = sessionRunRegistry.startRun({
+        sessionKey,
+        sessionId: createdSession.id,
+        mode: 'prompt',
+        execute: ({ signal }) =>
+          new Promise((resolve) => {
+            signal.addEventListener(
+              'abort',
+              () => {
+                resolve({ messageCount: 0 });
+              },
+              { once: true }
+            );
+          }),
+      });
+
+      const res = await patch(`${BASE}/research/name`, { name: 'Blocked Rename' });
+
+      expect(res.status).toBe(409);
+      expect(await res.json()).toEqual({
+        error: 'Artifact directory "research" has an active live run and cannot be renamed',
+      });
+
+      sessionRunRegistry.cancelRun(sessionKey, started.run.runId);
     });
   });
 

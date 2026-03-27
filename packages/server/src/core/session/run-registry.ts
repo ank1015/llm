@@ -313,6 +313,18 @@ class SessionRunRegistry {
     return this.runsBySessionKey.get(sessionKey)?.summary ?? null;
   }
 
+  hasActiveRunForArtifact(projectId: string, artifactDirId: string): boolean {
+    const artifactPrefix = `${projectId}:${artifactDirId}:`;
+
+    for (const [sessionKey, run] of this.runsBySessionKey.entries()) {
+      if (sessionKey.startsWith(artifactPrefix) && run.isRunning()) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   cancelRun(sessionKey: string, runId: string): boolean {
     const run = this.getRun(sessionKey, runId);
     if (!run) {

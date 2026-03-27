@@ -42,7 +42,7 @@ Responses:
 
 ## `PATCH /api/projects/:projectId/artifacts/:artifactDirId/name`
 
-Rename an artifact directory without changing its stable ID.
+Rename an artifact directory and move it to its new slug if needed.
 
 Request body:
 
@@ -57,6 +57,7 @@ Responses:
 - `200` — updated `ArtifactDirDto`
 - `400` — missing name
 - `404` — artifact not found
+- `409` — target artifact slug already exists or the artifact has an active live run
 
 ## `GET /api/projects/:projectId/artifacts/:artifactDirId/files`
 

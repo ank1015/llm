@@ -118,7 +118,7 @@ export class ArtifactDir {
     return readMetadata<ArtifactDirMetadata>(this.dataPath);
   }
 
-  /** Rename this artifact directory without changing its stable id */
+  /** Rename this artifact directory and move its working/metadata directories if the slug changes */
   async rename(name: string): Promise<ArtifactDirMetadata> {
     const trimmedName = name.trim();
 
@@ -127,13 +127,61 @@ export class ArtifactDir {
     }
 
     const metadata = await this.getMetadata();
+    const nextId = slugify(trimmedName);
+    if (!nextId) {
+      throw new Error('name is required');
+    }
+
     const nextMetadata: ArtifactDirMetadata = {
       ...metadata,
+      id: nextId,
       name: trimmedName,
     };
 
-    await writeMetadata(this.dataPath, nextMetadata);
-    return nextMetadata;
+    if (nextId === metadata.id) {
+      await writeMetadata(this.dataPath, nextMetadata);
+      return nextMetadata;
+    }
+
+    const nextDirPath = join(dirname(this.dirPath), nextId);
+    const nextDataPath = join(dirname(this.dataPath), nextId);
+
+    if (await pathExists(nextDirPath)) {
+      throw new Error(`Artifact directory "${trimmedName}" already exists in this project`);
+    }
+
+    if (await pathExists(nextDataPath)) {
+      throw new Error(`Artifact directory "${trimmedName}" already exists in this project`);
+    }
+
+    if (!(await pathExists(this.dirPath))) {
+      throw new Error(`Artifact working directory "${metadata.id}" not found`);
+    }
+
+    let workingDirMoved = false;
+    let metadataDirMoved = false;
+
+    try {
+      await rename(this.dirPath, nextDirPath);
+      workingDirMoved = true;
+
+      await rename(this.dataPath, nextDataPath);
+      metadataDirMoved = true;
+
+      await writeMetadata(nextDataPath, nextMetadata);
+      return nextMetadata;
+    } catch (error) {
+      if (metadataDirMoved) {
+        await rollbackRename(nextDataPath, this.dataPath);
+      }
+
+      if (workingDirMoved) {
+        await rollbackRename(nextDirPath, this.dirPath);
+      }
+
+      const message = error instanceof Error ? error.message : 'Failed to rename artifact';
+      throw new Error(`Failed to rename artifact directory: ${message}`);
+    }
   }
 
   /** List artifact files in the working directory (the actual content agents produce) */
@@ -573,6 +621,14 @@ function normalizeRelativePath(path: string): string {
 
 function normalizePathName(name: string): string {
   return name.trim();
+}
+
+async function rollbackRename(fromPath: string, toPath: string): Promise<void> {
+  if (!(await pathExists(fromPath)) || (await pathExists(toPath))) {
+    return;
+  }
+
+  await rename(fromPath, toPath);
 }
 
 function looksBinary(content: Buffer): boolean {
