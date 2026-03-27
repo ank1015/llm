@@ -148,6 +148,10 @@ function getBasename(path: string): string {
   return segments[segments.length - 1] ?? path;
 }
 
+function isArtifactRootEntry(entry: ProjectFileIndexEntry): boolean {
+  return entry.type === 'directory' && entry.path.length === 0;
+}
+
 function getDirname(path: string): string {
   const normalized = path.replace(/\\/g, '/');
   const idx = normalized.lastIndexOf('/');
@@ -187,11 +191,17 @@ function getRelativeMentionPath(currentArtifactId: string, entry: ProjectFileInd
   const upSegments = Array.from({ length: fromSegments.length - sharedLength }, () => '..');
   const downSegments = toSegments.slice(sharedLength);
   const relativePath = [...upSegments, ...downSegments].join('/');
+  const normalizedRelativePath =
+    relativePath.length > 0 ? relativePath : isArtifactRootEntry(entry) ? '.' : entry.path;
 
-  return formatIndexedMentionPath(relativePath.length > 0 ? relativePath : entry.path, entry.type);
+  return formatIndexedMentionPath(normalizedRelativePath, entry.type);
 }
 
 function getIndexedEntryDisplayName(entry: ProjectFileIndexEntry): string {
+  if (isArtifactRootEntry(entry)) {
+    return formatIndexedMentionPath(entry.artifactName, entry.type);
+  }
+
   return formatIndexedMentionPath(getBasename(entry.path), entry.type);
 }
 
@@ -244,11 +254,30 @@ function scoreFileMatch(entry: ProjectFileIndexEntry, query: string): number {
     return 0;
   }
 
+  const isArtifactRoot = isArtifactRootEntry(entry);
   const basename = getBasename(entry.path).toLowerCase();
   const filePath = entry.path.toLowerCase();
   const artifactPath = entry.artifactPath.toLowerCase();
+  const artifactId = entry.artifactId.toLowerCase();
   const artifactName = entry.artifactName.toLowerCase();
   let score = 0;
+
+  if (artifactPath === q) {
+    score += 1000;
+  } else if (artifactPath.startsWith(q)) {
+    score += 250;
+  }
+
+  if (isArtifactRoot) {
+    if (
+      q === artifactId ||
+      q === artifactName ||
+      q === `${artifactId}/` ||
+      q === `${artifactName}/`
+    ) {
+      score += 1200;
+    }
+  }
 
   if (basename === q) {
     score += 1000;
@@ -354,6 +383,10 @@ function removeMentionBeforeCaret(
 }
 
 function buildFileLabel(entry: ProjectFileIndexEntry): string {
+  if (isArtifactRootEntry(entry)) {
+    return 'Artifact root';
+  }
+
   const dir = getDirname(entry.path);
   return dir.length > 0 ? `${entry.artifactName}/${dir}` : entry.artifactName;
 }
@@ -539,7 +572,6 @@ function PromptInputWithActions() {
 
   const sidebarAddSession = useSidebarStore((state) => state.addSession);
   const sidebarRenameSession = useSidebarStore((state) => state.renameSession);
-  const loadProjectFileIndex = useArtifactFilesStore((state) => state.loadProjectFileIndex);
   const searchProjectFiles = useArtifactFilesStore((state) => state.searchProjectFiles);
   const input = currentSession ? composerInput : localInput;
   const attachments = currentSession ? composerAttachments : localAttachments;
@@ -591,12 +623,6 @@ function PromptInputWithActions() {
     textareaElementRef.current = textarea;
     syncActiveMention(textarea.value, textarea.selectionStart);
   };
-
-  useEffect(() => {
-    void loadProjectFileIndex(projectId).catch(() => {
-      // Mention search can still fallback to server query.
-    });
-  }, [loadProjectFileIndex, projectId]);
 
   useEffect(() => {
     if (!activeMention) {
