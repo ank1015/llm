@@ -129,6 +129,33 @@ export interface ProjectFileIndexResult {
   truncated: boolean;
 }
 
+export type TerminalStatus = 'running' | 'exited';
+
+export interface TerminalSummary {
+  id: string;
+  title: string;
+  status: TerminalStatus;
+  projectId: string;
+  artifactId: string;
+  cols: number;
+  rows: number;
+  createdAt: string;
+  lastActiveAt: string;
+  exitCode: number | null;
+  signal: string | null;
+  exitedAt: string | null;
+}
+
+export interface TerminalMetadata extends TerminalSummary {
+  cwdAtLaunch: string;
+  shell: string;
+}
+
+export interface CreateTerminalOptions {
+  cols?: number;
+  rows?: number;
+}
+
 /** Metadata stored in each session's metadata.json */
 export interface SessionMetadata {
   /** Session ID (matches the JSONL session ID) */
