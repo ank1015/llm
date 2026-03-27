@@ -57,7 +57,7 @@ Responses:
 - `200` — updated `ArtifactDirDto`
 - `400` — missing name
 - `404` — artifact not found
-- `409` — target artifact slug already exists or the artifact has an active live run
+- `409` — target artifact slug already exists, the artifact has an active live run, or the artifact has a running terminal
 
 ## `GET /api/projects/:projectId/artifacts/:artifactDirId/files`
 
@@ -213,3 +213,4 @@ Responses:
 
 - `200` — `{ "deleted": true }`
 - `404` — artifact not found
+- `409` — artifact has a running terminal

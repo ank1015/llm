@@ -18,6 +18,8 @@ DTO naming used in these docs:
 - `BundledSkillDto`
 - `InstalledSkillDto`
 - `LiveRunSummaryDto`
+- `TerminalSummaryDto`
+- `TerminalMetadataDto`
 
 ## Sections
 
@@ -26,3 +28,4 @@ DTO naming used in these docs:
 - [sessions.md](./sessions.md)
 - [skills.md](./skills.md)
 - [streaming.md](./streaming.md)
+- [terminals.md](./terminals.md)
