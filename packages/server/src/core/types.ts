@@ -89,7 +89,7 @@ export interface ArtifactFileResult {
 
 /** A path discovered while indexing one artifact directory */
 export interface ArtifactFileIndexEntry {
-  /** Relative path from artifact root */
+  /** Relative path from artifact root. Empty string represents the artifact root itself. */
   path: string;
   /** Whether this indexed path is a file or directory */
   type: ArtifactExplorerEntryType;
@@ -110,7 +110,7 @@ export interface ArtifactFileIndexResult {
 export interface ProjectFileIndexEntry {
   artifactId: string;
   artifactName: string;
-  /** Relative path inside the artifact directory */
+  /** Relative path inside the artifact directory. Empty string represents the artifact root. */
   path: string;
   /** Whether this indexed path is a file or directory */
   type: ArtifactExplorerEntryType;

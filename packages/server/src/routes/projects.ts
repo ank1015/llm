@@ -194,6 +194,7 @@ projectRoutes.get('/projects/:projectId/file-index', async (c) => {
       const indexed = await artifactDir.buildFileIndex({
         query,
         limit: remaining,
+        includeRoot: shouldIncludeArtifactRoot(query, artifact),
       });
 
       files.push(
@@ -202,7 +203,7 @@ projectRoutes.get('/projects/:projectId/file-index', async (c) => {
           artifactName: artifact.name,
           path: file.path,
           type: file.type,
-          artifactPath: `${artifact.id}/${file.path}${file.type === 'directory' ? '/' : ''}`,
+          artifactPath: buildArtifactPath(artifact.id, file.path, file.type),
           size: file.size,
           updatedAt: file.updatedAt,
         }))
@@ -233,6 +234,34 @@ projectRoutes.get('/projects/:projectId/file-index', async (c) => {
     return c.json({ error: message }, 404);
   }
 });
+
+function shouldIncludeArtifactRoot(query: string, artifact: { id: string; name: string }): boolean {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) {
+    return true;
+  }
+
+  const candidates = [
+    artifact.id.toLowerCase(),
+    `${artifact.id.toLowerCase()}/`,
+    artifact.name.toLowerCase(),
+    `${artifact.name.toLowerCase()}/`,
+  ];
+
+  return candidates.some((candidate) => candidate.includes(normalizedQuery));
+}
+
+function buildArtifactPath(
+  artifactId: string,
+  path: string,
+  type: ProjectFileIndexEntry['type']
+): string {
+  if (!path) {
+    return `${artifactId}/`;
+  }
+
+  return `${artifactId}/${path}${type === 'directory' ? '/' : ''}`;
+}
 
 /** PATCH /api/projects/:projectId/name — Rename a project without changing its stable id */
 projectRoutes.patch('/projects/:projectId/name', async (c) => {
