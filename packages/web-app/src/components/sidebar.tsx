@@ -15,10 +15,10 @@ import {
   Trash2,
 } from 'lucide-react';
 import Image from 'next/image';
-import { useParams, useRouter } from 'next/navigation';
-import { memo, useEffect, useRef, useState } from 'react';
+import { useParams, usePathname, useRouter } from 'next/navigation';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 
-import type { ArtifactDirOverviewDto, SessionSummaryDto } from '@/lib/client-api';
+import type { ArtifactDirDto, ArtifactDirOverviewDto, SessionSummaryDto } from '@/lib/client-api';
 import type { FC, FormEvent, ReactNode } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -42,11 +42,12 @@ import {
   deleteArtifactDir,
   deleteSession,
   getProjectOverview,
+  renameArtifactDir,
   renameSession,
 } from '@/lib/client-api';
 import { useTypewriter } from '@/lib/use-typewriter';
 import { cn } from '@/lib/utils';
-import { useChatStore, useSidebarStore, useUiStore } from '@/stores';
+import { useArtifactFilesStore, useChatStore, useSidebarStore, useUiStore } from '@/stores';
 
 // ---------------------------------------------------------------------------
 // SidebarItem
@@ -73,6 +74,25 @@ const SidebarItem: FC<SidebarItemProps> = ({ icon, label, collapsed, onClick }) 
     </button>
   );
 };
+
+function replaceArtifactSegmentInPath(
+  pathname: string,
+  projectId: string,
+  previousArtifactId: string,
+  nextArtifactId: string
+): string | null {
+  const prefix = `/${projectId}/${previousArtifactId}`;
+  if (!pathname.startsWith(prefix)) {
+    return null;
+  }
+
+  const suffix = pathname.slice(prefix.length);
+  if (suffix.length > 0 && !suffix.startsWith('/')) {
+    return null;
+  }
+
+  return `/${projectId}/${nextArtifactId}${suffix}`;
+}
 
 // ---------------------------------------------------------------------------
 // SessionItem — a single thread inside an artifact folder
@@ -248,6 +268,7 @@ const ArtifactGroup: FC<{
   activeArtifactId: string | null;
   urlThreadId: string | null;
   onDeleted: (artifactId: string) => void;
+  onRenamed: (previousArtifactId: string, artifact: ArtifactDirDto) => Promise<void>;
   onSessionRenamed: (sessionId: string, sessionName: string) => void;
   onSessionDeleted: (artifactId: string, sessionId: string) => void;
   defaultExpanded?: boolean;
@@ -257,14 +278,24 @@ const ArtifactGroup: FC<{
   activeArtifactId,
   urlThreadId,
   onDeleted,
+  onRenamed,
   onSessionRenamed,
   onSessionDeleted,
   defaultExpanded = false,
 }) => {
   const router = useRouter();
+  const pathname = usePathname();
   const setActiveSession = useChatStore((state) => state.setActiveSession);
   const clearSessionState = useChatStore((state) => state.clearSessionState);
+  const renameSidebarArtifact = useSidebarStore((state) => state.renameArtifact);
+  const clearArtifactCache = useArtifactFilesStore((state) => state.clearArtifactCache);
+  const clearProjectFileIndex = useArtifactFilesStore((state) => state.clearProjectFileIndex);
   const [isCollapsed, setIsCollapsed] = useState(!defaultExpanded);
+  const renameInputRef = useRef<HTMLInputElement>(null);
+  const [isRenameOpen, setIsRenameOpen] = useState(false);
+  const [renameValue, setRenameValue] = useState(artifact.name);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [renameError, setRenameError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [prevDefaultExpanded, setPrevDefaultExpanded] = useState(defaultExpanded);
@@ -273,6 +304,16 @@ const ArtifactGroup: FC<{
     setPrevDefaultExpanded(defaultExpanded);
     if (defaultExpanded) setIsCollapsed(false);
   }
+
+  useEffect(() => {
+    if (!isRenameOpen) {
+      return;
+    }
+
+    setRenameValue(artifact.name);
+    setRenameError(null);
+    setTimeout(() => renameInputRef.current?.focus(), 0);
+  }, [artifact.name, isRenameOpen]);
 
   const handleSessionSelect = (session: SessionSummaryDto) => {
     setActiveSession({ sessionId: session.sessionId });
@@ -310,6 +351,55 @@ const ArtifactGroup: FC<{
       setDeleteError(error instanceof Error ? error.message : 'Failed to delete artifact');
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleRenameArtifact = async (e: FormEvent) => {
+    e.preventDefault();
+    const trimmed = renameValue.trim();
+    if (!trimmed || isRenaming) return;
+
+    if (trimmed === artifact.name) {
+      setIsRenameOpen(false);
+      return;
+    }
+
+    setIsRenaming(true);
+    setRenameError(null);
+
+    try {
+      const renamedArtifact = await renameArtifactDir(projectId, artifact.id, {
+        name: trimmed,
+      });
+      const slugChanged = renamedArtifact.id !== artifact.id;
+
+      renameSidebarArtifact(artifact.id, {
+        id: renamedArtifact.id,
+        name: renamedArtifact.name,
+        description: renamedArtifact.description,
+        createdAt: renamedArtifact.createdAt,
+      });
+      clearProjectFileIndex(projectId);
+      if (slugChanged) {
+        clearArtifactCache({ projectId, artifactId: artifact.id });
+        clearArtifactCache({ projectId, artifactId: renamedArtifact.id });
+      }
+
+      const nextPath =
+        slugChanged && activeArtifactId === artifact.id
+          ? replaceArtifactSegmentInPath(pathname, projectId, artifact.id, renamedArtifact.id)
+          : null;
+
+      if (nextPath) {
+        router.replace(nextPath);
+      }
+
+      await onRenamed(artifact.id, renamedArtifact);
+      setIsRenameOpen(false);
+    } catch (error) {
+      setRenameError(error instanceof Error ? error.message : 'Failed to rename artifact');
+    } finally {
+      setIsRenaming(false);
     }
   };
 
@@ -371,12 +461,19 @@ const ArtifactGroup: FC<{
               <button
                 onClick={(e) => e.stopPropagation()}
                 className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-foreground/10 hover:text-foreground"
+                title="Artifact options"
+                aria-label="Artifact options"
               >
                 <Ellipsis size={14} strokeWidth={1.8} />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent side="right" align="start" className="w-[160px]">
-              <DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsRenameOpen(true);
+                }}
+              >
                 <Pencil size={14} />
                 Rename
               </DropdownMenuItem>
@@ -393,6 +490,48 @@ const ArtifactGroup: FC<{
           </DropdownMenu>
         </div>
       </div>
+      <Dialog open={isRenameOpen} onOpenChange={setIsRenameOpen}>
+        <DialogContent
+          className="bg-home-page border-home-border sm:max-w-sm"
+          showCloseButton={false}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <DialogHeader>
+            <DialogTitle className="text-foreground text-base">Rename artifact</DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              Update the artifact name and folder slug.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={(e) => void handleRenameArtifact(e)}>
+            <input
+              ref={renameInputRef}
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              className="bg-home-panel border-home-border text-foreground placeholder:text-muted-foreground w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-foreground/20"
+              placeholder="Artifact name"
+            />
+            {renameError && <p className="mt-2 text-xs text-red-500">{renameError}</p>}
+            <DialogFooter className="mt-4">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setIsRenameOpen(false)}
+                className="cursor-pointer"
+                disabled={isRenaming}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="cursor-pointer"
+                disabled={!renameValue.trim() || isRenaming}
+              >
+                {isRenaming ? 'Saving...' : 'Save'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
       {deleteError && <p className="px-2 pt-1 text-[11px] text-red-500">{deleteError}</p>}
       {!isCollapsed && artifact.sessions.length > 0 && (
         <div className="mt-1 flex flex-col gap-1">
@@ -443,21 +582,24 @@ const ArtifactList: FC<{ collapsed?: boolean; onNewArtifact?: () => void }> = ({
   const setIsLoading = useSidebarStore((s) => s.setIsLoading);
   const [collapseAllKey, setCollapseAllKey] = useState(0);
 
-  useEffect(() => {
+  const loadOverview = useCallback(async () => {
     if (!projectId) return;
+
     setIsLoading(true);
-    void getProjectOverview(projectId)
-      .then((overview) => {
-        setProjectName(overview.project.name);
-        setArtifactDirs(overview.artifactDirs);
-      })
-      .catch(() => {
-        setArtifactDirs([]);
-      })
-      .finally(() => {
-        setIsLoading(false);
-      });
+    try {
+      const overview = await getProjectOverview(projectId);
+      setProjectName(overview.project.name);
+      setArtifactDirs(overview.artifactDirs);
+    } catch {
+      setArtifactDirs([]);
+    } finally {
+      setIsLoading(false);
+    }
   }, [projectId, setArtifactDirs, setIsLoading, setProjectName]);
+
+  useEffect(() => {
+    void loadOverview();
+  }, [loadOverview]);
 
   const handleCollapseAll = () => setCollapseAllKey((k) => k + 1);
 
@@ -475,6 +617,9 @@ const ArtifactList: FC<{ collapsed?: boolean; onNewArtifact?: () => void }> = ({
     renameSidebarSession(sessionId, sessionName);
   const handleSessionDeleted = (artifactId: string, sessionId: string) =>
     removeSidebarSession(artifactId, sessionId);
+  const handleArtifactRenamed = async () => {
+    await loadOverview();
+  };
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -515,6 +660,7 @@ const ArtifactList: FC<{ collapsed?: boolean; onNewArtifact?: () => void }> = ({
               urlThreadId={urlThreadId ?? null}
               collapseAllKey={collapseAllKey}
               onArtifactDeleted={handleArtifactDeleted}
+              onArtifactRenamed={handleArtifactRenamed}
               onSessionRenamed={handleSessionRenamed}
               onSessionDeleted={handleSessionDeleted}
             />
@@ -532,6 +678,7 @@ const ArtifactListInner: FC<{
   urlThreadId: string | null;
   collapseAllKey: number;
   onArtifactDeleted: (artifactId: string) => void;
+  onArtifactRenamed: (previousArtifactId: string, artifact: ArtifactDirDto) => Promise<void>;
   onSessionRenamed: (sessionId: string, sessionName: string) => void;
   onSessionDeleted: (artifactId: string, sessionId: string) => void;
 }> = ({
@@ -541,6 +688,7 @@ const ArtifactListInner: FC<{
   urlThreadId,
   collapseAllKey,
   onArtifactDeleted,
+  onArtifactRenamed,
   onSessionRenamed,
   onSessionDeleted,
 }) => {
@@ -563,6 +711,7 @@ const ArtifactListInner: FC<{
           activeArtifactId={activeArtifactId}
           urlThreadId={urlThreadId}
           onDeleted={onArtifactDeleted}
+          onRenamed={onArtifactRenamed}
           onSessionRenamed={onSessionRenamed}
           onSessionDeleted={onSessionDeleted}
           defaultExpanded={activeArtifactId === artifact.id}
