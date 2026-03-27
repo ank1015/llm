@@ -7,7 +7,8 @@ import {
 import { Hono } from 'hono';
 
 import { ArtifactDir, Project, Session } from '../core/index.js';
-import { toArtifactDirOverviewDto, toProjectDto } from '../http/contracts.js';
+import { terminalRegistry } from '../core/terminal/terminal-registry.js';
+import { toArtifactDirOverviewDto, toProjectDto, toTerminalSummaryDto } from '../http/contracts.js';
 import { readJsonBody, validateSchema } from '../http/validation.js';
 
 import type { ProjectFileIndexEntry } from '../core/index.js';
@@ -19,6 +20,7 @@ import type {
   ProjectFileIndexResult,
   ProjectOverviewDto,
   RenameProjectRequest,
+  TerminalConflictResponse,
   UpdateProjectImageRequest,
 } from '@ank1015/llm-app-contracts';
 
@@ -301,6 +303,18 @@ projectRoutes.delete('/projects/:projectId', async (c) => {
   const { projectId } = c.req.param();
 
   try {
+    const runningTerminal = terminalRegistry.getRunningTerminalForProject(projectId);
+    if (runningTerminal) {
+      return c.json<TerminalConflictResponse>(
+        {
+          error: `Project "${projectId}" has a running terminal and cannot be deleted`,
+          terminal: toTerminalSummaryDto(runningTerminal),
+        },
+        409
+      );
+    }
+
+    terminalRegistry.dropExitedTerminalsForProject(projectId);
     const project = await Project.getById(projectId);
     await project.delete();
     return c.json<ProjectDeleteResponse>({ deleted: true });

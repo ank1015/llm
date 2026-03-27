@@ -4,6 +4,8 @@ import type {
   InstalledSkillEntry,
   ProjectMetadata,
   SessionMetadata,
+  TerminalMetadata,
+  TerminalSummary,
 } from '../core/index.js';
 import type {
   ArtifactDirDto,
@@ -16,6 +18,8 @@ import type {
   SessionMetadataDto,
   SessionSummaryDto,
   SessionTreeResponse,
+  TerminalMetadataDto,
+  TerminalSummaryDto,
 } from '@ank1015/llm-app-contracts';
 import type { SessionSummary } from '@ank1015/llm-sdk';
 
@@ -97,6 +101,14 @@ export function toDeleteArtifactSkillResponse(skillName: string): DeleteArtifact
 
 export function toLiveRunSummaryDto(summary: LiveRunSummaryDto): LiveRunSummaryDto {
   return summary;
+}
+
+export function toTerminalSummaryDto(summary: TerminalSummary): TerminalSummaryDto {
+  return summary;
+}
+
+export function toTerminalMetadataDto(metadata: TerminalMetadata): TerminalMetadataDto {
+  return metadata;
 }
 
 export function toSessionTreeResponse(

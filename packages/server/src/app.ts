@@ -6,6 +6,7 @@ import { keyRoutes } from './routes/keys.js';
 import { projectRoutes } from './routes/projects.js';
 import { sessionRoutes } from './routes/sessions.js';
 import { skillRoutes } from './routes/skills.js';
+import { terminalRoutes } from './routes/terminals.js';
 
 /**
  * Creates and configures the Hono application.
@@ -32,6 +33,7 @@ export function createApp(): Hono {
   app.route('/api', keyRoutes);
   app.route('/api', sessionRoutes);
   app.route('/api', skillRoutes);
+  app.route('/api', terminalRoutes);
 
   return app;
 }

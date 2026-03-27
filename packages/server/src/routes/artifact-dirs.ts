@@ -12,10 +12,12 @@ import { Hono } from 'hono';
 
 import { ArtifactDir } from '../core/index.js';
 import { sessionRunRegistry } from '../core/session/run-registry.js';
+import { terminalRegistry } from '../core/terminal/terminal-registry.js';
 import {
   toArtifactDirDto,
   toDeleteArtifactSkillResponse,
   toInstalledSkillDto,
+  toTerminalSummaryDto,
 } from '../http/contracts.js';
 import { readJsonBody, validateSchema } from '../http/validation.js';
 
@@ -37,6 +39,7 @@ import type {
   RenameArtifactDirRequest,
   RenameArtifactPathRequest,
   RenameArtifactPathResponse,
+  TerminalConflictResponse,
 } from '@ank1015/llm-app-contracts';
 
 const BASE = '/projects/:projectId/artifacts';
@@ -132,6 +135,20 @@ artifactDirRoutes.patch(`${BASE}/:artifactDirId/name`, async (c) => {
   }
 
   try {
+    const runningTerminal = terminalRegistry.getRunningTerminalForArtifact(
+      projectId,
+      artifactDirId
+    );
+    if (runningTerminal) {
+      return c.json<TerminalConflictResponse>(
+        {
+          error: `Artifact directory "${artifactDirId}" has a running terminal and cannot be renamed`,
+          terminal: toTerminalSummaryDto(runningTerminal),
+        },
+        409
+      );
+    }
+
     if (sessionRunRegistry.hasActiveRunForArtifact(projectId, artifactDirId)) {
       return c.json(
         {
@@ -141,6 +158,7 @@ artifactDirRoutes.patch(`${BASE}/:artifactDirId/name`, async (c) => {
       );
     }
 
+    terminalRegistry.dropExitedTerminalsForArtifact(projectId, artifactDirId);
     const dir = await ArtifactDir.getById(projectId, artifactDirId);
     const metadata = await dir.rename(name);
     const renamedDir = await ArtifactDir.getById(projectId, metadata.id);
@@ -423,6 +441,21 @@ artifactDirRoutes.delete(`${BASE}/:artifactDirId`, async (c) => {
   const { projectId, artifactDirId } = c.req.param();
 
   try {
+    const runningTerminal = terminalRegistry.getRunningTerminalForArtifact(
+      projectId,
+      artifactDirId
+    );
+    if (runningTerminal) {
+      return c.json<TerminalConflictResponse>(
+        {
+          error: `Artifact directory "${artifactDirId}" has a running terminal and cannot be deleted`,
+          terminal: toTerminalSummaryDto(runningTerminal),
+        },
+        409
+      );
+    }
+
+    terminalRegistry.dropExitedTerminalsForArtifact(projectId, artifactDirId);
     const dir = await ArtifactDir.getById(projectId, artifactDirId);
     await dir.delete();
     return c.json<ArtifactDirDeleteResponse>({ deleted: true });
