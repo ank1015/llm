@@ -192,3 +192,4 @@ Responses:
 
 - `200` — `{ "deleted": true }`
 - `404` — project not found
+- `409` — project has a running terminal

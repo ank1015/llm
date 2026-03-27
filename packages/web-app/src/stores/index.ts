@@ -6,4 +6,5 @@ export { useComposerStore } from './composer-store';
 export { useArtifactFilesStore } from './artifact-files-store';
 export { useSessionsStore } from './sessions-store';
 export { useSidebarStore } from './sidebar-store';
+export { useTerminalStore } from './terminals-store';
 export { useUiStore } from './ui-store';

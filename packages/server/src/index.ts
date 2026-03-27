@@ -5,6 +5,8 @@
  */
 
 import { createApp } from './app.js';
+import { createHttpServer } from './http-server.js';
 
 export { createApp };
+export { createHttpServer };
 export const app = createApp();

@@ -257,6 +257,69 @@ describe('Project Routes', () => {
       );
     });
 
+    it('should ignore common junk paths, respect .gitignore files, and include artifact roots', async () => {
+      await post('/api/projects', { name: 'Ignore Project' });
+      await post('/api/projects/ignore-project/artifacts', {
+        name: 'Workspace',
+      });
+
+      const base = join(projectsRoot, 'ignore-project', 'workspace');
+      await mkdir(join(base, 'src'), { recursive: true });
+      await mkdir(join(base, 'node_modules', 'pkg'), { recursive: true });
+      await mkdir(join(base, '.max'), { recursive: true });
+      await mkdir(join(base, 'dist'), { recursive: true });
+
+      await writeFile(join(base, '.gitignore'), ['ignored.txt', 'src/secret.txt'].join('\n'));
+      await writeFile(join(base, 'README.md'), '# Docs');
+      await writeFile(join(base, 'ignored.txt'), 'ignore me');
+      await writeFile(join(base, 'src', 'index.ts'), 'export {};');
+      await writeFile(join(base, 'src', 'secret.txt'), 'top secret');
+      await writeFile(join(base, 'node_modules', 'pkg', 'index.js'), 'module.exports = {};');
+      await writeFile(join(base, '.max', 'state.json'), '{}');
+      await writeFile(join(base, 'dist', 'bundle.js'), 'console.log("hi");');
+      await writeFile(join(base, '.DS_Store'), '');
+
+      const res = await get('/api/projects/ignore-project/file-index');
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.files).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            artifactId: 'workspace',
+            path: '',
+            type: 'directory',
+            artifactPath: 'workspace/',
+          }),
+          expect.objectContaining({
+            artifactId: 'workspace',
+            path: 'README.md',
+            type: 'file',
+            artifactPath: 'workspace/README.md',
+          }),
+          expect.objectContaining({
+            artifactId: 'workspace',
+            path: 'src/index.ts',
+            type: 'file',
+            artifactPath: 'workspace/src/index.ts',
+          }),
+        ])
+      );
+      expect(body.files).not.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ path: 'ignored.txt' }),
+          expect.objectContaining({ path: 'src/secret.txt' }),
+          expect.objectContaining({ path: 'node_modules' }),
+          expect.objectContaining({ path: 'node_modules/pkg/index.js' }),
+          expect.objectContaining({ path: '.max' }),
+          expect.objectContaining({ path: '.max/state.json' }),
+          expect.objectContaining({ path: 'dist' }),
+          expect.objectContaining({ path: 'dist/bundle.js' }),
+          expect.objectContaining({ path: '.DS_Store' }),
+        ])
+      );
+    });
+
     it('should filter files by query', async () => {
       await post('/api/projects', { name: 'Filter Project' });
       await post('/api/projects/filter-project/artifacts', {
@@ -273,6 +336,31 @@ describe('Project Routes', () => {
       expect(body.files).toHaveLength(1);
       expect(body.files[0].path).toBe('README.md');
       expect(body.files[0].type).toBe('file');
+    });
+
+    it('should match artifact roots when querying by artifact name with a trailing slash', async () => {
+      await post('/api/projects', { name: 'Artifact Root Project' });
+      await post('/api/projects/artifact-root-project/artifacts', {
+        name: 'Server',
+      });
+
+      const base = join(projectsRoot, 'artifact-root-project', 'server');
+      await mkdir(join(base, 'src'), { recursive: true });
+      await writeFile(join(base, 'src', 'index.ts'), 'export {};');
+
+      const res = await get('/api/projects/artifact-root-project/file-index?query=server%2F');
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.files).toEqual([
+        expect.objectContaining({
+          artifactId: 'server',
+          artifactName: 'Server',
+          path: '',
+          type: 'directory',
+          artifactPath: 'server/',
+        }),
+      ]);
     });
 
     it('should respect limit and set truncated', async () => {

@@ -42,4 +42,33 @@ describe('sidebar store', () => {
 
     expect(useSidebarStore.getState().artifactDirs[0]?.sessions).toEqual([]);
   });
+
+  it('renames an artifact while preserving its existing sessions', () => {
+    useSidebarStore.setState({
+      artifactDirs: [
+        {
+          ...ARTIFACT,
+          sessions: [SESSION],
+        },
+      ],
+      isLoading: false,
+      projectName: 'Project A',
+    });
+
+    useSidebarStore.getState().renameArtifact('artifact-a', {
+      id: 'artifact-renamed',
+      name: 'Artifact Renamed',
+      description: 'Updated description',
+      createdAt: ARTIFACT.createdAt,
+    });
+
+    expect(useSidebarStore.getState().artifactDirs).toEqual([
+      expect.objectContaining({
+        id: 'artifact-renamed',
+        name: 'Artifact Renamed',
+        description: 'Updated description',
+        sessions: [SESSION],
+      }),
+    ]);
+  });
 });

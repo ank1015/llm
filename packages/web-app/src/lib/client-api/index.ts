@@ -45,6 +45,14 @@ export {
   renameSession,
 } from './sessions';
 export type { SessionMetadataDto, SessionSummaryDto } from './sessions';
+export {
+  createTerminal,
+  deleteTerminal,
+  getTerminal,
+  listTerminals,
+  openTerminalSocket,
+} from './terminals';
+export type { OpenTerminalSocketRequest, TerminalSocketConnection } from './terminals';
 export type {
   ArtifactDirDto,
   ArtifactDirOverviewDto,
@@ -85,6 +93,16 @@ export type {
   StreamEventName,
   StreamNodePersistedEventData,
   StreamReadyEventData,
+  CreateTerminalRequest,
+  TerminalClientMessage,
+  TerminalErrorMessage,
+  TerminalExitMessage,
+  TerminalMetadataDto,
+  TerminalOutputMessage,
+  TerminalReadyMessage,
+  TerminalServerMessage,
+  TerminalStatus,
+  TerminalSummaryDto,
   TurnSettings,
   VisibleLeafSelection,
 } from '@ank1015/llm-app-contracts';

@@ -82,26 +82,6 @@ function toErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Unexpected error';
 }
 
-function filterProjectFiles(
-  entries: ProjectFileIndexEntry[],
-  query: string,
-  limit: number
-): ProjectFileIndexEntry[] {
-  const normalizedQuery = query.trim().toLowerCase();
-  if (!normalizedQuery) {
-    return entries.slice(0, limit);
-  }
-
-  return entries
-    .filter((entry) => {
-      const pathMatch = entry.path.toLowerCase().includes(normalizedQuery);
-      const artifactPathMatch = entry.artifactPath.toLowerCase().includes(normalizedQuery);
-      const artifactNameMatch = entry.artifactName.toLowerCase().includes(normalizedQuery);
-      return pathMatch || artifactPathMatch || artifactNameMatch;
-    })
-    .slice(0, limit);
-}
-
 export const useArtifactFilesStore = create<ArtifactFilesStoreState>((set, get) => ({
   directoriesByArtifact: {},
   filesByArtifact: {},
@@ -339,17 +319,6 @@ export const useArtifactFilesStore = create<ArtifactFilesStoreState>((set, get) 
 
   searchProjectFiles: async (projectId, query, limit = DEFAULT_PROJECT_FILE_SEARCH_LIMIT) => {
     const safeLimit = Math.max(1, Math.min(Math.floor(limit), 1000));
-    const cached = get().projectFileIndexByProject[projectId];
-    const isTruncated = get().projectFileIndexTruncatedByProject[projectId] ?? false;
-
-    if (cached && (!isTruncated || !query.trim())) {
-      return filterProjectFiles(cached, query, safeLimit);
-    }
-
-    if (!query.trim()) {
-      const fullIndex = await get().loadProjectFileIndex(projectId);
-      return filterProjectFiles(fullIndex, query, safeLimit);
-    }
 
     const result = await getProjectFileIndex(projectId, {
       query,

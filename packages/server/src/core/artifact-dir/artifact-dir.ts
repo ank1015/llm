@@ -13,6 +13,12 @@ import {
   listFiles,
 } from '../storage/fs.js';
 
+import {
+  getDefaultArtifactIndexIgnoreRules,
+  parseGitIgnoreRules,
+  shouldIgnoreArtifactIndexPath,
+} from './index-ignore.js';
+
 import type { AddSkillResult, DeleteSkillResult, InstalledSkillEntry } from '../skills.js';
 import type {
   ArtifactDirMetadata,
@@ -23,6 +29,7 @@ import type {
   ArtifactFileResult,
   CreateArtifactDirInput,
 } from '../types.js';
+import type { IgnoreRule } from './index-ignore.js';
 
 const DEFAULT_MAX_FILE_BYTES = 200_000;
 const MAX_ALLOWED_FILE_BYTES = 2_000_000;
@@ -111,7 +118,7 @@ export class ArtifactDir {
     return readMetadata<ArtifactDirMetadata>(this.dataPath);
   }
 
-  /** Rename this artifact directory without changing its stable id */
+  /** Rename this artifact directory and move its working/metadata directories if the slug changes */
   async rename(name: string): Promise<ArtifactDirMetadata> {
     const trimmedName = name.trim();
 
@@ -120,13 +127,61 @@ export class ArtifactDir {
     }
 
     const metadata = await this.getMetadata();
+    const nextId = slugify(trimmedName);
+    if (!nextId) {
+      throw new Error('name is required');
+    }
+
     const nextMetadata: ArtifactDirMetadata = {
       ...metadata,
+      id: nextId,
       name: trimmedName,
     };
 
-    await writeMetadata(this.dataPath, nextMetadata);
-    return nextMetadata;
+    if (nextId === metadata.id) {
+      await writeMetadata(this.dataPath, nextMetadata);
+      return nextMetadata;
+    }
+
+    const nextDirPath = join(dirname(this.dirPath), nextId);
+    const nextDataPath = join(dirname(this.dataPath), nextId);
+
+    if (await pathExists(nextDirPath)) {
+      throw new Error(`Artifact directory "${trimmedName}" already exists in this project`);
+    }
+
+    if (await pathExists(nextDataPath)) {
+      throw new Error(`Artifact directory "${trimmedName}" already exists in this project`);
+    }
+
+    if (!(await pathExists(this.dirPath))) {
+      throw new Error(`Artifact working directory "${metadata.id}" not found`);
+    }
+
+    let workingDirMoved = false;
+    let metadataDirMoved = false;
+
+    try {
+      await rename(this.dirPath, nextDirPath);
+      workingDirMoved = true;
+
+      await rename(this.dataPath, nextDataPath);
+      metadataDirMoved = true;
+
+      await writeMetadata(nextDataPath, nextMetadata);
+      return nextMetadata;
+    } catch (error) {
+      if (metadataDirMoved) {
+        await rollbackRename(nextDataPath, this.dataPath);
+      }
+
+      if (workingDirMoved) {
+        await rollbackRename(nextDirPath, this.dirPath);
+      }
+
+      const message = error instanceof Error ? error.message : 'Failed to rename artifact';
+      throw new Error(`Failed to rename artifact directory: ${message}`);
+    }
   }
 
   /** List artifact files in the working directory (the actual content agents produce) */
@@ -369,6 +424,7 @@ export class ArtifactDir {
   async buildFileIndex(options?: {
     query?: string;
     limit?: number;
+    includeRoot?: boolean;
   }): Promise<ArtifactFileIndexResult> {
     const query = (options?.query ?? '').trim().toLowerCase();
     const limit = Number.isFinite(options?.limit)
@@ -377,13 +433,51 @@ export class ArtifactDir {
 
     const files: ArtifactFileIndexResult['files'] = [];
     let truncated = false;
+    const addEntry = (entry: ArtifactFileIndexResult['files'][number]): boolean => {
+      if (files.length >= limit) {
+        truncated = true;
+        return false;
+      }
 
-    const stack: string[] = [''];
+      files.push(entry);
+      return true;
+    };
+
+    if (options?.includeRoot) {
+      const rootStats = await this.statPath(this.dirPath);
+      const didAddRoot = addEntry({
+        path: '',
+        type: 'directory',
+        size: 0,
+        updatedAt: rootStats?.mtime.toISOString() ?? new Date(0).toISOString(),
+      });
+
+      if (!didAddRoot) {
+        return { files, truncated };
+      }
+    }
+
+    const stack: Array<{ relativeDir: string; rules: readonly IgnoreRule[] }> = [
+      {
+        relativeDir: '',
+        rules: getDefaultArtifactIndexIgnoreRules(),
+      },
+    ];
 
     while (stack.length > 0) {
-      const relativeDir = stack.pop() ?? '';
+      const frame = stack.pop() ?? {
+        relativeDir: '',
+        rules: getDefaultArtifactIndexIgnoreRules(),
+      };
+      const relativeDir = frame.relativeDir;
       const { absolutePath } = this.resolveArtifactPath(relativeDir);
       const entries = await readdir(absolutePath, { withFileTypes: true });
+      const ignorePath = join(absolutePath, '.gitignore');
+      const localIgnoreRules = (await this.statPath(ignorePath))
+        ? parseGitIgnoreRules(await readFile(ignorePath, 'utf-8'), relativeDir)
+        : [];
+      const rules =
+        localIgnoreRules.length > 0 ? [...frame.rules, ...localIgnoreRules] : frame.rules;
 
       entries.sort((a, b) => {
         if (a.isDirectory() !== b.isDirectory()) {
@@ -393,7 +487,17 @@ export class ArtifactDir {
       });
 
       for (const entry of entries) {
+        if (!entry.isDirectory() && !entry.isFile()) {
+          continue;
+        }
+
         const relativePath = relativeDir ? `${relativeDir}/${entry.name}` : entry.name;
+        const entryType = entry.isDirectory() ? 'directory' : 'file';
+
+        if (shouldIgnoreArtifactIndexPath(relativePath, entryType, rules)) {
+          continue;
+        }
+
         const matchesQuery =
           !query ||
           relativePath.toLowerCase().includes(query) ||
@@ -402,24 +506,22 @@ export class ArtifactDir {
         if (entry.isDirectory()) {
           if (matchesQuery) {
             const entryStats = await stat(join(absolutePath, entry.name));
-            files.push({
+            const didAddEntry = addEntry({
               path: relativePath,
               type: 'directory',
               size: 0,
               updatedAt: entryStats.mtime.toISOString(),
             });
 
-            if (files.length >= limit) {
-              truncated = true;
+            if (!didAddEntry) {
               break;
             }
           }
 
-          stack.push(relativePath);
-          continue;
-        }
-
-        if (!entry.isFile()) {
+          stack.push({
+            relativeDir: relativePath,
+            rules,
+          });
           continue;
         }
 
@@ -428,15 +530,14 @@ export class ArtifactDir {
         }
 
         const entryStats = await stat(join(absolutePath, entry.name));
-        files.push({
+        const didAddEntry = addEntry({
           path: relativePath,
           type: 'file',
           size: entryStats.size,
           updatedAt: entryStats.mtime.toISOString(),
         });
 
-        if (files.length >= limit) {
-          truncated = true;
+        if (!didAddEntry) {
           break;
         }
       }
@@ -520,6 +621,14 @@ function normalizeRelativePath(path: string): string {
 
 function normalizePathName(name: string): string {
   return name.trim();
+}
+
+async function rollbackRename(fromPath: string, toPath: string): Promise<void> {
+  if (!(await pathExists(fromPath)) || (await pathExists(toPath))) {
+    return;
+  }
+
+  await rename(fromPath, toPath);
 }
 
 function looksBinary(content: Buffer): boolean {

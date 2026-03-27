@@ -7,7 +7,8 @@ import {
 import { Hono } from 'hono';
 
 import { ArtifactDir, Project, Session } from '../core/index.js';
-import { toArtifactDirOverviewDto, toProjectDto } from '../http/contracts.js';
+import { terminalRegistry } from '../core/terminal/terminal-registry.js';
+import { toArtifactDirOverviewDto, toProjectDto, toTerminalSummaryDto } from '../http/contracts.js';
 import { readJsonBody, validateSchema } from '../http/validation.js';
 
 import type { ProjectFileIndexEntry } from '../core/index.js';
@@ -19,6 +20,7 @@ import type {
   ProjectFileIndexResult,
   ProjectOverviewDto,
   RenameProjectRequest,
+  TerminalConflictResponse,
   UpdateProjectImageRequest,
 } from '@ank1015/llm-app-contracts';
 
@@ -194,6 +196,7 @@ projectRoutes.get('/projects/:projectId/file-index', async (c) => {
       const indexed = await artifactDir.buildFileIndex({
         query,
         limit: remaining,
+        includeRoot: shouldIncludeArtifactRoot(query, artifact),
       });
 
       files.push(
@@ -202,7 +205,7 @@ projectRoutes.get('/projects/:projectId/file-index', async (c) => {
           artifactName: artifact.name,
           path: file.path,
           type: file.type,
-          artifactPath: `${artifact.id}/${file.path}${file.type === 'directory' ? '/' : ''}`,
+          artifactPath: buildArtifactPath(artifact.id, file.path, file.type),
           size: file.size,
           updatedAt: file.updatedAt,
         }))
@@ -233,6 +236,34 @@ projectRoutes.get('/projects/:projectId/file-index', async (c) => {
     return c.json({ error: message }, 404);
   }
 });
+
+function shouldIncludeArtifactRoot(query: string, artifact: { id: string; name: string }): boolean {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) {
+    return true;
+  }
+
+  const candidates = [
+    artifact.id.toLowerCase(),
+    `${artifact.id.toLowerCase()}/`,
+    artifact.name.toLowerCase(),
+    `${artifact.name.toLowerCase()}/`,
+  ];
+
+  return candidates.some((candidate) => candidate.includes(normalizedQuery));
+}
+
+function buildArtifactPath(
+  artifactId: string,
+  path: string,
+  type: ProjectFileIndexEntry['type']
+): string {
+  if (!path) {
+    return `${artifactId}/`;
+  }
+
+  return `${artifactId}/${path}${type === 'directory' ? '/' : ''}`;
+}
 
 /** PATCH /api/projects/:projectId/name — Rename a project without changing its stable id */
 projectRoutes.patch('/projects/:projectId/name', async (c) => {
@@ -272,6 +303,18 @@ projectRoutes.delete('/projects/:projectId', async (c) => {
   const { projectId } = c.req.param();
 
   try {
+    const runningTerminal = terminalRegistry.getRunningTerminalForProject(projectId);
+    if (runningTerminal) {
+      return c.json<TerminalConflictResponse>(
+        {
+          error: `Project "${projectId}" has a running terminal and cannot be deleted`,
+          terminal: toTerminalSummaryDto(runningTerminal),
+        },
+        409
+      );
+    }
+
+    terminalRegistry.dropExitedTerminalsForProject(projectId);
     const project = await Project.getById(projectId);
     await project.delete();
     return c.json<ProjectDeleteResponse>({ deleted: true });

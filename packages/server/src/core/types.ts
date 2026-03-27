@@ -23,7 +23,7 @@ export interface ProjectMetadata {
 
 /** Metadata stored in each artifact directory's metadata.json */
 export interface ArtifactDirMetadata {
-  /** Unique identifier (used as directory name) */
+  /** Unique identifier slug (used as the directory name and route id) */
   id: string;
   /** Human-readable name (e.g. "research", "app", "assets") */
   name: string;
@@ -89,7 +89,7 @@ export interface ArtifactFileResult {
 
 /** A path discovered while indexing one artifact directory */
 export interface ArtifactFileIndexEntry {
-  /** Relative path from artifact root */
+  /** Relative path from artifact root. Empty string represents the artifact root itself. */
   path: string;
   /** Whether this indexed path is a file or directory */
   type: ArtifactExplorerEntryType;
@@ -110,7 +110,7 @@ export interface ArtifactFileIndexResult {
 export interface ProjectFileIndexEntry {
   artifactId: string;
   artifactName: string;
-  /** Relative path inside the artifact directory */
+  /** Relative path inside the artifact directory. Empty string represents the artifact root. */
   path: string;
   /** Whether this indexed path is a file or directory */
   type: ArtifactExplorerEntryType;
@@ -127,6 +127,33 @@ export interface ProjectFileIndexResult {
   files: ProjectFileIndexEntry[];
   /** True when `limit` was reached and more matches may exist */
   truncated: boolean;
+}
+
+export type TerminalStatus = 'running' | 'exited';
+
+export interface TerminalSummary {
+  id: string;
+  title: string;
+  status: TerminalStatus;
+  projectId: string;
+  artifactId: string;
+  cols: number;
+  rows: number;
+  createdAt: string;
+  lastActiveAt: string;
+  exitCode: number | null;
+  signal: string | null;
+  exitedAt: string | null;
+}
+
+export interface TerminalMetadata extends TerminalSummary {
+  cwdAtLaunch: string;
+  shell: string;
+}
+
+export interface CreateTerminalOptions {
+  cols?: number;
+  rows?: number;
 }
 
 /** Metadata stored in each session's metadata.json */

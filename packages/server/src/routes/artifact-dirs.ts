@@ -11,10 +11,13 @@ import {
 import { Hono } from 'hono';
 
 import { ArtifactDir } from '../core/index.js';
+import { sessionRunRegistry } from '../core/session/run-registry.js';
+import { terminalRegistry } from '../core/terminal/terminal-registry.js';
 import {
   toArtifactDirDto,
   toDeleteArtifactSkillResponse,
   toInstalledSkillDto,
+  toTerminalSummaryDto,
 } from '../http/contracts.js';
 import { readJsonBody, validateSchema } from '../http/validation.js';
 
@@ -36,6 +39,7 @@ import type {
   RenameArtifactDirRequest,
   RenameArtifactPathRequest,
   RenameArtifactPathResponse,
+  TerminalConflictResponse,
 } from '@ank1015/llm-app-contracts';
 
 const BASE = '/projects/:projectId/artifacts';
@@ -131,12 +135,38 @@ artifactDirRoutes.patch(`${BASE}/:artifactDirId/name`, async (c) => {
   }
 
   try {
+    const runningTerminal = terminalRegistry.getRunningTerminalForArtifact(
+      projectId,
+      artifactDirId
+    );
+    if (runningTerminal) {
+      return c.json<TerminalConflictResponse>(
+        {
+          error: `Artifact directory "${artifactDirId}" has a running terminal and cannot be renamed`,
+          terminal: toTerminalSummaryDto(runningTerminal),
+        },
+        409
+      );
+    }
+
+    if (sessionRunRegistry.hasActiveRunForArtifact(projectId, artifactDirId)) {
+      return c.json(
+        {
+          error: `Artifact directory "${artifactDirId}" has an active live run and cannot be renamed`,
+        },
+        409
+      );
+    }
+
+    terminalRegistry.dropExitedTerminalsForArtifact(projectId, artifactDirId);
     const dir = await ArtifactDir.getById(projectId, artifactDirId);
     const metadata = await dir.rename(name);
-    return c.json<ArtifactDirDto>(toArtifactDirDto(metadata));
+    const renamedDir = await ArtifactDir.getById(projectId, metadata.id);
+    const renamedMetadata = await renamedDir.getMetadata();
+    return c.json<ArtifactDirDto>(toArtifactDirDto(renamedMetadata));
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Failed to rename artifact directory';
-    const status = message.includes('not found') ? 404 : 500;
+    const status = classifyArtifactDirRenameErrorStatus(message);
     return c.json({ error: message }, status);
   }
 });
@@ -411,6 +441,21 @@ artifactDirRoutes.delete(`${BASE}/:artifactDirId`, async (c) => {
   const { projectId, artifactDirId } = c.req.param();
 
   try {
+    const runningTerminal = terminalRegistry.getRunningTerminalForArtifact(
+      projectId,
+      artifactDirId
+    );
+    if (runningTerminal) {
+      return c.json<TerminalConflictResponse>(
+        {
+          error: `Artifact directory "${artifactDirId}" has a running terminal and cannot be deleted`,
+          terminal: toTerminalSummaryDto(runningTerminal),
+        },
+        409
+      );
+    }
+
+    terminalRegistry.dropExitedTerminalsForArtifact(projectId, artifactDirId);
     const dir = await ArtifactDir.getById(projectId, artifactDirId);
     await dir.delete();
     return c.json<ArtifactDirDeleteResponse>({ deleted: true });
@@ -473,6 +518,22 @@ function classifyPathMutationErrorStatus(message: string): 400 | 404 | 409 | 500
   ) {
     return 400;
   }
+  return 500;
+}
+
+function classifyArtifactDirRenameErrorStatus(message: string): 404 | 409 | 500 {
+  if (
+    message === NOT_FOUND_MSG ||
+    message.includes(NOT_FOUND_IN_PROJECT_FRAGMENT) ||
+    message.includes('not found')
+  ) {
+    return 404;
+  }
+
+  if (message.includes('already exists') || message.includes('active live run')) {
+    return 409;
+  }
+
   return 500;
 }
 

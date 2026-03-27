@@ -5,6 +5,7 @@ import type { Metadata } from 'next';
 import { ThemeInit } from '@/components/theme-init';
 import { Toaster } from '@/components/ui/sonner';
 
+import '@xterm/xterm/css/xterm.css';
 import 'katex/dist/katex.min.css';
 import './globals.css';
 

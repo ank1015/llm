@@ -1,9 +1,9 @@
 'use client';
 
-import { ChevronRight, FolderOpen, Moon, Sun } from 'lucide-react';
+import { ChevronRight, FolderOpen, Moon, Sun, Terminal as TerminalIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import type { ProjectOverviewDto } from '@/lib/client-api';
 
@@ -11,7 +11,8 @@ import { Button } from '@/components/ui/button';
 import { getProjectOverview } from '@/lib/client-api';
 import { useTypewriter } from '@/lib/use-typewriter';
 import { cn } from '@/lib/utils';
-import { useSidebarStore, useUiStore } from '@/stores';
+import { useSidebarStore, useTerminalStore, useUiStore } from '@/stores';
+import { getTerminalArtifactKey } from '@/stores/terminals-store';
 
 const EMPTY_ARTIFACT_DIRS: ProjectOverviewDto['artifactDirs'] = [];
 const BREADCRUMB_LINK_TRANSITION_CLASS = 'hover:text-foreground transition-colors';
@@ -115,8 +116,20 @@ export function Header() {
   const router = useRouter();
   const pathname = usePathname();
   const { projectId, artifactId } = useParams<{ projectId: string; artifactId?: string }>();
+  const artifactCtx = useMemo(
+    () => (artifactId ? { projectId, artifactId } : null),
+    [artifactId, projectId]
+  );
+  const artifactKey = useMemo(
+    () => (artifactId ? getTerminalArtifactKey(projectId, artifactId) : null),
+    [artifactId, projectId]
+  );
   const theme = useUiStore((state) => state.theme);
   const toggleTheme = useUiStore((state) => state.toggleTheme);
+  const toggleDock = useTerminalStore((state) => state.toggleDock);
+  const terminalDockOpen = useTerminalStore((state) =>
+    artifactKey ? (state.dockByArtifact[artifactKey]?.open ?? false) : false
+  );
   const isArtifactsView = Boolean(artifactId && pathname.endsWith('/artifacts'));
 
   return (
@@ -128,17 +141,35 @@ export function Header() {
         {artifactId && (
           <Button
             variant="ghost"
-            size="sm"
+            size="icon-sm"
             onClick={() => router.push(`/${projectId}/${artifactId}/artifacts`)}
             className={cn(
-              'cursor-pointer gap-1.5',
+              'cursor-pointer',
               isArtifactsView ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
             )}
+            aria-label="Open artifacts"
+            title="Artifacts"
           >
             <FolderOpen size={16} strokeWidth={1.8} />
-            <span className="text-[13px]">Artifacts</span>
           </Button>
         )}
+        {artifactCtx ? (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => {
+              void toggleDock(artifactCtx).catch(() => undefined);
+            }}
+            className={cn(
+              'cursor-pointer',
+              terminalDockOpen ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
+            )}
+            aria-label="Toggle terminal"
+            title="Toggle terminal (Ctrl+`)"
+          >
+            <TerminalIcon size={16} strokeWidth={1.8} />
+          </Button>
+        ) : null}
         <Button
           variant="ghost"
           size="icon-sm"

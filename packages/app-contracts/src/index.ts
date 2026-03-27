@@ -5,3 +5,4 @@ export * from './keys.js';
 export * from './sessions.js';
 export * from './skills.js';
 export * from './streaming.js';
+export * from './terminals.js';

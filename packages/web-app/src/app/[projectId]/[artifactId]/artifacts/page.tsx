@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useParams } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { ArtifactExplorerResult, ArtifactFileDto } from '@/lib/client-api';
 import type { ReactNode } from 'react';
@@ -37,12 +37,13 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { getArtifactRawFileUrl } from '@/lib/client-api';
 import { cn } from '@/lib/utils';
-import { useArtifactFilesStore, useSidebarStore, useUiStore } from '@/stores';
+import { useArtifactFilesStore, useSidebarStore, useTerminalStore, useUiStore } from '@/stores';
 
 const EMPTY_DIRECTORY_MAP: Record<string, ArtifactExplorerResult> = {};
 const EMPTY_FILE_MAP: Record<string, ArtifactFileDto> = {};
 const EMPTY_LOADING_MAP: Record<string, boolean> = {};
 const EMPTY_ERROR_MAP: Record<string, string | null> = {};
+const EMPTY_PATHS: string[] = [];
 const ROOT_EXPANDED: Record<string, boolean> = { '': true };
 
 type ExplorerEntryTarget = {
@@ -433,6 +434,9 @@ export default function ArtifactFilesPage() {
     (state) => state.artifactDirs.find((dir) => dir.id === artifactId) ?? null
   );
   const setSidebarCollapsed = useUiStore((state) => state.setSidebarCollapsed);
+  const filesystemEpoch = useTerminalStore(
+    (state) => state.dockByArtifact[artifactKey]?.filesystemEpoch ?? 0
+  );
 
   const directories = useArtifactFilesStore(
     (state) => state.directoriesByArtifact[artifactKey] ?? EMPTY_DIRECTORY_MAP
@@ -471,8 +475,9 @@ export default function ArtifactFilesPage() {
   const [renameValue, setRenameValue] = useState('');
   const [isPathMutationPending, setIsPathMutationPending] = useState(false);
   const [pathActionError, setPathActionError] = useState<string | null>(null);
+  const lastReloadedFilesystemEpochRef = useRef(0);
   const expandedDirs = expandedDirsByArtifact[artifactKey] ?? ROOT_EXPANDED;
-  const openTabs = openTabsByArtifact[artifactKey] ?? [];
+  const openTabs = openTabsByArtifact[artifactKey] ?? EMPTY_PATHS;
 
   useEffect(() => {
     setSidebarCollapsed(true);
@@ -549,14 +554,17 @@ export default function ArtifactFilesPage() {
     return parseDelimitedTable(selectedFile.content, delimiter);
   }, [selectedFile, selectedFilePath]);
 
-  const syncOpenTabs = (nextTabs: string[]) => {
-    const normalizedTabs = uniquePaths(nextTabs);
-    setOpenTabsByArtifact((prev) => ({
-      ...prev,
-      [artifactKey]: normalizedTabs,
-    }));
-    return normalizedTabs;
-  };
+  const syncOpenTabs = useCallback(
+    (nextTabs: string[]) => {
+      const normalizedTabs = uniquePaths(nextTabs);
+      setOpenTabsByArtifact((prev) => ({
+        ...prev,
+        [artifactKey]: normalizedTabs,
+      }));
+      return normalizedTabs;
+    },
+    [artifactKey]
+  );
 
   const addOpenTab = (path: string) => {
     const safePath = normalizeRelativePath(path);
@@ -611,48 +619,60 @@ export default function ArtifactFilesPage() {
     }
   };
 
-  const reloadExplorerState = async (
-    nextExpandedDirs: Record<string, boolean>,
-    nextSelectedFilePath: string | null,
-    nextOpenTabs: string[]
-  ): Promise<void> => {
-    const normalizedTabs = syncOpenTabs(nextOpenTabs);
-    clearArtifactCache(artifactCtx);
-    await loadDirectory(artifactCtx, '', true);
+  const reloadExplorerState = useCallback(
+    async (
+      nextExpandedDirs: Record<string, boolean>,
+      nextSelectedFilePath: string | null,
+      nextOpenTabs: string[]
+    ): Promise<void> => {
+      const normalizedTabs = syncOpenTabs(nextOpenTabs);
+      clearArtifactCache(artifactCtx);
+      await loadDirectory(artifactCtx, '', true);
 
-    const expandedPaths = Object.entries(nextExpandedDirs)
-      .filter(([path, expanded]) => path !== '' && expanded)
-      .map(([path]) => path)
-      .sort((a, b) => a.length - b.length);
+      const expandedPaths = Object.entries(nextExpandedDirs)
+        .filter(([path, expanded]) => path !== '' && expanded)
+        .map(([path]) => path)
+        .sort((a, b) => a.length - b.length);
 
-    await Promise.all(
-      expandedPaths.map(async (path) => {
-        try {
-          await loadDirectory(artifactCtx, path, true);
-        } catch {
-          // Ignore stale paths after mutations.
-        }
-      })
-    );
-
-    if (!nextSelectedFilePath) {
-      setSelectedFile(artifactCtx, null);
-      return;
-    }
-
-    try {
-      await openFile(artifactCtx, nextSelectedFilePath, true);
-    } catch {
-      setSelectedFile(artifactCtx, null);
-      syncOpenTabs(
-        normalizedTabs.filter((path) => path !== normalizeRelativePath(nextSelectedFilePath))
+      await Promise.all(
+        expandedPaths.map(async (path) => {
+          try {
+            await loadDirectory(artifactCtx, path, true);
+          } catch {
+            // Ignore stale paths after mutations.
+          }
+        })
       );
-    }
-  };
+
+      if (!nextSelectedFilePath) {
+        setSelectedFile(artifactCtx, null);
+        return;
+      }
+
+      try {
+        await openFile(artifactCtx, nextSelectedFilePath, true);
+      } catch {
+        setSelectedFile(artifactCtx, null);
+        syncOpenTabs(
+          normalizedTabs.filter((path) => path !== normalizeRelativePath(nextSelectedFilePath))
+        );
+      }
+    },
+    [artifactCtx, clearArtifactCache, loadDirectory, openFile, setSelectedFile, syncOpenTabs]
+  );
 
   const handleRefresh = () => {
     void reloadExplorerState(expandedDirs, selectedFilePath, openTabs);
   };
+
+  useEffect(() => {
+    if (filesystemEpoch === 0 || filesystemEpoch === lastReloadedFilesystemEpochRef.current) {
+      return;
+    }
+
+    lastReloadedFilesystemEpochRef.current = filesystemEpoch;
+    void reloadExplorerState(expandedDirs, selectedFilePath, openTabs);
+  }, [expandedDirs, filesystemEpoch, openTabs, reloadExplorerState, selectedFilePath]);
 
   const handleOpenRename = (target: ExplorerEntryTarget) => {
     setPathActionError(null);
