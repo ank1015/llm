@@ -3,6 +3,7 @@ import { AssistantMessageEventStream } from '../../utils/event-stream.js';
 import { parseStreamingJson } from '../../utils/json-parse.js';
 import { validateToolArguments } from '../../utils/validation.js';
 
+import { getCodexErrorDetails } from './errors.js';
 import { buildParams, createClient, getMockCodexMessage, mapStopReason } from './utils.js';
 
 import type { StreamFunction } from '../../utils/types.js';
@@ -15,7 +16,7 @@ import type {
   Model,
   CodexProviderOptions,
   TextContent,
-} from '@ank1015/llm-types';
+} from '../../types/index.js';
 import type {
   Response,
   ResponseCreateParamsStreaming,
@@ -54,6 +55,25 @@ export const streamCodex: StreamFunction<'codex'> = (
       stopReason: 'stop',
       timestamp: startTimestamp,
       duration: 0,
+    };
+    const syncResponseUsage = (response: Response) => {
+      output.message = response;
+      if (response?.usage) {
+        const cachedTokens = response.usage.input_tokens_details?.cached_tokens || 0;
+        output.usage = {
+          input: (response.usage.input_tokens || 0) - cachedTokens,
+          output: response.usage.output_tokens || 0,
+          cacheRead: cachedTokens,
+          cacheWrite: 0,
+          totalTokens: response.usage.total_tokens || 0,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        };
+      }
+      output.usage.cost = calculateCost(model, output.usage);
+      output.stopReason = mapStopReason(response?.status);
+      if (output.content.some((b) => b.type === 'toolCall') && output.stopReason === 'stop') {
+        output.stopReason = 'toolUse';
+      }
     };
 
     try {
@@ -100,7 +120,7 @@ export const streamCodex: StreamFunction<'codex'> = (
             });
           } else if (item.type === 'message') {
             currentItem = item;
-            currentBlock = { type: 'response', content: [{ type: 'text', content: '' }] };
+            currentBlock = { type: 'response', response: [{ type: 'text', content: '' }] };
             output.content.push(currentBlock);
             stream.push({
               type: 'text_start',
@@ -188,9 +208,9 @@ export const streamCodex: StreamFunction<'codex'> = (
           ) {
             const lastPart = currentItem.content[currentItem.content.length - 1];
             if (lastPart && lastPart.type === 'output_text') {
-              const index = currentBlock.content.findIndex((c) => c.type === 'text');
+              const index = currentBlock.response.findIndex((c) => c.type === 'text');
               if (index !== -1) {
-                (currentBlock.content[index] as TextContent).content += event.delta;
+                (currentBlock.response[index] as TextContent).content += event.delta;
               }
               lastPart.text += event.delta;
               stream.push({
@@ -210,9 +230,9 @@ export const streamCodex: StreamFunction<'codex'> = (
           ) {
             const lastPart = currentItem.content[currentItem.content.length - 1];
             if (lastPart && lastPart.type === 'refusal') {
-              const index = currentBlock.content.findIndex((c) => c.type === 'text');
+              const index = currentBlock.response.findIndex((c) => c.type === 'text');
               if (index !== -1) {
-                (currentBlock.content[index] as TextContent).content += event.delta;
+                (currentBlock.response[index] as TextContent).content += event.delta;
               }
               lastPart.refusal += event.delta;
               stream.push({
@@ -256,16 +276,16 @@ export const streamCodex: StreamFunction<'codex'> = (
             });
             currentBlock = null;
           } else if (item.type === 'message' && currentBlock && currentBlock.type === 'response') {
-            const index = currentBlock.content.findIndex((c) => c.type === 'text');
+            const index = currentBlock.response.findIndex((c) => c.type === 'text');
             if (index !== -1) {
-              (currentBlock.content[index] as TextContent).content = item.content
+              (currentBlock.response[index] as TextContent).content = item.content
                 .map((c) => (c.type === 'output_text' ? c.text : c.refusal))
                 .join('');
             }
             stream.push({
               type: 'text_end',
               contentIndex: blockIndex(),
-              content: currentBlock.content,
+              content: currentBlock.response,
               message: output,
             });
             currentBlock = null;
@@ -310,31 +330,19 @@ export const streamCodex: StreamFunction<'codex'> = (
           const response = event.response;
           // Update the final Response
           finalResponse = response;
-          output.message = finalResponse;
-          if (response?.usage) {
-            const cachedTokens = response.usage.input_tokens_details?.cached_tokens || 0;
-            output.usage = {
-              // Codex includes cached tokens in input_tokens, so subtract to get non-cached input
-              input: (response.usage.input_tokens || 0) - cachedTokens,
-              output: response.usage.output_tokens || 0,
-              cacheRead: cachedTokens,
-              cacheWrite: 0,
-              totalTokens: response.usage.total_tokens || 0,
-              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-            };
-          }
-          output.usage.cost = calculateCost(model, output.usage);
-          // Map status to stop reason
-          output.stopReason = mapStopReason(response?.status);
-          if (output.content.some((b) => b.type === 'toolCall') && output.stopReason === 'stop') {
-            output.stopReason = 'toolUse';
-          }
+          syncResponseUsage(finalResponse);
         }
         // Handle errors
         else if (event.type === 'error') {
-          throw new Error(`Codex API Error (${event.code}): ${event.message}`);
+          throw {
+            code: event.code ?? undefined,
+            message: event.message,
+            type: event.code ?? undefined,
+          };
         } else if (event.type === 'response.failed') {
-          throw new Error('Codex response failed without error details');
+          finalResponse = event.response;
+          syncResponseUsage(finalResponse);
+          throw finalResponse.error || { message: 'Codex response failed without error details' };
         }
       }
 
@@ -359,11 +367,10 @@ export const streamCodex: StreamFunction<'codex'> = (
     } catch (error) {
       for (const block of output.content) delete (block as any).index;
       output.stopReason = options?.signal?.aborted ? 'aborted' : 'error';
-      output.errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
-
-      // Update finalResponse to reflect the error state
       finalResponse.status = options?.signal?.aborted ? 'cancelled' : 'failed';
-
+      output.message = finalResponse;
+      output.error = getCodexErrorDetails(error);
+      output.errorMessage = output.error.message;
       output.timestamp = Date.now();
       output.duration = Date.now() - startTimestamp;
       stream.push({
