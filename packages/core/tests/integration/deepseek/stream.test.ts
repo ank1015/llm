@@ -3,18 +3,17 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 import { getModel } from '../../../src/models/index.js';
 import { streamDeepSeek } from '../../../src/providers/deepseek/stream.js';
+import { describeIfAvailable, getIntegrationEnv } from '../helpers/live.js';
 
-import type { BaseAssistantEvent, Context, Model } from '@ank1015/llm-types';
+import type { BaseAssistantEvent, Context, Model } from '../../../src/types/index.js';
 
-describe('DeepSeek Stream Integration', () => {
+const apiKey = getIntegrationEnv('DEEPSEEK_API_KEY')!;
+const describeIfDeepSeek = describeIfAvailable(Boolean(apiKey));
+
+describeIfDeepSeek('DeepSeek Stream Integration', () => {
   let model: Model<'deepseek'>;
-  const apiKey = process.env.DEEPSEEK_API_KEY;
 
   beforeAll(() => {
-    if (!apiKey) {
-      throw new Error('DEEPSEEK_API_KEY environment variable is required for integration tests');
-    }
-
     const testModel = getModel('deepseek', 'deepseek');
     if (!testModel) {
       throw new Error('Test model deepseek not found');

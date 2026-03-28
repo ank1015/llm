@@ -3,18 +3,17 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 import { getModel } from '../../../src/models/index.js';
 import { streamCerebras } from '../../../src/providers/cerebras/stream.js';
+import { describeIfAvailable, getIntegrationEnv } from '../helpers/live.js';
 
-import type { BaseAssistantEvent, Context, Model } from '@ank1015/llm-types';
+import type { BaseAssistantEvent, Context, Model } from '../../../src/types/index.js';
 
-describe('Cerebras Stream Integration', () => {
+const apiKey = getIntegrationEnv('CEREBRAS_API_KEY')!;
+const describeIfCerebras = describeIfAvailable(Boolean(apiKey));
+
+describeIfCerebras('Cerebras Stream Integration', () => {
   let model: Model<'cerebras'>;
-  const apiKey = process.env.CEREBRAS_API_KEY;
 
   beforeAll(() => {
-    if (!apiKey) {
-      throw new Error('CEREBRAS_API_KEY environment variable is required for integration tests');
-    }
-
     const testModel = getModel('cerebras', 'zai-glm-4.7');
     if (!testModel) {
       throw new Error('Test model zai-glm-4.7 not found');

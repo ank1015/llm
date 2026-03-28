@@ -3,18 +3,17 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 import { getModel } from '../../../src/models/index.js';
 import { streamAnthropic } from '../../../src/providers/anthropic/stream.js';
+import { describeIfAvailable, getIntegrationEnv } from '../helpers/live.js';
 
-import type { BaseAssistantEvent, Context, Model } from '@ank1015/llm-types';
+import type { BaseAssistantEvent, Context, Model } from '../../../src/types/index.js';
 
-describe('Anthropic Stream Integration', () => {
+const apiKey = getIntegrationEnv('ANTHROPIC_API_KEY')!;
+const describeIfAnthropic = describeIfAvailable(Boolean(apiKey));
+
+describeIfAnthropic('Anthropic Stream Integration', () => {
   let model: Model<'anthropic'>;
-  const apiKey = process.env.ANTHROPIC_API_KEY;
 
   beforeAll(() => {
-    if (!apiKey) {
-      throw new Error('ANTHROPIC_API_KEY environment variable is required for integration tests');
-    }
-
     // Use Haiku for testing (fastest and cheapest)
     const testModel = getModel('anthropic', 'claude-haiku-4-5');
     if (!testModel) {

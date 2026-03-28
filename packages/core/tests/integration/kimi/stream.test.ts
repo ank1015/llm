@@ -3,18 +3,17 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 import { getModel } from '../../../src/models/index.js';
 import { streamKimi } from '../../../src/providers/kimi/stream.js';
+import { describeIfAvailable, getIntegrationEnv } from '../helpers/live.js';
 
-import type { BaseAssistantEvent, Context, Model } from '@ank1015/llm-types';
+import type { BaseAssistantEvent, Context, Model } from '../../../src/types/index.js';
 
-describe('Kimi Stream Integration', () => {
+const apiKey = getIntegrationEnv('KIMI_API_KEY')!;
+const describeIfKimi = describeIfAvailable(Boolean(apiKey));
+
+describeIfKimi('Kimi Stream Integration', () => {
   let model: Model<'kimi'>;
-  const apiKey = process.env.KIMI_API_KEY;
 
   beforeAll(() => {
-    if (!apiKey) {
-      throw new Error('KIMI_API_KEY environment variable is required for integration tests');
-    }
-
     const testModel = getModel('kimi', 'kimi-k2.5');
     if (!testModel) {
       throw new Error('Test model kimi-k2.5 not found');
