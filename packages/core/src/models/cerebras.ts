@@ -1,4 +1,4 @@
-import type { Model } from '@ank1015/llm-types';
+import type { Model } from '../types/index.js';
 
 const cerebrasBaseUrl = `https://api.cerebras.ai/v1`;
 

@@ -1,8 +1,8 @@
-import { KnownApis } from '@ank1015/llm-types';
+import { KnownApis } from '../types/index.js';
 
 import { MODELS } from './index.js';
 
-import type { Api, Model, Usage } from '@ank1015/llm-types';
+import type { Api, Model, Usage } from '../types/index.js';
 
 // Extract valid model IDs for a specific API
 type ModelIdsForApi<TApi extends Api> = TApi extends keyof typeof MODELS
