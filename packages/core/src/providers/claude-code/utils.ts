@@ -7,7 +7,7 @@ import {
   mapStopReason,
 } from '../anthropic/utils.js';
 
-import type { ClaudeCodeProviderOptions, Context, Model, Tool } from '@ank1015/llm-types';
+import type { ClaudeCodeProviderOptions, Context, Model, Tool } from '../../types/index.js';
 import type {
   Message as AnthropicMessage,
   MessageCreateParamsBase,

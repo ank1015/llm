@@ -1,6 +1,7 @@
 import { calculateCost } from '../../models/index.js';
 import { AssistantMessageEventStream } from '../../utils/event-stream.js';
 import { parseStreamingJson } from '../../utils/json-parse.js';
+import { getAnthropicErrorDetails } from '../anthropic/errors.js';
 
 import { buildParams, createClient, getMockClaudeCodeMessage, mapStopReason } from './utils.js';
 
@@ -14,7 +15,7 @@ import type {
   Context,
   Model,
   TextContent,
-} from '@ank1015/llm-types';
+} from '../../types/index.js';
 import type { MessageCreateParamsStreaming } from '@anthropic-ai/sdk/resources';
 import type {
   Message as AnthropicMessage,
@@ -100,7 +101,7 @@ export const streamClaudeCode: StreamFunction<'claude-code'> = (
           if (event.content_block.type === 'text') {
             const block: Block = {
               type: 'response',
-              content: [{ type: 'text', content: '' }],
+              response: [{ type: 'text', content: '' }],
               index: event.index,
             };
             output.content.push(block);
@@ -143,8 +144,8 @@ export const streamClaudeCode: StreamFunction<'claude-code'> = (
             const index = blocks.findIndex((b) => b.index === event.index);
             const block = blocks[index];
             if (block && block.type === 'response') {
-              const textContentIndex = block.content.findIndex((b) => b.type === 'text');
-              (block.content[textContentIndex] as TextContent).content += event.delta.text;
+              const textContentIndex = block.response.findIndex((b) => b.type === 'text');
+              (block.response[textContentIndex] as TextContent).content += event.delta.text;
               stream.push({
                 type: 'text_delta',
                 contentIndex: index,
@@ -216,7 +217,7 @@ export const streamClaudeCode: StreamFunction<'claude-code'> = (
               stream.push({
                 type: 'text_end',
                 contentIndex: index,
-                content: block.content,
+                content: block.response,
                 message: output,
               });
             } else if (block.type === 'thinking') {
@@ -261,7 +262,7 @@ export const streamClaudeCode: StreamFunction<'claude-code'> = (
 
       if (output.stopReason === 'aborted' || output.stopReason === 'error') {
         throw new Error(
-          `Stream ended with status: ${output.stopReason}${output.errorMessage ? ` - ${output.errorMessage}` : ''}`
+          `Stream ended with status: ${output.stopReason}${output.error?.message ? ` - ${output.error.message}` : ''}`
         );
       }
 
@@ -279,7 +280,8 @@ export const streamClaudeCode: StreamFunction<'claude-code'> = (
     } catch (error) {
       for (const block of output.content) delete (block as any).index;
       output.stopReason = options?.signal?.aborted ? 'aborted' : 'error';
-      output.errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+      output.error = getAnthropicErrorDetails(error);
+      output.errorMessage = output.error.message;
 
       // Populate finalResponse.content with accumulated content blocks even on error
       finalResponse.content = accumulatedContent as ContentBlock[];
