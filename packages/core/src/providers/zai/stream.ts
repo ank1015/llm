@@ -1,6 +1,7 @@
 import {
   createChatCompletionClient,
   createChatCompletionStream,
+  getZaiErrorDetails,
   mapChatStopReason,
 } from '../utils/index.js';
 
@@ -8,13 +9,14 @@ import { buildParams } from './utils.js';
 
 import type { StreamFunction } from '../../utils/types.js';
 import type { ChatStreamConfig } from '../utils/index.js';
-import type { Context, Model, ZaiProviderOptions } from '@ank1015/llm-types';
+import type { Context, Model, ZaiProviderOptions } from '../../types/index.js';
 
 const config: ChatStreamConfig<'zai'> = {
   mapStopReason: mapChatStopReason,
   extractCacheTokens: (usage) =>
     (usage as { prompt_tokens_details?: { cached_tokens?: number } }).prompt_tokens_details
       ?.cached_tokens || 0,
+  getErrorDetails: getZaiErrorDetails,
 };
 
 export const streamZai: StreamFunction<'zai'> = (

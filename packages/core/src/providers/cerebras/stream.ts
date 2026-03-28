@@ -1,6 +1,7 @@
 import {
   createChatCompletionClient,
   createChatCompletionStream,
+  getCerebrasErrorDetails,
   mapChatStopReason,
 } from '../utils/index.js';
 
@@ -8,7 +9,7 @@ import { buildParams } from './utils.js';
 
 import type { StreamFunction } from '../../utils/types.js';
 import type { ChatStreamConfig } from '../utils/index.js';
-import type { CerebrasProviderOptions, Context, Model } from '@ank1015/llm-types';
+import type { CerebrasProviderOptions, Context, Model } from '../../types/index.js';
 
 const config: ChatStreamConfig<'cerebras'> = {
   mapStopReason: mapChatStopReason,
@@ -17,6 +18,7 @@ const config: ChatStreamConfig<'cerebras'> = {
       ?.cached_tokens || 0,
   // Cerebras requires stream_options to include usage in stream
   streamParams: { stream_options: { include_usage: true } },
+  getErrorDetails: getCerebrasErrorDetails,
 };
 
 export const streamCerebras: StreamFunction<'cerebras'> = (

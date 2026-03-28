@@ -10,7 +10,7 @@ import type {
   OpenAIProviderOptions,
   StopReason,
   Tool,
-} from '@ank1015/llm-types';
+} from '../../types/index.js';
 import type {
   Tool as OpenAITool,
   Response,
@@ -228,7 +228,7 @@ export function buildOpenAIMessages(model: Model<'openai'>, context: Context): R
               )
             );
           } else if (contentBlock.type === 'response') {
-            for (const responseItem of contentBlock.content) {
+            for (const responseItem of contentBlock.response) {
               if (responseItem.type === 'text') {
                 textBuffer += sanitizeSurrogates(responseItem.content);
               } else if (responseItem.type === 'image' && model.input.includes('image')) {

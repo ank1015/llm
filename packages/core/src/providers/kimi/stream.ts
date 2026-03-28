@@ -1,6 +1,7 @@
 import {
   createChatCompletionClient,
   createChatCompletionStream,
+  getKimiErrorDetails,
   mapChatStopReason,
 } from '../utils/index.js';
 
@@ -8,7 +9,7 @@ import { buildParams } from './utils.js';
 
 import type { StreamFunction } from '../../utils/types.js';
 import type { ChatStreamConfig } from '../utils/index.js';
-import type { Context, KimiProviderOptions, Model } from '@ank1015/llm-types';
+import type { Context, KimiProviderOptions, Model } from '../../types/index.js';
 
 const config: ChatStreamConfig<'kimi'> = {
   mapStopReason: mapChatStopReason,
@@ -18,6 +19,7 @@ const config: ChatStreamConfig<'kimi'> = {
   // Kimi may report usage on either chunk.usage or choice.usage
   resolveUsage: (chunk, choice) =>
     (chunk.usage || (choice as { usage?: unknown }).usage) as Record<string, unknown> | undefined,
+  getErrorDetails: getKimiErrorDetails,
 };
 
 export const streamKimi: StreamFunction<'kimi'> = (

@@ -7,7 +7,7 @@ import type {
   Context,
   Model,
   TextContent,
-} from '@ank1015/llm-types';
+} from '../../types/index.js';
 import type {
   ChatCompletionAssistantMessageParam,
   ChatCompletionCreateParamsNonStreaming,
@@ -162,7 +162,7 @@ export function buildCerebrasMessages(
           if (contentBlock.type === 'thinking') {
             reasoningContent += sanitizeSurrogates(contentBlock.thinkingText);
           } else if (contentBlock.type === 'response') {
-            const text = contentBlock.content
+            const text = contentBlock.response
               .filter((c) => c.type === 'text')
               .map((c) => sanitizeSurrogates((c as TextContent).content))
               .join('');
