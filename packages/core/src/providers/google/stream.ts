@@ -2,6 +2,7 @@ import { calculateCost } from '../../models/index.js';
 import { AssistantMessageEventStream } from '../../utils/event-stream.js';
 import { validateToolArguments } from '../../utils/validation.js';
 
+import { getGoogleErrorDetails } from './errors.js';
 import { buildParams, createClient, mapStopReason } from './utils.js';
 
 import type { StreamFunction } from '../../utils/types.js';
@@ -11,12 +12,10 @@ import type {
   AssistantToolCall,
   BaseAssistantMessage,
   Context,
-  GeneratedImageMetadata,
   GoogleProviderOptions,
-  ImageContent,
   Model,
   TextContent,
-} from '@ank1015/llm-types';
+} from '../../types/index.js';
 import type { GenerateContentResponse, Part } from '@google/genai';
 
 export const streamGoogle: StreamFunction<'google'> = (
@@ -78,7 +77,7 @@ export const streamGoogle: StreamFunction<'google'> = (
           stream.push({
             type: 'text_end',
             contentIndex: blockIndex(),
-            content: currentBlock.content,
+            content: currentBlock.response,
             message: output,
           });
         } else {
@@ -91,35 +90,6 @@ export const streamGoogle: StreamFunction<'google'> = (
         }
 
         currentBlock = null;
-      };
-
-      const appendImageBlock = (image: ImageContent, metadata: GeneratedImageMetadata) => {
-        const imageBlock: AssistantResponseContent = {
-          type: 'response',
-          content: [image],
-        };
-
-        output.content.push(imageBlock);
-        const imageContentIndex = blockIndex();
-
-        stream.push({
-          type: 'image_start',
-          contentIndex: imageContentIndex,
-          metadata,
-          message: output,
-        });
-        stream.push({
-          type: 'image_frame',
-          contentIndex: imageContentIndex,
-          image,
-          message: output,
-        });
-        stream.push({
-          type: 'image_end',
-          contentIndex: imageContentIndex,
-          image,
-          message: output,
-        });
       };
 
       for await (const chunk of googleStream) {
@@ -171,7 +141,7 @@ export const streamGoogle: StreamFunction<'google'> = (
                     message: output,
                   });
                 } else {
-                  currentBlock = { type: 'response', content: [{ type: 'text', content: '' }] };
+                  currentBlock = { type: 'response', response: [{ type: 'text', content: '' }] };
                   output.content.push(currentBlock);
                   stream.push({
                     type: 'text_start',
@@ -190,11 +160,11 @@ export const streamGoogle: StreamFunction<'google'> = (
                   message: output,
                 });
               } else {
-                const textIndex = currentBlock.content.findIndex(
+                const textIndex = currentBlock.response.findIndex(
                   (content) => content.type === 'text'
                 );
                 if (textIndex !== -1) {
-                  (currentBlock.content[textIndex] as TextContent).content += part.text;
+                  (currentBlock.response[textIndex] as TextContent).content += part.text;
                 }
                 stream.push({
                   type: 'text_delta',
@@ -203,23 +173,6 @@ export const streamGoogle: StreamFunction<'google'> = (
                   message: output,
                 });
               }
-            }
-
-            if (part.inlineData?.data && part.inlineData.mimeType) {
-              closeCurrentBlock();
-
-              const metadata: GeneratedImageMetadata = {
-                generationStage: part.thought === true ? 'thought' : 'final',
-                generationProvider: 'google',
-              };
-              const image: ImageContent = {
-                type: 'image',
-                data: part.inlineData.data,
-                mimeType: part.inlineData.mimeType,
-                metadata,
-              };
-
-              appendImageBlock(image, metadata);
             }
 
             if (part.functionCall) {
@@ -345,7 +298,9 @@ export const streamGoogle: StreamFunction<'google'> = (
     } catch (error) {
       for (const block of output.content) delete (block as { index?: number }).index;
       output.stopReason = options?.signal?.aborted ? 'aborted' : 'error';
-      output.errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+      output.message = finalResponse;
+      output.error = getGoogleErrorDetails(error);
+      output.errorMessage = output.error.message;
       output.timestamp = Date.now();
       output.duration = Date.now() - startTimestamp;
       stream.push({

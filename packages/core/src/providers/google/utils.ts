@@ -18,7 +18,7 @@ import type {
   Model,
   StopReason,
   Tool,
-} from '@ank1015/llm-types';
+} from '../../types/index.js';
 import type { TSchema } from '@sinclair/typebox';
 
 export function createClient(model: Model<'google'>, apiKey: string): GoogleGenAI {
@@ -180,7 +180,7 @@ export function buildGoogleMessages(model: Model<'google'>, context: Context): C
               text: `<thinking>${sanitizeSurrogates(contentBlock.thinkingText)}</thinking>`,
             });
           } else if (contentBlock.type === 'response') {
-            for (const responseItem of contentBlock.content) {
+            for (const responseItem of contentBlock.response) {
               if (responseItem.type === 'text') {
                 if (responseItem.content) {
                   parts.push({
