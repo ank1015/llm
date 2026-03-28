@@ -1,4 +1,4 @@
-import type { BaseAssistantMessage, Api } from '@ank1015/llm-types';
+import type { BaseAssistantMessage, Api } from '../types/index.js';
 
 /**
  * Regex patterns to detect context overflow errors from different providers.
@@ -84,14 +84,16 @@ export function isContextOverflow(
   contextWindow?: number
 ): boolean {
   // Case 1: Check error message patterns
-  if (message.stopReason === 'error' && message.errorMessage) {
+  const errorMessage = message.error?.message || message.errorMessage;
+
+  if (message.stopReason === 'error' && errorMessage) {
     // Check known patterns
-    if (OVERFLOW_PATTERNS.some((p) => p.test(message.errorMessage!))) {
+    if (OVERFLOW_PATTERNS.some((p) => p.test(errorMessage))) {
       return true;
     }
 
     // Cerebras and Mistral return 400/413 with no body - check for status code pattern
-    if (/^4(00|13)\s*(status code)?\s*\(no body\)/i.test(message.errorMessage)) {
+    if (/^4(00|13)\s*(status code)?\s*\(no body\)/i.test(errorMessage)) {
       return true;
     }
   }

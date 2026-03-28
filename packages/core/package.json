@@ -18,16 +18,16 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "rm -rf dist *.tsbuildinfo && tsc",
+    "build": "node ../../scripts/remove-paths.mjs dist --tsbuildinfo && tsc",
     "dev": "tsc --watch",
     "test": "pnpm run test:unit && pnpm run test:integration",
     "test:unit": "vitest run tests/unit",
-    "test:integration": "node ./scripts/run-integration-tests.mjs",
+    "test:integration": "vitest run tests/integration",
     "test:coverage": "vitest run tests/unit --coverage",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src tests scripts vitest.config.ts vitest.setup.ts",
-    "clean": "rm -rf dist coverage *.tsbuildinfo",
+    "clean": "node ../../scripts/remove-paths.mjs dist coverage --tsbuildinfo",
     "prepack": "pnpm run build",
     "prepublishOnly": "node ../../scripts/ensure-pnpm-publish.mjs"
   },
@@ -59,7 +59,6 @@
     "access": "public"
   },
   "dependencies": {
-    "@ank1015/llm-types": "workspace:^",
     "@anthropic-ai/sdk": "^0.78.0",
     "@google/genai": "^1.44.0",
     "@sinclair/typebox": "^0.34.48",

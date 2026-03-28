@@ -1,7 +1,7 @@
 import AjvModule from 'ajv';
 import addFormatsModule from 'ajv-formats';
 
-import type { Tool, AssistantToolCall } from '@ank1015/llm-types';
+import type { Tool, AssistantToolCall } from '../types/index.js';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // Handle both default and named exports (CJS/ESM interop)
