@@ -1,22 +1,38 @@
-/**
- * Agent module - stateless agent loop and utilities
- */
-
-// Main runner function
-export { runAgentLoop } from './runner.js';
-
-// Message building utilities
+export {
+  DEFAULT_AGENT_RETRY_POLICY,
+  agentEngine,
+  runAgent,
+  stepAgent,
+} from './engine.js';
+export { createEventAdapter } from './adapter.js';
+export { defaultModelInvoker } from './invoker.js';
 export { buildUserMessage, buildToolResultMessage } from './utils.js';
-
-// Mock message generator
 export { getMockMessage } from './mock.js';
 
-// Types
 export type {
-  AgentCompleteFunction,
-  AgentStreamFunction,
-  AgentRunnerConfig,
-  AgentRunnerCallbacks,
-  AgentEventEmitter,
-  AgentRunnerResult,
-} from './types.js';
+  AgentEngine,
+  AgentEngineConfig,
+  AgentError,
+  AgentEvent,
+  AgentEventAdapter,
+  AgentEventAdapterOptions,
+  AgentExecutionLimits,
+  AgentHooks,
+  AgentModelInvocation,
+  AgentModelInvoker,
+  AgentRetryPolicy,
+  AgentRunFunction,
+  AgentRunOptions,
+  AgentRunResult,
+  AgentRunState,
+  AgentStepFunction,
+  AgentStepOptions,
+  AgentStepResult,
+  AgentTool,
+  AgentToolExecuteInput,
+  AgentToolResult,
+  AgentToolUpdateCallback,
+  Attachment,
+  QueuedMessage,
+  ToolExecutionContext,
+} from '../types/index.js';

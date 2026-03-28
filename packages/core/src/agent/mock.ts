@@ -1,7 +1,7 @@
 import { getProviderMockMessage } from '../providers/registry.js';
 import { generateUUID } from '../utils/uuid.js';
 
-import type { Api, BaseAssistantMessage, Model } from '@ank1015/llm-types';
+import type { Api, BaseAssistantMessage, Model } from '../types/index.js';
 
 /**
  * Creates a mock BaseAssistantMessage for the given model.
