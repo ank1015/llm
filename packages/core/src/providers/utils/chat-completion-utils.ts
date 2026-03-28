@@ -6,7 +6,7 @@
 
 import OpenAI from 'openai';
 
-import type { Api, Model, StopReason, Tool } from '@ank1015/llm-types';
+import type { Api, Model, StopReason, Tool } from '../../types/index.js';
 import type { ChatCompletion, ChatCompletionTool } from 'openai/resources/chat/completions.js';
 
 /**
@@ -56,6 +56,7 @@ export function mapChatStopReason(finishReason: string | null | undefined): Stop
       return 'length';
     case 'tool_calls':
       return 'toolUse';
+    case 'error':
     case 'sensitive':
     case 'content_filter':
     case 'network_error':

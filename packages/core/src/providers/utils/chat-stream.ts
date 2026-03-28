@@ -4,7 +4,7 @@
  * Handles the full streaming lifecycle for OpenAI Chat Completions API-compatible providers.
  * Provider-specific differences are injected via ChatStreamConfig.
  *
- * Used by: DeepSeek, Kimi, Z.AI
+ * Used by: Cerebras, DeepSeek, Kimi, OpenRouter, Z.AI
  */
 
 import { calculateCost } from '../../models/index.js';
@@ -13,6 +13,10 @@ import { parseStreamingJson } from '../../utils/json-parse.js';
 import { validateToolArguments } from '../../utils/validation.js';
 
 import { createMockChatCompletion } from './chat-completion-utils.js';
+import {
+  getChatFinishReasonErrorDetails,
+  getDefaultOpenAICompatibleErrorDetails,
+} from './chat-errors.js';
 
 import type {
   Api,
@@ -25,7 +29,7 @@ import type {
   StopReason,
   TextContent,
   Tool,
-} from '@ank1015/llm-types';
+} from '../../types/index.js';
 import type OpenAI from 'openai';
 import type {
   ChatCompletion,
@@ -65,6 +69,10 @@ export interface ChatStreamConfig<_TApi extends Api> {
    * Kimi uses this for stream_options: { include_usage: true }.
    */
   streamParams?: Record<string, unknown>;
+  /**
+   * Optional: maps thrown provider errors to structured assistant error details.
+   */
+  getErrorDetails?: (error: unknown) => BaseAssistantMessage<_TApi>['error'];
 }
 
 /**
@@ -117,6 +125,7 @@ export function createChatCompletionStream<
     };
     let accumulatedContent = '';
     let accumulatedReasoningContent = '';
+    let lastFinishReason: string | null | undefined;
     const accumulatedToolCalls: Map<
       number,
       { id: string; type: 'function'; function: { name: string; arguments: string } }
@@ -160,7 +169,7 @@ export function createChatCompletionStream<
                 stream.push({
                   type: 'text_end',
                   contentIndex: blockIndex(),
-                  content: currentBlock.content,
+                  content: currentBlock.response,
                   message: output,
                 });
               }
@@ -198,7 +207,7 @@ export function createChatCompletionStream<
                 message: output,
               });
             }
-            currentBlock = { type: 'response', content: [{ type: 'text', content: '' }] };
+            currentBlock = { type: 'response', response: [{ type: 'text', content: '' }] };
             output.content.push(currentBlock);
             stream.push({
               type: 'text_start',
@@ -208,9 +217,9 @@ export function createChatCompletionStream<
           }
 
           if (currentBlock.type === 'response') {
-            const index = currentBlock.content.findIndex((c) => c.type === 'text');
+            const index = currentBlock.response.findIndex((c) => c.type === 'text');
             if (index !== -1) {
-              (currentBlock.content[index] as TextContent).content += delta.content;
+              (currentBlock.response[index] as TextContent).content += delta.content;
             }
             stream.push({
               type: 'text_delta',
@@ -228,7 +237,7 @@ export function createChatCompletionStream<
               stream.push({
                 type: 'text_end',
                 contentIndex: blockIndex(),
-                content: currentBlock.content,
+                content: currentBlock.response,
                 message: output,
               });
             } else if (currentBlock.type === 'thinking') {
@@ -305,6 +314,7 @@ export function createChatCompletionStream<
 
         // Handle finish reason
         if (choice.finish_reason) {
+          lastFinishReason = choice.finish_reason;
           output.stopReason = config.mapStopReason(choice.finish_reason);
         }
 
@@ -333,7 +343,7 @@ export function createChatCompletionStream<
           stream.push({
             type: 'text_end',
             contentIndex: blockIndex(),
-            content: currentBlock.content,
+            content: currentBlock.response,
             message: output,
           });
         } else if (currentBlock.type === 'thinking') {
@@ -395,8 +405,13 @@ export function createChatCompletionStream<
       }
 
       if (output.stopReason === 'aborted' || output.stopReason === 'error') {
+        const finishReasonError =
+          output.stopReason === 'error'
+            ? getChatFinishReasonErrorDetails(lastFinishReason)
+            : undefined;
+
         throw new Error(
-          `Stream ended with status: ${output.stopReason}${output.errorMessage ? ` - ${output.errorMessage}` : ''}`
+          `Stream ended with status: ${output.stopReason}${finishReasonError?.message ? ` - ${finishReasonError.message}` : output.error?.message ? ` - ${output.error.message}` : ''}`
         );
       }
 
@@ -452,7 +467,13 @@ export function createChatCompletionStream<
         delete (block as { partialJson?: string }).partialJson;
       }
       output.stopReason = signal?.aborted ? 'aborted' : 'error';
-      output.errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+      output.error =
+        output.stopReason === 'error'
+          ? getChatFinishReasonErrorDetails(lastFinishReason) ||
+            config.getErrorDetails?.(error) ||
+            getDefaultOpenAICompatibleErrorDetails(error)
+          : config.getErrorDetails?.(error) || getDefaultOpenAICompatibleErrorDetails(error);
+      output.errorMessage = output.error.message;
       output.timestamp = Date.now();
       output.duration = Date.now() - startTimestamp;
       stream.push({
