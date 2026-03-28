@@ -6,16 +6,21 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 import { getModel } from '../../../src/models/index.js';
 import { streamCodex } from '../../../src/providers/codex/stream.js';
+import { describeIfAvailable } from '../helpers/live.js';
 
-import type { BaseAssistantEvent, CodexProviderOptions, Context, Model } from '@ank1015/llm-types';
+import type { BaseAssistantEvent, CodexProviderOptions, Context, Model } from '../../../src/types/index.js';
 
 const CODEX_HOME = path.join(process.env.HOME || '', '.codex');
-const auth = JSON.parse(fs.readFileSync(path.join(CODEX_HOME, 'auth.json'), 'utf-8'));
+const CODEX_AUTH_PATH = path.join(CODEX_HOME, 'auth.json');
+const auth = fs.existsSync(CODEX_AUTH_PATH)
+  ? JSON.parse(fs.readFileSync(CODEX_AUTH_PATH, 'utf-8'))
+  : null;
 
-const accessToken = auth.tokens.access_token;
-const accountId = auth.tokens.account_id;
+const accessToken = auth?.tokens?.access_token as string | undefined;
+const accountId = auth?.tokens?.account_id as string | undefined;
+const describeIfCodex = describeIfAvailable(Boolean(accessToken && accountId));
 
-describe('Codex Stream Integration', () => {
+describeIfCodex('Codex Stream Integration', () => {
   let model: Model<'codex'>;
   const apiKey = accessToken;
   const chatgptAccountId = accountId;
@@ -32,12 +37,6 @@ describe('Codex Stream Integration', () => {
   }
 
   beforeAll(() => {
-    if (!apiKey || !chatgptAccountId) {
-      throw new Error(
-        'CODEX_API_KEY and CODEX_CHATGPT_ACCOUNT_ID environment variables are required for integration tests'
-      );
-    }
-
     const testModel = getModel('codex', 'gpt-5.3-codex');
     if (!testModel) {
       throw new Error('Test model gpt-5.3-codex not found');

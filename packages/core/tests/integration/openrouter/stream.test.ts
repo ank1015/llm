@@ -3,18 +3,17 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 import { getModel } from '../../../src/models/index.js';
 import { streamOpenRouter } from '../../../src/providers/openrouter/stream.js';
+import { describeIfAvailable, getIntegrationEnv } from '../helpers/live.js';
 
-import type { BaseAssistantEvent, Context, Model } from '@ank1015/llm-types';
+import type { BaseAssistantEvent, Context, Model } from '../../../src/types/index.js';
 
-describe('OpenRouter Stream Integration', () => {
+const apiKey = getIntegrationEnv('OPENROUTER_API_KEY')!;
+const describeIfOpenRouter = describeIfAvailable(Boolean(apiKey));
+
+describeIfOpenRouter('OpenRouter Stream Integration', () => {
   let model: Model<'openrouter'>;
-  const apiKey = process.env.OPENROUTER_API_KEY;
 
   beforeAll(() => {
-    if (!apiKey) {
-      throw new Error('OPENROUTER_API_KEY environment variable is required for integration tests');
-    }
-
     const testModel = getModel('openrouter', 'openai/gpt-4o');
     if (!testModel) {
       throw new Error('Test model openai/gpt-4o not found');

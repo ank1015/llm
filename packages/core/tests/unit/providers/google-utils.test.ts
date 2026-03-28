@@ -18,7 +18,7 @@ import type {
   Tool,
   ToolResultMessage,
   UserMessage,
-} from '@ank1015/llm-types';
+} from '../../../src/types/index.js';
 import type { Content, GenerateContentResponse } from '@google/genai';
 
 describe('Google Utils', () => {
@@ -80,7 +80,7 @@ describe('Google Utils', () => {
         };
         const context: Context = { messages: [userMessage] };
 
-        const result = buildGoogleMessages(mockModel, context);
+        const result = buildGoogleMessages(mockModel, context) as any;
         expect(result[0]).toEqual({
           role: 'user',
           parts: [{ text: 'Hello' }],
@@ -98,7 +98,7 @@ describe('Google Utils', () => {
         };
         const context: Context = { messages: [userMessage] };
 
-        const result = buildGoogleMessages(mockModel, context);
+        const result = buildGoogleMessages(mockModel, context) as any;
         expect(result[0].parts).toEqual([
           { text: 'What is this?' },
           { inlineData: { mimeType: 'image/png', data: 'base64data' } },
@@ -115,7 +115,7 @@ describe('Google Utils', () => {
         };
         const context: Context = { messages: [userMessage] };
 
-        const result = buildGoogleMessages(mockModel, context);
+        const result = buildGoogleMessages(mockModel, context) as any;
         expect(result[0].parts).toContainEqual({
           inlineData: { mimeType: 'application/pdf', data: 'pdfdata' },
         });
@@ -136,7 +136,7 @@ describe('Google Utils', () => {
         };
         const context: Context = { messages: [userMessage] };
 
-        const result = buildGoogleMessages(modelNoImage, context);
+        const result = buildGoogleMessages(modelNoImage, context) as any;
         expect(result[0].parts).toEqual([{ text: 'Hello' }]);
       });
 
@@ -155,7 +155,7 @@ describe('Google Utils', () => {
         };
         const context: Context = { messages: [userMessage] };
 
-        const result = buildGoogleMessages(modelNoFile, context);
+        const result = buildGoogleMessages(modelNoFile, context) as any;
         expect(result[0].parts).toEqual([{ text: 'Hello' }]);
       });
 
@@ -168,7 +168,7 @@ describe('Google Utils', () => {
         };
         const context: Context = { messages: [userMessage] };
 
-        const result = buildGoogleMessages(mockModel, context);
+        const result = buildGoogleMessages(mockModel, context) as any;
         expect(result[0].parts[0].text).toBe('Hello  World');
       });
     });
@@ -186,7 +186,7 @@ describe('Google Utils', () => {
         };
         const context: Context = { messages: [toolResult] };
 
-        const result = buildGoogleMessages(mockModel, context);
+        const result = buildGoogleMessages(mockModel, context) as any;
         expect(result[0]).toEqual({
           role: 'user',
           parts: [
@@ -217,7 +217,7 @@ describe('Google Utils', () => {
         };
         const context: Context = { messages: [toolResult] };
 
-        const result = buildGoogleMessages(mockModel, context);
+        const result = buildGoogleMessages(mockModel, context) as any;
         expect(result[0].parts[0].functionResponse?.response.isError).toBe(true);
       });
 
@@ -236,7 +236,7 @@ describe('Google Utils', () => {
         };
         const context: Context = { messages: [toolResult] };
 
-        const result = buildGoogleMessages(mockModel, context);
+        const result = buildGoogleMessages(mockModel, context) as any;
         const functionResponse = result[0].parts[0].functionResponse;
         expect(functionResponse?.parts).toContainEqual({
           inlineData: { mimeType: 'image/png', data: 'imgdata' },
@@ -255,7 +255,7 @@ describe('Google Utils', () => {
         };
         const context: Context = { messages: [toolResult] };
 
-        const result = buildGoogleMessages(mockModel, context);
+        const result = buildGoogleMessages(mockModel, context) as any;
         const functionResponse = result[0].parts[0].functionResponse;
         expect(functionResponse?.response.result).toBe('(see attached:)');
       });
@@ -293,7 +293,7 @@ describe('Google Utils', () => {
         };
         const context: Context = { messages: [assistantMessage] };
 
-        const result = buildGoogleMessages(mockModel, context);
+        const result = buildGoogleMessages(mockModel, context) as any;
         expect(result[0]).toEqual({
           role: 'model',
           parts: [{ text: 'Hello' }],
@@ -327,7 +327,7 @@ describe('Google Utils', () => {
         };
         const context: Context = { messages: [assistantMessage] };
 
-        const result = buildGoogleMessages(mockModel, context);
+        const result = buildGoogleMessages(mockModel, context) as any;
         expect((result as any).length).toBe(2);
       });
 
@@ -344,7 +344,7 @@ describe('Google Utils', () => {
             content: [
               {
                 type: 'response',
-                content: [{ type: 'text', content: 'Hello from GPT!' }],
+                response: [{ type: 'text', content: 'Hello from GPT!' }],
               },
             ],
             usage: {
@@ -359,7 +359,7 @@ describe('Google Utils', () => {
           };
           const context: Context = { messages: [assistantMessage as any] };
 
-          const result = buildGoogleMessages(mockModel, context);
+          const result = buildGoogleMessages(mockModel, context) as any;
           expect(result[0]).toEqual({
             role: 'model',
             parts: [{ text: 'Hello from GPT!' }],
@@ -378,7 +378,7 @@ describe('Google Utils', () => {
             content: [
               {
                 type: 'response',
-                content: [
+                response: [
                   { type: 'text', content: 'Use these references.' },
                   { type: 'image', data: 'imgdata', mimeType: 'image/png' },
                   {
@@ -402,7 +402,7 @@ describe('Google Utils', () => {
           };
           const context: Context = { messages: [assistantMessage as any] };
 
-          const result = buildGoogleMessages(mockModel, context);
+          const result = buildGoogleMessages(mockModel, context) as any;
           expect(result[0]).toEqual({
             role: 'model',
             parts: [
@@ -429,7 +429,7 @@ describe('Google Utils', () => {
               },
               {
                 type: 'response',
-                content: [{ type: 'text', content: 'The answer is 42.' }],
+                response: [{ type: 'text', content: 'The answer is 42.' }],
               },
             ],
             usage: {
@@ -444,7 +444,7 @@ describe('Google Utils', () => {
           };
           const context: Context = { messages: [assistantMessage as any] };
 
-          const result = buildGoogleMessages(mockModel, context);
+          const result = buildGoogleMessages(mockModel, context) as any;
           expect(result[0]).toEqual({
             role: 'model',
             parts: [
@@ -483,7 +483,7 @@ describe('Google Utils', () => {
           };
           const context: Context = { messages: [assistantMessage as any] };
 
-          const result = buildGoogleMessages(mockModel, context);
+          const result = buildGoogleMessages(mockModel, context) as any;
           expect(result[0]).toEqual({
             role: 'model',
             parts: [
@@ -511,7 +511,7 @@ describe('Google Utils', () => {
             content: [
               {
                 type: 'response',
-                content: [{ type: 'text', content: 'I will search for that.' }],
+                response: [{ type: 'text', content: 'I will search for that.' }],
               },
               {
                 type: 'toolCall',
@@ -532,7 +532,7 @@ describe('Google Utils', () => {
           };
           const context: Context = { messages: [assistantMessage as any] };
 
-          const result = buildGoogleMessages(mockModel, context);
+          const result = buildGoogleMessages(mockModel, context) as any;
           expect(result[0].parts.length).toBe(2);
           expect(result[0].parts[0]).toEqual({ text: 'I will search for that.' });
           expect(result[0].parts[1]).toEqual({
@@ -558,7 +558,7 @@ describe('Google Utils', () => {
             content: [
               {
                 type: 'response',
-                content: [{ type: 'text', content: `Hello ${unpaired} World` }],
+                response: [{ type: 'text', content: `Hello ${unpaired} World` }],
               },
             ],
             usage: {
@@ -573,7 +573,7 @@ describe('Google Utils', () => {
           };
           const context: Context = { messages: [assistantMessage as any] };
 
-          const result = buildGoogleMessages(mockModel, context);
+          const result = buildGoogleMessages(mockModel, context) as any;
           expect(result[0].parts[0].text).toBe('Hello  World');
         });
 
@@ -599,7 +599,7 @@ describe('Google Utils', () => {
           };
           const context: Context = { messages: [assistantMessage as any] };
 
-          const result = buildGoogleMessages(mockModel, context);
+          const result = buildGoogleMessages(mockModel, context) as any;
           expect((result as Content[]).length).toBe(0);
         });
 
@@ -615,7 +615,7 @@ describe('Google Utils', () => {
             content: [
               {
                 type: 'response',
-                content: [{ type: 'text', content: '' }],
+                response: [{ type: 'text', content: '' }],
               },
             ],
             usage: {
@@ -630,7 +630,7 @@ describe('Google Utils', () => {
           };
           const context: Context = { messages: [assistantMessage as any] };
 
-          const result = buildGoogleMessages(mockModel, context);
+          const result = buildGoogleMessages(mockModel, context) as any;
           expect((result as Content[]).length).toBe(0);
         });
       });

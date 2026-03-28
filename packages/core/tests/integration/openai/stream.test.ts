@@ -3,19 +3,18 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 import { getModel } from '../../../src/models/index.js';
 import { streamOpenAI } from '../../../src/providers/openai/stream.js';
+import { describeIfAvailable, getIntegrationEnv } from '../helpers/live.js';
 
-import type { BaseAssistantEvent, Context, Model } from '@ank1015/llm-types';
+import type { BaseAssistantEvent, Context, Model } from '../../../src/types/index.js';
 
-describe('OpenAI Stream Integration', () => {
+const apiKey = getIntegrationEnv('OPENAI_API_KEY')!;
+const describeIfOpenAI = describeIfAvailable(Boolean(apiKey));
+
+describeIfOpenAI('OpenAI Stream Integration', () => {
   let model: Model<'openai'>;
-  const apiKey = process.env.OPENAI_API_KEY;
   const testModelId = 'gpt-5.4' as const;
 
   beforeAll(() => {
-    if (!apiKey) {
-      throw new Error('OPENAI_API_KEY environment variable is required for integration tests');
-    }
-
     // Use a model this project can access reliably for the main suite
     const testModel = getModel('openai', testModelId);
     if (!testModel) {

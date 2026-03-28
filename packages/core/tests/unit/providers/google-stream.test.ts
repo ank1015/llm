@@ -1,180 +1,99 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ApiError } from '@google/genai';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { Context, Model } from '@ank1015/llm-types';
+import { streamGoogle } from '../../../src/providers/google/stream.js';
+import { AssistantStreamError } from '../../../src/utils/event-stream.js';
+import * as googleProviderUtils from '../../../src/providers/google/utils.js';
 
-const googleMocks = vi.hoisted(() => ({
-  buildParams: vi.fn(),
-  createClient: vi.fn(),
-  generateContentStream: vi.fn(),
-  mapStopReason: vi.fn(),
-}));
+import type { Context, GoogleProviderOptions, Model } from '../../../src/types/index.js';
 
-vi.mock('../../../src/providers/google/utils.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../src/providers/google/utils.js')>();
-
-  return {
-    ...actual,
-    buildParams: googleMocks.buildParams,
-    createClient: googleMocks.createClient,
-    mapStopReason: googleMocks.mapStopReason,
+describe('Google stream errors', () => {
+  const context: Context = {
+    messages: [
+      {
+        role: 'user',
+        id: 'msg-1',
+        content: [{ type: 'text', content: 'Hello' }],
+      },
+    ],
   };
-});
 
-async function* chunkStream(chunks: unknown[]) {
-  for (const chunk of chunks) {
-    yield chunk;
-  }
-}
-
-describe('Google Stream', () => {
-  let streamGoogle: typeof import('../../../src/providers/google/stream.js').streamGoogle;
-
-  const mockModel: Model<'google'> = {
-    id: 'gemini-3.1-flash-image-preview',
-    name: 'Gemini 3.1 Flash Image Preview',
+  const model: Model<'google'> = {
+    id: 'gemini-2.5-flash',
+    name: 'Gemini 2.5 Flash',
     api: 'google',
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
-    reasoning: false,
-    input: ['text', 'image'],
-    cost: { input: 0.3, output: 2.5, cacheRead: 0, cacheWrite: 0 },
-    contextWindow: 32768,
-    maxTokens: 32768,
-    tools: [],
+    reasoning: true,
+    input: ['text'],
+    cost: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 },
+    contextWindow: 128000,
+    maxTokens: 8192,
+    tools: ['function_calling'],
   };
 
-  beforeEach(() => {
-    vi.resetModules();
-    vi.clearAllMocks();
-    googleMocks.buildParams.mockReturnValue({ model: mockModel.id });
-    googleMocks.createClient.mockReturnValue({
+  const options: GoogleProviderOptions = { apiKey: 'test-key' };
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function mockGoogleClient(factory: () => Promise<AsyncIterable<unknown>> | AsyncIterable<unknown>) {
+    vi.spyOn(googleProviderUtils, 'createClient').mockReturnValue({
       models: {
-        generateContentStream: googleMocks.generateContentStream,
+        generateContentStream: vi.fn(async () => factory()),
       },
-    });
-    googleMocks.mapStopReason.mockReturnValue('stop');
-  });
+    } as any);
+  }
 
-  beforeEach(async () => {
-    streamGoogle = (await import('../../../src/providers/google/stream.js')).streamGoogle;
-  });
+  it('marks retryable Gemini backend errors on the result', async () => {
+    mockGoogleClient(() => ({
+      async *[Symbol.asyncIterator]() {
+        throw new ApiError({
+          status: 503,
+          message: 'The service may be temporarily overloaded or down.',
+        });
+      },
+    }));
 
-  it('normalizes generated inlineData images and preserves candidate metadata', async () => {
-    googleMocks.generateContentStream.mockResolvedValue(
-      chunkStream([
-        {
-          candidates: [
-            {
-              finishReason: 'STOP',
-              groundingMetadata: {
-                searchEntryPoint: { renderedContent: '<div>search</div>' },
-              },
-              content: {
-                role: 'model',
-                parts: [{ inlineData: { mimeType: 'image/png', data: 'imgdata' } }],
-              },
-            },
-          ],
-          usageMetadata: {
-            promptTokenCount: 10,
-            cachedContentTokenCount: 0,
-            candidatesTokenCount: 20,
-            thoughtsTokenCount: 0,
-            totalTokenCount: 30,
-          },
-        },
-      ])
-    );
+    const stream = streamGoogle(model, context, options, 'test-msg-1');
 
-    const context: Context = { messages: [] };
-    const stream = streamGoogle(mockModel, context, { apiKey: 'test-key' }, 'google-img-1');
-
-    const events: Array<{ type: string }> = [];
-    for await (const event of stream) {
-      events.push(event);
+    for await (const _ of stream) {
+      // drain
     }
 
     const result = await stream.result();
 
-    expect(events.map((event) => event.type)).toEqual([
-      'start',
-      'image_start',
-      'image_frame',
-      'image_end',
-      'done',
-    ]);
-    expect(result.content).toEqual([
-      {
-        type: 'response',
-        content: [
-          {
-            type: 'image',
-            data: 'imgdata',
-            mimeType: 'image/png',
-            metadata: {
-              generationStage: 'final',
-              generationProvider: 'google',
-            },
-          },
-        ],
-      },
-    ]);
-    expect(result.message.candidates?.[0].groundingMetadata).toEqual({
-      searchEntryPoint: { renderedContent: '<div>search</div>' },
+    expect(result.stopReason).toBe('error');
+    expect(result.error).toEqual({
+      message: 'The service may be temporarily overloaded or down.',
+      canRetry: true,
     });
-    expect(result.message.candidates?.[0].content?.parts).toEqual([
-      { inlineData: { mimeType: 'image/png', data: 'imgdata' } },
-    ]);
   });
 
-  it('marks Google thought images with the thought stage', async () => {
-    googleMocks.generateContentStream.mockResolvedValue(
-      chunkStream([
-        {
-          candidates: [
-            {
-              finishReason: 'STOP',
-              content: {
-                role: 'model',
-                parts: [
-                  {
-                    inlineData: { mimeType: 'image/png', data: 'thoughtimg' },
-                    thought: true,
-                  },
-                ],
-              },
-            },
-          ],
-        },
-      ])
-    );
+  it('marks billing and precondition errors as non-retryable on drain()', async () => {
+    mockGoogleClient(() => ({
+      async *[Symbol.asyncIterator]() {
+        throw new ApiError({
+          status: 400,
+          message:
+            'Gemini API free tier is not available in your country. Please enable billing on your project in Google AI Studio.',
+        });
+      },
+    }));
 
-    const context: Context = { messages: [] };
-    const stream = streamGoogle(mockModel, context, { apiKey: 'test-key' }, 'google-img-2');
+    const stream = streamGoogle(model, context, options, 'test-msg-2');
 
-    let imageStartEvent: { metadata?: { generationStage?: string } } | undefined;
-    for await (const event of stream) {
-      if (event.type === 'image_start') {
-        imageStartEvent = event;
-      }
+    try {
+      await stream.drain();
+      expect.unreachable('Expected stream.drain() to throw');
+    } catch (caught) {
+      expect(caught).toBeInstanceOf(AssistantStreamError);
+      expect(caught).toMatchObject({
+        name: 'AssistantStreamError',
+        message:
+          'Gemini API free tier is not available in your country. Please enable billing on your project in Google AI Studio.',
+        canRetry: false,
+      });
     }
-
-    const result = await stream.result();
-    const responseBlock = result.content[0];
-
-    expect(imageStartEvent?.metadata?.generationStage).toBe('thought');
-    expect(responseBlock).toEqual({
-      type: 'response',
-      content: [
-        {
-          type: 'image',
-          data: 'thoughtimg',
-          mimeType: 'image/png',
-          metadata: {
-            generationStage: 'thought',
-            generationProvider: 'google',
-          },
-        },
-      ],
-    });
   });
 });

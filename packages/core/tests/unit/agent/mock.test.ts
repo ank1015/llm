@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { getMockMessage } from '../../../src/agent/mock.js';
 import { getModel } from '../../../src/models/index.js';
 
-import type { Api, Model } from '@ank1015/llm-types';
+import type { Api, Model } from '../../../src/types/index.js';
 
 describe('getMockMessage', () => {
   describe('common properties', () => {
@@ -161,7 +161,7 @@ describe('getMockMessage', () => {
         contextWindow: 4096,
         outputLimit: 4096,
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-      } as Model<Api>;
+      } as any;
 
       expect(() => getMockMessage(invalidModel)).toThrow(/Unsupported API/);
     });

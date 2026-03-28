@@ -3,18 +3,17 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 import { getModel } from '../../../src/models/index.js';
 import { streamGoogle } from '../../../src/providers/google/stream.js';
+import { describeIfAvailable, getIntegrationEnv } from '../helpers/live.js';
 
-import type { BaseAssistantEvent, Context, Model } from '@ank1015/llm-types';
+import type { BaseAssistantEvent, Context, Model } from '../../../src/types/index.js';
 
-describe('Google Stream Integration', () => {
+const apiKey = getIntegrationEnv('GEMINI_API_KEY')!;
+const describeIfGoogle = describeIfAvailable(Boolean(apiKey));
+
+describeIfGoogle('Google Stream Integration', () => {
   let model: Model<'google'>;
-  const apiKey = process.env.GEMINI_API_KEY;
 
   beforeAll(() => {
-    if (!apiKey) {
-      throw new Error('GEMINI_API_KEY environment variable is required for integration tests');
-    }
-
     // Use a fast, cheap model for testing
     const testModel = getModel('google', 'gemini-3-flash-preview');
     if (!testModel) {
@@ -611,7 +610,7 @@ describe('Google Stream Integration', () => {
             role: 'assistant',
             id: 'test-2',
             api: 'google',
-            content: [{ type: 'response', content: 'Hello Alice!' }],
+            content: [{ type: 'response', response: [{type: 'text', content: 'Hello'}] }],
             model: model,
             timestamp: Date.now(),
             duration: 100,

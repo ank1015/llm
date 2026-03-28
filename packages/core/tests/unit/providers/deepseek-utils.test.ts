@@ -18,7 +18,7 @@ import type {
   Tool,
   ToolResultMessage,
   UserMessage,
-} from '@ank1015/llm-types';
+} from '../../../src/types/index.js';
 import type { ChatCompletion } from 'openai/resources/chat/completions.js';
 
 describe('DeepSeek Utils', () => {
@@ -43,7 +43,7 @@ describe('DeepSeek Utils', () => {
     };
 
     it('should create client with provided API key', () => {
-      const client = createClient(mockModel, 'test-api-key');
+      const client = createClient(mockModel, 'test-api-key', 'deepseek');
       expect(client).toBeInstanceOf(OpenAI);
     });
 
@@ -52,7 +52,7 @@ describe('DeepSeek Utils', () => {
         ...mockModel,
         baseUrl: 'https://custom.deepseek.com',
       };
-      const client = createClient(customModel, 'test-key');
+      const client = createClient(customModel, 'test-key', 'deepseek');
       expect(client.baseURL).toBe('https://custom.deepseek.com');
     });
 
@@ -61,7 +61,7 @@ describe('DeepSeek Utils', () => {
         ...mockModel,
         headers: { 'X-Custom-Header': 'value' },
       };
-      const client = createClient(customModel, 'test-key');
+      const client = createClient(customModel, 'test-key', 'deepseek');
       expect(client).toBeInstanceOf(OpenAI);
     });
   });
@@ -282,7 +282,7 @@ describe('DeepSeek Utils', () => {
           duration: 100,
           stopReason: 'stop',
           content: [
-            { type: 'response', content: [{ type: 'text', content: 'Hello from DeepSeek!' }] },
+            { type: 'response', response: [{ type: 'text', content: 'Hello from DeepSeek!' }] },
           ],
           usage: {
             input: 10,
@@ -391,7 +391,7 @@ describe('DeepSeek Utils', () => {
             content: [
               {
                 type: 'response',
-                content: [{ type: 'text', content: 'Hello from Gemini!' }],
+                response: [{ type: 'text', content: 'Hello from Gemini!' }],
               },
             ],
             usage: {
@@ -430,7 +430,7 @@ describe('DeepSeek Utils', () => {
               },
               {
                 type: 'response',
-                content: [{ type: 'text', content: 'The answer is 42.' }],
+                response: [{ type: 'text', content: 'The answer is 42.' }],
               },
             ],
             usage: {
@@ -513,7 +513,7 @@ describe('DeepSeek Utils', () => {
             content: [
               {
                 type: 'response',
-                content: [{ type: 'text', content: `Hello ${unpaired} World` }],
+                response: [{ type: 'text', content: `Hello ${unpaired} World` }],
               },
             ],
             usage: {
