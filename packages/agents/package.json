@@ -58,9 +58,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@ank1015/llm-extension": "workspace:^",
-    "@ank1015/llm-sdk": "workspace:^",
-    "@ank1015/llm-sdk-adapters": "workspace:^",
+    "@ank1015/llm-core": "workspace:^",
     "@silvia-odwyer/photon-node": "^0.3.4",
     "@sinclair/typebox": "^0.34.48",
     "chalk": "^5.6.2",
