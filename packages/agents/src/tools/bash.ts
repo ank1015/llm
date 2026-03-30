@@ -15,7 +15,7 @@ import {
 } from './truncate.js';
 import { getShellConfig, getShellEnv, killProcessTree } from './utils/shell.js';
 
-import type { AgentTool } from '@ank1015/llm-sdk';
+import type { AgentTool } from '@ank1015/llm-core';
 
 /**
  * Generate a unique temp file path for bash output
@@ -183,22 +183,18 @@ export interface BashToolOptions {
 export function createBashTool(
   cwd: string,
   options?: BashToolOptions
-): AgentTool<typeof bashSchema> {
+): AgentTool<typeof bashSchema, BashToolDetails> {
   const ops = options?.operations ?? defaultBashOperations;
   const commandPrefix = options?.commandPrefix;
   const spawnHook = options?.spawnHook;
 
   return {
     name: 'bash',
-    label: 'bash',
     description: `Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last ${DEFAULT_MAX_LINES} lines or ${DEFAULT_MAX_BYTES / 1024}KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.`,
     parameters: bashSchema,
-    execute: async (
-      _toolCallId: string,
-      { command, timeout }: { command: string; timeout?: number },
-      signal?: AbortSignal,
-      onUpdate?
-    ) => {
+    execute: async ({ params, signal, onUpdate }) => {
+      const { command, timeout } = params;
+
       // Apply command prefix if configured (e.g., "shopt -s expand_aliases" for alias support)
       const resolvedCommand = commandPrefix ? `${commandPrefix}\n${command}` : command;
       const spawnContext = resolveSpawnContext(resolvedCommand, cwd, spawnHook);
@@ -248,12 +244,17 @@ export function createBashTool(
             const fullBuffer = Buffer.concat(chunks);
             const fullText = fullBuffer.toString('utf-8');
             const truncation = truncateTail(fullText);
+            const updateDetails: BashToolDetails = {};
+            if (truncation.truncated) {
+              updateDetails.truncation = truncation;
+            }
+            if (tempFilePath !== undefined) {
+              updateDetails.fullOutputPath = tempFilePath;
+            }
+
             onUpdate({
               content: [{ type: 'text', content: truncation.content || '' }],
-              details: {
-                truncation: truncation.truncated ? truncation : undefined,
-                fullOutputPath: tempFilePath,
-              },
+              ...(Object.keys(updateDetails).length > 0 ? { details: updateDetails } : {}),
             });
           }
         };
@@ -311,7 +312,10 @@ export function createBashTool(
               outputText += `\n\nCommand exited with code ${exitCode}`;
               reject(new Error(outputText));
             } else {
-              resolve({ content: [{ type: 'text', content: outputText }], details });
+              resolve({
+                content: [{ type: 'text', content: outputText }],
+                ...(details ? { details } : {}),
+              });
             }
           })
           .catch((err: Error) => {

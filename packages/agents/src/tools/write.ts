@@ -5,7 +5,7 @@ import { type Static, Type } from '@sinclair/typebox';
 
 import { resolveToCwd } from './path-utils.js';
 
-import type { AgentTool } from '@ank1015/llm-sdk';
+import type { AgentTool } from '@ank1015/llm-core';
 
 const writeSchema = Type.Object({
   path: Type.String({ description: 'Path to the file to write (relative or absolute)' }),
@@ -47,19 +47,15 @@ export function createWriteTool(
 
   return {
     name: 'write',
-    label: 'write',
     description:
       "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
     parameters: writeSchema,
-    execute: async (
-      _toolCallId: string,
-      { path, content }: { path: string; content: string },
-      signal?: AbortSignal
-    ) => {
+    execute: async ({ params, signal }) => {
+      const { path, content } = params;
       const absolutePath = resolveToCwd(path, cwd);
       const dir = dirname(absolutePath);
 
-      return new Promise<{ content: Array<{ type: 'text'; content: string }>; details: undefined }>(
+      return new Promise<{ content: Array<{ type: 'text'; content: string }> }>(
         (resolve, reject) => {
           // Check if already aborted
           if (signal?.aborted) {
@@ -110,7 +106,6 @@ export function createWriteTool(
                     content: `Successfully wrote ${content.length} bytes to ${path}`,
                   },
                 ],
-                details: undefined,
               });
             } catch (error: unknown) {
               // Clean up abort handler

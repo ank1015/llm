@@ -6,7 +6,7 @@ import { type Static, Type } from '@sinclair/typebox';
 import { resolveToCwd } from './path-utils.js';
 import { DEFAULT_MAX_BYTES, formatSize, type TruncationResult, truncateHead } from './truncate.js';
 
-import type { AgentTool } from '@ank1015/llm-sdk';
+import type { AgentTool } from '@ank1015/llm-core';
 
 const lsSchema = Type.Object({
   path: Type.Optional(
@@ -56,19 +56,19 @@ function toError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
 }
 
-export function createLsTool(cwd: string, options?: LsToolOptions): AgentTool<typeof lsSchema> {
+export function createLsTool(
+  cwd: string,
+  options?: LsToolOptions
+): AgentTool<typeof lsSchema, LsToolDetails> {
   const ops = options?.operations ?? defaultLsOperations;
 
   return {
     name: 'ls',
-    label: 'ls',
     description: `List directory contents. Returns entries sorted alphabetically, with '/' suffix for directories. Includes dotfiles. Output is truncated to ${DEFAULT_LIMIT} entries or ${DEFAULT_MAX_BYTES / 1024}KB (whichever is hit first).`,
     parameters: lsSchema,
-    execute: async (
-      _toolCallId: string,
-      { path, limit }: { path?: string; limit?: number },
-      signal?: AbortSignal
-    ) => {
+    execute: async ({ params, signal }) => {
+      const { path, limit } = params;
+
       return new Promise((resolve, reject) => {
         if (signal?.aborted) {
           reject(new Error('Operation aborted'));
@@ -141,7 +141,6 @@ export function createLsTool(cwd: string, options?: LsToolOptions): AgentTool<ty
             if (results.length === 0) {
               resolve({
                 content: [{ type: 'text', content: '(empty directory)' }],
-                details: undefined,
               });
               return;
             }
@@ -174,7 +173,7 @@ export function createLsTool(cwd: string, options?: LsToolOptions): AgentTool<ty
 
             resolve({
               content: [{ type: 'text', content: output }],
-              details: Object.keys(details).length > 0 ? details : undefined,
+              ...(Object.keys(details).length > 0 ? { details } : {}),
             });
           } catch (error: unknown) {
             signal?.removeEventListener('abort', onAbort);

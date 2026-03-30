@@ -9,7 +9,7 @@ import { resolveToCwd } from './path-utils.js';
 import { DEFAULT_MAX_BYTES, formatSize, type TruncationResult, truncateHead } from './truncate.js';
 import { ensureTool } from './utils/tools-manager.js';
 
-import type { AgentTool } from '@ank1015/llm-sdk';
+import type { AgentTool } from '@ank1015/llm-core';
 
 const findSchema = Type.Object({
   pattern: Type.String({
@@ -65,19 +65,16 @@ function toError(error: unknown): Error {
 export function createFindTool(
   cwd: string,
   options?: FindToolOptions
-): AgentTool<typeof findSchema> {
+): AgentTool<typeof findSchema, FindToolDetails> {
   const customOps = options?.operations;
 
   return {
     name: 'find',
-    label: 'find',
     description: `Search for files by glob pattern. Returns matching file paths relative to the search directory. Respects .gitignore. Output is truncated to ${DEFAULT_LIMIT} results or ${DEFAULT_MAX_BYTES / 1024}KB (whichever is hit first).`,
     parameters: findSchema,
-    execute: async (
-      _toolCallId: string,
-      { pattern, path: searchDir, limit }: { pattern: string; path?: string; limit?: number },
-      signal?: AbortSignal
-    ) => {
+    execute: async ({ params, signal }) => {
+      const { pattern, path: searchDir, limit } = params;
+
       return new Promise((resolve, reject) => {
         if (signal?.aborted) {
           reject(new Error('Operation aborted'));
@@ -112,7 +109,6 @@ export function createFindTool(
               if (results.length === 0) {
                 resolve({
                   content: [{ type: 'text', content: 'No files found matching pattern' }],
-                  details: undefined,
                 });
                 return;
               }
@@ -149,7 +145,7 @@ export function createFindTool(
 
               resolve({
                 content: [{ type: 'text', content: resultOutput }],
-                details: Object.keys(details).length > 0 ? details : undefined,
+                ...(Object.keys(details).length > 0 ? { details } : {}),
               });
               return;
             }
@@ -222,7 +218,6 @@ export function createFindTool(
             if (!output) {
               resolve({
                 content: [{ type: 'text', content: 'No files found matching pattern' }],
-                details: undefined,
               });
               return;
             }
@@ -275,7 +270,7 @@ export function createFindTool(
 
             resolve({
               content: [{ type: 'text', content: resultOutput }],
-              details: Object.keys(details).length > 0 ? details : undefined,
+              ...(Object.keys(details).length > 0 ? { details } : {}),
             });
           } catch (error: unknown) {
             signal?.removeEventListener('abort', onAbort);
