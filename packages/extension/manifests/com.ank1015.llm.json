@@ -1,7 +1,0 @@
-{
-  "name": "com.ank1015.llm",
-  "description": "LLM native messaging host",
-  "path": "/PLACEHOLDER/dist/native/host-wrapper.sh",
-  "type": "stdio",
-  "allowed_origins": ["chrome-extension://PLACEHOLDER_EXTENSION_ID/"]
-}
