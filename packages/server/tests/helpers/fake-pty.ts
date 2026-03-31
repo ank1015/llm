@@ -62,7 +62,10 @@ export class FakePtyProcess implements TerminalPtyProcess {
   }
 }
 
-export function createFakePtyFactory() {
+export function createFakePtyFactory(): {
+  factory: TerminalPtyFactory;
+  instances: FakePtyProcess[];
+} {
   const instances: FakePtyProcess[] = [];
   let nextPid = 1000;
 

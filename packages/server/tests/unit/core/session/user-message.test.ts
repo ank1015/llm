@@ -12,7 +12,7 @@ import {
   rewriteUserMessageVisibleText,
 } from '../../../../src/core/session/user-message.js';
 
-import type { Attachment, UserMessage } from '@ank1015/llm-sdk';
+import type { Attachment, UserMessage } from '@ank1015/llm-core';
 
 let tempDir: string | null = null;
 
