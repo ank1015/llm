@@ -3,7 +3,7 @@ import {
   ProjectFileIndexQuerySchema,
   RenameProjectRequestSchema,
   UpdateProjectImageRequestSchema,
-} from '@ank1015/llm-app-contracts';
+} from '../contracts/index.js';
 import { Hono } from 'hono';
 
 import { ArtifactDir, Project, Session } from '../core/index.js';
@@ -11,7 +11,6 @@ import { terminalRegistry } from '../core/terminal/terminal-registry.js';
 import { toArtifactDirOverviewDto, toProjectDto, toTerminalSummaryDto } from '../http/contracts.js';
 import { readJsonBody, validateSchema } from '../http/validation.js';
 
-import type { ProjectFileIndexEntry } from '../core/index.js';
 import type {
   CreateProjectRequest,
   ProjectDeleteResponse,
@@ -22,7 +21,8 @@ import type {
   RenameProjectRequest,
   TerminalConflictResponse,
   UpdateProjectImageRequest,
-} from '@ank1015/llm-app-contracts';
+} from '../contracts/index.js';
+import type { ProjectFileIndexEntry } from '../types/index.js';
 
 export const projectRoutes = new Hono();
 const DEFAULT_FILE_INDEX_LIMIT = 2000;
@@ -109,6 +109,20 @@ projectRoutes.patch('/projects/project-img', async (c) => {
     return c.json<ProjectDto>(toProjectDto(metadata));
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Failed to update project image';
+    return c.json({ error: message }, message.includes('not found') ? 404 : 500);
+  }
+});
+
+/** PATCH /api/projects/:projectId/archive-toggle — Toggle a project's archived state */
+projectRoutes.patch('/projects/:projectId/archive-toggle', async (c) => {
+  const { projectId } = c.req.param();
+
+  try {
+    const project = await Project.getById(projectId);
+    const metadata = await project.toggleArchived();
+    return c.json<ProjectDto>(toProjectDto(metadata));
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Failed to toggle project archive state';
     return c.json({ error: message }, message.includes('not found') ? 404 : 500);
   }
 });

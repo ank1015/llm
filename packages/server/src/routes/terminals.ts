@@ -1,4 +1,4 @@
-import { CreateTerminalRequestSchema } from '@ank1015/llm-app-contracts';
+import { CreateTerminalRequestSchema } from '../contracts/index.js';
 import { Hono } from 'hono';
 
 import { ArtifactDir } from '../core/index.js';
@@ -11,7 +11,7 @@ import type {
   DeleteTerminalResponse,
   TerminalMetadataDto,
   TerminalSummaryDto,
-} from '@ank1015/llm-app-contracts';
+} from '../contracts/index.js';
 
 const BASE = '/projects/:projectId/artifacts/:artifactDirId/terminals';
 const TERMINAL_NOT_FOUND_MESSAGE = 'Terminal not found';

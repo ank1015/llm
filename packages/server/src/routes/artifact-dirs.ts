@@ -4,21 +4,16 @@ import {
   ArtifactRawFileQuerySchema,
   CreateArtifactDirRequestSchema,
   DeleteArtifactPathQuerySchema,
-  InstallArtifactSkillRequestSchema,
   RenameArtifactDirRequestSchema,
   RenameArtifactPathRequestSchema,
-} from '@ank1015/llm-app-contracts';
+  UpdateArtifactFileRequestSchema,
+} from '../contracts/index.js';
 import { Hono } from 'hono';
 
 import { ArtifactDir } from '../core/index.js';
 import { sessionRunRegistry } from '../core/session/run-registry.js';
 import { terminalRegistry } from '../core/terminal/terminal-registry.js';
-import {
-  toArtifactDirDto,
-  toDeleteArtifactSkillResponse,
-  toInstalledSkillDto,
-  toTerminalSummaryDto,
-} from '../http/contracts.js';
+import { toArtifactDirDto, toTerminalSummaryDto } from '../http/contracts.js';
 import { readJsonBody, validateSchema } from '../http/validation.js';
 
 import type {
@@ -33,20 +28,17 @@ import type {
   CreateArtifactDirRequest,
   DeleteArtifactPathQuery,
   DeleteArtifactPathResponse,
-  DeleteArtifactSkillResponse,
-  InstallArtifactSkillRequest,
-  InstalledSkillDto,
   RenameArtifactDirRequest,
   RenameArtifactPathRequest,
   RenameArtifactPathResponse,
   TerminalConflictResponse,
-} from '@ank1015/llm-app-contracts';
+  UpdateArtifactFileRequest,
+} from '../contracts/index.js';
 
 const BASE = '/projects/:projectId/artifacts';
 const NOT_FOUND_MSG = 'Artifact directory not found';
 const FILE_READ_DEFAULT_MAX_BYTES = 200_000;
 const PATH_QUERY_REQUIRED_MESSAGE = 'path query parameter is required';
-const SKILL_NAME_REQUIRED_MESSAGE = 'skillName is required';
 const NOT_FOUND_IN_PROJECT_FRAGMENT = 'not found in project';
 const INVALID_PATH_MESSAGE = 'Invalid path';
 const INVALID_REQUEST_BODY_MESSAGE = 'Invalid request body';
@@ -185,20 +177,6 @@ artifactDirRoutes.get(`${BASE}/:artifactDirId/files`, async (c) => {
   }
 });
 
-/** GET /api/projects/:projectId/artifacts/:artifactDirId/skills — List installed artifact skills */
-artifactDirRoutes.get(`${BASE}/:artifactDirId/skills`, async (c) => {
-  const { projectId, artifactDirId } = c.req.param();
-
-  try {
-    const dir = await ArtifactDir.getById(projectId, artifactDirId);
-    const skills = await dir.listInstalledSkills();
-    return c.json<InstalledSkillDto[]>(skills.map(toInstalledSkillDto));
-  } catch (e) {
-    const message = e instanceof Error ? e.message : NOT_FOUND_MSG;
-    return c.json({ error: message }, 404);
-  }
-});
-
 /** GET /api/projects/:projectId/artifacts/:artifactDirId/explorer — List one directory level */
 artifactDirRoutes.get(`${BASE}/:artifactDirId/explorer`, async (c) => {
   const { projectId, artifactDirId } = c.req.param();
@@ -267,6 +245,44 @@ artifactDirRoutes.get(`${BASE}/:artifactDirId/file`, async (c) => {
   }
 });
 
+/** PATCH /api/projects/:projectId/artifacts/:artifactDirId/file — Update a text file */
+artifactDirRoutes.patch(`${BASE}/:artifactDirId/file`, async (c) => {
+  const { projectId, artifactDirId } = c.req.param();
+  const rawBody = await readJsonBody(c);
+  if (rawBody !== undefined) {
+    const validation = validateSchema(
+      c,
+      UpdateArtifactFileRequestSchema,
+      rawBody,
+      INVALID_REQUEST_BODY_MESSAGE
+    );
+    if (!validation.ok) {
+      return validation.response;
+    }
+  }
+
+  const body = (rawBody ?? {}) as UpdateArtifactFileRequest;
+  const path = body.path?.trim() ?? '';
+  const content = body.content;
+
+  if (!path) {
+    return c.json({ error: 'path is required' }, 400);
+  }
+  if (typeof content !== 'string') {
+    return c.json({ error: 'content is required' }, 400);
+  }
+
+  try {
+    const dir = await ArtifactDir.getById(projectId, artifactDirId);
+    const file = await dir.writeArtifactFile(path, content);
+    return c.json<ArtifactFileDto>(file);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Failed to update artifact file';
+    const status = classifyFileWriteErrorStatus(message);
+    return c.json({ error: message }, status);
+  }
+});
+
 /** GET /api/projects/:projectId/artifacts/:artifactDirId/file/raw?path=... — Read raw file bytes */
 artifactDirRoutes.get(`${BASE}/:artifactDirId/file/raw`, async (c) => {
   const { projectId, artifactDirId } = c.req.param();
@@ -302,60 +318,6 @@ artifactDirRoutes.get(`${BASE}/:artifactDirId/file/raw`, async (c) => {
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Failed to read raw artifact file';
     const status = classifyFileReadErrorStatus(message);
-    return c.json({ error: message }, status);
-  }
-});
-
-/** POST /api/projects/:projectId/artifacts/:artifactDirId/skills — Install a bundled skill */
-artifactDirRoutes.post(`${BASE}/:artifactDirId/skills`, async (c) => {
-  const { projectId, artifactDirId } = c.req.param();
-  const rawBody = await readJsonBody(c);
-  if (rawBody !== undefined) {
-    const validation = validateSchema(
-      c,
-      InstallArtifactSkillRequestSchema,
-      rawBody,
-      INVALID_REQUEST_BODY_MESSAGE
-    );
-    if (!validation.ok) {
-      return validation.response;
-    }
-  }
-
-  const body = rawBody as InstallArtifactSkillRequest | undefined;
-  const skillName = body?.skillName?.trim() ?? '';
-
-  if (!skillName) {
-    return c.json({ error: SKILL_NAME_REQUIRED_MESSAGE }, 400);
-  }
-
-  try {
-    const dir = await ArtifactDir.getById(projectId, artifactDirId);
-    const skill = await dir.installSkill(skillName);
-    return c.json<InstalledSkillDto>(toInstalledSkillDto(skill));
-  } catch (e) {
-    const message = e instanceof Error ? e.message : 'Failed to install skill';
-    const status = classifySkillErrorStatus(message);
-    return c.json({ error: message }, status);
-  }
-});
-
-/** DELETE /api/projects/:projectId/artifacts/:artifactDirId/skills/:skillName — Remove an installed skill */
-artifactDirRoutes.delete(`${BASE}/:artifactDirId/skills/:skillName`, async (c) => {
-  const { projectId, artifactDirId, skillName: rawSkillName } = c.req.param();
-  const skillName = rawSkillName?.trim() ?? '';
-
-  if (!skillName) {
-    return c.json({ error: SKILL_NAME_REQUIRED_MESSAGE }, 400);
-  }
-
-  try {
-    const dir = await ArtifactDir.getById(projectId, artifactDirId);
-    await dir.deleteSkill(skillName);
-    return c.json<DeleteArtifactSkillResponse>(toDeleteArtifactSkillResponse(skillName));
-  } catch (e) {
-    const message = e instanceof Error ? e.message : 'Failed to delete skill';
-    const status = classifySkillErrorStatus(message);
     return c.json({ error: message }, status);
   }
 });
@@ -497,6 +459,24 @@ function classifyFileReadErrorStatus(message: string): 400 | 404 | 500 {
   return 500;
 }
 
+function classifyFileWriteErrorStatus(message: string): 400 | 404 | 500 {
+  if (
+    message === NOT_FOUND_MSG ||
+    message.includes(NOT_FOUND_IN_PROJECT_FRAGMENT) ||
+    message.includes('not found')
+  ) {
+    return 404;
+  }
+  if (
+    message === INVALID_PATH_MESSAGE ||
+    message.includes('Path is required') ||
+    message.includes('not a file')
+  ) {
+    return 400;
+  }
+  return 500;
+}
+
 function classifyPathMutationErrorStatus(message: string): 400 | 404 | 409 | 500 {
   if (
     message === NOT_FOUND_MSG ||
@@ -534,20 +514,6 @@ function classifyArtifactDirRenameErrorStatus(message: string): 404 | 409 | 500 
     return 409;
   }
 
-  return 500;
-}
-
-function classifySkillErrorStatus(message: string): 400 | 404 | 500 {
-  if (
-    message === NOT_FOUND_MSG ||
-    message.includes(NOT_FOUND_IN_PROJECT_FRAGMENT) ||
-    message.includes('not found')
-  ) {
-    return 404;
-  }
-  if (message === SKILL_NAME_REQUIRED_MESSAGE || message.startsWith('Unknown bundled skill')) {
-    return 400;
-  }
   return 500;
 }
 
