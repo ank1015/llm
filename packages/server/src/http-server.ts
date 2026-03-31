@@ -1,15 +1,18 @@
-import { AttachTerminalQuerySchema, TerminalClientMessageSchema } from '@ank1015/llm-app-contracts';
 import { createAdaptorServer } from '@hono/node-server';
 import { Value } from '@sinclair/typebox/value';
 import { WebSocket, WebSocketServer } from 'ws';
 
+import {
+  AttachTerminalQuerySchema,
+  TerminalClientMessageSchema,
+} from './contracts/index.js';
 import { terminalRegistry } from './core/terminal/terminal-registry.js';
 
 import type {
   AttachTerminalQuery,
   TerminalClientMessage,
   TerminalServerMessage,
-} from '@ank1015/llm-app-contracts';
+} from './contracts/index.js';
 import type { Hono } from 'hono';
 import type { IncomingMessage } from 'node:http';
 import type { Duplex } from 'node:stream';
@@ -226,3 +229,10 @@ export function createHttpServer(app: Hono): ReturnType<typeof createAdaptorServ
 
   return server;
 }
+
+export {
+  attachTerminalSocket,
+  parseTerminalClientMessage,
+  parseTerminalSocketRequest,
+  writeUpgradeError,
+};
