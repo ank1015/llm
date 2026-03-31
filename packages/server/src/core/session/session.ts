@@ -1,16 +1,18 @@
 import { randomUUID } from 'node:crypto';
-import { join } from 'node:path';
+import { appendFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 
 import { createAllTools, createSystemPrompt } from '@ank1015/llm-agents';
-import { complete, Conversation, createSessionManager, getModel } from '@ank1015/llm-sdk';
-import { createFileSessionsAdapter, createFileKeysAdapter } from '@ank1015/llm-sdk-adapters';
+import { agent, getText, llm, userMessage } from '@ank1015/llm-sdk';
+import {
+  createSession as createSdkSession,
+  readSession,
+} from '@ank1015/llm-sdk/session';
 
 import { ArtifactDir } from '../artifact-dir/artifact-dir.js';
 import { getConfig } from '../config.js';
 import { Project } from '../project/project.js';
-import { ensureDir, readMetadata, writeMetadata, pathExists, removeDir } from '../storage/fs.js';
-import { createProviderOptions } from '../utils.js';
-
+import { ensureDir, pathExists } from '../storage/fs.js';
 import {
   buildPromptUserMessage,
   cloneUserMessage,
@@ -18,362 +20,469 @@ import {
 } from './user-message.js';
 
 import type {
-  CreateSessionOptions,
-  PromptInput,
-  ReasoningLevel,
-  SessionMetadata,
-} from '../types.js';
-import type {
   AgentEvent,
+  AgentResult,
+  AgentRun,
   AgentTool,
-  Api,
-  BaseAssistantMessage,
-  ConversationExternalCallback,
+  CuratedModelId,
   Message,
-  MessageNode,
-  Provider,
-  Session as StoredSession,
-  SessionManager,
-  SessionNode,
-  SessionSummary,
+  ReasoningEffort,
   UserMessage,
 } from '@ank1015/llm-sdk';
+import type {
+  Session as StoredSession,
+  SessionHeaderNode,
+  SessionMessageNode as StoredMessageNode,
+  SessionNode as StoredSessionNode,
+  SessionNodeSaver,
+} from '@ank1015/llm-sdk/session';
+import type {
+  CreateSessionOptions,
+  PromptInput,
+  SessionHeaderMetadata,
+  SessionMessageNode,
+  SessionMetadata,
+  SessionSummary,
+} from '../../types/index.js';
 
-/**
- * Manages sessions within an artifact directory.
- *
- * Each session has two storage locations:
- * - JSONL file (via SDK SessionManager): conversation messages
- *     ~/.llm/projects/{projectId}/artifacts/{artifactDirId}/sessions/{projectId}/{sessionId}.jsonl
- * - metadata.json: session config (api, modelId, name)
- *     ~/.llm/projects/{projectId}/artifacts/{artifactDirId}/sessions/meta/{sessionId}/metadata.json
- *
- * Uses the SDK's SessionManager + FileSessionsAdapter for persistence
- * and Conversation class for runtime LLM interaction.
- */
 type SessionExecutionConfig = {
-  api: Api;
-  modelId: string;
-  providerOptions: Record<string, unknown>;
+  modelId: CuratedModelId;
+  reasoningEffort: ReasoningEffort;
 };
 
 type PathContext = {
   branch: string;
   leafNodeId: string;
-  messageNodes: MessageNode[];
+  messageNodes: SessionMessageNode[];
   tree: StoredSession;
   persistedActiveBranch: string;
 };
 
-type PersistenceConfig = {
-  execution: SessionExecutionConfig;
-  branch: string;
-  initialParentId: string;
-  activateBranchOnFirstPersist?: boolean;
-  onNodePersisted?: (node: MessageNode) => void;
-};
-
 type StreamRunOptions = {
   onEvent: (event: AgentEvent) => void;
-  onNodePersisted?: (node: MessageNode) => void;
+  onNodePersisted?: (node: SessionMessageNode) => void;
   signal?: AbortSignal;
 };
 
+type SessionNodeSaverConfig = {
+  branch: string;
+  modelId: CuratedModelId;
+  activateBranchOnFirstPersist: boolean;
+  onNodePersisted?: (node: SessionMessageNode) => void;
+};
+
+type LegacyRecord = Record<string, unknown>;
+
+const DEFAULT_SESSION_NAME = 'Untitled Session';
 const DEFAULT_ACTIVE_BRANCH = 'main';
-const DEFAULT_REASONING_LEVEL: ReasoningLevel = 'high';
+const DEFAULT_REASONING_EFFORT: ReasoningEffort = 'high';
+const DEFAULT_NAMING_MODEL_ID = 'google/gemini-3-flash-preview' as const;
+
+function getSessionsBaseDir(projectId: string, artifactDirId: string): string {
+  const { dataRoot } = getConfig();
+  return join(dataRoot, projectId, 'artifacts', artifactDirId, 'sessions');
+}
+
+function getSessionFilePath(baseDir: string, sessionId: string): string {
+  return join(baseDir, `${sessionId}.jsonl`);
+}
+
+function getLegacySessionsDir(baseDir: string, projectId: string): string {
+  return join(baseDir, projectId);
+}
+
+function getLegacySessionFilePath(baseDir: string, projectId: string, sessionId: string): string {
+  return join(getLegacySessionsDir(baseDir, projectId), `${sessionId}.jsonl`);
+}
+
+async function resolveExistingSessionFilePath(
+  projectId: string,
+  artifactDirId: string,
+  sessionId: string
+): Promise<string | null> {
+  const baseDir = getSessionsBaseDir(projectId, artifactDirId);
+  const candidates = [
+    getSessionFilePath(baseDir, sessionId),
+    getLegacySessionFilePath(baseDir, projectId, sessionId),
+  ];
+
+  for (const candidate of candidates) {
+    if (await pathExists(candidate)) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+async function listSessionFilePaths(baseDir: string): Promise<string[]> {
+  const entries = await readdir(baseDir, { withFileTypes: true });
+  const directFiles = entries
+    .filter((entry) => entry.isFile() && isSessionFileName(entry.name))
+    .map((entry) => join(baseDir, entry.name));
+
+  const nestedFileGroups = await Promise.all(
+    entries
+      .filter((entry) => entry.isDirectory() && entry.name !== 'meta')
+      .map(async (entry) => {
+        const nestedDir = join(baseDir, entry.name);
+        const nestedEntries = await readdir(nestedDir, { withFileTypes: true });
+
+        return nestedEntries
+          .filter((nestedEntry) => nestedEntry.isFile() && isSessionFileName(nestedEntry.name))
+          .map((nestedEntry) => join(nestedDir, nestedEntry.name));
+      })
+  );
+
+  return [...directFiles, ...nestedFileGroups.flat()];
+}
+
+function normalizeSessionName(name: string | undefined): string {
+  const trimmed = name?.trim();
+  return trimmed ? trimmed : DEFAULT_SESSION_NAME;
+}
+
+function isSessionFileName(fileName: string): boolean {
+  return fileName.endsWith('.jsonl');
+}
+
+function getLegacyString(record: LegacyRecord, key: string): string | undefined {
+  const value = record[key];
+  return typeof value === 'string' ? value : undefined;
+}
+
+function resolveSessionModelId(session: StoredSession): CuratedModelId | null {
+  const headerRecord = session.header as SessionHeaderNode & LegacyRecord;
+  const headerMetadata = (headerRecord.metadata ?? {}) as LegacyRecord;
+
+  if (typeof headerMetadata['modelId'] === 'string') {
+    return headerMetadata['modelId'] as CuratedModelId;
+  }
+
+  if (typeof headerRecord['modelId'] === 'string') {
+    return headerRecord['modelId'] as CuratedModelId;
+  }
+
+  for (let index = session.nodes.length - 1; index >= 0; index -= 1) {
+    const node = session.nodes[index] as StoredSessionNode & LegacyRecord;
+    const metadata = (node.metadata ?? {}) as LegacyRecord;
+
+    if (typeof metadata['modelId'] === 'string') {
+      return metadata['modelId'] as CuratedModelId;
+    }
+
+    if (typeof node['modelId'] === 'string') {
+      return node['modelId'] as CuratedModelId;
+    }
+  }
+
+  return null;
+}
+
+function parseHeaderMetadata(
+  header: SessionHeaderNode,
+  fallbackModelId?: CuratedModelId | null
+): SessionHeaderMetadata {
+  const headerRecord = header as SessionHeaderNode & LegacyRecord;
+  const metadata = (header.metadata ?? {}) as LegacyRecord;
+  const modelId = metadata['modelId'];
+  const legacyModelId = getLegacyString(headerRecord, 'modelId');
+  const resolvedModelId =
+    typeof modelId === 'string'
+      ? (modelId as CuratedModelId)
+      : legacyModelId
+        ? (legacyModelId as CuratedModelId)
+        : fallbackModelId ?? null;
+
+  if (!resolvedModelId) {
+    throw new Error(`Session "${header.id}" is missing required header metadata "modelId"`);
+  }
+
+  return {
+    modelId: resolvedModelId,
+    activeBranch:
+      typeof metadata['activeBranch'] === 'string'
+        ? metadata['activeBranch']
+        : getLegacyString(headerRecord, 'branch')
+          ? (getLegacyString(headerRecord, 'branch') as string)
+        : DEFAULT_ACTIVE_BRANCH,
+  };
+}
+
+function toSessionMetadata(
+  header: SessionHeaderNode,
+  fallbackModelId?: CuratedModelId | null
+): SessionMetadata {
+  const headerRecord = header as SessionHeaderNode & LegacyRecord;
+  const metadata = parseHeaderMetadata(header, fallbackModelId);
+  const legacySessionName = getLegacyString(headerRecord, 'sessionName');
+  const legacyTimestamp = getLegacyString(headerRecord, 'timestamp');
+
+  return {
+    id: header.id,
+    name: header.title ?? legacySessionName ?? DEFAULT_SESSION_NAME,
+    modelId: metadata.modelId,
+    createdAt: header.createdAt ?? legacyTimestamp ?? new Date(0).toISOString(),
+    activeBranch: metadata.activeBranch ?? DEFAULT_ACTIVE_BRANCH,
+  };
+}
+
+function toSessionMessageNode(node: StoredMessageNode): SessionMessageNode {
+  return node as SessionMessageNode;
+}
+
+function serializeSession(session: StoredSession): string {
+  return [session.header, ...session.nodes].map((entry) => JSON.stringify(entry)).join('\n') + '\n';
+}
+
+async function rewriteSessionHeader(
+  path: string,
+  update: (header: SessionHeaderNode) => SessionHeaderNode
+): Promise<StoredSession> {
+  const session = await readSession(path);
+  if (!session) {
+    throw new Error(`Session not found: ${path}`);
+  }
+
+  session.header = update(session.header);
+  await writeFile(path, serializeSession(session), 'utf8');
+  return session;
+}
+
+async function appendSessionEntry(path: string, node: StoredSessionNode): Promise<void> {
+  await ensureDir(dirname(path));
+  await appendFile(path, `${JSON.stringify(node)}\n`, 'utf8');
+}
+
+function findLatestNodeInBranch(
+  nodes: StoredSessionNode[],
+  branch: string
+): StoredSessionNode | undefined {
+  for (let index = nodes.length - 1; index >= 0; index -= 1) {
+    const node = nodes[index];
+    if (node?.branch === branch) {
+      return node;
+    }
+  }
+
+  return undefined;
+}
+
+function fallbackGeneratedName(query: string): string {
+  const trimmed = query.trim();
+  return trimmed ? trimmed.slice(0, 50) : 'New chat';
+}
 
 export class Session {
-  private sessionManager: SessionManager;
-  /** projectName used in SessionManager (maps to our projectId) */
-  private readonly projectName: string;
-  /** Path where session metadata.json files live */
-  private readonly metaDir: string;
+  private readonly baseDir: string;
+  private readonly sessionPath: string;
 
   constructor(
     readonly projectId: string,
     readonly artifactDirId: string,
     readonly sessionId: string,
-    readonly api: Api,
-    readonly modelId: string
+    readonly modelId: CuratedModelId,
+    sessionPath?: string
   ) {
-    const { dataRoot } = getConfig();
-    const baseDir = join(dataRoot, projectId, 'artifacts', artifactDirId, 'sessions');
-
-    this.projectName = projectId;
-    this.metaDir = join(baseDir, 'meta', sessionId);
-
-    const sessionsAdapter = createFileSessionsAdapter(baseDir);
-    this.sessionManager = createSessionManager(sessionsAdapter);
+    this.baseDir = getSessionsBaseDir(projectId, artifactDirId);
+    this.sessionPath = sessionPath ?? getSessionFilePath(this.baseDir, sessionId);
   }
 
-  /**
-   * Create a new session in an artifact directory.
-   */
   static async create(
     projectId: string,
     artifactDirId: string,
     options: CreateSessionOptions
   ): Promise<Session> {
-    const { dataRoot } = getConfig();
-    const baseDir = join(dataRoot, projectId, 'artifacts', artifactDirId, 'sessions');
-    const sessionsAdapter = createFileSessionsAdapter(baseDir);
-    const sessionManager = createSessionManager(sessionsAdapter);
+    const baseDir = getSessionsBaseDir(projectId, artifactDirId);
+    const sessionId = randomUUID();
 
-    const api = options.api as Api;
-    const createInput = {
-      projectName: projectId,
-      ...(options.name !== null ? { sessionName: options.name } : {}),
-    };
-    const { sessionId } = await sessionManager.createSession(createInput);
-
-    // Write session metadata
-    const metaDir = join(baseDir, 'meta', sessionId);
-    await ensureDir(metaDir);
-
-    const metadata: SessionMetadata = {
+    await ensureDir(baseDir);
+    await createSdkSession({
       id: sessionId,
-      name: options.name ?? 'Untitled Session',
-      api: options.api,
-      modelId: options.modelId,
-      createdAt: new Date().toISOString(),
-      activeBranch: DEFAULT_ACTIVE_BRANCH,
-    };
-    await writeMetadata(metaDir, metadata);
+      path: getSessionFilePath(baseDir, sessionId),
+      title: normalizeSessionName(options.name),
+      metadata: {
+        modelId: options.modelId,
+        activeBranch: DEFAULT_ACTIVE_BRANCH,
+      },
+    });
 
-    return new Session(projectId, artifactDirId, sessionId, api, options.modelId);
+    return new Session(projectId, artifactDirId, sessionId, options.modelId);
   }
 
-  /**
-   * Load an existing session by ID.
-   * Reads metadata to reconstruct the Session with correct api/modelId.
-   */
   static async getById(
     projectId: string,
     artifactDirId: string,
     sessionId: string
   ): Promise<Session> {
-    const { dataRoot } = getConfig();
-    const baseDir = join(dataRoot, projectId, 'artifacts', artifactDirId, 'sessions');
-    const metaDir = join(baseDir, 'meta', sessionId);
-
-    if (!(await pathExists(metaDir))) {
+    const sessionPath = await resolveExistingSessionFilePath(projectId, artifactDirId, sessionId);
+    if (!sessionPath) {
       throw new Error(`Session "${sessionId}" not found in artifact dir "${artifactDirId}"`);
     }
 
-    const metadata = await readMetadata<SessionMetadata>(metaDir);
-    return new Session(projectId, artifactDirId, sessionId, metadata.api as Api, metadata.modelId);
-  }
-
-  /**
-   * List all sessions in an artifact directory.
-   */
-  static async list(projectId: string, artifactDirId: string): Promise<SessionSummary[]> {
-    const { dataRoot } = getConfig();
-    const baseDir = join(dataRoot, projectId, 'artifacts', artifactDirId, 'sessions');
-    const sessionsAdapter = createFileSessionsAdapter(baseDir);
-    const sessionManager = createSessionManager(sessionsAdapter);
-
-    return sessionManager.listSessions(projectId);
-  }
-
-  /**
-   * Delete a session by removing its SDK data and metadata directory.
-   */
-  static async delete(projectId: string, artifactDirId: string, sessionId: string): Promise<void> {
-    const { dataRoot } = getConfig();
-    const baseDir = join(dataRoot, projectId, 'artifacts', artifactDirId, 'sessions');
-    const sessionsAdapter = createFileSessionsAdapter(baseDir);
-    const sessionManager = createSessionManager(sessionsAdapter);
-
-    await sessionManager.deleteSession(projectId, sessionId);
-
-    const metaDir = join(baseDir, 'meta', sessionId);
-    if (await pathExists(metaDir)) {
-      await removeDir(metaDir);
+    const session = await readSession(sessionPath);
+    if (!session) {
+      throw new Error(`Session "${sessionId}" not found in artifact dir "${artifactDirId}"`);
     }
-  }
 
-  /** Read this session's metadata */
-  async getMetadata(): Promise<SessionMetadata> {
-    const metadata = await readMetadata<SessionMetadata>(this.metaDir);
-    return {
-      ...metadata,
-      activeBranch: metadata.activeBranch ?? DEFAULT_ACTIVE_BRANCH,
-    };
-  }
-
-  /**
-   * Update the session name.
-   * Updates both the SDK session (JSONL header) and our metadata.json.
-   */
-  async updateName(name: string): Promise<void> {
-    // Update SDK session name
-    await this.sessionManager.updateSessionName(this.projectName, this.sessionId, name);
-
-    // Update our metadata.json
-    const metadata = await this.getMetadata();
-    metadata.name = name;
-    await writeMetadata(this.metaDir, metadata);
-  }
-
-  /**
-   * Generate a descriptive session name from the user's first message using an LLM.
-   * Uses a cheap/fast model (Gemini Flash) to generate a 2-6 word topic name.
-   * Falls back to a truncated version of the query if the LLM call fails.
-   */
-  async generateName(query: string): Promise<string> {
-    const namingModel = getModel(
-      'google',
-      'gemini-3-flash-preview' as Parameters<typeof getModel<'google'>>[1]
+    const modelId = resolveSessionModelId(session);
+    return new Session(
+      projectId,
+      artifactDirId,
+      sessionId,
+      parseHeaderMetadata(session.header, modelId).modelId,
+      sessionPath
     );
-    if (!namingModel) {
-      // Fallback: use first 50 chars of query
-      const fallback = query.slice(0, 50).trim() || 'New chat';
-      await this.updateName(fallback);
-      return fallback;
+  }
+
+  static async list(projectId: string, artifactDirId: string): Promise<SessionSummary[]> {
+    const baseDir = getSessionsBaseDir(projectId, artifactDirId);
+    if (!(await pathExists(baseDir))) {
+      return [];
     }
 
-    const keysAdapter = createFileKeysAdapter();
-
-    try {
-      const response: BaseAssistantMessage<Api> = await complete(
-        namingModel,
-        {
-          messages: [
-            {
-              role: 'user' as const,
-              id: 'name-req',
-              content: [{ type: 'text' as const, content: query }],
-            },
-          ],
-          systemPrompt:
-            "You are a conversation naming assistant. Given the user's first message, generate a short, descriptive topic name (2-6 words) for the conversation. Reply with ONLY the topic name, nothing else. No quotes, no punctuation at the end, no explanation.",
-        },
-        { keysAdapter }
-      );
-
-      // Extract text from the response content blocks
-      let generatedName = 'New chat';
-      for (const block of response.content) {
-        if (block.type === 'response') {
-          const responseBlock = block as {
-            type: string;
-            content: Array<{ type: string; content: string }>;
-          };
-          for (const part of responseBlock.content) {
-            if (part.type === 'text' && part.content.trim()) {
-              generatedName = part.content.trim();
-              break;
-            }
+    const sessionPaths = await listSessionFilePaths(baseDir);
+    const summaries = await Promise.all(
+      sessionPaths.map(async (sessionPath): Promise<SessionSummary | null> => {
+        try {
+          const [session, fileStats] = await Promise.all([readSession(sessionPath), stat(sessionPath)]);
+          if (!session) {
+            return null;
           }
-          break;
-        }
-      }
 
-      await this.updateName(generatedName);
-      return generatedName;
-    } catch {
-      // Fallback: use first 50 chars of query
-      const fallback = query.slice(0, 50).trim() || 'New chat';
-      await this.updateName(fallback);
-      return fallback;
+          const headerRecord = session.header as SessionHeaderNode & LegacyRecord;
+          const summaryTimestamp =
+            session.header.createdAt ??
+            getLegacyString(headerRecord, 'timestamp') ??
+            fileStats.mtime.toISOString();
+          const summaryName =
+            session.header.title ??
+            getLegacyString(headerRecord, 'sessionName') ??
+            DEFAULT_SESSION_NAME;
+
+          return {
+            sessionId: session.header.id,
+            sessionName: summaryName,
+            createdAt: summaryTimestamp,
+            updatedAt: fileStats.mtime.toISOString(),
+            nodeCount: session.nodes.length,
+          };
+        } catch {
+          return null;
+        }
+      })
+    );
+
+    return summaries
+      .filter((summary): summary is SessionSummary => summary !== null)
+      .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+  }
+
+  static async delete(projectId: string, artifactDirId: string, sessionId: string): Promise<void> {
+    const sessionPath = await resolveExistingSessionFilePath(projectId, artifactDirId, sessionId);
+    if (sessionPath) {
+      await rm(sessionPath, { force: true });
     }
   }
 
-  /**
-   * Send a message and get the LLM's response.
-   *
-   * Flow:
-   * 1. Load message history from session file
-   * 2. Create a Conversation instance, populate with history
-   * 3. Call conversation.prompt() — runs full agent loop
-   * 4. Save all new messages back to session file
-   * 5. Return the new messages
-   */
+  async getMetadata(): Promise<SessionMetadata> {
+    const session = await this.getStoredSession();
+    return toSessionMetadata(session.header, resolveSessionModelId(session));
+  }
+
+  async updateName(name: string): Promise<void> {
+    await rewriteSessionHeader(this.sessionPath, (header) => ({
+      ...header,
+      title: name,
+    }));
+  }
+
+  async generateName(query: string): Promise<string> {
+    try {
+      const response = await llm({
+        modelId: DEFAULT_NAMING_MODEL_ID,
+        messages: [userMessage(query)],
+        system:
+          "You are a conversation naming assistant. Given the user's first message, generate a short, descriptive topic name (2-6 words) for the conversation. Reply with ONLY the topic name, nothing else. No quotes, no punctuation at the end, no explanation.",
+      });
+      const generatedName = getText(response).trim().replace(/^["']|["']$/g, '');
+      const nextName = generatedName || fallbackGeneratedName(query);
+
+      await this.updateName(nextName);
+      return nextName;
+    } catch {
+      const nextName = fallbackGeneratedName(query);
+      await this.updateName(nextName);
+      return nextName;
+    }
+  }
+
   async prompt(input: PromptInput): Promise<Message[]> {
-    const execution = this.resolveExecutionConfig(input);
-    const [context, agentConfig] = await Promise.all([
+    const [execution, context, agentConfig, nextUserMessage] = await Promise.all([
+      Promise.resolve(this.resolveExecutionConfig(input)),
       this.loadPathContext(input.leafNodeId),
       this.loadAgentConfig(),
+      this.createPromptUserMessage(input),
     ]);
-    const conversation = this.createConversation({
-      execution,
-      existingMessages: context.messageNodes.map((node) => node.message),
-      agentConfig,
-      streamAssistantMessage: false,
-    });
-    const userMessage = await this.createPromptUserMessage(input);
-    const newMessages = await conversation.promptMessage(userMessage);
-    const allNewMessages =
-      newMessages[0]?.role === 'user' ? newMessages : [userMessage, ...newMessages];
-    await this.saveMessages(allNewMessages, {
+
+    const newMessages = await this.runAgentTurn({
       execution,
       branch: context.branch,
-      initialParentId: context.leafNodeId,
+      headId: context.leafNodeId,
       activateBranchOnFirstPersist: context.branch !== context.persistedActiveBranch,
+      agentConfig,
+      userMessage: nextUserMessage,
     });
 
-    return allNewMessages;
+    return [nextUserMessage, ...newMessages];
   }
 
-  /**
-   * Send a message and stream the LLM's response via SSE events.
-   *
-   * Unlike `prompt()`, this method:
-   * - Streams events to the caller via `onEvent` callback
-   * - Saves messages incrementally via persistence callback
-   * - Supports cancellation via AbortSignal
-   */
   async streamPrompt(input: PromptInput, options: StreamRunOptions): Promise<Message[]> {
-    const execution = this.resolveExecutionConfig(input);
-    const [context, agentConfig] = await Promise.all([
+    const [execution, context, agentConfig, nextUserMessage] = await Promise.all([
+      Promise.resolve(this.resolveExecutionConfig(input)),
       this.loadPathContext(input.leafNodeId),
       this.loadAgentConfig(),
+      this.createPromptUserMessage(input),
     ]);
-    const userMessage = await this.createPromptUserMessage(input);
 
-    return this.runStreamingPrompt(
-      {
-        execution,
-        existingMessages: context.messageNodes.map((node) => node.message),
-        agentConfig,
-        userMessage,
-        persistence: {
-          execution,
-          branch: context.branch,
-          initialParentId: context.leafNodeId,
-          activateBranchOnFirstPersist: context.branch !== context.persistedActiveBranch,
-          ...(options.onNodePersisted ? { onNodePersisted: options.onNodePersisted } : {}),
-        },
-      },
-      options
-    );
+    const newMessages = await this.runAgentTurn({
+      execution,
+      branch: context.branch,
+      headId: context.leafNodeId,
+      activateBranchOnFirstPersist: context.branch !== context.persistedActiveBranch,
+      agentConfig,
+      userMessage: nextUserMessage,
+      options,
+    });
+
+    return [nextUserMessage, ...newMessages];
   }
 
-  /** Get the full message history for this session. */
   async getHistory(): Promise<Message[]> {
     const messageNodes = await this.getHistoryNodes();
     return messageNodes.map((node) => node.message);
   }
 
-  /** Get the full message history as MessageNode[] (includes metadata). */
-  async getHistoryNodes(): Promise<MessageNode[]> {
+  async getHistoryNodes(): Promise<SessionMessageNode[]> {
     const context = await this.loadPersistedPathContext();
     return context.messageNodes;
   }
 
   async getMessageTree(): Promise<{
-    nodes: MessageNode[];
+    nodes: SessionMessageNode[];
     persistedLeafNodeId: string | null;
     activeBranch: string;
   }> {
-    const [metadata, tree] = await Promise.all([this.getMetadata(), this.getSessionTree()]);
+    const [metadata, tree] = await Promise.all([this.getMetadata(), this.getStoredSession()]);
     const persistedActiveBranch = this.resolvePersistedActiveBranch(tree, metadata.activeBranch);
     const persistedContext = this.resolvePersistedPathContext(tree, persistedActiveBranch);
 
     return {
-      nodes: tree.nodes.filter((node): node is MessageNode => node.type === 'message'),
-      persistedLeafNodeId: persistedContext.messageNodes.at(-1)?.id ?? null,
+      nodes: tree.nodes
+        .filter((node): node is StoredMessageNode => node.type === 'message')
+        .map((node) => toSessionMessageNode(node)),
+      persistedLeafNodeId:
+        persistedContext.messageNodes[persistedContext.messageNodes.length - 1]?.id ?? null,
       activeBranch: persistedActiveBranch,
     };
   }
@@ -427,84 +536,84 @@ export class Session {
   }
 
   private resolveExecutionConfig(
-    input: Pick<PromptInput, 'api' | 'modelId' | 'reasoningLevel' | 'reasoning'>
+    input: Pick<PromptInput, 'modelId' | 'reasoningEffort'>
   ): SessionExecutionConfig {
-    const api = input.api ?? this.api;
-    const modelId = input.modelId ?? this.modelId;
-    const reasoningLevel = input.reasoningLevel ?? input.reasoning ?? DEFAULT_REASONING_LEVEL;
-
     return {
-      api,
-      modelId,
-      providerOptions: createProviderOptions(api, reasoningLevel),
+      modelId: input.modelId ?? this.modelId,
+      reasoningEffort: input.reasoningEffort ?? DEFAULT_REASONING_EFFORT,
     };
   }
 
-  /**
-   * Create a persistence callback that saves messages incrementally.
-   * Used by streamPrompt() to persist each message as it completes.
-   */
-  private createPersistenceCallback(config: PersistenceConfig): {
-    callback: ConversationExternalCallback;
-    nodes: MessageNode[];
-  } {
-    const nodes: MessageNode[] = [];
-    let parentIdPromise = Promise.resolve(config.initialParentId);
-    let didActivateBranch = !config.activateBranchOnFirstPersist;
+  private async runAgentTurn(input: {
+    execution: SessionExecutionConfig;
+    branch: string;
+    headId: string;
+    activateBranchOnFirstPersist: boolean;
+    agentConfig: { systemPrompt: string; tools: AgentTool[] };
+    userMessage: UserMessage;
+    options?: StreamRunOptions;
+  }): Promise<Message[]> {
+    const run = agent({
+      modelId: input.execution.modelId,
+      inputMessages: [input.userMessage],
+      system: input.agentConfig.systemPrompt,
+      tools: input.agentConfig.tools,
+      reasoningEffort: input.execution.reasoningEffort,
+      ...(input.options?.signal ? { signal: input.options.signal } : {}),
+      session: {
+        path: this.sessionPath,
+        branch: input.branch,
+        headId: input.headId,
+        saveNode: this.createSessionNodeSaver({
+          branch: input.branch,
+          modelId: input.execution.modelId,
+          activateBranchOnFirstPersist: input.activateBranchOnFirstPersist,
+          ...(input.options?.onNodePersisted
+            ? { onNodePersisted: input.options.onNodePersisted }
+            : {}),
+        }),
+      },
+    });
 
-    const callback: ConversationExternalCallback = async (message) => {
-      const parentId = await parentIdPromise;
-      const result = await this.sessionManager.appendMessage({
-        projectName: this.projectName,
-        path: '',
-        sessionId: this.sessionId,
-        parentId,
-        branch: config.branch,
-        message,
-        api: config.execution.api,
-        modelId: config.execution.modelId,
-        providerOptions: config.execution.providerOptions,
-      });
-      nodes.push(result.node);
-      parentIdPromise = Promise.resolve(result.node.id);
-      config.onNodePersisted?.(result.node);
+    const result = input.options?.onEvent
+      ? await this.collectStreamedRun(run, input.options.onEvent)
+      : await run;
 
-      if (!didActivateBranch) {
-        didActivateBranch = true;
-        await this.setActiveBranch(config.branch);
-      }
-    };
-
-    return { callback, nodes };
-  }
-
-  /**
-   * Save new messages to the session file.
-   * Finds the latest node to use as parentId, then appends each message sequentially.
-   */
-  private async saveMessages(messages: Message[], config: PersistenceConfig): Promise<void> {
-    let parentId = config.initialParentId;
-    let didActivateBranch = !config.activateBranchOnFirstPersist;
-
-    for (const message of messages) {
-      const result = await this.sessionManager.appendMessage({
-        projectName: this.projectName,
-        path: '',
-        sessionId: this.sessionId,
-        parentId,
-        branch: config.branch,
-        message,
-        api: config.execution.api,
-        modelId: config.execution.modelId,
-        providerOptions: config.execution.providerOptions,
-      });
-      parentId = result.node.id;
-
-      if (!didActivateBranch) {
-        didActivateBranch = true;
-        await this.setActiveBranch(config.branch);
-      }
+    if (!result.ok && result.error.phase !== 'aborted') {
+      throw new Error(result.error.message);
     }
+
+    return result.newMessages;
+  }
+
+  private createSessionNodeSaver(config: SessionNodeSaverConfig): SessionNodeSaver {
+    let didActivateBranch = !config.activateBranchOnFirstPersist;
+
+    return async ({ path, node }) => {
+      let persistedNode: StoredSessionNode = node;
+
+      if (node.type === 'message') {
+        persistedNode = {
+          ...node,
+          metadata: {
+            ...(node.metadata ?? {}),
+            modelId: config.modelId,
+          },
+        };
+        Object.assign(node, persistedNode);
+      }
+
+      await appendSessionEntry(path, persistedNode);
+
+      if (!didActivateBranch) {
+        didActivateBranch = true;
+        await this.setActiveBranch(config.branch);
+      }
+
+      if (persistedNode.type === 'message') {
+        config.onNodePersisted?.(toSessionMessageNode(persistedNode));
+      }
+    };
   }
 
   private async streamRewriteFromUserMessage(input: {
@@ -527,9 +636,6 @@ export class Session {
     if (targetNode.message.role !== 'user') {
       throw new Error('Only user messages can be edited or retried');
     }
-    if (!targetNode.parentId) {
-      throw new Error('Cannot rewrite the root session node');
-    }
 
     const baseUserMessage =
       input.messageOverride !== undefined
@@ -538,111 +644,30 @@ export class Session {
     if (baseUserMessage.content.length === 0) {
       throw new Error('Edited message cannot be empty');
     }
-    const parentPathNodes = this.getMessagePathNodesToNode(context.tree, targetNode.parentId);
+
     const branch = this.createBranchName(input.branchPrefix);
-
-    return this.runStreamingPrompt(
-      {
-        execution,
-        existingMessages: parentPathNodes.map((node) => node.message),
-        agentConfig,
-        userMessage: baseUserMessage,
-        persistence: {
-          execution,
-          branch,
-          initialParentId: targetNode.parentId,
-          activateBranchOnFirstPersist: true,
-          ...(input.options.onNodePersisted
-            ? { onNodePersisted: input.options.onNodePersisted }
-            : {}),
-        },
-      },
-      input.options
-    );
-  }
-
-  private runStreamingPrompt(
-    input: {
-      execution: SessionExecutionConfig;
-      existingMessages: Message[];
-      agentConfig: { systemPrompt: string; tools: AgentTool[] };
-      userMessage: UserMessage;
-      persistence: PersistenceConfig;
-    },
-    options: StreamRunOptions
-  ): Promise<Message[]> {
-    const conversation = this.createConversation({
-      execution: input.execution,
-      existingMessages: input.existingMessages,
-      agentConfig: input.agentConfig,
-      streamAssistantMessage: true,
+    const newMessages = await this.runAgentTurn({
+      execution,
+      branch,
+      headId: targetNode.parentId,
+      activateBranchOnFirstPersist: true,
+      agentConfig,
+      userMessage: baseUserMessage,
+      options: input.options,
     });
 
-    const unsubscribe = conversation.subscribe((event) => options.onEvent(event));
-    const abortListener = (): void => {
-      conversation.abort();
-    };
-    if (options.signal) {
-      options.signal.addEventListener('abort', abortListener, { once: true });
-      if (options.signal.aborted) {
-        abortListener();
-      }
-    }
-
-    if (options.signal?.aborted) {
-      unsubscribe();
-      if (options.signal) {
-        options.signal.removeEventListener('abort', abortListener);
-      }
-      return Promise.reject(new Error('aborted'));
-    }
-
-    return conversation
-      .promptMessage(input.userMessage, this.createPersistenceCallback(input.persistence).callback)
-      .finally(() => {
-        unsubscribe();
-        if (options.signal) {
-          options.signal.removeEventListener('abort', abortListener);
-        }
-      });
+    return [baseUserMessage, ...newMessages];
   }
 
-  private createConversation(input: {
-    execution: SessionExecutionConfig;
-    existingMessages: Message[];
-    agentConfig: { systemPrompt: string; tools: AgentTool[] };
-    streamAssistantMessage: boolean;
-  }): Conversation {
-    const model = this.resolveModel(input.execution);
-    const keysAdapter = createFileKeysAdapter();
-    const conversation = new Conversation({
-      keysAdapter,
-      streamAssistantMessage: input.streamAssistantMessage,
-      initialState: {
-        messages: input.existingMessages,
-        tools: input.agentConfig.tools,
-      },
-    });
-
-    conversation.setProvider({
-      model,
-      providerOptions: input.execution.providerOptions,
-    } as Provider<Api>);
-    conversation.setSystemPrompt(input.agentConfig.systemPrompt);
-    conversation.setTools(input.agentConfig.tools);
-
-    return conversation;
-  }
-
-  private resolveModel(
-    execution: SessionExecutionConfig
-  ): NonNullable<ReturnType<typeof getModel>> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const model = getModel(execution.api, execution.modelId as any);
-    if (!model) {
-      throw new Error(`Model "${execution.modelId}" not found for API "${execution.api}"`);
+  private async collectStreamedRun(
+    run: AgentRun,
+    onEvent: (event: AgentEvent) => void
+  ): Promise<AgentResult> {
+    for await (const event of run) {
+      onEvent(event);
     }
-    return model;
+
+    return run;
   }
 
   private async loadPersistedPathContext(): Promise<PathContext> {
@@ -650,7 +675,7 @@ export class Session {
   }
 
   private async loadPathContext(leafNodeId?: string): Promise<PathContext> {
-    const [metadata, tree] = await Promise.all([this.getMetadata(), this.getSessionTree()]);
+    const [metadata, tree] = await Promise.all([this.getMetadata(), this.getStoredSession()]);
     const persistedActiveBranch = this.resolvePersistedActiveBranch(tree, metadata.activeBranch);
 
     if (leafNodeId) {
@@ -660,8 +685,8 @@ export class Session {
     return this.resolvePersistedPathContext(tree, persistedActiveBranch);
   }
 
-  private async getSessionTree(): Promise<StoredSession> {
-    const session = await this.sessionManager.getSession(this.projectName, this.sessionId);
+  private async getStoredSession(): Promise<StoredSession> {
+    const session = await readSession(this.sessionPath);
     if (!session) {
       throw new Error(`Session "${this.sessionId}" not found`);
     }
@@ -678,11 +703,16 @@ export class Session {
     tree: StoredSession,
     persistedActiveBranch: string
   ): PathContext {
-    const branchNodes = tree.nodes.filter((node) => node.branch === persistedActiveBranch);
-    const leafNode = branchNodes[branchNodes.length - 1];
+    const leafNode = findLatestNodeInBranch(tree.nodes, persistedActiveBranch);
 
     if (!leafNode) {
-      throw new Error(`Session "${this.sessionId}" has no nodes — cannot resolve active path`);
+      return {
+        branch: persistedActiveBranch,
+        leafNodeId: tree.header.id,
+        messageNodes: [],
+        tree,
+        persistedActiveBranch,
+      };
     }
 
     return {
@@ -719,10 +749,10 @@ export class Session {
     };
   }
 
-  private getMessagePathNodesToNode(tree: StoredSession, nodeId: string): MessageNode[] {
-    return this.getLineageToNode(tree, nodeId).filter(
-      (node): node is MessageNode => node.type === 'message'
-    );
+  private getMessagePathNodesToNode(tree: StoredSession, nodeId: string): SessionMessageNode[] {
+    return this.getLineageToNode(tree, nodeId)
+      .filter((node): node is StoredMessageNode => node.type === 'message')
+      .map((node) => toSessionMessageNode(node));
   }
 
   private async createPromptUserMessage(
@@ -741,9 +771,16 @@ export class Session {
     return !tree.nodes.some((node) => node.parentId === nodeId);
   }
 
-  private getLineageToNode(tree: StoredSession, nodeId: string): SessionNode[] {
-    const nodeMap = new Map<string, SessionNode>(tree.nodes.map((node) => [node.id, node]));
-    const lineage: SessionNode[] = [];
+  private getLineageToNode(
+    tree: StoredSession,
+    nodeId: string
+  ): Array<SessionHeaderNode | StoredSessionNode> {
+    if (nodeId === tree.header.id) {
+      return [tree.header];
+    }
+
+    const nodeMap = new Map<string, StoredSessionNode>(tree.nodes.map((node) => [node.id, node]));
+    const lineage: Array<SessionHeaderNode | StoredSessionNode> = [];
     let current = nodeMap.get(nodeId);
 
     if (!current) {
@@ -752,7 +789,9 @@ export class Session {
 
     while (current) {
       lineage.push(current);
-      if (current.parentId === null) {
+
+      if (current.parentId === tree.header.id) {
+        lineage.push(tree.header);
         break;
       }
 
@@ -771,10 +810,17 @@ export class Session {
   }
 
   private async setActiveBranch(branch: string): Promise<void> {
-    const metadata = await this.getMetadata();
-    await writeMetadata(this.metaDir, {
-      ...metadata,
-      activeBranch: branch,
+    await rewriteSessionHeader(this.sessionPath, (header) => {
+      const currentMetadata = parseHeaderMetadata(header, this.modelId);
+
+      return {
+        ...header,
+        metadata: {
+          ...(header.metadata ?? {}),
+          modelId: currentMetadata.modelId,
+          activeBranch: branch,
+        },
+      };
     });
   }
 }

@@ -11,7 +11,7 @@ import type {
   ImageContent,
   TextContent,
   UserMessage,
-} from '@ank1015/llm-sdk';
+} from '@ank1015/llm-core';
 
 export const USER_ARTIFACTS_DIR = '.max/user-artifacts';
 
