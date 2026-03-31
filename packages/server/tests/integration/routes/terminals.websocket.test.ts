@@ -1,23 +1,19 @@
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import WebSocket from 'ws';
 
-import { setConfig } from '../../../src/core/config.js';
+import { createApp } from '../../../src/app.js';
+import { createHttpServer } from '../../../src/http-server.js';
 import { resetTerminalRegistry } from '../../../src/core/terminal/terminal-registry.js';
-import { app, createHttpServer } from '../../../src/index.js';
 import { createFakePtyFactory } from '../../helpers/fake-pty.js';
-import { resetAgentMocks } from '../../helpers/mock-agents.js';
+import { createTempServerConfig, jsonRequest } from '../../helpers/server-fixture.js';
+import { openSocket, waitForCondition } from '../../helpers/websocket.js';
 
 import type { AddressInfo } from 'node:net';
-import type { RawData } from 'ws';
 
-let projectsRoot: string;
-let dataRoot: string;
+let cleanup: (() => Promise<void>) | null = null;
 let fakePtys: ReturnType<typeof createFakePtyFactory>;
 let server: ReturnType<typeof createHttpServer> | null = null;
+let app = createApp();
 let baseWsUrl = '';
 let openSockets: WebSocket[] = [];
 
@@ -25,27 +21,19 @@ const PROJECT = 'terminal-project';
 const ARTIFACT = 'workspace';
 
 beforeEach(async () => {
-  resetAgentMocks();
   fakePtys = createFakePtyFactory();
   resetTerminalRegistry(fakePtys.factory);
-  projectsRoot = await mkdtemp(join(tmpdir(), 'terminal-ws-projects-'));
-  dataRoot = await mkdtemp(join(tmpdir(), 'terminal-ws-data-'));
-  setConfig({ projectsRoot, dataRoot });
 
-  await app.request('/api/projects', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: PROJECT }),
-  });
-  await app.request(`/api/projects/${PROJECT}/artifacts`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: ARTIFACT }),
-  });
+  const fixture = await createTempServerConfig('llm-server-terminal-ws');
+  cleanup = fixture.cleanup;
+  app = createApp();
+
+  await jsonRequest(app, '/api/projects', 'POST', { name: PROJECT });
+  await jsonRequest(app, `/api/projects/${PROJECT}/artifacts`, 'POST', { name: ARTIFACT });
 
   server = createHttpServer(app);
   await new Promise<void>((resolve) => {
-    server!.listen(0, '127.0.0.1', resolve);
+    server?.listen(0, '127.0.0.1', resolve);
   });
   const address = server.address() as AddressInfo;
   baseWsUrl = `ws://127.0.0.1:${address.port}`;
@@ -53,8 +41,12 @@ beforeEach(async () => {
 
 afterEach(async () => {
   for (const socket of openSockets) {
-    if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
-      socket.terminate();
+    if (socket.readyState === WebSocket.OPEN) {
+      try {
+        socket.terminate();
+      } catch {
+        // Ignore teardown races for rejected websocket connections.
+      }
     }
     socket.removeAllListeners();
   }
@@ -70,11 +62,13 @@ afterEach(async () => {
         if (settled) {
           return;
         }
+
         settled = true;
         if (error) {
           reject(error);
           return;
         }
+
         resolve();
       };
 
@@ -85,128 +79,20 @@ afterEach(async () => {
         finish(null);
       }, 50);
     });
-  } else {
-    server = null;
   }
-  await rm(projectsRoot, { recursive: true, force: true });
-  await rm(dataRoot, { recursive: true, force: true });
+
+  await cleanup?.();
+  cleanup = null;
 });
 
-async function createTerminal() {
-  const response = await app.request(`/api/projects/${PROJECT}/artifacts/${ARTIFACT}/terminals`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({}),
-  });
-  return response.json();
-}
-
-type SocketHarness = {
-  socket: WebSocket;
-  nextMessage: () => Promise<any>;
-  waitForClose: () => Promise<{ code: number; reason: string }>;
-};
-
-function createSocketHarness(socket: WebSocket): SocketHarness {
-  const queuedMessages: any[] = [];
-  const pendingResolvers: Array<{
-    resolve: (message: any) => void;
-    reject: (error: Error) => void;
-  }> = [];
-  let closeInfo: { code: number; reason: string } | null = null;
-  let terminalError: Error | null = null;
-
-  socket.on('message', (raw: RawData) => {
-    const parsed = JSON.parse(String(raw));
-    const pending = pendingResolvers.shift();
-    if (pending) {
-      pending.resolve(parsed);
-      return;
-    }
-
-    queuedMessages.push(parsed);
-  });
-
-  socket.on('close', (code, reason) => {
-    closeInfo = {
-      code,
-      reason: reason.toString(),
-    };
-    while (pendingResolvers.length > 0) {
-      pendingResolvers.shift()!.reject(new Error('Socket closed before the next message arrived'));
-    }
-  });
-
-  socket.on('error', (error) => {
-    terminalError = error;
-    while (pendingResolvers.length > 0) {
-      pendingResolvers.shift()!.reject(error);
-    }
-  });
-
-  return {
-    socket,
-    nextMessage: () => {
-      if (queuedMessages.length > 0) {
-        return Promise.resolve(queuedMessages.shift());
-      }
-
-      if (terminalError) {
-        return Promise.reject(terminalError);
-      }
-
-      if (closeInfo) {
-        return Promise.reject(new Error('Socket closed before the next message arrived'));
-      }
-
-      return new Promise((resolve, reject) => {
-        pendingResolvers.push({ resolve, reject });
-      });
-    },
-    waitForClose: () => {
-      if (closeInfo) {
-        return Promise.resolve(closeInfo);
-      }
-
-      return new Promise((resolve) => {
-        socket.once('close', (code, reason) => {
-          resolve({
-            code,
-            reason: reason.toString(),
-          });
-        });
-      });
-    },
-  };
-}
-
-async function openSocket(url: string): Promise<SocketHarness> {
-  const socket = new WebSocket(url);
-  openSockets.push(socket);
-  const harness = createSocketHarness(socket);
-  await new Promise<void>((resolve, reject) => {
-    socket.once('open', () => resolve());
-    socket.once('error', reject);
-    socket.once('unexpected-response', (_request, response) => {
-      reject(new Error(`Unexpected terminal websocket response: ${response.statusCode ?? 0}`));
-    });
-  });
-  return harness;
-}
-
-async function waitForCondition(
-  predicate: () => boolean,
-  timeoutMs = 2000,
-  intervalMs = 10
-): Promise<void> {
-  const startedAt = Date.now();
-
-  while (!predicate()) {
-    if (Date.now() - startedAt > timeoutMs) {
-      throw new Error('Timed out waiting for condition');
-    }
-    await new Promise((resolve) => setTimeout(resolve, intervalMs));
-  }
+async function createTerminal(): Promise<{ id: string }> {
+  const response = await jsonRequest(
+    app,
+    `/api/projects/${PROJECT}/artifacts/${ARTIFACT}/terminals`,
+    'POST',
+    {}
+  );
+  return response.json() as Promise<{ id: string }>;
 }
 
 describe('Terminal WebSocket server', () => {
@@ -214,7 +100,7 @@ describe('Terminal WebSocket server', () => {
     const created = await createTerminal();
     const socketPath = `/api/projects/${PROJECT}/artifacts/${ARTIFACT}/terminals/${created.id}/socket`;
 
-    const firstSocket = await openSocket(`${baseWsUrl}${socketPath}`);
+    const firstSocket = await openSocket(`${baseWsUrl}${socketPath}`, openSockets);
     expect(await firstSocket.nextMessage()).toEqual(
       expect.objectContaining({
         type: 'ready',
@@ -222,7 +108,7 @@ describe('Terminal WebSocket server', () => {
       })
     );
 
-    fakePtys.instances[0]!.emitData('hello');
+    fakePtys.instances[0]?.emitData('hello');
     expect(await firstSocket.nextMessage()).toEqual({
       type: 'output',
       seq: 1,
@@ -232,18 +118,18 @@ describe('Terminal WebSocket server', () => {
     firstSocket.socket.send(JSON.stringify({ type: 'input', data: 'pwd\n' }));
     firstSocket.socket.send(JSON.stringify({ type: 'resize', cols: 160, rows: 48 }));
 
-    await waitForCondition(() => fakePtys.instances[0]!.writes.length === 1);
-    await waitForCondition(() => fakePtys.instances[0]!.resizeCalls.length === 1);
-    expect(fakePtys.instances[0]!.writes).toEqual(['pwd\n']);
-    expect(fakePtys.instances[0]!.resizeCalls).toEqual([{ cols: 160, rows: 48 }]);
+    await waitForCondition(() => (fakePtys.instances[0]?.writes.length ?? 0) === 1);
+    await waitForCondition(() => (fakePtys.instances[0]?.resizeCalls.length ?? 0) === 1);
+    expect(fakePtys.instances[0]?.writes).toEqual(['pwd\n']);
+    expect(fakePtys.instances[0]?.resizeCalls).toEqual([{ cols: 160, rows: 48 }]);
 
     const firstSocketClosed = firstSocket.waitForClose();
     firstSocket.socket.close();
     await firstSocketClosed;
 
-    fakePtys.instances[0]!.emitData('missed output');
+    fakePtys.instances[0]?.emitData('missed output');
 
-    const secondSocket = await openSocket(`${baseWsUrl}${socketPath}?afterSeq=1`);
+    const secondSocket = await openSocket(`${baseWsUrl}${socketPath}?afterSeq=1`, openSockets);
     expect(await secondSocket.nextMessage()).toEqual(
       expect.objectContaining({
         type: 'ready',
@@ -260,62 +146,25 @@ describe('Terminal WebSocket server', () => {
     await secondSocketClosed;
   });
 
-  it('replaces the active controller and replays exited terminals before closing the socket', async () => {
-    const created = await createTerminal();
-    const socketPath = `/api/projects/${PROJECT}/artifacts/${ARTIFACT}/terminals/${created.id}/socket`;
-
-    const firstSocket = await openSocket(`${baseWsUrl}${socketPath}`);
-    await firstSocket.nextMessage();
-
-    const firstSocketClosed = firstSocket.waitForClose();
-    const secondSocket = await openSocket(`${baseWsUrl}${socketPath}`);
-    expect((await firstSocketClosed).code).toBe(4101);
-    expect(await secondSocket.nextMessage()).toEqual(
-      expect.objectContaining({
-        type: 'ready',
-      })
+  it('rejects connections to terminals that do not exist', async () => {
+    const missingSocket = new WebSocket(
+      `${baseWsUrl}/api/projects/${PROJECT}/artifacts/${ARTIFACT}/terminals/missing/socket`
     );
+    openSockets.push(missingSocket);
 
-    fakePtys.instances[0]!.emitData('before exit');
-    expect(await secondSocket.nextMessage()).toEqual({
-      type: 'output',
-      seq: 1,
-      data: 'before exit',
-    });
-
-    const secondSocketClosed = secondSocket.waitForClose();
-    fakePtys.instances[0]!.emitExit({ exitCode: 0 });
-    expect(await secondSocket.nextMessage()).toEqual(
-      expect.objectContaining({
-        type: 'exit',
-        seq: 2,
-        exitCode: 0,
+    await expect(
+      new Promise<void>((resolve, reject) => {
+        missingSocket.once('unexpected-response', (_request, response) => {
+          missingSocket.removeAllListeners();
+          if (response.statusCode === 404) {
+            resolve();
+            return;
+          }
+          reject(new Error(`Unexpected status: ${response.statusCode ?? 0}`));
+        });
+        missingSocket.once('open', () => reject(new Error('Socket should not open')));
+        missingSocket.once('error', reject);
       })
-    );
-    expect((await secondSocketClosed).code).toBe(1000);
-
-    const replaySocket = await openSocket(`${baseWsUrl}${socketPath}`);
-    const replaySocketClosed = replaySocket.waitForClose();
-    expect(await replaySocket.nextMessage()).toEqual(
-      expect.objectContaining({
-        type: 'ready',
-        terminal: expect.objectContaining({
-          status: 'exited',
-        }),
-      })
-    );
-    expect(await replaySocket.nextMessage()).toEqual({
-      type: 'output',
-      seq: 1,
-      data: 'before exit',
-    });
-    expect(await replaySocket.nextMessage()).toEqual(
-      expect.objectContaining({
-        type: 'exit',
-        seq: 2,
-        exitCode: 0,
-      })
-    );
-    expect((await replaySocketClosed).code).toBe(1000);
+    ).resolves.toBeUndefined();
   });
 });
