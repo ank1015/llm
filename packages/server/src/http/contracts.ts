@@ -1,18 +1,21 @@
 import type {
   ArtifactDirMetadata,
-  BundledSkillEntry,
-  InstalledSkillEntry,
+  ArtifactCheckpoint,
+  ArtifactCheckpointDiffFile,
   ProjectMetadata,
+  SessionMessageNode,
   SessionMetadata,
+  SessionSummary,
   TerminalMetadata,
   TerminalSummary,
-} from '../core/index.js';
+} from '../types/index.js';
 import type {
   ArtifactDirDto,
+  ArtifactCheckpointDto,
+  ArtifactCheckpointDiffFileDto,
+  ArtifactCheckpointDiffResponse,
+  ArtifactCheckpointListResponse,
   ArtifactDirOverviewDto,
-  BundledSkillDto,
-  DeleteArtifactSkillResponse,
-  InstalledSkillDto,
   LiveRunSummaryDto,
   ProjectDto,
   SessionMetadataDto,
@@ -20,8 +23,8 @@ import type {
   SessionTreeResponse,
   TerminalMetadataDto,
   TerminalSummaryDto,
-} from '@ank1015/llm-app-contracts';
-import type { SessionSummary } from '@ank1015/llm-sdk';
+} from '../contracts/index.js';
+import type { LiveRunSummary } from '../core/session/run-registry.js';
 
 export function toProjectDto(project: ProjectMetadata): ProjectDto {
   return {
@@ -29,6 +32,7 @@ export function toProjectDto(project: ProjectMetadata): ProjectDto {
     name: project.name,
     description: project.description,
     projectImg: project.projectImg,
+    archived: project.archived,
     createdAt: project.createdAt,
   };
 }
@@ -39,6 +43,48 @@ export function toArtifactDirDto(artifactDir: ArtifactDirMetadata): ArtifactDirD
     name: artifactDir.name,
     description: artifactDir.description,
     createdAt: artifactDir.createdAt,
+  };
+}
+
+export function toArtifactCheckpointDto(checkpoint: ArtifactCheckpoint): ArtifactCheckpointDto {
+  return checkpoint;
+}
+
+export function toArtifactCheckpointListResponse(
+  result: {
+    hasRepository: boolean;
+    dirty: boolean;
+    headCommitHash: string | null;
+    checkpoints: ArtifactCheckpoint[];
+  }
+): ArtifactCheckpointListResponse {
+  return {
+    hasRepository: result.hasRepository,
+    dirty: result.dirty,
+    headCommitHash: result.headCommitHash,
+    checkpoints: result.checkpoints.map(toArtifactCheckpointDto),
+  };
+}
+
+export function toArtifactCheckpointDiffFileDto(
+  file: ArtifactCheckpointDiffFile
+): ArtifactCheckpointDiffFileDto {
+  return file;
+}
+
+export function toArtifactCheckpointDiffResponse(
+  result: {
+    hasRepository: boolean;
+    headCommitHash: string | null;
+    dirty: boolean;
+    files: ArtifactCheckpointDiffFile[];
+  }
+): ArtifactCheckpointDiffResponse {
+  return {
+    hasRepository: result.hasRepository,
+    headCommitHash: result.headCommitHash,
+    dirty: result.dirty,
+    files: result.files.map(toArtifactCheckpointDiffFileDto),
   };
 }
 
@@ -56,7 +102,6 @@ export function toSessionMetadataDto(session: SessionMetadata): SessionMetadataD
   return {
     id: session.id,
     name: session.name,
-    api: session.api,
     modelId: session.modelId,
     createdAt: session.createdAt,
     activeBranch: session.activeBranch,
@@ -73,33 +118,7 @@ export function toArtifactDirOverviewDto(
   };
 }
 
-function toSkillDto<T extends BundledSkillDto | InstalledSkillDto>(
-  skill: BundledSkillEntry | InstalledSkillEntry
-): T {
-  return {
-    name: skill.name,
-    description: skill.description,
-    ...(skill.helperProject ? { helperProject: skill.helperProject } : {}),
-  } as T;
-}
-
-export function toBundledSkillDto(skill: BundledSkillEntry): BundledSkillDto {
-  return toSkillDto<BundledSkillDto>(skill);
-}
-
-export function toInstalledSkillDto(skill: InstalledSkillEntry): InstalledSkillDto {
-  return toSkillDto<InstalledSkillDto>(skill);
-}
-
-export function toDeleteArtifactSkillResponse(skillName: string): DeleteArtifactSkillResponse {
-  return {
-    ok: true,
-    skillName,
-    deleted: true,
-  };
-}
-
-export function toLiveRunSummaryDto(summary: LiveRunSummaryDto): LiveRunSummaryDto {
+export function toLiveRunSummaryDto(summary: LiveRunSummary): LiveRunSummaryDto {
   return summary;
 }
 
@@ -113,11 +132,11 @@ export function toTerminalMetadataDto(metadata: TerminalMetadata): TerminalMetad
 
 export function toSessionTreeResponse(
   tree: {
-    nodes: SessionTreeResponse['nodes'];
+    nodes: SessionMessageNode[];
     persistedLeafNodeId: string | null;
     activeBranch: string;
   },
-  liveRun?: LiveRunSummaryDto | null
+  liveRun?: LiveRunSummary | null
 ): SessionTreeResponse {
   return {
     nodes: tree.nodes,
