@@ -5,7 +5,7 @@ import { spawn as spawnPty } from 'node-pty';
 import { createPythonPtyFactory } from './python-pty.js';
 import { getTerminalShellLaunchConfig } from './shell.js';
 
-import type { CreateTerminalOptions, TerminalMetadata, TerminalSummary } from '../types.js';
+import type { CreateTerminalOptions, TerminalMetadata, TerminalSummary } from '../../types/index.js';
 import type {
   TerminalErrorMessage,
   TerminalExitMessage,
@@ -14,7 +14,7 @@ import type {
   TerminalReadyMessage,
   TerminalServerMessage,
   TerminalSummaryDto,
-} from '@ank1015/llm-app-contracts';
+} from '../../contracts/index.js';
 import type { IPty } from 'node-pty';
 
 const DEFAULT_COLS = 120;
