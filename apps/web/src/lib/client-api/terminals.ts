@@ -1,6 +1,6 @@
-import { apiRequestJson, SERVER_BASE } from './http';
+import { apiRequestJson, SERVER_BASE, toWebSocketUrl } from "./http";
 
-import type { ArtifactContext } from './projects';
+import type { ArtifactContext } from "./projects";
 import type {
   CreateTerminalRequest,
   DeleteTerminalResponse,
@@ -9,7 +9,7 @@ import type {
   TerminalResizeMessage,
   TerminalServerMessage,
   TerminalSummaryDto,
-} from '@ank1015/llm-app-contracts';
+} from "@ank1015/llm-server/contracts";
 
 function buildTerminalsBase(ctx: ArtifactContext): string {
   return `${SERVER_BASE}/api/projects/${encodeURIComponent(ctx.projectId)}/artifacts/${encodeURIComponent(ctx.artifactId)}/terminals`;
@@ -21,17 +21,20 @@ function buildTerminalPath(ctx: ArtifactContext, terminalId: string): string {
 
 function buildTerminalSocketUrl(input: OpenTerminalSocketRequest): string {
   const url = new URL(`${buildTerminalPath(input, input.terminalId)}/socket`);
-  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
 
-  if (typeof input.afterSeq === 'number' && Number.isFinite(input.afterSeq) && input.afterSeq > 0) {
-    url.searchParams.set('afterSeq', `${Math.floor(input.afterSeq)}`);
+  if (
+    typeof input.afterSeq === "number" &&
+    Number.isFinite(input.afterSeq) &&
+    input.afterSeq > 0
+  ) {
+    url.searchParams.set("afterSeq", `${Math.floor(input.afterSeq)}`);
   }
 
-  return url.toString();
+  return toWebSocketUrl(url.toString());
 }
 
 function parseTerminalServerMessage(rawData: unknown): TerminalServerMessage | null {
-  if (typeof rawData !== 'string') {
+  if (typeof rawData !== "string") {
     return null;
   }
 
@@ -42,7 +45,7 @@ function parseTerminalServerMessage(rawData: unknown): TerminalServerMessage | n
   }
 }
 
-type TerminalSocketHandlers = {
+export type TerminalSocketHandlers = {
   onOpen?: () => void;
   onMessage?: (message: TerminalServerMessage) => void;
   onClose?: (event: CloseEvent) => void;
@@ -56,49 +59,51 @@ export type OpenTerminalSocketRequest = ArtifactContext & {
 
 export type TerminalSocketConnection = {
   sendInput: (data: string) => void;
-  sendResize: (input: Pick<TerminalResizeMessage, 'cols' | 'rows'>) => void;
+  sendResize: (input: Pick<TerminalResizeMessage, "cols" | "rows">) => void;
   close: (code?: number, reason?: string) => void;
   readonly readyState: () => number;
 };
 
-export async function listTerminals(ctx: ArtifactContext): Promise<TerminalSummaryDto[]> {
+export async function listTerminals(
+  ctx: ArtifactContext,
+): Promise<TerminalSummaryDto[]> {
   return apiRequestJson<TerminalSummaryDto[]>(buildTerminalsBase(ctx), {
-    method: 'GET',
+    method: "GET",
   });
 }
 
 export async function createTerminal(
   ctx: ArtifactContext,
-  input?: CreateTerminalRequest
+  input?: CreateTerminalRequest,
 ): Promise<TerminalMetadataDto> {
   return apiRequestJson<TerminalMetadataDto>(buildTerminalsBase(ctx), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input ?? {}),
   });
 }
 
 export async function getTerminal(
   ctx: ArtifactContext,
-  terminalId: string
+  terminalId: string,
 ): Promise<TerminalMetadataDto> {
   return apiRequestJson<TerminalMetadataDto>(buildTerminalPath(ctx, terminalId), {
-    method: 'GET',
+    method: "GET",
   });
 }
 
 export async function deleteTerminal(
   ctx: ArtifactContext,
-  terminalId: string
+  terminalId: string,
 ): Promise<DeleteTerminalResponse> {
   return apiRequestJson<DeleteTerminalResponse>(buildTerminalPath(ctx, terminalId), {
-    method: 'DELETE',
+    method: "DELETE",
   });
 }
 
 export function openTerminalSocket(
   input: OpenTerminalSocketRequest,
-  handlers: TerminalSocketHandlers = {}
+  handlers: TerminalSocketHandlers = {},
 ): TerminalSocketConnection {
   const socket = new WebSocket(buildTerminalSocketUrl(input));
   const pendingMessages: TerminalClientMessage[] = [];
@@ -132,40 +137,40 @@ export function openTerminalSocket(
     socket.send(JSON.stringify(message));
   };
 
-  socket.addEventListener('open', () => {
+  socket.addEventListener("open", () => {
     flushPendingMessages();
     handlers.onOpen?.();
   });
 
-  socket.addEventListener('message', (event) => {
+  socket.addEventListener("message", (event) => {
     const parsed = parseTerminalServerMessage(event.data);
     if (!parsed) {
-      handlers.onError?.(new Error('Received an invalid terminal socket message.'));
+      handlers.onError?.(new Error("Received an invalid terminal socket message."));
       return;
     }
 
     handlers.onMessage?.(parsed);
   });
 
-  socket.addEventListener('close', (event) => {
+  socket.addEventListener("close", (event) => {
     closed = true;
     handlers.onClose?.(event);
   });
 
-  socket.addEventListener('error', () => {
-    handlers.onError?.(new Error('Terminal socket connection failed.'));
+  socket.addEventListener("error", () => {
+    handlers.onError?.(new Error("Terminal socket connection failed."));
   });
 
   return {
     sendInput: (data) => {
       sendMessage({
-        type: 'input',
+        type: "input",
         data,
       });
     },
     sendResize: ({ cols, rows }) => {
       sendMessage({
-        type: 'resize',
+        type: "resize",
         cols,
         rows,
       });
@@ -177,5 +182,3 @@ export function openTerminalSocket(
     readyState: () => socket.readyState,
   };
 }
-
-export type { TerminalSocketHandlers };
