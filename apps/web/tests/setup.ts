@@ -1,7 +1,7 @@
-import '@testing-library/jest-dom/vitest';
+import "@testing-library/jest-dom/vitest";
 
-import { cleanup } from '@testing-library/react';
-import { afterEach, vi } from 'vitest';
+import { cleanup } from "@testing-library/react";
+import { afterEach, vi } from "vitest";
 
 class MemoryStorage implements Storage {
   private readonly store = new Map<string, string>();
@@ -37,15 +37,15 @@ class ResizeObserverMock {
   disconnect() {}
 }
 
-if (!('ResizeObserver' in window)) {
-  Object.defineProperty(window, 'ResizeObserver', {
+if (!("ResizeObserver" in window)) {
+  Object.defineProperty(window, "ResizeObserver", {
     value: ResizeObserverMock,
     writable: true,
   });
 }
 
-if (!('matchMedia' in window)) {
-  Object.defineProperty(window, 'matchMedia', {
+if (!("matchMedia" in window)) {
+  Object.defineProperty(window, "matchMedia", {
     value: (query: string) => ({
       addEventListener: vi.fn(),
       addListener: vi.fn(),
@@ -62,13 +62,18 @@ if (!('matchMedia' in window)) {
 
 const localStorageMock = new MemoryStorage();
 
-Object.defineProperty(window, 'localStorage', {
+Object.defineProperty(window, "localStorage", {
   value: localStorageMock,
   writable: true,
 });
 
-Object.defineProperty(globalThis, 'localStorage', {
+Object.defineProperty(globalThis, "localStorage", {
   value: localStorageMock,
+  writable: true,
+});
+
+Object.defineProperty(globalThis, "IS_REACT_ACT_ENVIRONMENT", {
+  value: true,
   writable: true,
 });
 
