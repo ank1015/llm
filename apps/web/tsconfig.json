@@ -19,7 +19,9 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@ank1015/llm-server/contracts": ["../../packages/server/dist/contracts/index.d.ts"],
+      "@ank1015/llm-server": ["../../packages/server/dist/index.d.ts"]
     }
   },
   "include": [
@@ -27,8 +29,8 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
-    "**/*.mts",
-    ".next/dev/types/**/*.ts"
+    ".next/dev/types/**/*.ts",
+    "**/*.mts"
   ],
   "exclude": ["node_modules"]
 }
