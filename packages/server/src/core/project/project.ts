@@ -10,11 +10,12 @@ import {
   listDirs,
 } from '../storage/fs.js';
 
-import type { ProjectMetadata, CreateProjectInput } from '../types.js';
+import type { ProjectMetadata, CreateProjectInput } from '../../types/index.js';
 
-type StoredProjectMetadata = Omit<ProjectMetadata, 'description' | 'projectImg'> & {
+type StoredProjectMetadata = Omit<ProjectMetadata, 'description' | 'projectImg' | 'archived'> & {
   description?: string | null;
   projectImg?: string | null;
+  archived?: boolean;
 };
 
 /**
@@ -58,6 +59,7 @@ export class Project {
         name: input.name,
         description: input.description ?? null,
         projectImg: input.projectImg ?? null,
+        archived: false,
         projectPath,
         createdAt: new Date().toISOString(),
       };
@@ -130,6 +132,18 @@ export class Project {
     return nextMetadata;
   }
 
+  /** Toggle this project's archived flag. */
+  async toggleArchived(): Promise<ProjectMetadata> {
+    const metadata = await this.getMetadata();
+    const nextMetadata: ProjectMetadata = {
+      ...metadata,
+      archived: !metadata.archived,
+    };
+
+    await writeMetadata(this.dataPath, nextMetadata);
+    return nextMetadata;
+  }
+
   /** Update this project's display name without changing its stable id or paths. */
   async rename(name: string): Promise<ProjectMetadata> {
     const trimmedName = name.trim();
@@ -187,5 +201,6 @@ async function readProjectMetadata(dirPath: string): Promise<ProjectMetadata> {
     ...metadata,
     description: metadata.description ?? null,
     projectImg: metadata.projectImg ?? null,
+    archived: metadata.archived ?? false,
   };
 }

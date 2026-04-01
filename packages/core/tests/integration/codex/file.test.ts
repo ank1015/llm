@@ -4,15 +4,16 @@ import { fileURLToPath } from 'node:url';
 
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { complete } from '../../../src/llm/complete.js';
+import { streamCodex } from '../../../src/providers/codex';
 import { getModel } from '../../../src/models/index.js';
+import { describeIfAvailable } from '../helpers/live.js';
 
 import type {
   BaseAssistantMessage,
   CodexProviderOptions,
   Context,
   Model,
-} from '@ank1015/llm-types';
+} from '../../../src/types/index.js';
 
 const CODEX_HOME = path.join(process.env.HOME || '', '.codex');
 const CODEX_AUTH_PATH = path.join(CODEX_HOME, 'auth.json');
@@ -25,6 +26,7 @@ const auth = fs.existsSync(CODEX_AUTH_PATH)
 
 const accessToken = auth?.tokens?.access_token as string | undefined;
 const accountId = auth?.tokens?.account_id as string | undefined;
+const describeIfCodex = describeIfAvailable(Boolean(accessToken && accountId));
 
 function getResponseText(message: BaseAssistantMessage<'codex'>) {
   let text = '';
@@ -34,7 +36,7 @@ function getResponseText(message: BaseAssistantMessage<'codex'>) {
       continue;
     }
 
-    for (const item of block.content) {
+    for (const item of block.response) {
       if (item.type === 'text') {
         text += item.content;
       }
@@ -44,7 +46,7 @@ function getResponseText(message: BaseAssistantMessage<'codex'>) {
   return text.trim();
 }
 
-describe('Codex File Input Integration', () => {
+describeIfCodex('Codex File Input Integration', () => {
   let model: Model<'codex'>;
   let pdfBase64: string;
 
@@ -60,12 +62,6 @@ describe('Codex File Input Integration', () => {
   }
 
   beforeAll(() => {
-    if (!accessToken || !accountId) {
-      throw new Error(
-        'CODEX_API_KEY and CODEX_CHATGPT_ACCOUNT_ID environment variables are required for integration tests'
-      );
-    }
-
     if (!fs.existsSync(PDF_FIXTURE_PATH)) {
       throw new Error(`PDF fixture not found: ${PDF_FIXTURE_PATH}`);
     }
@@ -102,7 +98,7 @@ describe('Codex File Input Integration', () => {
       ],
     };
 
-    const result = await complete(model, context, getOptions(), 'codex-file-msg-1');
+    const result = await streamCodex(model, context, getOptions(), 'codex-file-msg-1').drain();
     const responseText = getResponseText(result);
 
     expect(result.stopReason).not.toBe('error');
@@ -173,7 +169,7 @@ describe('Codex File Input Integration', () => {
       ],
     };
 
-    const result = await complete(model, context, getOptions(), 'codex-tool-result-file-msg-1');
+    const result = await streamCodex(model, context, getOptions(), 'codex-tool-result-file-msg-1').drain();
     const responseText = getResponseText(result);
 
     expect(result.stopReason).not.toBe('error');

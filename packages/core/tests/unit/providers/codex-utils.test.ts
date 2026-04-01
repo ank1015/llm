@@ -9,7 +9,7 @@ import {
   rewriteCodexErrorBody,
 } from '../../../src/providers/codex/utils.js';
 
-import type { CodexProviderOptions, Context, Model, Tool, UserMessage } from '@ank1015/llm-types';
+import type { CodexProviderOptions, Context, Model, Tool, UserMessage } from '../../../src/types/index.js';
 
 describe('Codex Utils', () => {
   const mockModel: Model<'codex'> = {
@@ -119,7 +119,7 @@ describe('Codex Utils', () => {
       const result = buildParams(mockModel, context, defaultOptions);
 
       expect(result.tools).toBeDefined();
-      expect(result.tools?.[0]?.name).toBe('search');
+      expect((result.tools?.[0] as any).name).toBe('search');
     });
 
     it('should map context systemPrompt to instructions', () => {
@@ -190,6 +190,29 @@ describe('Codex Utils', () => {
           message: 'temperature is not supported',
           type: 'codex_backend_error',
           code: '400',
+        },
+      });
+    });
+
+    it('should preserve structured backend error codes and types', () => {
+      const rewritten = rewriteCodexErrorBody(
+        JSON.stringify({
+          error: {
+            type: 'usage_limit_reached',
+            message: 'The usage limit has been reached',
+            plan_type: 'pro',
+          },
+        }),
+        429
+      );
+      const parsed = JSON.parse(rewritten);
+
+      expect(parsed).toEqual({
+        error: {
+          type: 'usage_limit_reached',
+          code: '429',
+          message: 'The usage limit has been reached',
+          plan_type: 'pro',
         },
       });
     });

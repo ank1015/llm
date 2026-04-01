@@ -17,7 +17,7 @@ import type {
   Tool,
   ToolResultMessage,
   UserMessage,
-} from '@ank1015/llm-types';
+} from '../../../src/types/index.js';
 import type { Message as AnthropicMessage } from '@anthropic-ai/sdk/resources/messages.js';
 
 describe('Anthropic Utils', () => {
@@ -492,7 +492,7 @@ describe('Anthropic Utils', () => {
             content: [
               {
                 type: 'response',
-                content: [{ type: 'text', content: 'Hello from GPT!' }],
+                response: [{ type: 'text', content: 'Hello from GPT!' }],
               },
             ],
             usage: {
@@ -530,7 +530,7 @@ describe('Anthropic Utils', () => {
               },
               {
                 type: 'response',
-                content: [{ type: 'text', content: 'The answer is 42.' }],
+                response: [{ type: 'text', content: 'The answer is 42.' }],
               },
             ],
             usage: {
@@ -611,7 +611,7 @@ describe('Anthropic Utils', () => {
             content: [
               {
                 type: 'response',
-                content: [{ type: 'text', content: 'I will search for that.' }],
+                response: [{ type: 'text', content: 'I will search for that.' }],
               },
               {
                 type: 'toolCall',
@@ -652,7 +652,7 @@ describe('Anthropic Utils', () => {
             content: [
               {
                 type: 'response',
-                content: [{ type: 'text', content: `Hello ${unpaired} World` }],
+                response: [{ type: 'text', content: `Hello ${unpaired} World` }],
               },
             ],
             usage: {
@@ -683,7 +683,7 @@ describe('Anthropic Utils', () => {
             content: [
               {
                 type: 'response',
-                content: [{ type: 'text', content: '' }],
+                response: [{ type: 'text', content: '' }],
               },
             ],
             usage: {

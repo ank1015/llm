@@ -4,10 +4,11 @@ import { fileURLToPath } from 'node:url';
 
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { complete } from '../../../src/llm/complete.js';
+import { streamOpenAI } from '../../../src/providers/openai/index.js';
 import { getModel } from '../../../src/models/index.js';
+import { describeIfAvailable, getIntegrationEnv } from '../helpers/live.js';
 
-import type { BaseAssistantMessage, Context, Model } from '@ank1015/llm-types';
+import type { BaseAssistantMessage, Context, Model } from '../../../src/types/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PDF_FIXTURE_PATH = path.resolve(__dirname, '../../utils/research-paper.pdf');
@@ -20,7 +21,7 @@ function getResponseText(message: BaseAssistantMessage<'openai'>) {
       continue;
     }
 
-    for (const item of block.content) {
+    for (const item of block.response) {
       if (item.type === 'text') {
         text += item.content;
       }
@@ -30,16 +31,14 @@ function getResponseText(message: BaseAssistantMessage<'openai'>) {
   return text.trim();
 }
 
-describe('OpenAI File Input Integration', () => {
+const apiKey = getIntegrationEnv('OPENAI_API_KEY')!;
+const describeIfOpenAI = describeIfAvailable(Boolean(apiKey));
+
+describeIfOpenAI('OpenAI File Input Integration', () => {
   let model: Model<'openai'>;
   let pdfBase64: string;
-  const apiKey = process.env.OPENAI_API_KEY;
 
   beforeAll(() => {
-    if (!apiKey) {
-      throw new Error('OPENAI_API_KEY environment variable is required for integration tests');
-    }
-
     if (!fs.existsSync(PDF_FIXTURE_PATH)) {
       throw new Error(`PDF fixture not found: ${PDF_FIXTURE_PATH}`);
     }
@@ -76,7 +75,7 @@ describe('OpenAI File Input Integration', () => {
       ],
     };
 
-    const result = await complete(model, context, { apiKey }, 'openai-file-msg-1');
+    const result = await streamOpenAI(model, context, { apiKey }, 'openai-file-msg-1').drain();
     const responseText = getResponseText(result);
 
     expect(result.stopReason).not.toBe('error');
@@ -145,7 +144,7 @@ describe('OpenAI File Input Integration', () => {
       ],
     };
 
-    const result = await complete(model, context, { apiKey }, 'openai-tool-result-file-msg-1');
+    const result = await streamOpenAI(model, context, { apiKey }, 'openai-tool-result-file-msg-1').drain();
     const responseText = getResponseText(result);
 
     expect(result.stopReason).not.toBe('error');

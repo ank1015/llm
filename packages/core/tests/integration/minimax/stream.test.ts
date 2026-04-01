@@ -3,19 +3,18 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 import { getModel } from '../../../src/models/index.js';
 import { streamMinimax } from '../../../src/providers/minimax/stream.js';
+import { describeIfAvailable, getIntegrationEnv } from '../helpers/live.js';
 
-import type { BaseAssistantEvent, Context, Model } from '@ank1015/llm-types';
+import type { BaseAssistantEvent, Context, Model } from '../../../src/types/index.js';
 
-describe('MiniMax Stream Integration', () => {
+const apiKey = getIntegrationEnv('MINIMAX_API_KEY')!;
+const describeIfMiniMax = describeIfAvailable(Boolean(apiKey));
+
+describeIfMiniMax('MiniMax Stream Integration', () => {
   let model: Model<'minimax'>;
-  const apiKey = process.env.MINIMAX_API_KEY;
   const testModelId = 'MiniMax-M2.7-highspeed' as const;
 
   beforeAll(() => {
-    if (!apiKey) {
-      throw new Error('MINIMAX_API_KEY environment variable is required for integration tests');
-    }
-
     const testModel = getModel('minimax', testModelId);
     if (!testModel) {
       throw new Error(`Test model ${testModelId} not found`);

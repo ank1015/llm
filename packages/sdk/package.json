@@ -9,6 +9,42 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./agent": {
+      "types": "./dist/agent.d.ts",
+      "import": "./dist/agent.js"
+    },
+    "./config": {
+      "types": "./dist/config.d.ts",
+      "import": "./dist/config.js"
+    },
+    "./keys": {
+      "types": "./dist/keys.d.ts",
+      "import": "./dist/keys.js"
+    },
+    "./llm": {
+      "types": "./dist/llm.d.ts",
+      "import": "./dist/llm.js"
+    },
+    "./messages": {
+      "types": "./dist/messages.d.ts",
+      "import": "./dist/messages.js"
+    },
+    "./model-input": {
+      "types": "./dist/model-input.d.ts",
+      "import": "./dist/model-input.js"
+    },
+    "./response": {
+      "types": "./dist/response.d.ts",
+      "import": "./dist/response.js"
+    },
+    "./session": {
+      "types": "./dist/session.d.ts",
+      "import": "./dist/session.js"
+    },
+    "./tool": {
+      "types": "./dist/tool.d.ts",
+      "import": "./dist/tool.js"
     }
   },
   "files": [
@@ -18,7 +54,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "rm -rf dist *.tsbuildinfo && tsc",
+    "build": "node ../../scripts/remove-paths.mjs dist --tsbuildinfo && tsc",
     "dev": "tsc --watch",
     "test": "pnpm run test:unit && pnpm run test:integration",
     "test:watch": "vitest",
@@ -27,7 +63,7 @@
     "test:coverage": "vitest run tests/unit --coverage",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src tests vitest.config.ts",
-    "clean": "rm -rf dist coverage *.tsbuildinfo",
+    "clean": "node ../../scripts/remove-paths.mjs dist coverage --tsbuildinfo",
     "prepack": "pnpm run build",
     "prepublishOnly": "node ../../scripts/ensure-pnpm-publish.mjs"
   },
@@ -55,10 +91,10 @@
     "access": "public"
   },
   "dependencies": {
-    "@ank1015/llm-core": "workspace:^",
-    "@ank1015/llm-types": "workspace:^"
+    "@ank1015/llm-core": "workspace:^"
   },
   "devDependencies": {
+    "@types/node": "^24.6.0",
     "@sinclair/typebox": "^0.34.48",
     "vitest": "^2.1.0"
   }

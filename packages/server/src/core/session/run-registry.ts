@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
-import type { AgentEvent, MessageNode } from '@ank1015/llm-sdk';
+import type { AgentEvent } from '@ank1015/llm-sdk';
+import type { SessionMessageNode as MessageNode } from '../../types/index.js';
 
 export type SessionRunMode = 'prompt' | 'retry' | 'edit';
 export type SessionRunStatus = 'running' | 'completed' | 'failed' | 'cancelled';

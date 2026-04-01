@@ -1,6 +1,6 @@
 import { basename } from 'node:path';
 
-import type { ArtifactExplorerEntryType } from '../types.js';
+import type { ArtifactExplorerEntryType } from '../../types/index.js';
 
 export type IgnoreRule = {
   basePath: string;

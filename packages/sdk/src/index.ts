@@ -1,162 +1,51 @@
-/**
- * @ank1015/llm-sdk
- *
- * Unified SDK for LLM interactions with multiple providers.
- *
- * This package provides:
- * - Adapter-based credential and session contracts
- * - Conversation class for stateful agent interactions
- * - Session management for conversation persistence
- */
-
-// Adapter interfaces and types (implementations in @ank1015/llm-sdk-adapters)
-export type {
-  KeysAdapter,
-  SessionsAdapter,
-  CreateSessionInput,
-  AppendMessageInput,
-  AppendCustomInput,
-  SessionLocation,
-} from './adapters/index.js';
-
-// LLM functions
-export { complete, stream } from './llm/index.js';
-export type { CompleteOptions, StreamOptions } from './llm/index.js';
-
-// Utilities
-export { resolveApiKey, resolveProviderCredentials } from './utils/resolve-key.js';
-
-// Agent
-export { Conversation } from './agent/index.js';
-export type { ConversationExternalCallback, ConversationOptions } from './agent/index.js';
-
-// Session Manager
-export { SessionManager, createSessionManager } from './session/index.js';
-
-// Re-export everything from core
-export {
-  VERSION,
-  MODELS,
-  getProviders,
-  getModel,
-  getModels,
-  calculateCost,
-  EventStream,
-  AssistantMessageEventStream,
-  parseStreamingJson,
-  isContextOverflow,
-  getOverflowPatterns,
-  sanitizeSurrogates,
-  validateToolCall,
-  validateToolArguments,
-  generateUUID,
-  // Agent loop (from core)
-  runAgentLoop,
-  buildUserMessage,
-  buildToolResultMessage,
-  getMockMessage,
-  // Provider-specific functions
-  streamAnthropic,
-  streamOpenAI,
-  streamGoogle,
-  GoogleThinkingLevel,
-  streamDeepSeek,
-  streamZai,
-  streamKimi,
-} from '@ank1015/llm-core';
+export { agent, AgentInputError, AgentRunConsumptionError } from './agent.js';
+export { llm, LlmInputError, LlmRunConsumptionError } from './llm.js';
+export { toolResultMessage, userMessage } from './messages.js';
+export { getText, getThinking, getToolCalls } from './response.js';
+export { CuratedModelIds, ReasoningEfforts, isCuratedModelId } from './model-input.js';
+export { tool } from './tool.js';
 
 export type {
-  CompleteFunction,
-  StreamFunction,
-  AgentRunnerConfig,
-  AgentRunnerCallbacks,
-  AgentEventEmitter,
-  AgentRunnerResult,
-  AgentCompleteFunction,
-  AgentStreamFunction,
-} from '@ank1015/llm-core';
-
-// Re-export all types from types package
+  AgentFailure,
+  AgentFailurePhase,
+  AgentInput,
+  AgentResult,
+  AgentRun,
+  AgentSessionInput,
+} from './agent.js';
+export type { LlmInput, LlmRun } from './llm.js';
+export type { ToolResultMessageOptions, UserMessageOptions } from './messages.js';
 export type {
-  // API
+  CuratedModelId,
+  ProviderOptionsForApi,
+  ProviderOptionsForModelId,
+  ReasoningEffort,
+  SupportedProviderOptions,
+  SupportedProviderOptionsByApi,
+} from './model-input.js';
+export type { AssistantResponseInput } from './response.js';
+export type { SessionMessagesLoader, SessionNodeSaver } from './session.js';
+export type {
+  ToolContext,
+  ToolDefinition,
+  ToolResult,
+  ToolUpdateCallback,
+} from './tool.js';
+
+export type {
   Api,
-  // Content
-  TextContent,
-  ImageContent,
-  FileContent,
-  Content,
-  // Provider types
-  AnthropicNativeResponse,
-  AnthropicProviderOptions,
-  DeepSeekNativeResponse,
-  DeepSeekProviderOptions,
-  GoogleNativeResponse,
-  GoogleProviderOptions,
-  KimiNativeResponse,
-  KimiProviderOptions,
-  KimiThinkingConfig,
-  OpenAINativeResponse,
-  OpenAIProviderOptions,
-  ZaiNativeResponse,
-  ZaiProviderOptions,
-  ZaiThinkingConfig,
-  ApiNativeResponseMap,
-  NativeResponseForApi,
-  CodexProviderOptions,
-  ClaudeCodeProviderOptions,
-  ApiOptionsMap,
-  OptionsForApi,
-  // Model
-  Model,
-  Provider,
-  // Message
-  StopReason,
+  AgentEvent,
+  AgentTool,
+  Attachment,
+  AssistantResponse,
   AssistantResponseContent,
   AssistantThinkingContent,
   AssistantToolCall,
-  AssistantResponse,
-  Usage,
-  UserMessage,
-  ToolResultMessage,
-  BaseAssistantMessage,
-  CustomMessage,
-  Message,
   BaseAssistantEvent,
-  // Tool
+  BaseAssistantMessage,
+  Content,
+  Message,
   Tool,
-  Context,
-  // Errors
-  LLMErrorCode,
-  // Agent types
-  ToolExecutionContext,
-  AgentToolResult,
-  Attachment,
-  AgentToolUpdateCallback,
-  AgentTool,
-  QueuedMessage,
-  AgentState,
-  AgentLoopConfig,
-  AgentEvent,
-  // Session types
-  BaseNode,
-  SessionHeader,
-  MessageNode,
-  CustomNode,
-  SessionNode,
-  AppendableNode,
-  SessionSummary,
-  Session,
-  BranchInfo,
-  UpdateSessionNameInput,
-} from '@ank1015/llm-types';
-
-// Re-export runtime values from types
-export { KnownApis, isValidApi } from '@ank1015/llm-types';
-export {
-  LLMError,
-  ApiKeyNotFoundError,
-  CostLimitError,
-  ContextLimitError,
-  ConversationBusyError,
-  ModelNotConfiguredError,
-} from '@ank1015/llm-types';
+  ToolResultMessage,
+  UserMessage,
+} from '@ank1015/llm-core';

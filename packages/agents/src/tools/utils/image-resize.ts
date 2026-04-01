@@ -1,6 +1,6 @@
 import { loadPhoton } from './photon.js';
 
-import type { ImageContent } from '@ank1015/llm-sdk';
+import type { ImageContent } from '@ank1015/llm-core';
 
 export interface ImageResizeOptions {
   maxWidth?: number; // Default: 2000

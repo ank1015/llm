@@ -1,4 +1,4 @@
-import type { BaseAssistantMessage, BaseAssistantEvent, Api } from '@ank1015/llm-types';
+import type { BaseAssistantMessage, BaseAssistantEvent, Api } from '../types/index.js';
 
 // Generic event stream class for async iteration
 export class EventStream<T, R = T> implements AsyncIterable<T> {
@@ -72,13 +72,38 @@ export class EventStream<T, R = T> implements AsyncIterable<T> {
   }
 }
 
+/**
+ * Error thrown by `drain()` when the stream finishes unsuccessfully.
+ */
+export class AssistantStreamError<TApi extends Api = Api> extends Error {
+  readonly canRetry: boolean;
+  readonly stopReason: Extract<BaseAssistantMessage<TApi>['stopReason'], 'aborted' | 'error'>;
+  readonly assistantMessage: BaseAssistantMessage<TApi>;
+
+  constructor(message: BaseAssistantMessage<TApi>) {
+    super(
+      message.error?.message ||
+        message.errorMessage ||
+        (message.stopReason === 'aborted' ? 'Stream was aborted' : 'Stream ended with error')
+    );
+    this.name = 'AssistantStreamError';
+    this.canRetry = message.error?.canRetry ?? false;
+    this.stopReason = message.stopReason as Extract<
+      BaseAssistantMessage<TApi>['stopReason'],
+      'aborted' | 'error'
+    >;
+    this.assistantMessage = message;
+  }
+}
+
 export class AssistantMessageEventStream<TApi extends Api> extends EventStream<
   BaseAssistantEvent<TApi>,
   BaseAssistantMessage<TApi>
 > {
   /**
    * Drains all stream events and returns the final result.
-   * Unlike `result()`, this throws if the stream ended with an error or was aborted.
+   * Unlike `result()`, this throws an `AssistantStreamError`
+   * if the stream ended with an error or was aborted.
    * Use this as the non-streaming / "complete" path where callers expect errors to throw.
    */
   override async drain(): Promise<BaseAssistantMessage<TApi>> {
@@ -87,10 +112,10 @@ export class AssistantMessageEventStream<TApi extends Api> extends EventStream<
     }
     const message = await this.result();
     if (message.stopReason === 'error') {
-      throw new Error(message.errorMessage || 'Stream ended with error');
+      throw new AssistantStreamError(message);
     }
     if (message.stopReason === 'aborted') {
-      throw new Error(message.errorMessage || 'Stream was aborted');
+      throw new AssistantStreamError(message);
     }
     return message;
   }

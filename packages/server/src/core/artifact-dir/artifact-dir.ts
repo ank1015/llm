@@ -1,8 +1,8 @@
-import { readFile, readdir, rename, rm, stat } from 'node:fs/promises';
+import { readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 
 import { getConfig } from '../config.js';
-import { addSkill, deleteSkill, listInstalledSkills } from '../skills.js';
+// import { addSkill, deleteSkill, listInstalledSkills } from '../skills.js';
 import {
   ensureDir,
   pathExists,
@@ -19,7 +19,7 @@ import {
   shouldIgnoreArtifactIndexPath,
 } from './index-ignore.js';
 
-import type { AddSkillResult, DeleteSkillResult, InstalledSkillEntry } from '../skills.js';
+// import type { AddSkillResult, DeleteSkillResult, InstalledSkillEntry } from '../skills.js';
 import type {
   ArtifactDirMetadata,
   ArtifactExplorerEntry,
@@ -28,7 +28,7 @@ import type {
   ArtifactFileIndexResult,
   ArtifactFileResult,
   CreateArtifactDirInput,
-} from '../types.js';
+} from '../../types/index.js';
 import type { IgnoreRule } from './index-ignore.js';
 
 const DEFAULT_MAX_FILE_BYTES = 200_000;
@@ -318,19 +318,33 @@ export class ArtifactDir {
     };
   }
 
-  /** Install a bundled agent skill into this artifact's local .max state */
-  async installSkill(skillName: string): Promise<AddSkillResult> {
-    return addSkill(skillName, this.dirPath);
-  }
+  /** Write a UTF-8 text file inside the artifact tree and return updated preview metadata */
+  async writeArtifactFile(relativePath: string, content: string): Promise<ArtifactFileResult> {
+    const { absolutePath, relativePath: safePath } = this.resolveArtifactPath(relativePath);
 
-  /** List bundled agent skills installed for this artifact */
-  async listInstalledSkills(): Promise<InstalledSkillEntry[]> {
-    return listInstalledSkills(this.dirPath);
-  }
+    if (!safePath) {
+      throw new Error(PATH_REQUIRED_MESSAGE);
+    }
 
-  /** Delete an installed bundled agent skill from this artifact */
-  async deleteSkill(skillName: string): Promise<DeleteSkillResult> {
-    return deleteSkill(skillName, this.dirPath);
+    const fileStats = await this.statPath(absolutePath);
+    if (!fileStats) {
+      throw new Error(`File "${safePath}" not found`);
+    }
+    if (!fileStats.isFile()) {
+      throw new Error(`Path "${safePath}" is not a file`);
+    }
+
+    await writeFile(absolutePath, content, 'utf8');
+    const updatedStats = await stat(absolutePath);
+
+    return {
+      path: safePath,
+      content,
+      size: Buffer.byteLength(content, 'utf8'),
+      updatedAt: updatedStats.mtime.toISOString(),
+      isBinary: false,
+      truncated: false,
+    };
   }
 
   /** Delete a file or directory inside the artifact tree */

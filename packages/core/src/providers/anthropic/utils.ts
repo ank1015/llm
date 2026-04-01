@@ -10,7 +10,7 @@ import type {
   StopReason,
   TextContent,
   Tool,
-} from '@ank1015/llm-types';
+} from '../../types/index.js';
 import type {
   DocumentBlockParam,
   Message as AnthropicMessage,
@@ -297,7 +297,7 @@ export function buildAnthropicMessages(
               text: `<thinking>${sanitizeSurrogates(contentBlock.thinkingText)}</thinking>`,
             });
           } else if (contentBlock.type === 'response') {
-            const textContent = contentBlock.content
+            const textContent = contentBlock.response
               .filter((c) => c.type === 'text')
               .map((c) => sanitizeSurrogates((c as TextContent).content))
               .join('');

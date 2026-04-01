@@ -18,7 +18,7 @@ import type {
   Tool,
   ToolResultMessage,
   UserMessage,
-} from '@ank1015/llm-types';
+} from '../../../src/types/index.js';
 import type { ChatCompletion } from 'openai/resources/chat/completions.js';
 
 describe('Kimi Utils', () => {
@@ -43,7 +43,7 @@ describe('Kimi Utils', () => {
     };
 
     it('should create client with provided API key', () => {
-      const client = createClient(mockModel, 'test-api-key');
+      const client = createClient(mockModel, 'test-api-key', 'kimi');
       expect(client).toBeInstanceOf(OpenAI);
     });
 
@@ -52,7 +52,7 @@ describe('Kimi Utils', () => {
         ...mockModel,
         baseUrl: 'https://custom.moonshot.ai/v1',
       };
-      const client = createClient(customModel, 'test-key');
+      const client = createClient(customModel, 'test-key', 'kimi');
       expect(client.baseURL).toBe('https://custom.moonshot.ai/v1');
     });
 
@@ -61,7 +61,7 @@ describe('Kimi Utils', () => {
         ...mockModel,
         headers: { 'X-Custom-Header': 'value' },
       };
-      const client = createClient(customModel, 'test-key');
+      const client = createClient(customModel, 'test-key', 'kimi');
       expect(client).toBeInstanceOf(OpenAI);
     });
   });
@@ -308,7 +308,7 @@ describe('Kimi Utils', () => {
           timestamp: Date.now(),
           duration: 100,
           stopReason: 'stop',
-          content: [{ type: 'response', content: [{ type: 'text', content: 'Hello from Kimi!' }] }],
+          content: [{ type: 'response', response: [{ type: 'text', content: 'Hello from Kimi!' }] }],
           usage: {
             input: 10,
             output: 5,
@@ -359,7 +359,7 @@ describe('Kimi Utils', () => {
           stopReason: 'stop',
           content: [
             { type: 'thinking', thinkingText: 'Let me think step by step...' },
-            { type: 'response', content: [{ type: 'text', content: 'The answer is 42.' }] },
+            { type: 'response', response: [{ type: 'text', content: 'The answer is 42.' }] },
           ],
           usage: {
             input: 10,
@@ -470,7 +470,7 @@ describe('Kimi Utils', () => {
             content: [
               {
                 type: 'response',
-                content: [{ type: 'text', content: 'Hello from Gemini!' }],
+                response: [{ type: 'text', content: 'Hello from Gemini!' }],
               },
             ],
             usage: {
@@ -509,7 +509,7 @@ describe('Kimi Utils', () => {
               },
               {
                 type: 'response',
-                content: [{ type: 'text', content: 'The answer is 42.' }],
+                response: [{ type: 'text', content: 'The answer is 42.' }],
               },
             ],
             usage: {
@@ -592,7 +592,7 @@ describe('Kimi Utils', () => {
             content: [
               {
                 type: 'response',
-                content: [{ type: 'text', content: `Hello ${unpaired} World` }],
+                response: [{ type: 'text', content: `Hello ${unpaired} World` }],
               },
             ],
             usage: {

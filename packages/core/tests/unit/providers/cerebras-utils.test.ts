@@ -18,7 +18,7 @@ import type {
   Tool,
   ToolResultMessage,
   UserMessage,
-} from '@ank1015/llm-types';
+} from '../../../src/types/index.js';
 import type { ChatCompletion } from 'openai/resources/chat/completions.js';
 
 describe('Cerebras Utils', () => {
@@ -43,12 +43,12 @@ describe('Cerebras Utils', () => {
     };
 
     it('should create client with provided API key', () => {
-      const client = createClient(mockModel, 'test-api-key');
+      const client = createClient(mockModel, 'test-api-key', 'cerebras');
       expect(client).toBeInstanceOf(OpenAI);
     });
 
     it('should set baseURL from model', () => {
-      const client = createClient(mockModel, 'test-key');
+      const client = createClient(mockModel, 'test-key', 'cerebras');
       expect(client.baseURL).toBe('https://api.cerebras.ai/v1');
     });
 
@@ -57,7 +57,7 @@ describe('Cerebras Utils', () => {
         ...mockModel,
         headers: { 'X-Custom-Header': 'value' },
       };
-      const client = createClient(customModel, 'test-key');
+      const client = createClient(customModel, 'test-key', 'cerebras');
       expect(client).toBeInstanceOf(OpenAI);
     });
   });
@@ -278,7 +278,7 @@ describe('Cerebras Utils', () => {
           duration: 100,
           stopReason: 'stop',
           content: [
-            { type: 'response', content: [{ type: 'text', content: 'Hello from Cerebras!' }] },
+            { type: 'response', response: [{ type: 'text', content: 'Hello from Cerebras!' }] },
           ],
           usage: {
             input: 10,
@@ -387,7 +387,7 @@ describe('Cerebras Utils', () => {
             content: [
               {
                 type: 'response',
-                content: [{ type: 'text', content: 'Hello from Gemini!' }],
+                response: [{ type: 'text', content: 'Hello from Gemini!' }],
               },
             ],
             usage: {
@@ -426,7 +426,7 @@ describe('Cerebras Utils', () => {
               },
               {
                 type: 'response',
-                content: [{ type: 'text', content: 'The answer is 42.' }],
+                response: [{ type: 'text', content: 'The answer is 42.' }],
               },
             ],
             usage: {
@@ -509,7 +509,7 @@ describe('Cerebras Utils', () => {
             content: [
               {
                 type: 'response',
-                content: [{ type: 'text', content: `Hello ${unpaired} World` }],
+                response: [{ type: 'text', content: `Hello ${unpaired} World` }],
               },
             ],
             usage: {

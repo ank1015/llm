@@ -18,7 +18,7 @@ import type {
   Tool,
   ToolResultMessage,
   UserMessage,
-} from '@ank1015/llm-types';
+} from '../../../src/types/index.js';
 import type { ChatCompletion } from 'openai/resources/chat/completions.js';
 
 describe('Z.AI Utils', () => {
@@ -43,7 +43,7 @@ describe('Z.AI Utils', () => {
     };
 
     it('should create client with provided API key', () => {
-      const client = createClient(mockModel, 'test-api-key');
+      const client = createClient(mockModel, 'test-api-key', 'zai');
       expect(client).toBeInstanceOf(OpenAI);
     });
 
@@ -52,7 +52,7 @@ describe('Z.AI Utils', () => {
         ...mockModel,
         baseUrl: 'https://custom.z.ai/api/v4',
       };
-      const client = createClient(customModel, 'test-key');
+      const client = createClient(customModel, 'test-key', 'zai');
       expect(client.baseURL).toBe('https://custom.z.ai/api/v4');
     });
 
@@ -61,7 +61,7 @@ describe('Z.AI Utils', () => {
         ...mockModel,
         headers: { 'X-Custom-Header': 'value' },
       };
-      const client = createClient(customModel, 'test-key');
+      const client = createClient(customModel, 'test-key', 'zai');
       expect(client).toBeInstanceOf(OpenAI);
     });
   });
@@ -281,7 +281,7 @@ describe('Z.AI Utils', () => {
           timestamp: Date.now(),
           duration: 100,
           stopReason: 'stop',
-          content: [{ type: 'response', content: [{ type: 'text', content: 'Hello from Z.AI!' }] }],
+          content: [{ type: 'response', response: [{ type: 'text', content: 'Hello from Z.AI!' }] }],
           usage: {
             input: 10,
             output: 5,
@@ -332,7 +332,7 @@ describe('Z.AI Utils', () => {
           stopReason: 'stop',
           content: [
             { type: 'thinking', thinkingText: 'Let me think step by step...' },
-            { type: 'response', content: [{ type: 'text', content: 'The answer is 42.' }] },
+            { type: 'response', response: [{ type: 'text', content: 'The answer is 42.' }] },
           ],
           usage: {
             input: 10,
@@ -443,7 +443,7 @@ describe('Z.AI Utils', () => {
             content: [
               {
                 type: 'response',
-                content: [{ type: 'text', content: 'Hello from Gemini!' }],
+                response: [{ type: 'text', content: 'Hello from Gemini!' }],
               },
             ],
             usage: {
@@ -482,7 +482,7 @@ describe('Z.AI Utils', () => {
               },
               {
                 type: 'response',
-                content: [{ type: 'text', content: 'The answer is 42.' }],
+                response: [{ type: 'text', content: 'The answer is 42.' }],
               },
             ],
             usage: {
@@ -565,7 +565,7 @@ describe('Z.AI Utils', () => {
             content: [
               {
                 type: 'response',
-                content: [{ type: 'text', content: `Hello ${unpaired} World` }],
+                response: [{ type: 'text', content: `Hello ${unpaired} World` }],
               },
             ],
             usage: {

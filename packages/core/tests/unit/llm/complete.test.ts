@@ -4,7 +4,7 @@ import { complete } from '../../../src/llm/complete.js';
 import { stream } from '../../../src/llm/stream.js';
 import { AssistantMessageEventStream } from '../../../src/utils/event-stream.js';
 
-import type { BaseAssistantMessage, Context, Model } from '@ank1015/llm-types';
+import type { BaseAssistantMessage, Context, Model } from '../../../src/types/index.js';
 
 // Mock the stream function
 vi.mock('../../../src/llm/stream.js', () => ({
@@ -44,7 +44,7 @@ function createMockResponse(api: string): BaseAssistantMessage<any> {
     api,
     model: createMockModel(api),
     message: {},
-    content: [{ type: 'response', content: [{ type: 'text', content: 'Hello!' }] }],
+    content: [{ type: 'response', response: [{ type: 'text', content: 'Hello!' }] }],
     usage: {
       input: 10,
       output: 5,

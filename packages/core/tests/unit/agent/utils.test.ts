@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { buildUserMessage, buildToolResultMessage } from '../../../src/agent/utils.js';
 
-import type { AgentToolResult, AssistantToolCall, Attachment } from '@ank1015/llm-types';
+import type { AgentToolResult, AssistantToolCall, Attachment } from '../../../src/types/index.js';
 
 describe('buildUserMessage', () => {
   describe('text only', () => {
@@ -60,6 +60,7 @@ describe('buildUserMessage', () => {
     it('should include image attachment', () => {
       const attachments: Attachment[] = [
         {
+          id: '1',
           type: 'image',
           content: 'base64encodedimage',
           mimeType: 'image/png',
@@ -89,6 +90,7 @@ describe('buildUserMessage', () => {
     it('should include file attachment', () => {
       const attachments: Attachment[] = [
         {
+          id: '1',
           type: 'file',
           content: 'file content here',
           mimeType: 'text/plain',
@@ -119,6 +121,7 @@ describe('buildUserMessage', () => {
     it('should handle multiple attachments', () => {
       const attachments: Attachment[] = [
         {
+          id: '1',
           type: 'image',
           content: 'image1data',
           mimeType: 'image/jpeg',
@@ -126,6 +129,7 @@ describe('buildUserMessage', () => {
           size: 2048,
         },
         {
+          id: '2',
           type: 'image',
           content: 'image2data',
           mimeType: 'image/png',
@@ -133,6 +137,7 @@ describe('buildUserMessage', () => {
           size: 4096,
         },
         {
+          id: '3',
           type: 'file',
           content: 'pdf content',
           mimeType: 'application/pdf',
@@ -153,6 +158,7 @@ describe('buildUserMessage', () => {
     it('should default size to 0 when not provided', () => {
       const attachments: Attachment[] = [
         {
+          id: '1',
           type: 'image',
           content: 'imagedata',
           mimeType: 'image/png',

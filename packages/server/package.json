@@ -9,6 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./contracts": {
+      "types": "./dist/contracts/index.d.ts",
+      "import": "./dist/contracts/index.js"
     }
   },
   "files": [
@@ -26,6 +30,7 @@
     "test:watch": "vitest",
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
+    "test:live": "vitest run tests/live",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src tests vitest.config.ts",
@@ -57,9 +62,8 @@
   },
   "dependencies": {
     "@ank1015/llm-agents": "workspace:^",
-    "@ank1015/llm-app-contracts": "workspace:^",
+    "@ank1015/llm-core": "workspace:^",
     "@ank1015/llm-sdk": "workspace:^",
-    "@ank1015/llm-sdk-adapters": "workspace:^",
     "@anthropic-ai/claude-agent-sdk": "^0.2.42",
     "@hono/node-server": "^1.14.1",
     "@sinclair/typebox": "^0.34.48",

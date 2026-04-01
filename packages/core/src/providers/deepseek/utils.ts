@@ -7,7 +7,7 @@ import type {
   DeepSeekProviderOptions,
   Model,
   TextContent,
-} from '@ank1015/llm-types';
+} from '../../types/index.js';
 import type {
   ChatCompletionAssistantMessageParam,
   ChatCompletionCreateParamsNonStreaming,
@@ -134,7 +134,7 @@ export function buildDeepSeekMessages(
             // Wrap thinking in tags for cross-provider context
             reasoningContent += `${sanitizeSurrogates(contentBlock.thinkingText)}`;
           } else if (contentBlock.type === 'response') {
-            const text = contentBlock.content
+            const text = contentBlock.response
               .filter((c) => c.type === 'text')
               .map((c) => sanitizeSurrogates((c as TextContent).content))
               .join('');

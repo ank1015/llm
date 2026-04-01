@@ -3,18 +3,17 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 import { getModel } from '../../../src/models/index.js';
 import { streamZai } from '../../../src/providers/zai/stream.js';
+import { describeIfAvailable, getIntegrationEnv } from '../helpers/live.js';
 
-import type { BaseAssistantEvent, Context, Model } from '@ank1015/llm-types';
+import type { BaseAssistantEvent, Context, Model } from '../../../src/types/index.js';
 
-describe('Zai Stream Integration', () => {
+const apiKey = getIntegrationEnv('ZAI_API_KEY')!;
+const describeIfZai = describeIfAvailable(Boolean(apiKey));
+
+describeIfZai('Zai Stream Integration', () => {
   let model: Model<'zai'>;
-  const apiKey = process.env.ZAI_API_KEY;
 
   beforeAll(() => {
-    if (!apiKey) {
-      throw new Error('ZAI_API_KEY environment variable is required for integration tests');
-    }
-
     const testModel = getModel('zai', 'glm-5');
     if (!testModel) {
       throw new Error('Test model glm-5 not found');

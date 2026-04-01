@@ -18,7 +18,7 @@ import {
   detectSupportedImageMimeTypeFromFile,
 } from './utils/mime.js';
 
-import type { AgentTool, FileContent, ImageContent, TextContent } from '@ank1015/llm-sdk';
+import type { AgentTool, FileContent, ImageContent, TextContent } from '@ank1015/llm-core';
 
 const readSchema = Type.Object({
   path: Type.String({ description: 'Path to the file to read (relative or absolute)' }),
@@ -67,26 +67,22 @@ function toError(error: unknown): Error {
 export function createReadTool(
   cwd: string,
   options?: ReadToolOptions
-): AgentTool<typeof readSchema> {
+): AgentTool<typeof readSchema, ReadToolDetails> {
   const autoResizeImages = options?.autoResizeImages ?? true;
   const ops = options?.operations ?? defaultReadOperations;
 
   return {
     name: 'read',
-    label: 'read',
     description: `Read the contents of a file. Supports text files, images, and PDFs. Images (jpg, png, gif, webp) and PDFs are sent as attachments. For text files, output is truncated to ${DEFAULT_MAX_LINES} lines or ${DEFAULT_MAX_BYTES / 1024}KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.`,
     parameters: readSchema,
-    execute: async (
-      _toolCallId: string,
-      { path, offset, limit }: { path: string; offset?: number; limit?: number },
-      signal?: AbortSignal
-    ) => {
+    execute: async ({ params, signal }) => {
+      const { path, offset, limit } = params;
       const absolutePath = resolveReadPath(path, cwd);
       const filename = basename(absolutePath);
 
       return new Promise<{
         content: (TextContent | ImageContent | FileContent)[];
-        details: ReadToolDetails | undefined;
+        details?: ReadToolDetails;
       }>((resolve, reject) => {
         // Check if already aborted
         if (signal?.aborted) {
@@ -239,7 +235,10 @@ export function createReadTool(
               signal.removeEventListener('abort', onAbort);
             }
 
-            resolve({ content, details });
+            resolve({
+              content,
+              ...(details ? { details } : {}),
+            });
           } catch (error: unknown) {
             // Clean up abort handler
             if (signal) {

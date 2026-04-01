@@ -14,7 +14,7 @@ import type {
   Model,
   Tool,
   UserMessage,
-} from '@ank1015/llm-types';
+} from '../../../src/types/index.js';
 
 describe('Claude Code Utils', () => {
   const mockModel: Model<'claude-code'> = {

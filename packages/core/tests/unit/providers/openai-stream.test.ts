@@ -1,234 +1,118 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { RateLimitError } from 'openai/error';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { Context, Model } from '@ank1015/llm-types';
-import type { Response } from 'openai/resources/responses/responses.js';
+import { streamOpenAI } from '../../../src/providers/openai/stream.js';
+import { getMockOpenaiMessage } from '../../../src/providers/openai/utils.js';
+import { AssistantStreamError } from '../../../src/utils/event-stream.js';
+import * as openaiProviderUtils from '../../../src/providers/openai/utils.js';
 
-const openAIMocks = vi.hoisted(() => ({
-  buildParams: vi.fn(),
-  createClient: vi.fn(),
-  getMockOpenaiMessage: vi.fn(),
-  mapStopReason: vi.fn(),
-  responsesCreate: vi.fn(),
-}));
+import type { Context, Model, OpenAIProviderOptions } from '../../../src/types/index.js';
 
-vi.mock('../../../src/providers/openai/utils.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../src/providers/openai/utils.js')>();
-
-  return {
-    ...actual,
-    buildParams: openAIMocks.buildParams,
-    createClient: openAIMocks.createClient,
-    getMockOpenaiMessage: openAIMocks.getMockOpenaiMessage,
-    mapStopReason: openAIMocks.mapStopReason,
+describe('OpenAI Responses stream errors', () => {
+  const context: Context = {
+    messages: [
+      {
+        role: 'user',
+        id: 'msg-1',
+        content: [{ type: 'text', content: 'Hello' }],
+      },
+    ],
   };
-});
 
-async function* responseEvents(events: unknown[]) {
-  for (const event of events) {
-    yield event;
-  }
-}
-
-describe('OpenAI Stream', () => {
-  let streamOpenAI: typeof import('../../../src/providers/openai/stream.js').streamOpenAI;
-
-  const mockModel: Model<'openai'> = {
-    id: 'gpt-5',
-    name: 'GPT-5',
+  const model: Model<'openai'> = {
+    id: 'gpt-5-mini',
+    name: 'GPT-5 Mini',
     api: 'openai',
     baseUrl: 'https://api.openai.com/v1',
-    reasoning: false,
-    input: ['text', 'image'],
-    cost: { input: 1, output: 2, cacheRead: 0.1, cacheWrite: 0 },
+    reasoning: true,
+    input: ['text'],
+    cost: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 },
     contextWindow: 128000,
     maxTokens: 4096,
     tools: ['function_calling'],
   };
 
-  const mockResponse: Response = {
-    id: 'resp_test',
-    object: 'response',
-    created_at: 1,
-    output_text: '',
-    status: 'completed',
-    incomplete_details: null,
-    parallel_tool_calls: false,
-    error: null,
-    instructions: null,
-    max_output_tokens: null,
-    model: mockModel.id,
-    output: [],
-    previous_response_id: null,
-    temperature: 1,
-    text: {},
-    tool_choice: 'auto',
-    tools: [],
-    top_p: 1,
-    truncation: 'disabled',
-    usage: {
-      input_tokens: 0,
-      output_tokens: 0,
-      output_tokens_details: {
-        reasoning_tokens: 0,
-      },
-      input_tokens_details: {
-        cached_tokens: 0,
-      },
-      total_tokens: 0,
-    },
-    metadata: {},
-  };
+  const options: OpenAIProviderOptions = { apiKey: 'test-key' };
 
-  beforeEach(() => {
-    vi.resetModules();
-    vi.clearAllMocks();
-    openAIMocks.buildParams.mockReturnValue({ model: mockModel.id, input: [] });
-    openAIMocks.createClient.mockReturnValue({
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function mockResponsesClient(factory: () => Promise<AsyncIterable<unknown>> | AsyncIterable<unknown>) {
+    vi.spyOn(openaiProviderUtils, 'createClient').mockReturnValue({
       responses: {
-        create: openAIMocks.responsesCreate,
+        create: vi.fn(async () => factory()),
       },
-    });
-    openAIMocks.getMockOpenaiMessage.mockReturnValue({ ...mockResponse });
-    openAIMocks.mapStopReason.mockReturnValue('stop');
-  });
+    } as any);
+  }
 
-  beforeEach(async () => {
-    streamOpenAI = (await import('../../../src/providers/openai/stream.js')).streamOpenAI;
-  });
-
-  it('streams partial image previews and persists the final generated image', async () => {
-    openAIMocks.responsesCreate.mockResolvedValue(
-      responseEvents([
-        {
-          type: 'response.output_item.added',
-          item: {
-            type: 'image_generation_call',
-            id: 'img_1',
-            result: null,
-            status: 'in_progress',
-          },
-        },
-        {
-          type: 'response.image_generation_call.in_progress',
-          item_id: 'img_1',
-          output_index: 0,
+  it('surfaces retryable response.failed errors from the Responses API', async () => {
+    mockResponsesClient(() => ({
+      async *[Symbol.asyncIterator]() {
+        yield {
+          type: 'response.failed',
           sequence_number: 1,
-        },
-        {
-          type: 'response.image_generation_call.partial_image',
-          item_id: 'img_1',
-          output_index: 0,
-          partial_image_b64: 'partial-b64',
-          partial_image_index: 0,
-          sequence_number: 2,
-        },
-        {
-          type: 'response.output_item.done',
-          item: {
-            type: 'image_generation_call',
-            id: 'img_1',
-            result: 'final-b64',
-            status: 'completed',
-            revised_prompt: 'A bright orange cat portrait',
-            output_format: 'jpeg',
-            quality: 'high',
-            background: 'transparent',
-            size: '1024x1024',
-            action: 'generate',
-          },
-        },
-        {
-          type: 'response.completed',
           response: {
-            ...mockResponse,
-            output: [
-              {
-                type: 'image_generation_call',
-                id: 'img_1',
-                result: 'final-b64',
-                status: 'completed',
-              },
-            ],
-            usage: {
-              input_tokens: 100,
-              output_tokens: 200,
-              output_tokens_details: {
-                reasoning_tokens: 0,
-              },
-              input_tokens_details: {
-                cached_tokens: 10,
-              },
-              total_tokens: 310,
+            ...getMockOpenaiMessage(model.id, 'resp-1'),
+            status: 'failed',
+            error: {
+              code: 'server_error',
+              message: 'The server had an error while processing your request',
             },
           },
-        },
-      ])
-    );
-
-    const context: Context = { messages: [] };
-    const stream = streamOpenAI(
-      mockModel,
-      context,
-      {
-        apiKey: 'test-key',
-        tools: [
-          {
-            type: 'image_generation',
-            partial_images: 1,
-            output_format: 'jpeg',
-            quality: 'high',
-            background: 'transparent',
-            size: '1024x1024',
-            action: 'generate',
-          },
-        ],
+        };
       },
-      'openai-img-1'
-    );
+    }));
 
-    const events: Array<{ type: string }> = [];
-    for await (const event of stream) {
-      events.push(event);
+    const stream = streamOpenAI(model, context, options, 'test-msg-1');
+
+    for await (const _ of stream) {
+      // drain
     }
 
     const result = await stream.result();
 
-    expect(events.map((event) => event.type)).toEqual([
-      'start',
-      'image_start',
-      'image_frame',
-      'image_frame',
-      'image_end',
-      'done',
-    ]);
-    expect(result.content).toEqual([
-      {
-        type: 'response',
-        content: [
-          {
-            type: 'image',
-            data: 'final-b64',
-            mimeType: 'image/jpeg',
-            metadata: {
-              generationStage: 'final',
-              generationProvider: 'openai',
-              generationProviderItemId: 'img_1',
-              generationAction: 'generate',
-              generationRevisedPrompt: 'A bright orange cat portrait',
-              generationOutputSize: '1024x1024',
-              generationOutputQuality: 'high',
-              generationOutputBackground: 'transparent',
-              generationOutputFormat: 'jpeg',
-            },
-          },
-        ],
-      },
-    ]);
-    expect(result.usage).toMatchObject({
-      input: 90,
-      output: 200,
-      cacheRead: 10,
-      totalTokens: 310,
+    expect(result.stopReason).toBe('error');
+    expect(result.error).toEqual({
+      message: 'The server had an error while processing your request',
+      canRetry: true,
     });
+    expect(result.errorMessage).toBe('The server had an error while processing your request');
+  });
+
+  it('marks quota 429 errors as non-retryable on drain()', async () => {
+    const error = new RateLimitError(
+      429,
+      {
+        type: 'insufficient_quota',
+        code: 'insufficient_quota',
+        message:
+          'You exceeded your current quota, please check your plan and billing details',
+      },
+      undefined,
+      new Headers({ 'x-request-id': 'req_test_123' })
+    );
+
+    vi.spyOn(openaiProviderUtils, 'createClient').mockReturnValue({
+      responses: {
+        create: vi.fn(async () => {
+          throw error;
+        }),
+      },
+    } as any);
+
+    const stream = streamOpenAI(model, context, options, 'test-msg-2');
+
+    try {
+      await stream.drain();
+      expect.unreachable('Expected stream.drain() to throw');
+    } catch (caught) {
+      expect(caught).toBeInstanceOf(AssistantStreamError);
+      expect(caught).toMatchObject({
+        name: 'AssistantStreamError',
+        message: 'You exceeded your current quota, please check your plan and billing details',
+        canRetry: false,
+      });
+    }
   });
 });

@@ -18,7 +18,7 @@ import type {
   Tool,
   ToolResultMessage,
   UserMessage,
-} from '@ank1015/llm-types';
+} from '../../../src/types/index.js';
 import type { ChatCompletion } from 'openai/resources/chat/completions.js';
 
 describe('OpenRouter Utils', () => {
@@ -43,12 +43,12 @@ describe('OpenRouter Utils', () => {
     };
 
     it('should create client with provided API key', () => {
-      const client = createClient(mockModel, 'test-api-key');
+      const client = createClient(mockModel, 'test-api-key', 'openrouter');
       expect(client).toBeInstanceOf(OpenAI);
     });
 
     it('should set baseURL from model', () => {
-      const client = createClient(mockModel, 'test-key');
+      const client = createClient(mockModel, 'test-key', 'openrouter');
       expect(client.baseURL).toBe('https://openrouter.ai/api/v1');
     });
 
@@ -57,7 +57,7 @@ describe('OpenRouter Utils', () => {
         ...mockModel,
         headers: { 'X-Custom-Header': 'value' },
       };
-      const client = createClient(customModel, 'test-key');
+      const client = createClient(customModel, 'test-key', 'openrouter');
       expect(client).toBeInstanceOf(OpenAI);
     });
   });
@@ -278,7 +278,7 @@ describe('OpenRouter Utils', () => {
           duration: 100,
           stopReason: 'stop',
           content: [
-            { type: 'response', content: [{ type: 'text', content: 'Hello from OpenRouter!' }] },
+            { type: 'response', response: [{ type: 'text', content: 'Hello from OpenRouter!' }] },
           ],
           usage: {
             input: 10,
@@ -387,7 +387,7 @@ describe('OpenRouter Utils', () => {
             content: [
               {
                 type: 'response',
-                content: [{ type: 'text', content: 'Hello from Gemini!' }],
+                response: [{ type: 'text', content: 'Hello from Gemini!' }],
               },
             ],
             usage: {
@@ -425,7 +425,7 @@ describe('OpenRouter Utils', () => {
               },
               {
                 type: 'response',
-                content: [{ type: 'text', content: 'The answer is 42.' }],
+                response: [{ type: 'text', content: 'The answer is 42.' }],
               },
             ],
             usage: {
@@ -507,7 +507,7 @@ describe('OpenRouter Utils', () => {
             content: [
               {
                 type: 'response',
-                content: [{ type: 'text', content: `Hello ${unpaired} World` }],
+                response: [{ type: 'text', content: `Hello ${unpaired} World` }],
               },
             ],
             usage: {

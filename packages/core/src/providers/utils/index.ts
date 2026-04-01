@@ -6,3 +6,12 @@ export {
 } from './chat-completion-utils.js';
 export { createChatCompletionStream } from './chat-stream.js';
 export type { ChatStreamConfig } from './chat-stream.js';
+export {
+  getCerebrasErrorDetails,
+  getDeepSeekErrorDetails,
+  getKimiErrorDetails,
+  getOpenAIErrorDetails,
+  getOpenRouterErrorDetails,
+  getZaiErrorDetails,
+  getChatFinishReasonErrorDetails,
+} from './chat-errors.js';

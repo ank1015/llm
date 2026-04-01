@@ -7,7 +7,7 @@
 
 import { stream } from './stream.js';
 
-import type { Api, BaseAssistantMessage, Context, Model, OptionsForApi } from '@ank1015/llm-types';
+import type { Api, BaseAssistantMessage, Context, Model, OptionsForApi } from '../types/index.js';
 
 /**
  * Complete a chat request using the specified provider.

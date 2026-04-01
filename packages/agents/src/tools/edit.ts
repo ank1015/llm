@@ -14,7 +14,7 @@ import {
 } from './edit-diff.js';
 import { resolveToCwd } from './path-utils.js';
 
-import type { AgentTool } from '@ank1015/llm-sdk';
+import type { AgentTool } from '@ank1015/llm-core';
 
 const editSchema = Type.Object({
   path: Type.String({ description: 'Path to the file to edit (relative or absolute)' }),
@@ -62,25 +62,21 @@ function toError(error: unknown): Error {
 export function createEditTool(
   cwd: string,
   options?: EditToolOptions
-): AgentTool<typeof editSchema> {
+): AgentTool<typeof editSchema, EditToolDetails> {
   const ops = options?.operations ?? defaultEditOperations;
 
   return {
     name: 'edit',
-    label: 'edit',
     description:
       'Edit a file by replacing exact text. The oldText must match exactly (including whitespace). Use this for precise, surgical edits.',
     parameters: editSchema,
-    execute: async (
-      _toolCallId: string,
-      { path, oldText, newText }: { path: string; oldText: string; newText: string },
-      signal?: AbortSignal
-    ) => {
+    execute: async ({ params, signal }) => {
+      const { path, oldText, newText } = params;
       const absolutePath = resolveToCwd(path, cwd);
 
       return new Promise<{
         content: Array<{ type: 'text'; content: string }>;
-        details: EditToolDetails | undefined;
+        details?: EditToolDetails;
       }>((resolve, reject) => {
         // Check if already aborted
         if (signal?.aborted) {

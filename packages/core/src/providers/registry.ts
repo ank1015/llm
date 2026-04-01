@@ -7,7 +7,7 @@
  */
 
 import type { StreamFunction } from '../utils/types.js';
-import type { Api } from '@ank1015/llm-types';
+import type { Api } from '../types/index.js';
 
 /** A mock message factory that creates a provider-native message shell. */
 export type MockMessageFactory = (modelId: string, messageId: string) => unknown;

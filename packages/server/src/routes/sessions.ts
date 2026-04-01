@@ -5,7 +5,7 @@ import {
   RenameSessionRequestSchema,
   SessionPromptRequestSchema,
   SessionTurnSettingsRequestSchema,
-} from '@ank1015/llm-app-contracts';
+} from '../contracts/index.js';
 import { Hono } from 'hono';
 
 import { Session } from '../core/index.js';
@@ -18,12 +18,13 @@ import {
 } from '../http/contracts.js';
 import { readJsonBody, validateSchema } from '../http/validation.js';
 
-import type { PromptInput } from '../core/index.js';
 import type {
   AttachSessionRunQuery,
   CancelSessionRunResponse,
   CreateSessionRequest,
   DeleteSessionResponse,
+  GenerateSessionNameRequest,
+  RenameSessionRequest,
   SessionMessagesResponse,
   SessionMetadataDto,
   SessionNameResponse,
@@ -33,15 +34,16 @@ import type {
   SessionTreeResponse,
   SessionTurnSettingsRequest,
   StreamConflictResponse,
-} from '@ank1015/llm-app-contracts';
-import type { AgentEvent, MessageNode } from '@ank1015/llm-sdk';
+} from '../contracts/index.js';
+import type { AgentEvent } from '@ank1015/llm-sdk';
+import type { PromptInput, SessionMessageNode, TurnSettingsInput } from '../types/index.js';
 import type { Context } from 'hono';
 
 const BASE = '/projects/:projectId/artifacts/:artifactDirId/sessions';
 const HEARTBEAT_INTERVAL_MS = 15_000;
 const SESSION_NOT_FOUND_MESSAGE = 'Session not found';
 const INVALID_REQUEST_BODY_MESSAGE = 'Invalid request body';
-const MODEL_AND_API_REQUIRED_MESSAGE = 'modelId and api are required';
+const MODEL_ID_REQUIRED_MESSAGE = 'modelId is required';
 
 export const sessionRoutes = new Hono();
 
@@ -54,15 +56,8 @@ function resolvePromptInput(
     return { error: 'message or attachments are required' };
   }
 
-  const api = body?.api;
-  const modelId = body?.modelId?.trim() ?? '';
-  const hasProviderOverride = Boolean(api) || modelId.length > 0;
-
-  if (hasProviderOverride && (!api || modelId.length === 0)) {
-    return { error: 'api and modelId must be provided together' };
-  }
-
-  const reasoningLevel = body?.reasoningLevel ?? body?.reasoning;
+  const modelId = body?.modelId as PromptInput['modelId'];
+  const reasoningEffort = body?.reasoningEffort as PromptInput['reasoningEffort'];
   const leafNodeId = body?.leafNodeId?.trim() ?? '';
 
   return {
@@ -70,31 +65,24 @@ function resolvePromptInput(
       message,
       ...(attachments.length > 0 ? { attachments } : {}),
       ...(leafNodeId ? { leafNodeId } : {}),
-      ...(hasProviderOverride && api ? { api, modelId } : {}),
-      ...(reasoningLevel ? { reasoningLevel } : {}),
+      ...(modelId ? { modelId } : {}),
+      ...(reasoningEffort ? { reasoningEffort } : {}),
     },
   };
 }
 
 function resolveTurnSettings(
   body: SessionTurnSettingsRequest | undefined
-): { error: string } | { input: Omit<PromptInput, 'message'> } {
-  const api = body?.api;
-  const modelId = body?.modelId?.trim() ?? '';
-  const hasProviderOverride = Boolean(api) || modelId.length > 0;
-
-  if (hasProviderOverride && (!api || modelId.length === 0)) {
-    return { error: 'api and modelId must be provided together' };
-  }
-
-  const reasoningLevel = body?.reasoningLevel ?? body?.reasoning;
+): { error: string } | { input: TurnSettingsInput } {
+  const modelId = body?.modelId as TurnSettingsInput['modelId'];
+  const reasoningEffort = body?.reasoningEffort as TurnSettingsInput['reasoningEffort'];
   const leafNodeId = body?.leafNodeId?.trim() ?? '';
 
   return {
     input: {
       ...(leafNodeId ? { leafNodeId } : {}),
-      ...(hasProviderOverride && api ? { api, modelId } : {}),
-      ...(reasoningLevel ? { reasoningLevel } : {}),
+      ...(modelId ? { modelId } : {}),
+      ...(reasoningEffort ? { reasoningEffort } : {}),
     },
   };
 }
@@ -116,17 +104,15 @@ sessionRoutes.post(BASE, async (c) => {
   }
 
   const body = (rawBody ?? {}) as CreateSessionRequest;
-  const modelId = body.modelId?.trim() ?? '';
-  const api = body.api;
+  const modelId = body.modelId as PromptInput['modelId'];
 
-  if (!modelId || !api) {
-    return c.json({ error: MODEL_AND_API_REQUIRED_MESSAGE }, 400);
+  if (!modelId) {
+    return c.json({ error: MODEL_ID_REQUIRED_MESSAGE }, 400);
   }
 
   try {
     const session = await Session.create(projectId, artifactDirId, {
       ...(body.name?.trim() ? { name: body.name.trim() } : {}),
-      api,
       modelId,
     });
     const metadata = await session.getMetadata();
@@ -187,9 +173,7 @@ sessionRoutes.get(`${BASE}/:sessionId/tree`, async (c) => {
     const tree = await session.getMessageTree();
     const sessionKey = getSessionRunKey(projectId, artifactDirId, sessionId);
     const liveRun = sessionRunRegistry.getLiveRunSummary(sessionKey);
-    return c.json<SessionTreeResponse>(
-      toSessionTreeResponse(tree, liveRun ? toLiveRunSummaryDto(liveRun) : null)
-    );
+    return c.json<SessionTreeResponse>(toSessionTreeResponse(tree, liveRun));
   } catch (e) {
     const message = e instanceof Error ? e.message : SESSION_NOT_FOUND_MESSAGE;
     return c.json({ error: message }, 404);
@@ -261,7 +245,7 @@ sessionRoutes.post(`${BASE}/:sessionId/generate-name`, async (c) => {
     }
   }
 
-  const body = rawBody as { query?: string } | undefined;
+  const body = rawBody as GenerateSessionNameRequest | undefined;
 
   const query = typeof body?.query === 'string' ? body.query.trim() : '';
   if (!query) {
@@ -294,7 +278,7 @@ sessionRoutes.patch(`${BASE}/:sessionId/name`, async (c) => {
     }
   }
 
-  const body = rawBody as { name?: string } | undefined;
+  const body = rawBody as RenameSessionRequest | undefined;
 
   const name = typeof body?.name === 'string' ? body.name.trim() : '';
   if (!name) {
@@ -370,7 +354,11 @@ function streamAttachedRun(
       const close = (): void => {
         if (closed) return;
         closed = true;
-        controller.close();
+        try {
+          controller.close();
+        } catch {
+          // The stream may already be closed if the client disconnected first.
+        }
       };
 
       const cleanup = (): void => {
@@ -449,7 +437,7 @@ async function startSessionRun(
     execute: (options: {
       signal: AbortSignal;
       onEvent: (event: AgentEvent) => void;
-      onNodePersisted: (node: MessageNode) => void;
+      onNodePersisted: (node: SessionMessageNode) => void;
     }) => Promise<{ messageCount: number }>;
   }
 ): Promise<Response> {

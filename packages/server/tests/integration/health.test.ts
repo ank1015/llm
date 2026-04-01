@@ -1,12 +1,13 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-import { app } from '../../src/index.js';
+import { createApp } from '../../src/app.js';
 
 describe('GET /health', () => {
-  it('should return 200 with status ok', async () => {
-    const res = await app.request('/health');
+  it('returns 200 with status ok', async () => {
+    const app = createApp();
+    const response = await app.request('/health');
 
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ status: 'ok' });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ status: 'ok' });
   });
 });

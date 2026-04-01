@@ -7,7 +7,7 @@
 import { getProviderStream } from '../providers/registry.js';
 
 import type { AssistantMessageEventStream } from '../utils/event-stream.js';
-import type { Api, Context, Model, OptionsForApi } from '@ank1015/llm-types';
+import type { Api, Context, Model, OptionsForApi } from '../types/index.js';
 
 /**
  * Stream a chat request using the specified provider.

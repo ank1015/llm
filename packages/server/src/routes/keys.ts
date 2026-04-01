@@ -1,12 +1,21 @@
-import { SetKeyRequestSchema } from '@ank1015/llm-app-contracts';
-import { isValidApi, KnownApis } from '@ank1015/llm-sdk';
-import { createFileKeysAdapter } from '@ank1015/llm-sdk-adapters';
+import { getSdkConfig } from '@ank1015/llm-sdk/config';
+import {
+  getProviderCredentialSpec,
+  KnownKeyProviders,
+  readKeysFile,
+  resolveProviderCredentials,
+  setProviderCredentials,
+  writeKeysFile,
+} from '@ank1015/llm-sdk/keys';
 import { Hono } from 'hono';
 
 import {
   RELOADABLE_CREDENTIAL_APIS,
   reloadCredentials as reloadProviderCredentials,
 } from '../core/session/credential-utils.js';
+import {
+  SetKeyRequestSchema,
+} from '../contracts/index.js';
 import { readJsonBody, validateSchema } from '../http/validation.js';
 
 import type {
@@ -16,20 +25,41 @@ import type {
   ReloadKeyResponse,
   SetKeyRequest,
   SetKeyResponse,
-} from '@ank1015/llm-app-contracts';
-import type { KeysAdapter, Api } from '@ank1015/llm-sdk';
+} from '../contracts/index.js';
+import type {
+  KeyProvider,
+  KeysFileValues,
+  ProviderCredentials,
+} from '@ank1015/llm-sdk/keys';
 import type { Context } from 'hono';
 
 const INVALID_REQUEST_BODY_MESSAGE = 'Invalid request body';
-const KEYS_PROVIDER_ROUTE = '/keys/:api';
-const KEYS_RELOAD_ROUTE = '/keys/:api/reload';
+const KEYS_PROVIDER_ROUTE = '/keys/:provider';
+const KEYS_RELOAD_ROUTE = '/keys/:provider/reload';
 const RELOAD_NOT_SUPPORTED_PREFIX = 'Reload not supported for';
 const UNKNOWN_PROVIDER_PREFIX = 'Unknown provider:';
 
+type ReloadableKeyProvider = Extract<KeyProvider, 'codex' | 'claude-code'>;
+
 type KeyRouteDependencies = {
-  keysAdapter: KeysAdapter;
-  reloadCredentials: (api: Api) => Promise<Record<string, string>>;
+  keysFilePath: string;
+  reloadCredentials: (provider: ReloadableKeyProvider) => Promise<Record<string, string>>;
 };
+
+const RELOADABLE_KEY_PROVIDERS = new Set<ReloadableKeyProvider>(
+  [...RELOADABLE_CREDENTIAL_APIS].filter(
+    (provider): provider is ReloadableKeyProvider =>
+      provider === 'codex' || provider === 'claude-code'
+  )
+);
+
+function isKnownKeyProvider(value: string): value is KeyProvider {
+  return KnownKeyProviders.includes(value as KeyProvider);
+}
+
+function isReloadableKeyProvider(value: KeyProvider): value is ReloadableKeyProvider {
+  return RELOADABLE_KEY_PROVIDERS.has(value as ReloadableKeyProvider);
+}
 
 function maskCredentialValue(value: string): string {
   if (value.length <= 10) {
@@ -39,66 +69,137 @@ function maskCredentialValue(value: string): string {
   return `${value.slice(0, 4)}****${value.slice(-4)}`;
 }
 
-async function getStoredCredentials(
-  keysAdapter: KeysAdapter,
-  api: Api
-): Promise<Record<string, string> | undefined> {
-  if (keysAdapter.getCredentials) {
-    return keysAdapter.getCredentials(api);
-  }
-
-  const key = await keysAdapter.get(api);
-  return key ? { apiKey: key } : undefined;
+function isNodeErrorWithCode(
+  error: unknown,
+  code: string
+): error is NodeJS.ErrnoException & { code: string } {
+  return typeof error === 'object' && error !== null && 'code' in error && error.code === code;
 }
 
-function createUnknownProviderResponse(c: Context, api: string): Response {
-  return c.json({ error: `${UNKNOWN_PROVIDER_PREFIX} ${api}` }, 400);
+async function readExistingKeysFile(filePath: string): Promise<KeysFileValues> {
+  try {
+    return await readKeysFile(filePath);
+  } catch (error) {
+    if (isNodeErrorWithCode(error, 'ENOENT')) {
+      return {};
+    }
+
+    throw error;
+  }
+}
+
+function getStoredCredentials(values: KeysFileValues, provider: KeyProvider): Record<string, string> {
+  const spec = getProviderCredentialSpec(provider);
+  const credentials: Record<string, string> = {};
+
+  for (const field of spec.fields) {
+    const keys = [field.env, ...field.aliases];
+
+    for (const key of keys) {
+      const value = values[key];
+      if (typeof value === 'string' && value.length > 0) {
+        credentials[field.option] = value;
+        break;
+      }
+    }
+  }
+
+  return credentials;
+}
+
+async function saveProviderCredentials<TProvider extends KeyProvider>(
+  filePath: string,
+  provider: TProvider,
+  credentials: Record<string, string>
+): Promise<void> {
+  await setProviderCredentials(
+    filePath,
+    provider,
+    credentials as Partial<ProviderCredentials<TProvider>>
+  );
+}
+
+async function deleteProviderCredentials(filePath: string, provider: KeyProvider): Promise<boolean> {
+  const values = await readExistingKeysFile(filePath);
+  const nextValues: KeysFileValues = { ...values };
+  let deleted = false;
+
+  for (const field of getProviderCredentialSpec(provider).fields) {
+    for (const key of [field.env, ...field.aliases]) {
+      if (key in nextValues) {
+        delete nextValues[key];
+        deleted = true;
+      }
+    }
+  }
+
+  if (deleted) {
+    await writeKeysFile(filePath, nextValues);
+  }
+
+  return deleted;
+}
+
+function createUnknownProviderResponse(c: Context, provider: string): Response {
+  return c.json({ error: `${UNKNOWN_PROVIDER_PREFIX} ${provider}` }, 400);
 }
 
 export function createKeyRoutes(dependencies: Partial<KeyRouteDependencies> = {}): Hono {
-  const keysAdapter = dependencies.keysAdapter ?? createFileKeysAdapter();
-  const reloadCredentials = dependencies.reloadCredentials ?? reloadProviderCredentials;
+  const keysFilePath = dependencies.keysFilePath ?? getSdkConfig().keysFilePath;
+  const reloadCredentials =
+    dependencies.reloadCredentials ??
+    (reloadProviderCredentials as KeyRouteDependencies['reloadCredentials']);
   const keyRoutes = new Hono();
 
   keyRoutes.get('/keys', async (c) => {
-    const storedApis = new Set(await keysAdapter.list());
+    const values = await readExistingKeysFile(keysFilePath);
     const providers: KeysListResponse['providers'] = await Promise.all(
-      KnownApis.map(async (api) => {
-        const hasKey = storedApis.has(api);
-        const credentials = hasKey ? await getStoredCredentials(keysAdapter, api) : undefined;
-        const maskedCredentials = credentials
-          ? Object.fromEntries(
-              Object.entries(credentials).map(([key, value]) => [key, maskCredentialValue(value)])
-            )
-          : undefined;
+      KnownKeyProviders.map(async (provider) => {
+        const credentials = getStoredCredentials(values, provider);
+        const resolution = await resolveProviderCredentials(keysFilePath, provider);
+        const hasKey = resolution.ok || Object.keys(credentials).length > 0;
+        const maskedCredentials =
+          Object.keys(credentials).length > 0
+            ? Object.fromEntries(
+                Object.entries(credentials).map(([key, value]) => [key, maskCredentialValue(value)])
+              )
+            : undefined;
 
         return {
-          api,
+          provider,
           hasKey,
           ...(maskedCredentials ? { credentials: maskedCredentials } : {}),
         };
       })
     );
 
-    const body: KeysListResponse = { providers };
-    return c.json(body);
+    return c.json<KeysListResponse>({ providers });
   });
 
   keyRoutes.get(KEYS_PROVIDER_ROUTE, async (c) => {
-    const { api } = c.req.param();
-    if (!isValidApi(api)) {
-      return createUnknownProviderResponse(c, api);
+    const { provider } = c.req.param();
+    if (!isKnownKeyProvider(provider)) {
+      return createUnknownProviderResponse(c, provider);
     }
 
-    const credentials = (await getStoredCredentials(keysAdapter, api)) ?? {};
-    const body: KeyProviderDetailsResponse = { credentials };
-    return c.json(body);
+    const values = await readExistingKeysFile(keysFilePath);
+    await resolveProviderCredentials(keysFilePath, provider);
+
+    return c.json<KeyProviderDetailsResponse>({
+      provider,
+      credentials: getStoredCredentials(values, provider),
+      fields: getProviderCredentialSpec(provider).fields.map((field) => ({
+        option: field.option,
+        env: field.env,
+        aliases: [...field.aliases],
+      })),
+    });
   });
 
   keyRoutes.put(KEYS_PROVIDER_ROUTE, async (c) => {
-    const { api } = c.req.param();
-    if (!isValidApi(api)) {
-      return createUnknownProviderResponse(c, api);
+    const { provider } = c.req.param();
+    if (!isKnownKeyProvider(provider)) {
+      return createUnknownProviderResponse(c, provider);
     }
 
     const rawBody = await readJsonBody(c);
@@ -113,58 +214,39 @@ export function createKeyRoutes(dependencies: Partial<KeyRouteDependencies> = {}
     }
 
     const body = validation.value as SetKeyRequest;
-    if (body.credentials && Object.keys(body.credentials).length > 0) {
-      if (keysAdapter.setCredentials) {
-        await keysAdapter.setCredentials(api, body.credentials);
-      } else if (typeof body.credentials.apiKey === 'string') {
-        await keysAdapter.set(api, body.credentials.apiKey);
-      } else {
-        return c.json({ error: 'This provider does not support credential bundles' }, 400);
-      }
-    } else if (typeof body.key === 'string') {
-      await keysAdapter.set(api, body.key);
-    } else {
-      return c.json({ error: 'Provide "key" or "credentials"' }, 400);
+    if (!body.credentials || Object.keys(body.credentials).length === 0) {
+      return c.json({ error: 'Provide "credentials"' }, 400);
     }
 
-    const response: SetKeyResponse = { ok: true };
-    return c.json(response);
+    await saveProviderCredentials(keysFilePath, provider, body.credentials);
+
+    return c.json<SetKeyResponse>({ ok: true });
   });
 
   keyRoutes.delete(KEYS_PROVIDER_ROUTE, async (c) => {
-    const { api } = c.req.param();
-    if (!isValidApi(api)) {
-      return createUnknownProviderResponse(c, api);
+    const { provider } = c.req.param();
+    if (!isKnownKeyProvider(provider)) {
+      return createUnknownProviderResponse(c, provider);
     }
 
-    const deleted = keysAdapter.deleteCredentials
-      ? await keysAdapter.deleteCredentials(api)
-      : await keysAdapter.delete(api);
-    const response: DeleteKeyResponse = { deleted };
-    return c.json(response);
+    const deleted = await deleteProviderCredentials(keysFilePath, provider);
+    return c.json<DeleteKeyResponse>({ deleted });
   });
 
   keyRoutes.post(KEYS_RELOAD_ROUTE, async (c) => {
-    const { api } = c.req.param();
-    if (!isValidApi(api)) {
-      return createUnknownProviderResponse(c, api);
+    const { provider } = c.req.param();
+    if (!isKnownKeyProvider(provider)) {
+      return createUnknownProviderResponse(c, provider);
     }
 
-    if (!RELOADABLE_CREDENTIAL_APIS.has(api)) {
-      return c.json({ error: `${RELOAD_NOT_SUPPORTED_PREFIX} ${api}` }, 400);
+    if (!isReloadableKeyProvider(provider)) {
+      return c.json({ error: `${RELOAD_NOT_SUPPORTED_PREFIX} ${provider}` }, 400);
     }
 
-    const credentials = await reloadCredentials(api);
-    if (keysAdapter.setCredentials) {
-      await keysAdapter.setCredentials(api, credentials);
-    } else if (typeof credentials.apiKey === 'string') {
-      await keysAdapter.set(api, credentials.apiKey);
-    } else {
-      return c.json({ error: 'This provider does not support credential bundles' }, 400);
-    }
+    const credentials = await reloadCredentials(provider);
+    await saveProviderCredentials(keysFilePath, provider, credentials);
 
-    const response: ReloadKeyResponse = { ok: true };
-    return c.json(response);
+    return c.json<ReloadKeyResponse>({ ok: true });
   });
 
   return keyRoutes;

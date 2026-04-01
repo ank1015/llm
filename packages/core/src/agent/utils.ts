@@ -7,7 +7,7 @@ import type {
   Content,
   ToolResultMessage,
   UserMessage,
-} from '@ank1015/llm-types';
+} from '../types/index.js';
 
 /**
  * Builds a UserMessage from text input and optional attachments.

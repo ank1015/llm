@@ -8,7 +8,7 @@ import {
   mapStopReason,
 } from '../openai/utils.js';
 
-import type { CodexProviderOptions, Context, Model } from '@ank1015/llm-types';
+import type { CodexProviderOptions, Context, Model } from '../../types/index.js';
 import type {
   Tool as OpenAITool,
   Response as OpenAIResponse,
@@ -21,6 +21,8 @@ const DEFAULT_CODEX_INSTRUCTIONS = 'You are a helpful assistant';
 
 interface CodexBackendErrorBody {
   detail?: unknown;
+  error?: Record<string, unknown>;
+  message?: unknown;
 }
 
 /**
@@ -29,8 +31,31 @@ interface CodexBackendErrorBody {
  */
 export function rewriteCodexErrorBody(body: string, status: number): string {
   let detail = body;
+  let type = 'codex_backend_error';
+  let code = String(status);
+  let extra: Record<string, unknown> = {};
+
   try {
     const json = JSON.parse(body) as CodexBackendErrorBody;
+    if (json.error && typeof json.error === 'object') {
+      extra = { ...json.error };
+      if (typeof json.error.message === 'string' && json.error.message.length > 0) {
+        detail = json.error.message;
+      } else {
+        detail = JSON.stringify(json.error);
+      }
+      if (typeof json.error.type === 'string' && json.error.type.length > 0) {
+        type = json.error.type;
+      }
+      if (
+        (typeof json.error.code === 'string' && json.error.code.length > 0) ||
+        typeof json.error.code === 'number'
+      ) {
+        code = String(json.error.code);
+      }
+    } else if (typeof json.message === 'string' && json.message.length > 0) {
+      detail = json.message;
+    }
     if (typeof json.detail === 'string' && json.detail.length > 0) {
       detail = json.detail;
     }
@@ -40,9 +65,10 @@ export function rewriteCodexErrorBody(body: string, status: number): string {
 
   return JSON.stringify({
     error: {
+      ...extra,
       message: detail,
-      type: 'codex_backend_error',
-      code: String(status),
+      type,
+      code,
     },
   });
 }
