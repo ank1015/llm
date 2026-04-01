@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { cn } from '@/lib/utils';
+import { cn } from "@/lib/utils";
 
 export type TextShimmerProps = {
   as?: string;
@@ -11,7 +11,7 @@ export type TextShimmerProps = {
 } & React.HTMLAttributes<HTMLElement>;
 
 export function TextShimmer({
-  as = 'span',
+  as = "span",
   className,
   duration = 4,
   spread = 20,
@@ -25,14 +25,14 @@ export function TextShimmer({
   return (
     <Component
       className={cn(
-        'bg-size-[200%_auto] bg-clip-text font-medium text-transparent cursor-pointer',
-        !stop && 'animate-[shimmer_4s_infinite_linear]',
-        className
+        "bg-size-[200%_auto] bg-clip-text cursor-pointer font-medium text-transparent",
+        !stop && "animate-[shimmer_4s_infinite_linear]",
+        className,
       )}
       style={{
         backgroundImage: `linear-gradient(to right, var(--muted-foreground) ${50 - dynamicSpread}%, var(--foreground) 50%, var(--muted-foreground) ${50 + dynamicSpread}%)`,
         animationDuration: stop ? undefined : `${duration}s`,
-        backgroundPosition: stop ? 'center center' : undefined,
+        backgroundPosition: stop ? "center center" : undefined,
       }}
       {...props}
     >
