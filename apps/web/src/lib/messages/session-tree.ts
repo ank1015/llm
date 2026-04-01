@@ -1,4 +1,10 @@
-import type { MessageNode } from '@ank1015/llm-types';
+import type { SessionTreeResponse } from "@/lib/client-api";
+
+type PersistedMessageNode = SessionTreeResponse["nodes"][number];
+
+export type MessageNode = Omit<PersistedMessageNode, "parentId"> & {
+  parentId: string | null;
+};
 
 export type BranchNavigatorState = {
   currentIndex: number;
@@ -27,7 +33,7 @@ export function sortMessageNodesChronologically(nodes: MessageNode[]): MessageNo
 
 export function getVisiblePathNodes(
   nodes: MessageNode[],
-  leafNodeId: string | null
+  leafNodeId: string | null,
 ): MessageNode[] {
   if (!leafNodeId) {
     return [];
@@ -67,7 +73,7 @@ function buildChildrenByParentId(nodes: MessageNode[]): Map<string, MessageNode[
 
 export function getLatestLeafNodeIdInSubtree(
   nodes: MessageNode[],
-  rootNodeId: string
+  rootNodeId: string,
 ): string | null {
   const nodeMap = new Map<string, MessageNode>(nodes.map((node) => [node.id, node]));
   if (!nodeMap.has(rootNodeId)) {
@@ -107,14 +113,14 @@ export function getLatestLeafNodeIdInSubtree(
 
 export function getBranchNavigatorState(
   nodes: MessageNode[],
-  userNode: MessageNode
+  userNode: MessageNode,
 ): BranchNavigatorState | null {
-  if (userNode.message.role !== 'user' || !userNode.parentId) {
+  if (userNode.message.role !== "user" || !userNode.parentId) {
     return null;
   }
 
   const siblings = nodes
-    .filter((node) => node.parentId === userNode.parentId && node.message.role === 'user')
+    .filter((node) => node.parentId === userNode.parentId && node.message.role === "user")
     .sort(compareMessageNodeChronology);
 
   if (siblings.length <= 1) {
