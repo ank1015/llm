@@ -1,54 +1,51 @@
-'use client';
+"use client";
 
-import { Check, Copy } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { CheckmarkCircle02Icon, Copy01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { useCallback, useMemo, useState } from "react";
 
-import { ChatMarkdown } from './markdown-renderer';
-import { WorkingTrace } from './working-trace';
+import { AssistantTurnMetricsInline } from "@/components/assistant-turn-metrics";
+import { ChatMarkdown } from "@/components/markdown-renderer";
+import { WorkingTrace } from "@/components/working-trace";
+import { getAssistantTurnMetrics } from "@/lib/messages/assistant-turn-metrics";
+import { buildWorkingTraceModel } from "@/lib/messages/working-trace";
+import { useChatStore } from "@/stores/chat-store";
 
+import type { MessageNode } from "@/stores/types";
 import type {
   AgentEvent,
   Api,
   BaseAssistantMessage,
   Message,
-  MessageNode,
-} from '@ank1015/llm-types';
+} from "@ank1015/llm-sdk";
 
-import { buildWorkingTraceModel } from '@/lib/messages/working-trace';
-import { useChatStore } from '@/stores/chat-store';
-
-/* ------------------------------------------------------------------ */
-/*  Types                                                             */
-/* ------------------------------------------------------------------ */
-
-type AssistantStreamingMessage = Omit<BaseAssistantMessage<Api>, 'message'>;
+type AssistantStreamingMessage = Omit<BaseAssistantMessage<Api>, "message">;
 type CotRenderableMessage = Message | AssistantStreamingMessage;
 const EMPTY_AGENT_EVENTS: AgentEvent[] = [];
 
 type AssistantMessagesProps = {
-  /** All message nodes between this turn's user message and the next user message */
   cotMessages: CotRenderableMessage[];
-  /** The final assistant node for this turn (if completed) */
   assistantNode: MessageNode | null;
-  /** Whether this is the currently streaming turn */
   isStreamingTurn: boolean;
-  /** The streaming assistant message (partial, not yet a node) */
   streamingAssistant: AssistantStreamingMessage | null;
-  /** The API provider used for this turn */
   api: Api | null;
-  /** Session key for live reasoning drawer updates */
   sessionKey: string | null;
-  /** Timestamp (ms epoch) of the user message that started this turn */
   userTimestamp: number | null;
 };
 
 function getDurationInSeconds(
   userTimestamp: number | null,
-  assistantNode: MessageNode | null
+  assistantNode: MessageNode | null,
 ): number | undefined {
-  if (userTimestamp === null || !assistantNode) return undefined;
+  if (userTimestamp === null || !assistantNode) {
+    return undefined;
+  }
+
   const endTimestamp = assistantNode.message.timestamp;
-  if (typeof endTimestamp !== 'number') return undefined;
+  if (typeof endTimestamp !== "number") {
+    return undefined;
+  }
+
   return (endTimestamp - userTimestamp) / 1000;
 }
 
@@ -57,33 +54,37 @@ function AssistantMessageActions({
   displayText,
   isStreamingTurn,
   onCopy,
+  metrics,
 }: {
   copied: boolean;
   displayText: string | null;
   isStreamingTurn: boolean;
   onCopy: () => void;
+  metrics: ReturnType<typeof getAssistantTurnMetrics>;
 }) {
   if (isStreamingTurn || !displayText) {
     return null;
   }
 
   return (
-    <div className="ml-[2%] mt-1 flex h-5 items-center opacity-0 transition-opacity group-hover/assistant:opacity-100">
+    <div className="text-muted-foreground ml-[2%] mt-1 flex min-h-5 items-center gap-1.5 opacity-0 transition-opacity group-hover/assistant:opacity-100">
       <button
         type="button"
         onClick={onCopy}
         className="text-muted-foreground hover:text-foreground cursor-pointer rounded p-1 transition-colors"
-        aria-label={copied ? 'Copied' : 'Copy message'}
+        aria-label={copied ? "Copied" : "Copy message"}
       >
-        {copied ? <Check className="size-3.5 text-blue-500" /> : <Copy className="size-3.5" />}
+        <HugeiconsIcon
+          icon={copied ? CheckmarkCircle02Icon : Copy01Icon}
+          size={14}
+          color="currentColor"
+          strokeWidth={1.8}
+        />
       </button>
+      <AssistantTurnMetricsInline metrics={metrics} />
     </div>
   );
 }
-
-/* ------------------------------------------------------------------ */
-/*  AssistantMessages                                                 */
-/* ------------------------------------------------------------------ */
 
 export function AssistantMessages({
   cotMessages,
@@ -104,14 +105,14 @@ export function AssistantMessages({
 
   const duration = useMemo(
     () => getDurationInSeconds(userTimestamp, assistantNode),
-    [userTimestamp, assistantNode]
+    [assistantNode, userTimestamp],
   );
 
   const label = isStreamingTurn
-    ? 'Working'
+    ? "Working"
     : duration !== undefined
       ? `Worked for ${duration.toFixed(1)}s`
-      : 'Worked';
+      : "Worked";
 
   const traceModel = useMemo(
     () =>
@@ -123,20 +124,34 @@ export function AssistantMessages({
         agentEvents: liveAgentEvents,
         api,
       }),
-    [api, assistantNode, cotMessages, isStreamingTurn, liveAgentEvents, streamingAssistant]
+    [api, assistantNode, cotMessages, isStreamingTurn, liveAgentEvents, streamingAssistant],
+  );
+  const turnMetrics = useMemo(
+    () =>
+      getAssistantTurnMetrics({
+        cotMessages,
+        assistantMessage:
+          assistantNode?.message.role === "assistant"
+            ? (assistantNode.message as BaseAssistantMessage<Api>)
+            : null,
+      }),
+    [assistantNode, cotMessages],
   );
 
   const displayText = traceModel.finalResponseText;
   const [copied, setCopied] = useState(false);
 
   const handleCopy = useCallback(async () => {
-    if (!displayText) return;
+    if (!displayText) {
+      return;
+    }
+
     try {
       await navigator.clipboard.writeText(displayText);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Clipboard API may not be available
+      // Clipboard may not be available.
     }
   }, [displayText]);
 
@@ -144,22 +159,24 @@ export function AssistantMessages({
     <div className="group/assistant flex w-full flex-col gap-3">
       <WorkingTrace
         model={traceModel}
-        presentation={isStreamingTurn ? 'streaming' : 'completed'}
+        presentation={isStreamingTurn ? "streaming" : "completed"}
         label={label}
       />
 
-      {/* Final assistant response */}
-      {!isStreamingTurn && displayText && (
-        <div className="max-w-[96%] ml-[2%]" data-streaming={isStreamingTurn ? 'true' : 'false'}>
-          <ChatMarkdown className="text-foreground">{displayText}</ChatMarkdown>
+      {!isStreamingTurn && displayText ? (
+        <div className="ml-[2%] max-w-[96%]" data-streaming={isStreamingTurn ? "true" : "false"}>
+          <ChatMarkdown enableArtifactFileLinks className="text-foreground">
+            {displayText}
+          </ChatMarkdown>
         </div>
-      )}
+      ) : null}
 
       <AssistantMessageActions
         copied={copied}
         displayText={displayText}
         isStreamingTurn={isStreamingTurn}
         onCopy={handleCopy}
+        metrics={turnMetrics}
       />
     </div>
   );

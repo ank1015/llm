@@ -1,37 +1,48 @@
-'use client';
+"use client";
 
-import { Check, ChevronRight, CircleAlert, LoaderCircle } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import {
+  ArrowRight01Icon,
+  Cancel01Icon,
+  CheckmarkCircle02Icon,
+  Loading01Icon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { useMemo, useState } from "react";
 
-import { CopyButton } from './copy-button';
-import { ChatMarkdown } from './markdown-renderer';
+import { TextShimmer } from "@/components/ai/text-shimmer";
+import { CopyButton } from "@/components/copy-button";
+import { ChatMarkdown } from "@/components/markdown-renderer";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+  getWorkingTraceFiles,
+  getWorkingTraceImages,
+  getWorkingTraceTextContent,
+} from "@/lib/messages/working-trace";
+import { cn } from "@/lib/utils";
 
 import type {
   WorkingToolEntry,
   WorkingTraceItem,
   WorkingTraceModel,
-} from '@/lib/messages/working-trace';
-
-import { TextShimmer } from '@/components/ai/text-shimmer';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import {
-  getWorkingTraceFiles,
-  getWorkingTraceImages,
-  getWorkingTraceTextContent,
-} from '@/lib/messages/working-trace';
-import { cn } from '@/lib/utils';
+} from "@/lib/messages/working-trace";
 
 type WorkingTraceProps = {
   model: WorkingTraceModel;
-  presentation: 'streaming' | 'completed';
+  presentation: "streaming" | "completed";
   label: string;
 };
 
 const TRACE_MARKDOWN_CLASSNAME =
-  'text-[13px] leading-relaxed [&_h1]:!my-0 [&_h1]:!text-[13px] [&_h1]:!font-medium [&_h1]:!leading-relaxed [&_h1]:!text-foreground/85 [&_h2]:!my-0 [&_h2]:!text-[13px] [&_h2]:!font-medium [&_h2]:!leading-relaxed [&_h2]:!text-foreground/85 [&_h3]:!my-0 [&_h3]:!text-[13px] [&_h3]:!font-medium [&_h3]:!leading-relaxed [&_h3]:!text-foreground/85 [&_h4]:!my-0 [&_h4]:!text-[13px] [&_h4]:!font-medium [&_h4]:!leading-relaxed [&_h4]:!text-foreground/85 [&_h5]:!my-0 [&_h5]:!text-[13px] [&_h5]:!font-medium [&_h5]:!leading-relaxed [&_h5]:!text-foreground/85 [&_h6]:!my-0 [&_h6]:!text-[13px] [&_h6]:!font-medium [&_h6]:!leading-relaxed [&_h6]:!text-foreground/85 [&_p]:!my-0 [&_p]:!text-[13px] [&_p]:!leading-relaxed [&_p]:!text-foreground/80 [&_ul]:!my-1.5 [&_ul]:!text-[13px] [&_ol]:!my-1.5 [&_ol]:!text-[13px] [&_li]:!text-[13px] [&_li]:!leading-relaxed [&_li]:!text-foreground/80';
+  "text-[13px] leading-relaxed [&_h1]:!my-0 [&_h1]:!text-[13px] [&_h1]:!font-medium [&_h1]:!leading-relaxed [&_h1]:!text-foreground/85 [&_h2]:!my-0 [&_h2]:!text-[13px] [&_h2]:!font-medium [&_h2]:!leading-relaxed [&_h2]:!text-foreground/85 [&_h3]:!my-0 [&_h3]:!text-[13px] [&_h3]:!font-medium [&_h3]:!leading-relaxed [&_h3]:!text-foreground/85 [&_h4]:!my-0 [&_h4]:!text-[13px] [&_h4]:!font-medium [&_h4]:!leading-relaxed [&_h4]:!text-foreground/85 [&_h5]:!my-0 [&_h5]:!text-[13px] [&_h5]:!font-medium [&_h5]:!leading-relaxed [&_h5]:!text-foreground/85 [&_h6]:!my-0 [&_h6]:!text-[13px] [&_h6]:!font-medium [&_h6]:!leading-relaxed [&_h6]:!text-foreground/85 [&_p]:!my-0 [&_p]:!text-[13px] [&_p]:!leading-relaxed [&_p]:!text-foreground/80 [&_ul]:!my-1.5 [&_ul]:!text-[13px] [&_ol]:!my-1.5 [&_ol]:!text-[13px] [&_li]:!text-[13px] [&_li]:!leading-relaxed [&_li]:!text-foreground/80";
 
-function ContentScroll({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <div className={cn('max-h-48 overflow-auto pr-2', className)}>{children}</div>;
+function ContentScroll({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return <div className={cn("max-h-48 overflow-auto pr-2", className)}>{children}</div>;
 }
 
 function FileChip({ filename, mimeType }: { filename: string; mimeType: string }) {
@@ -48,7 +59,7 @@ function renderUnknownArgs(args: unknown): string | null {
     return null;
   }
 
-  if (typeof args === 'string') {
+  if (typeof args === "string") {
     return args;
   }
 
@@ -60,103 +71,114 @@ function renderUnknownArgs(args: unknown): string | null {
 }
 
 function getStringArg(args: unknown, key: string): string | null {
-  if (typeof args !== 'object' || args === null || !(key in args)) {
+  if (typeof args !== "object" || args === null || !(key in args)) {
     return null;
   }
 
   const value = (args as Record<string, unknown>)[key];
-  return typeof value === 'string' && value.trim().length > 0 ? value : null;
+  return typeof value === "string" && value.trim().length > 0 ? value : null;
 }
 
 function getToolPanelLabel(toolName: string): string {
   switch (toolName) {
-    case 'bash':
-      return 'Shell';
-    case 'ls':
-      return 'List';
-    case 'find':
-      return 'Find';
-    case 'grep':
-      return 'Grep';
-    case 'read':
-      return 'Read';
-    case 'write':
-      return 'Write';
-    case 'edit':
-      return 'Edit';
+    case "bash":
+      return "Shell";
+    case "ls":
+      return "List";
+    case "find":
+      return "Find";
+    case "grep":
+      return "Grep";
+    case "read":
+      return "Read";
+    case "write":
+      return "Write";
+    case "edit":
+      return "Edit";
     default:
-      return 'Tool';
+      return "Tool";
   }
 }
 
 function getToolCopyText(entry: WorkingToolEntry): string | null {
   const textContent = getWorkingTraceTextContent(entry.content);
 
-  if (entry.toolName === 'bash') {
-    const command = getStringArg(entry.args, 'command');
+  if (entry.toolName === "bash") {
+    const command = getStringArg(entry.args, "command");
     const output = textContent || entry.errorText;
-    const value = [command ? `$ ${command}` : null, output].filter(Boolean).join('\n\n').trim();
+    const value = [command ? `$ ${command}` : null, output].filter(Boolean).join("\n\n").trim();
     return value.length > 0 ? value : null;
   }
 
-  if (entry.toolName === 'edit') {
+  if (entry.toolName === "edit") {
     const diff =
-      typeof entry.details === 'object' && entry.details !== null && 'diff' in entry.details
+      typeof entry.details === "object" && entry.details !== null && "diff" in entry.details
         ? (entry.details as { diff?: unknown }).diff
         : undefined;
 
-    if (typeof diff === 'string' && diff.trim().length > 0) {
+    if (typeof diff === "string" && diff.trim().length > 0) {
       return diff;
     }
 
-    const oldText = getStringArg(entry.args, 'oldText');
-    const newText = getStringArg(entry.args, 'newText');
+    const oldText = getStringArg(entry.args, "oldText");
+    const newText = getStringArg(entry.args, "newText");
     const value = [
       oldText ? `Before\n${oldText}` : null,
       newText ? `After\n${newText}` : null,
       textContent || entry.errorText || null,
     ]
       .filter(Boolean)
-      .join('\n\n')
+      .join("\n\n")
       .trim();
     return value.length > 0 ? value : null;
   }
 
-  if (entry.toolName === 'write') {
-    const content = getStringArg(entry.args, 'content');
+  if (entry.toolName === "write") {
+    const content = getStringArg(entry.args, "content");
     const value = [content, textContent || entry.errorText || null]
       .filter(Boolean)
-      .join('\n\n')
+      .join("\n\n")
       .trim();
     return value.length > 0 ? value : null;
   }
 
-  const value = (textContent || renderUnknownArgs(entry.args) || entry.errorText || '').trim();
+  const value = (textContent || renderUnknownArgs(entry.args) || entry.errorText || "").trim();
   return value.length > 0 ? value : null;
 }
 
-function ToolPanelStatus({ status }: { status: WorkingToolEntry['status'] }) {
-  if (status === 'running') {
+function ToolPanelStatus({ status }: { status: WorkingToolEntry["status"] }) {
+  if (status === "running") {
     return (
       <>
-        <LoaderCircle className="size-3.5 animate-spin" />
+        <HugeiconsIcon
+          icon={Loading01Icon}
+          size={14}
+          color="currentColor"
+          strokeWidth={1.8}
+          className="animate-spin"
+        />
         <span>Running</span>
       </>
     );
   }
 
-  if (status === 'error') {
+  if (status === "error") {
     return (
       <>
-        <CircleAlert className="size-3.5 text-red-500" />
-        <span className="text-red-500">Error</span>
+        <HugeiconsIcon icon={Cancel01Icon} size={14} color="currentColor" strokeWidth={1.8} />
+        <span className="text-[#FF6363]">Error</span>
       </>
     );
   }
 
   return (
     <>
-      <Check className="size-3.5" />
+      <HugeiconsIcon
+        icon={CheckmarkCircle02Icon}
+        size={14}
+        color="currentColor"
+        strokeWidth={1.8}
+      />
       <span>Success</span>
     </>
   );
@@ -167,29 +189,29 @@ function ToolContentPreview({ entry }: { entry: WorkingToolEntry }) {
   const images = useMemo(() => getWorkingTraceImages(entry.content), [entry.content]);
   const files = useMemo(() => getWorkingTraceFiles(entry.content), [entry.content]);
 
-  if (entry.toolName === 'bash') {
-    const command = getStringArg(entry.args, 'command');
+  if (entry.toolName === "bash") {
+    const command = getStringArg(entry.args, "command");
     const bodyText = [command ? `$ ${command}` : null, textContent || entry.errorText || null]
       .filter(Boolean)
-      .join('\n\n')
+      .join("\n\n")
       .trim();
 
     return (
       <ContentScroll>
         <pre className="text-foreground/85 font-mono text-[12px] leading-relaxed whitespace-pre-wrap">
-          {bodyText || '(no output)'}
+          {bodyText || "(no output)"}
         </pre>
       </ContentScroll>
     );
   }
 
-  if (entry.toolName === 'edit') {
+  if (entry.toolName === "edit") {
     const diff =
-      typeof entry.details === 'object' && entry.details !== null && 'diff' in entry.details
+      typeof entry.details === "object" && entry.details !== null && "diff" in entry.details
         ? (entry.details as { diff?: unknown }).diff
         : undefined;
 
-    if (typeof diff === 'string' && diff.trim().length > 0) {
+    if (typeof diff === "string" && diff.trim().length > 0) {
       return (
         <ContentScroll>
           <pre className="text-foreground/85 font-mono text-[12px] leading-relaxed whitespace-pre-wrap">
@@ -200,17 +222,17 @@ function ToolContentPreview({ entry }: { entry: WorkingToolEntry }) {
     }
 
     const oldText =
-      typeof entry.args === 'object' && entry.args !== null && 'oldText' in entry.args
+      typeof entry.args === "object" && entry.args !== null && "oldText" in entry.args
         ? (entry.args as { oldText?: unknown }).oldText
         : undefined;
     const newText =
-      typeof entry.args === 'object' && entry.args !== null && 'newText' in entry.args
+      typeof entry.args === "object" && entry.args !== null && "newText" in entry.args
         ? (entry.args as { newText?: unknown }).newText
         : undefined;
 
     return (
       <div className="space-y-2">
-        {typeof oldText === 'string' && oldText.length > 0 && (
+        {typeof oldText === "string" && oldText.length > 0 ? (
           <div className="space-y-1">
             <p className="text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
               Before
@@ -221,8 +243,8 @@ function ToolContentPreview({ entry }: { entry: WorkingToolEntry }) {
               </pre>
             </ContentScroll>
           </div>
-        )}
-        {typeof newText === 'string' && newText.length > 0 && (
+        ) : null}
+        {typeof newText === "string" && newText.length > 0 ? (
           <div className="space-y-1">
             <p className="text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
               After
@@ -233,27 +255,27 @@ function ToolContentPreview({ entry }: { entry: WorkingToolEntry }) {
               </pre>
             </ContentScroll>
           </div>
-        )}
-        {textContent && (
+        ) : null}
+        {textContent ? (
           <ContentScroll>
             <pre className="text-foreground/85 font-mono text-[12px] leading-relaxed whitespace-pre-wrap">
               {textContent}
             </pre>
           </ContentScroll>
-        )}
+        ) : null}
       </div>
     );
   }
 
-  if (entry.toolName === 'write') {
+  if (entry.toolName === "write") {
     const content =
-      typeof entry.args === 'object' && entry.args !== null && 'content' in entry.args
+      typeof entry.args === "object" && entry.args !== null && "content" in entry.args
         ? (entry.args as { content?: unknown }).content
         : undefined;
 
     return (
       <div className="space-y-2">
-        {typeof content === 'string' && content.length > 0 && (
+        {typeof content === "string" && content.length > 0 ? (
           <div className="space-y-1">
             <p className="text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
               Content
@@ -264,14 +286,14 @@ function ToolContentPreview({ entry }: { entry: WorkingToolEntry }) {
               </pre>
             </ContentScroll>
           </div>
-        )}
-        {textContent && (
+        ) : null}
+        {textContent ? (
           <ContentScroll>
             <pre className="text-foreground/85 font-mono text-[12px] leading-relaxed whitespace-pre-wrap">
               {textContent}
             </pre>
           </ContentScroll>
-        )}
+        ) : null}
       </div>
     );
   }
@@ -279,22 +301,18 @@ function ToolContentPreview({ entry }: { entry: WorkingToolEntry }) {
   if (images.length > 0 || files.length > 0) {
     return (
       <div className="space-y-3">
-        {textContent && (
+        {textContent ? (
           <ContentScroll>
             <pre className="text-foreground/85 font-mono text-[12px] leading-relaxed whitespace-pre-wrap">
               {textContent}
             </pre>
           </ContentScroll>
-        )}
-        {images.length > 0 && (
+        ) : null}
+        {images.length > 0 ? (
           <div className="grid gap-3 sm:grid-cols-2">
             {images.map((image, index) => (
-              <div
-                key={`${entry.toolCallId}-image-${index}`}
-                className="overflow-hidden rounded-md"
-              >
-                {/* Tool outputs provide dynamic data URLs, so next/image is not a good fit here. */}
-                {}
+              <div key={`${entry.toolCallId}-image-${index}`} className="overflow-hidden rounded-md">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={`data:${image.mimeType};base64,${image.data}`}
                   alt=""
@@ -303,8 +321,8 @@ function ToolContentPreview({ entry }: { entry: WorkingToolEntry }) {
               </div>
             ))}
           </div>
-        )}
-        {files.length > 0 && (
+        ) : null}
+        {files.length > 0 ? (
           <div className="flex flex-wrap gap-2">
             {files.map((file, index) => (
               <FileChip
@@ -314,12 +332,12 @@ function ToolContentPreview({ entry }: { entry: WorkingToolEntry }) {
               />
             ))}
           </div>
-        )}
+        ) : null}
       </div>
     );
   }
 
-  const bodyText = textContent || renderUnknownArgs(entry.args) || entry.errorText || '(no output)';
+  const bodyText = textContent || renderUnknownArgs(entry.args) || entry.errorText || "(no output)";
 
   return (
     <ContentScroll>
@@ -343,11 +361,12 @@ function ToolTraceItem({ entry }: { entry: WorkingToolEntry }) {
             className="flex w-full items-center gap-2 text-left text-[13px] transition-opacity hover:opacity-80"
           >
             <span className="min-w-0 flex-1 truncate font-medium">{entry.title}</span>
-            <ChevronRight
-              className={cn(
-                'text-muted-foreground size-4 shrink-0 transition-transform',
-                open && 'rotate-90'
-              )}
+            <HugeiconsIcon
+              icon={ArrowRight01Icon}
+              size={16}
+              color="currentColor"
+              strokeWidth={1.8}
+              className={cn("text-muted-foreground shrink-0 transition-transform", open && "rotate-90")}
             />
           </button>
         </CollapsibleTrigger>
@@ -379,65 +398,73 @@ function TraceContent({
   presentation,
 }: {
   item: Exclude<WorkingTraceItem, WorkingToolEntry>;
-  presentation: WorkingTraceProps['presentation'];
+  presentation: WorkingTraceProps["presentation"];
 }) {
-  if (presentation === 'streaming') {
-    if (item.type === 'assistant_note') {
+  if (presentation === "streaming") {
+    if (item.type === "assistant_note") {
       return (
         <div className="min-w-0 pb-4">
-          <ChatMarkdown className="text-foreground">{item.body}</ChatMarkdown>
+          <ChatMarkdown enableArtifactFileLinks className="text-foreground">
+            {item.body}
+          </ChatMarkdown>
         </div>
       );
     }
 
-    if (item.format === 'markdown') {
+    if (item.format === "markdown") {
       return (
         <div className="min-w-0 pb-4">
-          <ChatMarkdown className="text-foreground">{item.body}</ChatMarkdown>
+          <ChatMarkdown enableArtifactFileLinks className="text-foreground">
+            {item.body}
+          </ChatMarkdown>
         </div>
       );
     }
 
     return (
       <div className="min-w-0 pb-4">
-        {item.title && (
+        {item.title ? (
           <p className="text-foreground text-[15px] font-medium leading-[1.8]">{item.title}</p>
-        )}
-        {item.body && (
+        ) : null}
+        {item.body ? (
           <p className="text-foreground whitespace-pre-wrap text-[15px] leading-[1.8]">
             {item.body}
           </p>
-        )}
+        ) : null}
       </div>
     );
   }
 
-  if (item.type === 'assistant_note') {
+  if (item.type === "assistant_note") {
     return (
       <div className="min-w-0 pb-4">
-        <ChatMarkdown className={TRACE_MARKDOWN_CLASSNAME}>{item.body}</ChatMarkdown>
+        <ChatMarkdown enableArtifactFileLinks className={TRACE_MARKDOWN_CLASSNAME}>
+          {item.body}
+        </ChatMarkdown>
       </div>
     );
   }
 
-  if (item.format === 'markdown') {
+  if (item.format === "markdown") {
     return (
       <div className="min-w-0 pb-4">
-        <ChatMarkdown className={TRACE_MARKDOWN_CLASSNAME}>{item.body}</ChatMarkdown>
+        <ChatMarkdown enableArtifactFileLinks className={TRACE_MARKDOWN_CLASSNAME}>
+          {item.body}
+        </ChatMarkdown>
       </div>
     );
   }
 
   return (
     <div className="min-w-0 pb-4">
-      {item.title && (
+      {item.title ? (
         <p className="text-foreground/85 text-[13px] font-medium leading-relaxed">{item.title}</p>
-      )}
-      {item.body && (
+      ) : null}
+      {item.body ? (
         <p className="text-foreground/80 mt-1 whitespace-pre-wrap text-[13px] leading-relaxed">
           {item.body}
         </p>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -447,9 +474,9 @@ function TraceItemView({
   presentation,
 }: {
   item: WorkingTraceItem;
-  presentation: WorkingTraceProps['presentation'];
+  presentation: WorkingTraceProps["presentation"];
 }) {
-  if (item.type === 'tool') {
+  if (item.type === "tool") {
     return <ToolTraceItem entry={item} />;
   }
 
@@ -461,7 +488,7 @@ function TraceItems({
   presentation,
 }: {
   model: WorkingTraceModel;
-  presentation: WorkingTraceProps['presentation'];
+  presentation: WorkingTraceProps["presentation"];
 }) {
   if (model.items.length === 0) {
     return <p className="text-muted-foreground text-[12px]">No working details captured.</p>;
@@ -479,11 +506,11 @@ function TraceItems({
 export function WorkingTrace({ model, presentation, label }: WorkingTraceProps) {
   const [isOpen, setIsOpen] = useState(false);
 
-  if (presentation === 'streaming') {
+  if (presentation === "streaming") {
     return (
       <div className="ml-[2%] max-w-[96%]">
         <div className="flex items-center gap-1 text-left text-sm">
-          <TextShimmer className="font-medium cursor-default">{label}</TextShimmer>
+          <TextShimmer className="cursor-default font-medium">{label}</TextShimmer>
         </div>
         <div className="pt-3">
           <TraceItems model={model} presentation={presentation} />
@@ -503,11 +530,12 @@ export function WorkingTrace({ model, presentation, label }: WorkingTraceProps) 
             <TextShimmer className="font-medium" stop>
               {label}
             </TextShimmer>
-            <ChevronRight
-              className={cn(
-                'text-muted-foreground size-4 shrink-0 transition-transform',
-                isOpen && 'rotate-90'
-              )}
+            <HugeiconsIcon
+              icon={ArrowRight01Icon}
+              size={16}
+              color="currentColor"
+              strokeWidth={1.8}
+              className={cn("text-muted-foreground shrink-0 transition-transform", isOpen && "rotate-90")}
             />
           </button>
         </CollapsibleTrigger>
