@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { useChatStore } from './chat-store';
-import { useComposerStore } from './composer-store';
-import { useUiStore } from './ui-store';
+import { useChatStore } from "./chat-store";
+import { useComposerStore } from "./composer-store";
+import { useUiStore } from "./ui-store";
 
-import type { SessionRef } from '@/lib/client-api';
+import type { SessionRef } from "./types";
 
 let coordinationInitialized = false;
 
@@ -53,6 +53,6 @@ export function initializeStoreCoordination(): void {
   });
 }
 
-if (typeof window !== 'undefined') {
+if (typeof window !== "undefined") {
   initializeStoreCoordination();
 }

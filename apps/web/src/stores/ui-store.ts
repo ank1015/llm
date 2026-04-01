@@ -1,8 +1,9 @@
-'use client';
+"use client";
 
-import { create } from 'zustand';
+import { create } from "zustand";
 
-type SettingsTab = 'general' | 'model' | 'keys';
+type SettingsTab = "general" | "model" | "keys";
+type Theme = "light" | "dark";
 
 type SideDrawerProps = {
   open: boolean;
@@ -11,10 +12,9 @@ type SideDrawerProps = {
   renderContent: () => React.ReactNode;
 };
 
-type Theme = 'light' | 'dark';
-
 type UiStoreState = {
   theme: Theme;
+  isThemeHydrated: boolean;
   isSidebarCollapsed: boolean;
   sideDrawer: SideDrawerProps;
   isMobileSidebarOpen: boolean;
@@ -22,11 +22,12 @@ type UiStoreState = {
   activeSettingsTab: SettingsTab;
   renameSessionId: string | null;
   deleteSessionId: string | null;
+  hydrateTheme: (theme: Theme) => void;
   setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   toggleSidebarCollapsed: () => void;
-  openSideDrawer: (props: Omit<SideDrawerProps, 'open'>) => void;
+  openSideDrawer: (props: Omit<SideDrawerProps, "open">) => void;
   updateSideDrawer: (props: Partial<SideDrawerProps>) => void;
   dismissSideDrawer: () => void;
   openMobileSidebar: () => void;
@@ -42,55 +43,104 @@ type UiStoreState = {
   resetUi: () => void;
 };
 
-const initialState = {
-  theme: 'light' as Theme,
-  isSidebarCollapsed: false,
-  sideDrawer: { open: false, title: '', renderContent: () => null, badge: undefined },
-  isMobileSidebarOpen: false,
-  isSettingsOpen: false,
-  activeSettingsTab: 'keys' as SettingsTab,
-  renameSessionId: null as string | null,
-  deleteSessionId: null as string | null,
-};
+const THEME_STORAGE_KEY = "theme";
+
+function getInitialTheme(): Theme {
+  return "light";
+}
+
+function applyTheme(theme: Theme): void {
+  if (typeof document === "undefined") {
+    return;
+  }
+
+  document.documentElement.classList.toggle("dark", theme === "dark");
+  document.documentElement.style.colorScheme = theme;
+}
+
+function persistTheme(theme: Theme): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+}
+
+function createInitialState() {
+  return {
+    theme: getInitialTheme(),
+    isThemeHydrated: false,
+    isSidebarCollapsed: false,
+    sideDrawer: {
+      open: false,
+      title: "",
+      renderContent: () => null,
+      badge: undefined,
+    } satisfies SideDrawerProps,
+    isMobileSidebarOpen: false,
+    isSettingsOpen: false,
+    activeSettingsTab: "keys" as SettingsTab,
+    renameSessionId: null as string | null,
+    deleteSessionId: null as string | null,
+  };
+}
 
 export const useUiStore = create<UiStoreState>((set) => ({
-  ...initialState,
+  ...createInitialState(),
+
+  hydrateTheme: (theme) => {
+    applyTheme(theme);
+    persistTheme(theme);
+    set({ theme, isThemeHydrated: true });
+  },
 
   setTheme: (theme) => {
-    document.documentElement.classList.toggle('dark', theme === 'dark');
-    localStorage.setItem('theme', theme);
-    set({ theme });
+    applyTheme(theme);
+    persistTheme(theme);
+    set({ theme, isThemeHydrated: true });
   },
+
   toggleTheme: () => {
     set((state) => {
-      const next = state.theme === 'light' ? 'dark' : 'light';
-      document.documentElement.classList.toggle('dark', next === 'dark');
-      localStorage.setItem('theme', next);
-      return { theme: next };
+      const theme = state.theme === "light" ? "dark" : "light";
+      applyTheme(theme);
+      persistTheme(theme);
+      return { theme, isThemeHydrated: true };
     });
   },
+
   setSidebarCollapsed: (collapsed) => set({ isSidebarCollapsed: collapsed }),
-  toggleSidebarCollapsed: () => set((state) => ({ isSidebarCollapsed: !state.isSidebarCollapsed })),
-  openSideDrawer: (props: Omit<SideDrawerProps, 'open'>) => {
+  toggleSidebarCollapsed: () =>
+    set((state) => ({ isSidebarCollapsed: !state.isSidebarCollapsed })),
+
+  openSideDrawer: (props) => {
     set({ sideDrawer: { ...props, open: true } });
   },
-  updateSideDrawer: (props: Partial<SideDrawerProps>) =>
+
+  updateSideDrawer: (props) =>
     set((state) => ({
       sideDrawer: { ...state.sideDrawer, ...props },
     })),
+
   dismissSideDrawer: () =>
     set({
-      sideDrawer: { open: false, title: '', renderContent: () => null, badge: undefined },
+      sideDrawer: {
+        open: false,
+        title: "",
+        renderContent: () => null,
+        badge: undefined,
+      },
     }),
 
   openMobileSidebar: () => set({ isMobileSidebarOpen: true }),
   closeMobileSidebar: () => set({ isMobileSidebarOpen: false }),
-  toggleMobileSidebar: () => set((state) => ({ isMobileSidebarOpen: !state.isMobileSidebarOpen })),
+  toggleMobileSidebar: () =>
+    set((state) => ({ isMobileSidebarOpen: !state.isMobileSidebarOpen })),
 
   openSettings: (tab) =>
     set({
       isSettingsOpen: true,
-      activeSettingsTab: tab ?? 'keys',
+      activeSettingsTab: tab ?? "keys",
     }),
 
   closeSettings: () => set({ isSettingsOpen: false }),
@@ -102,5 +152,5 @@ export const useUiStore = create<UiStoreState>((set) => ({
   openDeleteSessionDialog: (sessionId) => set({ deleteSessionId: sessionId }),
   closeDeleteSessionDialog: () => set({ deleteSessionId: null }),
 
-  resetUi: () => set(initialState),
+  resetUi: () => set(createInitialState()),
 }));

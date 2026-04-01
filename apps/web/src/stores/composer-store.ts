@@ -1,10 +1,11 @@
-'use client';
+"use client";
 
-import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
+import { create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
 
-import type { SessionRef } from '@/lib/client-api';
-import type { Attachment } from '@ank1015/llm-types';
+import type { Attachment } from "@ank1015/llm-sdk";
+
+import type { SessionRef } from "./types";
 
 type ComposerSnapshot = {
   draft: string;
@@ -62,7 +63,7 @@ function getSessionKey(session: SessionRef): string {
 
 function resolveSessionRef(
   session: SessionRef | undefined,
-  activeSession: SessionRef | null
+  activeSession: SessionRef | null,
 ): SessionRef | undefined {
   return session ?? activeSession ?? undefined;
 }
@@ -100,7 +101,7 @@ export const useComposerStore = create<ComposerStoreState>()(
           activeSession: session,
           draftsBySession: {
             ...state.draftsBySession,
-            [key]: state.draftsBySession[key] ?? '',
+            [key]: state.draftsBySession[key] ?? "",
           },
           attachmentsBySession: {
             ...state.attachmentsBySession,
@@ -150,7 +151,7 @@ export const useComposerStore = create<ComposerStoreState>()(
         const key = getSessionKey(resolvedSession);
 
         set((state) => {
-          const currentDraft = state.draftsBySession[key] ?? '';
+          const currentDraft = state.draftsBySession[key] ?? "";
           const nextDraft = currentDraft + text;
 
           return {
@@ -177,7 +178,7 @@ export const useComposerStore = create<ComposerStoreState>()(
         set((state) => ({
           draftsBySession: {
             ...state.draftsBySession,
-            [key]: '',
+            [key]: "",
           },
           isDirtyBySession: {
             ...state.isDirtyBySession,
@@ -202,7 +203,7 @@ export const useComposerStore = create<ComposerStoreState>()(
           },
           isDirtyBySession: {
             ...state.isDirtyBySession,
-            [key]: (state.draftsBySession[key] ?? '').length > 0 || uniqueAttachments.length > 0,
+            [key]: (state.draftsBySession[key] ?? "").length > 0 || uniqueAttachments.length > 0,
           },
         }));
       },
@@ -251,7 +252,7 @@ export const useComposerStore = create<ComposerStoreState>()(
             },
             isDirtyBySession: {
               ...state.isDirtyBySession,
-              [key]: (state.draftsBySession[key] ?? '').length > 0 || next.length > 0,
+              [key]: (state.draftsBySession[key] ?? "").length > 0 || next.length > 0,
             },
           };
         });
@@ -272,7 +273,7 @@ export const useComposerStore = create<ComposerStoreState>()(
           },
           isDirtyBySession: {
             ...state.isDirtyBySession,
-            [key]: (state.draftsBySession[key] ?? '').length > 0,
+            [key]: (state.draftsBySession[key] ?? "").length > 0,
           },
         }));
       },
@@ -288,7 +289,7 @@ export const useComposerStore = create<ComposerStoreState>()(
         set((state) => ({
           draftsBySession: {
             ...state.draftsBySession,
-            [key]: '',
+            [key]: "",
           },
           attachmentsBySession: {
             ...state.attachmentsBySession,
@@ -305,7 +306,7 @@ export const useComposerStore = create<ComposerStoreState>()(
         const resolvedSession = resolveSessionRef(session, get().activeSession);
         if (!resolvedSession) {
           return {
-            draft: '',
+            draft: "",
             attachments: [],
             isDirty: false,
           };
@@ -315,7 +316,7 @@ export const useComposerStore = create<ComposerStoreState>()(
         const state = get();
 
         return {
-          draft: state.draftsBySession[key] ?? '',
+          draft: state.draftsBySession[key] ?? "",
           attachments: state.attachmentsBySession[key] ?? [],
           isDirty: state.isDirtyBySession[key] ?? false,
         };
@@ -331,8 +332,7 @@ export const useComposerStore = create<ComposerStoreState>()(
 
         set((state) => {
           const existingEditState = state.editStateBySession[key];
-          const previousDraft =
-            existingEditState?.previousDraft ?? state.draftsBySession[key] ?? '';
+          const previousDraft = existingEditState?.previousDraft ?? state.draftsBySession[key] ?? "";
           const previousAttachments =
             existingEditState?.previousAttachments ?? state.attachmentsBySession[key] ?? [];
 
@@ -420,7 +420,7 @@ export const useComposerStore = create<ComposerStoreState>()(
         set((state) => ({
           draftsBySession: {
             ...state.draftsBySession,
-            [key]: '',
+            [key]: "",
           },
           attachmentsBySession: {
             ...state.attachmentsBySession,
@@ -442,7 +442,7 @@ export const useComposerStore = create<ComposerStoreState>()(
       },
     }),
     {
-      name: 'web-app-composer-store',
+      name: "web-app-composer-store",
       version: 2,
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
@@ -451,7 +451,7 @@ export const useComposerStore = create<ComposerStoreState>()(
       }),
       migrate: (persistedState) => {
         const state =
-          persistedState && typeof persistedState === 'object'
+          persistedState && typeof persistedState === "object"
             ? (persistedState as Partial<typeof initialState>)
             : {};
 
@@ -463,8 +463,8 @@ export const useComposerStore = create<ComposerStoreState>()(
           editStateBySession: {},
         };
       },
-    }
-  )
+    },
+  ),
 );
 
 export type { ComposerEditState, ComposerSnapshot, SessionRef };

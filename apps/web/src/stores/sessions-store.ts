@@ -1,19 +1,27 @@
-'use client';
+"use client";
 
-import { create } from 'zustand';
-
-import type { ModelSelection, SessionSummaryDto } from '@/lib/client-api';
+import { create } from "zustand";
 
 import {
   createSession as createSessionApi,
   deleteSession as deleteSessionApi,
   listSessions,
   renameSession as renameSessionApi,
-} from '@/lib/client-api';
+} from "@/lib/client-api";
+import { getBrowserQueryClient } from "@/lib/query-client";
+import { queryKeys } from "@/lib/query-keys";
 
-type ArtifactContext = {
-  projectId: string;
-  artifactId: string;
+import type {
+  ArtifactContext,
+  CuratedModelIdContract,
+  SessionMetadataDto,
+  SessionSummaryDto,
+} from "@/lib/client-api";
+import type { ProjectOverviewDto } from "@ank1015/llm-server/contracts";
+
+type CreateSessionStoreInput = {
+  sessionName?: string;
+  modelId: CuratedModelIdContract;
 };
 
 type SessionsStoreState = {
@@ -30,11 +38,11 @@ type SessionsStoreState = {
   refresh: (ctx: ArtifactContext) => Promise<void>;
   createSession: (
     ctx: ArtifactContext,
-    input: { sessionName?: string } & ModelSelection
+    input: CreateSessionStoreInput,
   ) => Promise<{ sessionId: string }>;
   renameSession: (
     ctx: ArtifactContext,
-    input: { sessionId: string; sessionName: string }
+    input: { sessionId: string; sessionName: string },
   ) => Promise<void>;
   deleteSession: (ctx: ArtifactContext, sessionId: string) => Promise<void>;
   reset: () => void;
@@ -50,7 +58,7 @@ function getErrorMessage(error: unknown): string {
     return error.message;
   }
 
-  return 'Unknown error while loading sessions.';
+  return "Unknown error while loading sessions.";
 }
 
 const initialState = {
@@ -63,6 +71,75 @@ const initialState = {
   deletingSessionId: null as string | null,
   mutationError: null as string | null,
 };
+
+function syncOverviewSessionName(
+  ctx: ArtifactContext,
+  sessionId: string,
+  sessionName: string,
+): void {
+  const queryClient = getBrowserQueryClient();
+  queryClient.setQueryData<ProjectOverviewDto | undefined>(
+    queryKeys.projects.overview(ctx.projectId),
+    (overview) => {
+      if (!overview) {
+        return overview;
+      }
+
+      return {
+        ...overview,
+        artifactDirs: overview.artifactDirs.map((artifact) => ({
+          ...artifact,
+          sessions: artifact.sessions.map((session) =>
+            session.sessionId === sessionId ? { ...session, sessionName } : session,
+          ),
+        })),
+      };
+    },
+  );
+}
+
+function removeOverviewSession(ctx: ArtifactContext, sessionId: string): void {
+  const queryClient = getBrowserQueryClient();
+  queryClient.setQueryData<ProjectOverviewDto | undefined>(
+    queryKeys.projects.overview(ctx.projectId),
+    (overview) => {
+      if (!overview) {
+        return overview;
+      }
+
+      return {
+        ...overview,
+        artifactDirs: overview.artifactDirs.map((artifact) =>
+          artifact.id === ctx.artifactId
+            ? {
+                ...artifact,
+                sessions: artifact.sessions.filter((session) => session.sessionId !== sessionId),
+              }
+            : artifact,
+        ),
+      };
+    },
+  );
+}
+
+function upsertSessionsCache(ctx: ArtifactContext, sessions: SessionSummaryDto[]): void {
+  getBrowserQueryClient().setQueryData(queryKeys.sessions.list(ctx), sessions);
+}
+
+async function fetchSessionsFromCache(
+  ctx: ArtifactContext,
+  force = false,
+): Promise<SessionSummaryDto[]> {
+  const queryClient = getBrowserQueryClient();
+  if (force) {
+    await queryClient.invalidateQueries({ queryKey: queryKeys.sessions.list(ctx) });
+  }
+
+  return queryClient.fetchQuery({
+    queryKey: queryKeys.sessions.list(ctx),
+    queryFn: () => listSessions(ctx),
+  });
+}
 
 export const useSessionsStore = create<SessionsStoreState>((set, get) => ({
   ...initialState,
@@ -81,8 +158,7 @@ export const useSessionsStore = create<SessionsStoreState>((set, get) => ({
     });
 
     try {
-      const sessions = await listSessions(ctx);
-
+      const sessions = await fetchSessionsFromCache(ctx);
       if (requestId !== latestRequestId) {
         return;
       }
@@ -112,8 +188,7 @@ export const useSessionsStore = create<SessionsStoreState>((set, get) => ({
     });
 
     try {
-      const sessions = await listSessions(ctx);
-
+      const sessions = await fetchSessionsFromCache(ctx, true);
       if (requestId !== latestRequestId) {
         return;
       }
@@ -135,6 +210,7 @@ export const useSessionsStore = create<SessionsStoreState>((set, get) => ({
   },
 
   createSession: async (ctx, input) => {
+    const queryClient = getBrowserQueryClient();
     set({
       isCreating: true,
       mutationError: null,
@@ -142,11 +218,15 @@ export const useSessionsStore = create<SessionsStoreState>((set, get) => ({
 
     try {
       const metadata = await createSessionApi(ctx, {
-        name: input?.sessionName,
-        api: input.api,
+        ...(input.sessionName?.trim() ? { name: input.sessionName.trim() } : {}),
         modelId: input.modelId,
       });
 
+      queryClient.setQueryData(queryKeys.sessions.detail(ctx, metadata.id), metadata);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.sessions.list(ctx) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.projects.overview(ctx.projectId) }),
+      ]);
       await get().refresh(ctx);
 
       return {
@@ -164,10 +244,12 @@ export const useSessionsStore = create<SessionsStoreState>((set, get) => ({
   renameSession: async (ctx, { sessionId, sessionName }) => {
     const trimmedName = sessionName.trim();
     if (trimmedName.length === 0) {
-      throw new Error('Session name cannot be empty.');
+      throw new Error("Session name cannot be empty.");
     }
 
-    const previousSession = get().sessions.find((session) => session.sessionId === sessionId);
+    const queryClient = getBrowserQueryClient();
+    const previousSessions = get().sessions;
+    const previousSession = previousSessions.find((session) => session.sessionId === sessionId);
     const previousName = previousSession?.sessionName;
 
     set({
@@ -176,15 +258,30 @@ export const useSessionsStore = create<SessionsStoreState>((set, get) => ({
     });
 
     get().optimisticRenameSession(sessionId, trimmedName);
+    upsertSessionsCache(ctx, useSessionsStore.getState().sessions);
+    syncOverviewSessionName(ctx, sessionId, trimmedName);
 
     try {
       await renameSessionApi(ctx, {
         sessionId,
         name: trimmedName,
       });
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.sessions.list(ctx) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.sessions.scope(ctx, sessionId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.projects.overview(ctx.projectId) }),
+      ]);
     } catch (error) {
       if (previousName) {
         get().optimisticRenameSession(sessionId, previousName);
+      } else {
+        set({ sessions: previousSessions });
+      }
+
+      upsertSessionsCache(ctx, useSessionsStore.getState().sessions);
+      if (previousName) {
+        syncOverviewSessionName(ctx, sessionId, previousName);
       }
 
       set({
@@ -199,7 +296,9 @@ export const useSessionsStore = create<SessionsStoreState>((set, get) => ({
   },
 
   deleteSession: async (ctx, sessionId) => {
-    const hadSession = get().sessions.some((session) => session.sessionId === sessionId);
+    const queryClient = getBrowserQueryClient();
+    const previousSessions = get().sessions;
+    const hadSession = previousSessions.some((session) => session.sessionId === sessionId);
 
     set({
       deletingSessionId: sessionId,
@@ -208,14 +307,23 @@ export const useSessionsStore = create<SessionsStoreState>((set, get) => ({
 
     if (hadSession) {
       get().optimisticRemoveSession(sessionId);
+      upsertSessionsCache(ctx, useSessionsStore.getState().sessions);
+      removeOverviewSession(ctx, sessionId);
     }
 
     try {
       await deleteSessionApi(ctx, sessionId);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.sessions.list(ctx) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.sessions.scope(ctx, sessionId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.projects.overview(ctx.projectId) }),
+      ]);
     } catch (error) {
       set({
         mutationError: getErrorMessage(error),
+        sessions: previousSessions,
       });
+      upsertSessionsCache(ctx, previousSessions);
 
       if (hadSession) {
         await get().refresh(ctx);
@@ -241,7 +349,7 @@ export const useSessionsStore = create<SessionsStoreState>((set, get) => ({
 
     set((state) => ({
       sessions: state.sessions.map((session) =>
-        session.sessionId === sessionId ? { ...session, sessionName: trimmedName } : session
+        session.sessionId === sessionId ? { ...session, sessionName: trimmedName } : session,
       ),
     }));
   },
@@ -271,3 +379,5 @@ export const useSessionsStore = create<SessionsStoreState>((set, get) => ({
     });
   },
 }));
+
+export type { CreateSessionStoreInput, SessionMetadataDto };

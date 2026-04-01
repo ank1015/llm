@@ -1,54 +1,65 @@
-'use client';
+"use client";
 
-import { create } from 'zustand';
+import { create } from "zustand";
+
+import {
+  attachToSessionRun,
+  cancelSessionRun,
+  getSession,
+  getSessionMessages,
+  getSessionTree,
+  StreamConflictError,
+  streamConversation,
+  streamEditConversation,
+  streamRetryConversation,
+} from "@/lib/client-api";
+import { getBrowserQueryClient } from "@/lib/query-client";
+import { queryKeys } from "@/lib/query-keys";
+import { getVisiblePathNodes, sortMessageNodesChronologically } from "@/lib/messages/session-tree";
+import { getTextFromUserMessage, rewriteUserMessageText } from "@/lib/messages/utils";
 
 import type {
+  ArtifactContext,
   LiveRunSummaryDto,
-  SessionRef,
+  SessionMessagesResponse,
   SessionTreeResponse,
   StreamAgentEventData,
   StreamDoneEventData,
   StreamErrorEventData,
   StreamNodePersistedEventData,
   StreamReadyEventData,
-  TurnSettings,
-} from '@/lib/client-api';
+} from "@/lib/client-api";
 import type {
   AgentEvent,
   Attachment,
   Api,
   BaseAssistantEvent,
   BaseAssistantMessage,
+  CuratedModelId,
   Message,
-  MessageNode,
+  ReasoningEffort,
   UserMessage,
-} from '@ank1015/llm-types';
+} from "@ank1015/llm-sdk";
 
-import {
-  attachToSessionRun,
-  cancelSessionRun,
-  getSessionTree,
-  StreamConflictError,
-  streamConversation,
-  streamEditConversation,
-  streamRetryConversation,
-} from '@/lib/client-api';
-import { getVisiblePathNodes, sortMessageNodesChronologically } from '@/lib/messages/session-tree';
-import { getTextFromUserMessage, rewriteUserMessageText } from '@/lib/messages/utils';
+import type { MessageNode, SessionRef } from "./types";
+
+type RuntimeTurnSettings = {
+  leafNodeId?: string;
+  modelId?: CuratedModelId;
+  reasoningEffort?: ReasoningEffort;
+};
 
 type PendingPrompt = {
   id: string;
   prompt: string;
   createdAt: number;
-  status: 'pending' | 'failed';
+  status: "pending" | "failed";
   error?: string;
 };
 
-type StreamRequestContext = {
+type StreamRequestContext = ArtifactContext & {
   sessionId: string;
-  projectId: string;
-  artifactId: string;
-} & TurnSettings;
+} & RuntimeTurnSettings;
 
 type RetryStreamInput = StreamRequestContext & {
   nodeId: string;
@@ -67,8 +78,11 @@ type RewritePreparation = {
   stagedMessages: MessageNode[];
 };
 
-const EMPTY_PROMPT_ERROR_MESSAGE = 'Prompt cannot be empty.';
-const STREAM_ALREADY_RUNNING_ERROR_MESSAGE = 'A stream is already running for this session.';
+const EMPTY_PROMPT_ERROR_MESSAGE = "Prompt cannot be empty.";
+const STREAM_ALREADY_RUNNING_ERROR_MESSAGE = "A stream is already running for this session.";
+const MAX_AGENT_EVENTS = 200;
+const RECONNECT_DELAY_MS = 750;
+const ARTIFACT_CHAT_LOG_PREFIX = "[artifact-chat]";
 
 type ChatStoreState = {
   activeSession: SessionRef | null;
@@ -78,7 +92,7 @@ type ChatStoreState = {
   visibleLeafNodeIdBySession: Record<string, string | null>;
   liveRunBySession: Record<string, LiveRunSummaryDto | null>;
   lastSeqBySession: Record<string, number>;
-  streamingAssistantBySession: Record<string, Omit<BaseAssistantMessage<Api>, 'message'> | null>;
+  streamingAssistantBySession: Record<string, Omit<BaseAssistantMessage<Api>, "message"> | null>;
   pendingPromptsBySession: Record<string, PendingPrompt[]>;
   agentEventsBySession: Record<string, AgentEvent[]>;
   isLoadingMessagesBySession: Record<string, boolean>;
@@ -109,7 +123,7 @@ type ChatStoreState = {
       projectId: string;
       artifactId: string;
       attachments?: Attachment[];
-    } & TurnSettings
+    } & RuntimeTurnSettings,
   ) => Promise<void>;
   retryFromNode: (input: RetryStreamInput) => Promise<void>;
   editFromNode: (input: EditStreamInput) => Promise<void>;
@@ -119,9 +133,6 @@ type ChatStoreState = {
     artifactId: string;
   }) => Promise<void>;
 };
-
-const MAX_AGENT_EVENTS = 200;
-const RECONNECT_DELAY_MS = 750;
 
 const messageLoadRequestIds = new Map<string, number>();
 const streamAbortControllers = new Map<
@@ -142,7 +153,16 @@ function getErrorMessage(error: unknown): string {
     return error.message;
   }
 
-  return 'Unexpected chat error.';
+  return "Unexpected chat error.";
+}
+
+function logArtifactChat(event: string, payload?: unknown): void {
+  if (payload === undefined) {
+    console.debug(ARTIFACT_CHAT_LOG_PREFIX, event);
+    return;
+  }
+
+  console.debug(ARTIFACT_CHAT_LOG_PREFIX, event, payload);
 }
 
 function isAbortError(error: unknown): boolean {
@@ -150,12 +170,12 @@ function isAbortError(error: unknown): boolean {
     return false;
   }
 
-  if (typeof DOMException !== 'undefined' && error instanceof DOMException) {
-    return error.name === 'AbortError';
+  if (typeof DOMException !== "undefined" && error instanceof DOMException) {
+    return error.name === "AbortError";
   }
 
   if (error instanceof Error) {
-    return error.name === 'AbortError' || error.message.toLowerCase().includes('abort');
+    return error.name === "AbortError" || error.message.toLowerCase().includes("abort");
   }
 
   return false;
@@ -164,12 +184,12 @@ function isAbortError(error: unknown): boolean {
 function createPendingPrompt(prompt: string): PendingPrompt {
   return {
     id:
-      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
         ? crypto.randomUUID()
         : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
     prompt,
     createdAt: Date.now(),
-    status: 'pending',
+    status: "pending",
   };
 }
 
@@ -180,22 +200,22 @@ function getPendingPromptLabel(prompt: string, attachments?: Attachment[]): stri
   }
 
   if (!attachments || attachments.length === 0) {
-    return '';
+    return "";
   }
 
   if (attachments.length === 1) {
-    return attachments[0]?.fileName ?? 'Attachment';
+    return attachments[0]?.fileName ?? "Attachment";
   }
 
   return `${attachments.length} attachments`;
 }
 
 function toIsoTimestamp(value: unknown): string {
-  if (typeof value === 'number' && Number.isFinite(value)) {
+  if (typeof value === "number" && Number.isFinite(value)) {
     return new Date(value).toISOString();
   }
 
-  if (typeof value === 'string' && value.trim().length > 0) {
+  if (typeof value === "string" && value.trim().length > 0) {
     const parsed = Date.parse(value);
     if (Number.isFinite(parsed)) {
       return new Date(parsed).toISOString();
@@ -205,17 +225,14 @@ function toIsoTimestamp(value: unknown): string {
   return new Date().toISOString();
 }
 
-function upsertOptimisticMessageNode(
-  existing: MessageNode[],
-  incoming: MessageNode
-): MessageNode[] {
+function upsertOptimisticMessageNode(existing: MessageNode[], incoming: MessageNode): MessageNode[] {
   const incomingMessageId = incoming.message.id;
   const next = [...existing];
   const index = next.findIndex((node) => node.message.id === incomingMessageId);
 
   if (index === -1) {
     next.push(incoming);
-  } else if (next[index]?.id.startsWith('optimistic:')) {
+  } else if (next[index]?.id.startsWith("optimistic:")) {
     next[index] = incoming;
   }
 
@@ -225,7 +242,7 @@ function upsertOptimisticMessageNode(
 function replaceOptimisticMessageNode(
   existing: MessageNode[],
   placeholderMessageId: string,
-  incoming: MessageNode
+  incoming: MessageNode,
 ): MessageNode[] {
   const next = [...existing];
   const index = next.findIndex((node) => node.message.id === placeholderMessageId);
@@ -242,7 +259,7 @@ function replaceOptimisticMessageNode(
 function upsertPersistedMessageNode(existing: MessageNode[], incoming: MessageNode): MessageNode[] {
   const next = [...existing];
   const index = next.findIndex(
-    (node) => node.id === incoming.id || node.message.id === incoming.message.id
+    (node) => node.id === incoming.id || node.message.id === incoming.message.id,
   );
 
   if (index === -1) {
@@ -257,20 +274,17 @@ function upsertPersistedMessageNode(existing: MessageNode[], incoming: MessageNo
 function createOptimisticNode(input: {
   message: Message;
   parentId: string | null;
-  api: Api;
-  modelId: string;
+  modelId?: CuratedModelId;
   branch?: string;
 }): MessageNode {
   return {
-    type: 'message',
+    type: "message",
     id: `optimistic:${input.message.id}`,
     parentId: input.parentId,
-    branch: input.branch ?? 'main',
+    branch: input.branch ?? "main",
     timestamp: toIsoTimestamp(input.message.timestamp),
     message: input.message,
-    api: input.api,
-    modelId: input.modelId,
-    providerOptions: {},
+    ...(input.modelId ? { metadata: { modelId: input.modelId } } : {}),
   };
 }
 
@@ -289,42 +303,38 @@ function createOptimisticUserMessage(message: UserMessage, textOverride?: string
 function prepareRewriteState(input: {
   messages: MessageNode[];
   nodeId: string;
-  api: Api;
-  modelId: string;
+  modelId?: CuratedModelId;
   textOverride?: string;
 }): RewritePreparation {
   const targetIndex = input.messages.findIndex((node) => node.id === input.nodeId);
   if (targetIndex === -1) {
-    throw new Error('Message to rewrite was not found in the visible thread.');
+    throw new Error("Message to rewrite was not found in the visible thread.");
   }
 
   const targetNode = input.messages[targetIndex];
-  if (!targetNode || targetNode.message.role !== 'user') {
-    throw new Error('Only user messages can be edited or retried.');
+  if (!targetNode || targetNode.message.role !== "user") {
+    throw new Error("Only user messages can be edited or retried.");
   }
 
   const baseMessages = input.messages.slice(0, targetIndex);
   const initialParentId = baseMessages.at(-1)?.id ?? null;
   const placeholderMessage = createOptimisticUserMessage(
     targetNode.message as UserMessage,
-    input.textOverride
+    input.textOverride,
   );
   const placeholderNode = createOptimisticNode({
     message: placeholderMessage,
     parentId: initialParentId,
-    api: input.api,
     modelId: input.modelId,
     branch: targetNode.branch,
   });
-  const promptText = (
-    input.textOverride ?? getTextFromUserMessage(targetNode.message as UserMessage)
-  )
+  const promptText = (input.textOverride ?? getTextFromUserMessage(targetNode.message as UserMessage))
     .trim()
-    .replace(/\s+/g, ' ');
+    .replace(/\s+/g, " ");
 
   return {
     initialParentId,
-    pendingPromptText: promptText.length > 0 ? promptText : 'Rewrite message',
+    pendingPromptText: promptText.length > 0 ? promptText : "Rewrite message",
     placeholderMessageId: placeholderMessage.id,
     snapshot: input.messages,
     stagedMessages: [...baseMessages, placeholderNode],
@@ -337,16 +347,30 @@ function resolveSession(options: {
 }): SessionRef {
   const candidate = options.session ?? options.activeSession;
   if (!candidate) {
-    throw new Error('No active session selected.');
+    throw new Error("No active session selected.");
   }
 
   return candidate;
 }
 
+function requireArtifactContext(input?: {
+  projectId?: string;
+  artifactId?: string;
+}): ArtifactContext {
+  const projectId = input?.projectId?.trim();
+  const artifactId = input?.artifactId?.trim();
+
+  if (!projectId || !artifactId) {
+    throw new Error("Project and artifact context are required.");
+  }
+
+  return { projectId, artifactId };
+}
+
 function upsertPendingPrompt(
   pendingBySession: Record<string, PendingPrompt[]>,
   key: string,
-  pending: PendingPrompt
+  pending: PendingPrompt,
 ): Record<string, PendingPrompt[]> {
   const existing = pendingBySession[key] ?? [];
   return {
@@ -358,7 +382,7 @@ function upsertPendingPrompt(
 function removePendingPrompt(
   pendingBySession: Record<string, PendingPrompt[]>,
   key: string,
-  pendingId: string
+  pendingId: string,
 ): Record<string, PendingPrompt[]> {
   const existing = pendingBySession[key] ?? [];
   const filtered = existing.filter((item) => item.id !== pendingId);
@@ -373,7 +397,7 @@ function markPendingFailed(
   pendingBySession: Record<string, PendingPrompt[]>,
   key: string,
   pendingId: string,
-  error: string
+  error: string,
 ): Record<string, PendingPrompt[]> {
   const existing = pendingBySession[key] ?? [];
 
@@ -383,23 +407,23 @@ function markPendingFailed(
       item.id === pendingId
         ? {
             ...item,
-            status: 'failed',
+            status: "failed",
             error,
           }
-        : item
+        : item,
     ),
   };
 }
 
 function getStreamingAssistantMessage(
-  eventMessage: Message | BaseAssistantEvent<Api>
-): Omit<BaseAssistantMessage<Api>, 'message'> | null {
-  if (typeof eventMessage !== 'object' || eventMessage === null || !('type' in eventMessage)) {
+  eventMessage: Message | BaseAssistantEvent<Api>,
+): Omit<BaseAssistantMessage<Api>, "message"> | null {
+  if (typeof eventMessage !== "object" || eventMessage === null || !("type" in eventMessage)) {
     return null;
   }
 
   const candidate = (eventMessage as BaseAssistantEvent<Api>).message;
-  if (!candidate || candidate.role !== 'assistant') {
+  if (!candidate || candidate.role !== "assistant") {
     return null;
   }
 
@@ -414,14 +438,17 @@ function deriveVisibleMessages(nodes: MessageNode[], leafNodeId: string | null):
   return getVisiblePathNodes(nodes, leafNodeId);
 }
 
-function applyLoadedTreeState(tree: SessionTreeResponse): {
+function applyLoadedTreeState(
+  tree: SessionTreeResponse,
+  visibleMessages?: SessionMessagesResponse,
+): {
   allNodes: MessageNode[];
   persistedLeafNodeId: string | null;
   visibleLeafNodeId: string | null;
   visibleMessages: MessageNode[];
   liveRun: LiveRunSummaryDto | null;
 } {
-  const allNodes = sortMessageNodesChronologically(tree.nodes);
+  const allNodes = sortMessageNodesChronologically(tree.nodes as MessageNode[]);
   const persistedLeafNodeId = tree.persistedLeafNodeId;
   const visibleLeafNodeId = persistedLeafNodeId;
 
@@ -429,7 +456,9 @@ function applyLoadedTreeState(tree: SessionTreeResponse): {
     allNodes,
     persistedLeafNodeId,
     visibleLeafNodeId,
-    visibleMessages: deriveVisibleMessages(allNodes, visibleLeafNodeId),
+    visibleMessages: visibleMessages
+      ? sortMessageNodesChronologically(visibleMessages as MessageNode[])
+      : deriveVisibleMessages(allNodes, visibleLeafNodeId),
     liveRun: tree.liveRun ?? null,
   };
 }
@@ -458,13 +487,13 @@ function clearStreamAttachment(key: string): void {
 function applyPersistedNodeToSessionState(
   state: ChatStoreState,
   key: string,
-  node: MessageNode
+  node: MessageNode,
 ): Pick<
   ChatStoreState,
-  | 'messageTreesBySession'
-  | 'messagesBySession'
-  | 'persistedLeafNodeIdBySession'
-  | 'visibleLeafNodeIdBySession'
+  | "messageTreesBySession"
+  | "messagesBySession"
+  | "persistedLeafNodeIdBySession"
+  | "visibleLeafNodeIdBySession"
 > {
   const nextTree = upsertPersistedMessageNode(state.messageTreesBySession[key] ?? [], node);
   const nextLeafNodeId = node.id;
@@ -487,6 +516,37 @@ function applyPersistedNodeToSessionState(
       [key]: nextLeafNodeId,
     },
   };
+}
+
+function syncPersistedNodeQueryData(
+  ctx: ArtifactContext,
+  sessionId: string,
+  node: SessionTreeResponse["nodes"][number],
+): void {
+  const queryClient = getBrowserQueryClient();
+
+  queryClient.setQueryData<SessionTreeResponse | undefined>(
+    queryKeys.sessions.tree(ctx, sessionId),
+    (tree) =>
+      tree
+        ? {
+            ...tree,
+            nodes: upsertPersistedMessageNode(
+              tree.nodes as MessageNode[],
+              node as MessageNode,
+            ) as SessionTreeResponse["nodes"],
+            persistedLeafNodeId: node.id,
+          }
+        : tree,
+  );
+
+  queryClient.setQueryData<SessionMessagesResponse | undefined>(
+    queryKeys.sessions.messages(ctx, sessionId),
+    (messages) =>
+      messages
+        ? (upsertPersistedMessageNode(messages as MessageNode[], node as MessageNode) as SessionMessagesResponse)
+        : messages,
+  );
 }
 
 export const useChatStore = create<ChatStoreState>((set, get) => ({
@@ -679,14 +739,37 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     }));
 
     try {
-      const ctx = { projectId: options?.projectId ?? '', artifactId: options?.artifactId ?? '' };
-      const tree = await getSessionTree(ctx, session.sessionId);
+      const ctx = requireArtifactContext(options);
+      const queryClient = getBrowserQueryClient();
+
+      if (options?.force) {
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: queryKeys.sessions.detail(ctx, session.sessionId) }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.sessions.messages(ctx, session.sessionId) }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.sessions.tree(ctx, session.sessionId) }),
+        ]);
+      }
+
+      const [, historyNodes, tree] = await Promise.all([
+        queryClient.fetchQuery({
+          queryKey: queryKeys.sessions.detail(ctx, session.sessionId),
+          queryFn: () => getSession(ctx, session.sessionId),
+        }),
+        queryClient.fetchQuery({
+          queryKey: queryKeys.sessions.messages(ctx, session.sessionId),
+          queryFn: () => getSessionMessages(ctx, session.sessionId),
+        }),
+        queryClient.fetchQuery({
+          queryKey: queryKeys.sessions.tree(ctx, session.sessionId),
+          queryFn: () => getSessionTree(ctx, session.sessionId),
+        }),
+      ]);
 
       if ((messageLoadRequestIds.get(key) ?? 0) !== nextRequestId) {
         return;
       }
 
-      const loadedState = applyLoadedTreeState(tree);
+      const loadedState = applyLoadedTreeState(tree, historyNodes);
       const previousLiveRun = get().liveRunBySession[key] ?? null;
       const shouldResetReplay = previousLiveRun?.runId !== loadedState.liveRun?.runId;
 
@@ -713,7 +796,8 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
         },
         lastSeqBySession: {
           ...state.lastSeqBySession,
-          [key]: shouldResetReplay || !loadedState.liveRun ? 0 : (state.lastSeqBySession[key] ?? 0),
+          [key]:
+            shouldResetReplay || !loadedState.liveRun ? 0 : (state.lastSeqBySession[key] ?? 0),
         },
         streamingAssistantBySession: {
           ...state.streamingAssistantBySession,
@@ -725,13 +809,11 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
         agentEventsBySession: {
           ...state.agentEventsBySession,
           [key]:
-            shouldResetReplay || !loadedState.liveRun
-              ? []
-              : (state.agentEventsBySession[key] ?? []),
+            shouldResetReplay || !loadedState.liveRun ? [] : (state.agentEventsBySession[key] ?? []),
         },
         isStreamingBySession: {
           ...state.isStreamingBySession,
-          [key]: loadedState.liveRun?.status === 'running',
+          [key]: loadedState.liveRun?.status === "running",
         },
         isLoadingMessagesBySession: {
           ...state.isLoadingMessagesBySession,
@@ -739,7 +821,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
         },
       }));
 
-      if (!loadedState.liveRun || loadedState.liveRun.status !== 'running') {
+      if (!loadedState.liveRun || loadedState.liveRun.status !== "running") {
         clearStreamAttachment(key);
         return;
       }
@@ -774,11 +856,20 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     const session: SessionRef = { sessionId: input.sessionId };
     const key = getSessionKey(session);
     const activeConnection = streamAbortControllers.get(key);
+    const ctx = {
+      projectId: input.projectId,
+      artifactId: input.artifactId,
+    };
 
     if (activeConnection?.runId === input.runId) {
+      logArtifactChat("attachToLiveRun skipped; already attached", {
+        sessionId: input.sessionId,
+        runId: input.runId,
+      });
       return;
     }
 
+    logArtifactChat("attachToLiveRun begin", input);
     clearStreamAttachment(key);
 
     if (input.resetReplay) {
@@ -815,8 +906,9 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
         },
         {
           onEvent: (eventName, data) => {
-            if (eventName === 'ready') {
+            if (eventName === "ready") {
               const readyData = data as StreamReadyEventData;
+              logArtifactChat("attachToLiveRun ready", readyData);
 
               set((state) => ({
                 liveRunBySession: {
@@ -829,21 +921,22 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
                       }
                     : {
                         runId: readyData.runId,
-                        mode: 'prompt',
+                        mode: "prompt",
                         status: readyData.status,
                         startedAt: new Date().toISOString(),
                       },
                 },
                 isStreamingBySession: {
                   ...state.isStreamingBySession,
-                  [key]: readyData.status === 'running',
+                  [key]: readyData.status === "running",
                 },
               }));
               return;
             }
 
-            if (eventName === 'agent_event') {
+            if (eventName === "agent_event") {
               const payload = data as StreamAgentEventData;
+              logArtifactChat("attachToLiveRun agent_event", payload);
 
               set((state) => {
                 const existingEvents = state.agentEventsBySession[key] ?? [];
@@ -865,8 +958,8 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
                 };
 
                 if (
-                  payload.event.type === 'message_update' &&
-                  payload.event.messageType === 'assistant'
+                  payload.event.type === "message_update" &&
+                  payload.event.messageType === "assistant"
                 ) {
                   const streamingAssistant = getStreamingAssistantMessage(payload.event.message);
                   if (streamingAssistant) {
@@ -878,8 +971,8 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
                 }
 
                 if (
-                  payload.event.type === 'message_end' &&
-                  payload.event.messageType === 'assistant'
+                  payload.event.type === "message_end" &&
+                  payload.event.messageType === "assistant"
                 ) {
                   nextState.streamingAssistantBySession = {
                     ...state.streamingAssistantBySession,
@@ -892,11 +985,13 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
               return;
             }
 
-            if (eventName === 'node_persisted') {
+            if (eventName === "node_persisted") {
               const payload = data as StreamNodePersistedEventData;
+              logArtifactChat("attachToLiveRun node_persisted", payload);
+              syncPersistedNodeQueryData(ctx, input.sessionId, payload.node);
 
               set((state) => ({
-                ...applyPersistedNodeToSessionState(state, key, payload.node),
+                ...applyPersistedNodeToSessionState(state, key, payload.node as MessageNode),
                 lastSeqBySession: {
                   ...state.lastSeqBySession,
                   [key]: Math.max(state.lastSeqBySession[key] ?? 0, payload.seq),
@@ -905,8 +1000,9 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
               return;
             }
 
-            if (eventName === 'done') {
+            if (eventName === "done") {
               const doneData = data as StreamDoneEventData;
+              logArtifactChat("attachToLiveRun done", doneData);
 
               set((state) => ({
                 liveRunBySession: {
@@ -938,8 +1034,9 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
               return;
             }
 
-            if (eventName === 'error') {
+            if (eventName === "error") {
               const errorData = data as StreamErrorEventData;
+              logArtifactChat("attachToLiveRun error", errorData);
 
               set((state) => ({
                 liveRunBySession: {
@@ -947,7 +1044,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
                   [key]: state.liveRunBySession[key]
                     ? {
                         ...state.liveRunBySession[key],
-                        status: 'failed',
+                        status: "failed",
                         finishedAt: new Date().toISOString(),
                       }
                     : null,
@@ -975,15 +1072,24 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
             }
           },
         },
-        controller.signal
+        controller.signal,
       );
     } catch (error) {
       if (controller.signal.aborted || isAbortError(error)) {
+        logArtifactChat("attachToLiveRun aborted", {
+          sessionId: input.sessionId,
+          runId: input.runId,
+        });
         return;
       }
 
       const liveRun = get().liveRunBySession[key];
-      if (liveRun?.runId === input.runId && liveRun.status === 'running') {
+      if (liveRun?.runId === input.runId && liveRun.status === "running") {
+        logArtifactChat("attachToLiveRun scheduling reconnect", {
+          sessionId: input.sessionId,
+          runId: input.runId,
+          afterSeq: get().lastSeqBySession[key] ?? 0,
+        });
         clearReconnectTimer(key);
         const reconnectTimer = setTimeout(() => {
           streamReconnectTimers.delete(key);
@@ -1006,6 +1112,11 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
           [key]: getErrorMessage(error),
         },
       }));
+      logArtifactChat("attachToLiveRun failed", {
+        sessionId: input.sessionId,
+        runId: input.runId,
+        error: getErrorMessage(error),
+      });
     } finally {
       const active = streamAbortControllers.get(key);
       if (active?.runId === input.runId && active.controller === controller) {
@@ -1019,6 +1130,23 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     const key = getSessionKey(session);
     const prompt = input.prompt.trim();
     const attachments = input.attachments ?? [];
+
+    logArtifactChat("startStream invoked", {
+      sessionId: input.sessionId,
+      projectId: input.projectId,
+      artifactId: input.artifactId,
+      prompt,
+      leafNodeId: input.leafNodeId,
+      modelId: input.modelId,
+      reasoningEffort: input.reasoningEffort,
+      attachments: attachments.map((attachment) => ({
+        id: attachment.id,
+        fileName: attachment.fileName,
+        type: attachment.type,
+        mimeType: attachment.mimeType,
+        size: attachment.size,
+      })),
+    });
 
     if (prompt.length === 0 && attachments.length === 0) {
       throw new Error(EMPTY_PROMPT_ERROR_MESSAGE);
@@ -1057,8 +1185,8 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
         ...state.liveRunBySession,
         [key]: {
           runId: `pending:${pending.id}`,
-          mode: 'prompt',
-          status: 'running',
+          mode: "prompt",
+          status: "running",
           startedAt: new Date().toISOString(),
         },
       },
@@ -1080,15 +1208,15 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
           ...(attachments.length > 0 ? { attachments } : {}),
           projectId: input.projectId,
           artifactId: input.artifactId,
-          api: input.api,
           modelId: input.modelId,
-          reasoningLevel: input.reasoningLevel,
+          reasoningEffort: input.reasoningEffort,
           ...(visibleLeafNodeId ? { leafNodeId: visibleLeafNodeId } : {}),
         },
         {
           onEvent: (eventName, data) => {
-            if (eventName === 'ready') {
+            if (eventName === "ready") {
               const readyData = data as StreamReadyEventData;
+              logArtifactChat("startStream ready", readyData);
 
               streamAbortControllers.set(key, {
                 runId: readyData.runId,
@@ -1100,25 +1228,26 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
                   ...state.liveRunBySession,
                   [key]: {
                     ...(state.liveRunBySession[key] ?? {
-                      mode: 'prompt' as const,
+                      mode: "prompt" as const,
                       startedAt: new Date().toISOString(),
                     }),
                     runId: readyData.runId,
                     status: readyData.status,
-                    mode: 'prompt',
+                    mode: "prompt",
                   },
                 },
                 isStreamingBySession: {
                   ...state.isStreamingBySession,
-                  [key]: readyData.status === 'running',
+                  [key]: readyData.status === "running",
                 },
               }));
               return;
             }
 
-            if (eventName === 'agent_event') {
+            if (eventName === "agent_event") {
               const payload = data as StreamAgentEventData;
               const agentEvent = payload.event;
+              logArtifactChat("startStream agent_event", payload);
 
               set((state) => {
                 const existingEvents = state.agentEventsBySession[key] ?? [];
@@ -1140,8 +1269,8 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
                 };
 
                 if (
-                  agentEvent.type === 'message_update' &&
-                  agentEvent.messageType === 'assistant'
+                  agentEvent.type === "message_update" &&
+                  agentEvent.messageType === "assistant"
                 ) {
                   const streamingAssistant = getStreamingAssistantMessage(agentEvent.message);
                   if (streamingAssistant) {
@@ -1152,11 +1281,10 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
                   }
                 }
 
-                if (agentEvent.type === 'message_end') {
+                if (agentEvent.type === "message_end") {
                   const optimisticNode = createOptimisticNode({
                     message: agentEvent.message,
                     parentId: optimisticParentId,
-                    api: input.api,
                     modelId: input.modelId,
                   });
 
@@ -1164,13 +1292,10 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
 
                   nextState.messagesBySession = {
                     ...state.messagesBySession,
-                    [key]: upsertOptimisticMessageNode(
-                      state.messagesBySession[key] ?? [],
-                      optimisticNode
-                    ),
+                    [key]: upsertOptimisticMessageNode(state.messagesBySession[key] ?? [], optimisticNode),
                   };
 
-                  if (agentEvent.messageType === 'assistant') {
+                  if (agentEvent.messageType === "assistant") {
                     nextState.streamingAssistantBySession = {
                       ...state.streamingAssistantBySession,
                       [key]: null,
@@ -1183,11 +1308,20 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
               return;
             }
 
-            if (eventName === 'node_persisted') {
+            if (eventName === "node_persisted") {
               const payload = data as StreamNodePersistedEventData;
+              logArtifactChat("startStream node_persisted", payload);
+              syncPersistedNodeQueryData(
+                {
+                  projectId: input.projectId,
+                  artifactId: input.artifactId,
+                },
+                input.sessionId,
+                payload.node,
+              );
 
               set((state) => ({
-                ...applyPersistedNodeToSessionState(state, key, payload.node),
+                ...applyPersistedNodeToSessionState(state, key, payload.node as MessageNode),
                 lastSeqBySession: {
                   ...state.lastSeqBySession,
                   [key]: Math.max(state.lastSeqBySession[key] ?? 0, payload.seq),
@@ -1196,8 +1330,9 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
               return;
             }
 
-            if (eventName === 'error') {
+            if (eventName === "error") {
               const errorData = data as StreamErrorEventData;
+              logArtifactChat("startStream error", errorData);
 
               set((state) => ({
                 liveRunBySession: {
@@ -1205,7 +1340,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
                   [key]: state.liveRunBySession[key]
                     ? {
                         ...state.liveRunBySession[key],
-                        status: 'failed',
+                        status: "failed",
                         finishedAt: new Date().toISOString(),
                       }
                     : null,
@@ -1226,8 +1361,9 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
               return;
             }
 
-            if (eventName === 'done') {
+            if (eventName === "done") {
               const doneData = data as StreamDoneEventData;
+              logArtifactChat("startStream done", doneData);
 
               set((state) => ({
                 liveRunBySession: {
@@ -1252,7 +1388,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
             }
           },
         },
-        controller.signal
+        controller.signal,
       );
 
       await get().loadMessages({
@@ -1263,11 +1399,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
       });
 
       set((state) => ({
-        pendingPromptsBySession: removePendingPrompt(
-          state.pendingPromptsBySession,
-          key,
-          pending.id
-        ),
+        pendingPromptsBySession: removePendingPrompt(state.pendingPromptsBySession, key, pending.id),
         streamingAssistantBySession: {
           ...state.streamingAssistantBySession,
           [key]: null,
@@ -1275,19 +1407,16 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
       }));
     } catch (error) {
       if (error instanceof StreamConflictError) {
+        logArtifactChat("startStream conflict", error.liveRun);
         set((state) => ({
-          pendingPromptsBySession: removePendingPrompt(
-            state.pendingPromptsBySession,
-            key,
-            pending.id
-          ),
+          pendingPromptsBySession: removePendingPrompt(state.pendingPromptsBySession, key, pending.id),
           liveRunBySession: {
             ...state.liveRunBySession,
             [key]: error.liveRun,
           },
           isStreamingBySession: {
             ...state.isStreamingBySession,
-            [key]: error.liveRun.status === 'running',
+            [key]: error.liveRun.status === "running",
           },
           streamingAssistantBySession: {
             ...state.streamingAssistantBySession,
@@ -1308,12 +1437,12 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
       }
 
       if (controller.signal.aborted) {
+        logArtifactChat("startStream aborted", {
+          sessionId: input.sessionId,
+          pendingId: pending.id,
+        });
         set((state) => ({
-          pendingPromptsBySession: removePendingPrompt(
-            state.pendingPromptsBySession,
-            key,
-            pending.id
-          ),
+          pendingPromptsBySession: removePendingPrompt(state.pendingPromptsBySession, key, pending.id),
           streamingAssistantBySession: {
             ...state.streamingAssistantBySession,
             [key]: null,
@@ -1325,13 +1454,17 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
         }));
       } else {
         const message = getErrorMessage(error);
+        logArtifactChat("startStream failed", {
+          sessionId: input.sessionId,
+          error: message,
+        });
 
         set((state) => ({
           pendingPromptsBySession: markPendingFailed(
             state.pendingPromptsBySession,
             key,
             pending.id,
-            message
+            message,
           ),
           errorsBySession: {
             ...state.errorsBySession,
@@ -1358,7 +1491,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
       set((state) => ({
         isStreamingBySession: {
           ...state.isStreamingBySession,
-          [key]: state.liveRunBySession[key]?.status === 'running',
+          [key]: state.liveRunBySession[key]?.status === "running",
         },
       }));
     }
@@ -1375,7 +1508,6 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     const rewrite = prepareRewriteState({
       messages: get().messagesBySession[key] ?? [],
       nodeId: input.nodeId,
-      api: input.api,
       modelId: input.modelId,
     });
 
@@ -1414,8 +1546,8 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
         ...state.liveRunBySession,
         [key]: {
           runId: `pending:${pending.id}`,
-          mode: 'retry',
-          status: 'running',
+          mode: "retry",
+          status: "running",
           startedAt: new Date().toISOString(),
         },
       },
@@ -1436,14 +1568,13 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
           nodeId: input.nodeId,
           projectId: input.projectId,
           artifactId: input.artifactId,
-          api: input.api,
           modelId: input.modelId,
-          reasoningLevel: input.reasoningLevel,
+          reasoningEffort: input.reasoningEffort,
           ...(visibleLeafNodeId ? { leafNodeId: visibleLeafNodeId } : {}),
         },
         {
           onEvent: (eventName, data) => {
-            if (eventName === 'ready') {
+            if (eventName === "ready") {
               const readyData = data as StreamReadyEventData;
 
               streamAbortControllers.set(key, {
@@ -1456,23 +1587,23 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
                   ...state.liveRunBySession,
                   [key]: {
                     ...(state.liveRunBySession[key] ?? {
-                      mode: 'retry' as const,
+                      mode: "retry" as const,
                       startedAt: new Date().toISOString(),
                     }),
                     runId: readyData.runId,
                     status: readyData.status,
-                    mode: 'retry',
+                    mode: "retry",
                   },
                 },
                 isStreamingBySession: {
                   ...state.isStreamingBySession,
-                  [key]: readyData.status === 'running',
+                  [key]: readyData.status === "running",
                 },
               }));
               return;
             }
 
-            if (eventName === 'agent_event') {
+            if (eventName === "agent_event") {
               const payload = data as StreamAgentEventData;
               const agentEvent = payload.event;
 
@@ -1496,8 +1627,8 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
                 };
 
                 if (
-                  agentEvent.type === 'message_update' &&
-                  agentEvent.messageType === 'assistant'
+                  agentEvent.type === "message_update" &&
+                  agentEvent.messageType === "assistant"
                 ) {
                   const streamingAssistant = getStreamingAssistantMessage(agentEvent.message);
                   if (streamingAssistant) {
@@ -1508,30 +1639,26 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
                   }
                 }
 
-                if (agentEvent.type === 'message_end') {
+                if (agentEvent.type === "message_end") {
                   didPersistAnyMessage = true;
                   const optimisticNode = createOptimisticNode({
                     message: agentEvent.message,
                     parentId: optimisticParentId,
-                    api: input.api,
                     modelId: input.modelId,
                   });
 
                   optimisticParentId = optimisticNode.id;
 
                   const nextMessages =
-                    placeholderMessageId && agentEvent.messageType === 'user'
+                    placeholderMessageId && agentEvent.messageType === "user"
                       ? replaceOptimisticMessageNode(
                           state.messagesBySession[key] ?? [],
                           placeholderMessageId,
-                          optimisticNode
+                          optimisticNode,
                         )
-                      : upsertOptimisticMessageNode(
-                          state.messagesBySession[key] ?? [],
-                          optimisticNode
-                        );
+                      : upsertOptimisticMessageNode(state.messagesBySession[key] ?? [], optimisticNode);
 
-                  if (agentEvent.messageType === 'user') {
+                  if (agentEvent.messageType === "user") {
                     placeholderMessageId = null;
                   }
 
@@ -1540,7 +1667,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
                     [key]: nextMessages,
                   };
 
-                  if (agentEvent.messageType === 'assistant') {
+                  if (agentEvent.messageType === "assistant") {
                     nextState.streamingAssistantBySession = {
                       ...state.streamingAssistantBySession,
                       [key]: null,
@@ -1553,17 +1680,26 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
               return;
             }
 
-            if (eventName === 'node_persisted') {
+            if (eventName === "node_persisted") {
               const persistedData = data as StreamNodePersistedEventData;
 
               didPersistAnyMessage = true;
               optimisticParentId = persistedData.node.id;
-              if (persistedData.node.message.role === 'user') {
+              if (persistedData.node.message.role === "user") {
                 placeholderMessageId = null;
               }
 
+              syncPersistedNodeQueryData(
+                {
+                  projectId: input.projectId,
+                  artifactId: input.artifactId,
+                },
+                input.sessionId,
+                persistedData.node,
+              );
+
               set((state) => ({
-                ...applyPersistedNodeToSessionState(state, key, persistedData.node),
+                ...applyPersistedNodeToSessionState(state, key, persistedData.node as MessageNode),
                 lastSeqBySession: {
                   ...state.lastSeqBySession,
                   [key]: Math.max(state.lastSeqBySession[key] ?? 0, persistedData.seq),
@@ -1572,7 +1708,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
               return;
             }
 
-            if (eventName === 'error') {
+            if (eventName === "error") {
               const errorData = data as StreamErrorEventData;
 
               set((state) => ({
@@ -1581,7 +1717,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
                   [key]: state.liveRunBySession[key]
                     ? {
                         ...state.liveRunBySession[key],
-                        status: 'failed',
+                        status: "failed",
                         finishedAt: new Date().toISOString(),
                       }
                     : null,
@@ -1602,7 +1738,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
               return;
             }
 
-            if (eventName === 'done') {
+            if (eventName === "done") {
               const doneData = data as StreamDoneEventData;
 
               set((state) => ({
@@ -1628,7 +1764,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
             }
           },
         },
-        controller.signal
+        controller.signal,
       );
 
       await get().loadMessages({
@@ -1639,11 +1775,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
       });
 
       set((state) => ({
-        pendingPromptsBySession: removePendingPrompt(
-          state.pendingPromptsBySession,
-          key,
-          pending.id
-        ),
+        pendingPromptsBySession: removePendingPrompt(state.pendingPromptsBySession, key, pending.id),
         streamingAssistantBySession: {
           ...state.streamingAssistantBySession,
           [key]: null,
@@ -1656,18 +1788,14 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
             ...state.messagesBySession,
             [key]: rewrite.snapshot,
           },
-          pendingPromptsBySession: removePendingPrompt(
-            state.pendingPromptsBySession,
-            key,
-            pending.id
-          ),
+          pendingPromptsBySession: removePendingPrompt(state.pendingPromptsBySession, key, pending.id),
           liveRunBySession: {
             ...state.liveRunBySession,
             [key]: error.liveRun,
           },
           isStreamingBySession: {
             ...state.isStreamingBySession,
-            [key]: error.liveRun.status === 'running',
+            [key]: error.liveRun.status === "running",
           },
           streamingAssistantBySession: {
             ...state.streamingAssistantBySession,
@@ -1703,11 +1831,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
         }
 
         set((state) => ({
-          pendingPromptsBySession: removePendingPrompt(
-            state.pendingPromptsBySession,
-            key,
-            pending.id
-          ),
+          pendingPromptsBySession: removePendingPrompt(state.pendingPromptsBySession, key, pending.id),
           errorsBySession: {
             ...state.errorsBySession,
             [key]: aborted ? null : message,
@@ -1727,11 +1851,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
             ...state.messagesBySession,
             [key]: rewrite.snapshot,
           },
-          pendingPromptsBySession: removePendingPrompt(
-            state.pendingPromptsBySession,
-            key,
-            pending.id
-          ),
+          pendingPromptsBySession: removePendingPrompt(state.pendingPromptsBySession, key, pending.id),
           streamingAssistantBySession: {
             ...state.streamingAssistantBySession,
             [key]: null,
@@ -1751,7 +1871,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
             state.pendingPromptsBySession,
             key,
             pending.id,
-            message
+            message,
           ),
           errorsBySession: {
             ...state.errorsBySession,
@@ -1778,7 +1898,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
       set((state) => ({
         isStreamingBySession: {
           ...state.isStreamingBySession,
-          [key]: state.liveRunBySession[key]?.status === 'running',
+          [key]: state.liveRunBySession[key]?.status === "running",
         },
       }));
     }
@@ -1800,7 +1920,6 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     const rewrite = prepareRewriteState({
       messages: get().messagesBySession[key] ?? [],
       nodeId: input.nodeId,
-      api: input.api,
       modelId: input.modelId,
       textOverride: prompt,
     });
@@ -1840,8 +1959,8 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
         ...state.liveRunBySession,
         [key]: {
           runId: `pending:${pending.id}`,
-          mode: 'edit',
-          status: 'running',
+          mode: "edit",
+          status: "running",
           startedAt: new Date().toISOString(),
         },
       },
@@ -1863,14 +1982,13 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
           message: prompt,
           projectId: input.projectId,
           artifactId: input.artifactId,
-          api: input.api,
           modelId: input.modelId,
-          reasoningLevel: input.reasoningLevel,
+          reasoningEffort: input.reasoningEffort,
           ...(visibleLeafNodeId ? { leafNodeId: visibleLeafNodeId } : {}),
         },
         {
           onEvent: (eventName, data) => {
-            if (eventName === 'ready') {
+            if (eventName === "ready") {
               const readyData = data as StreamReadyEventData;
 
               streamAbortControllers.set(key, {
@@ -1883,23 +2001,23 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
                   ...state.liveRunBySession,
                   [key]: {
                     ...(state.liveRunBySession[key] ?? {
-                      mode: 'edit' as const,
+                      mode: "edit" as const,
                       startedAt: new Date().toISOString(),
                     }),
                     runId: readyData.runId,
                     status: readyData.status,
-                    mode: 'edit',
+                    mode: "edit",
                   },
                 },
                 isStreamingBySession: {
                   ...state.isStreamingBySession,
-                  [key]: readyData.status === 'running',
+                  [key]: readyData.status === "running",
                 },
               }));
               return;
             }
 
-            if (eventName === 'agent_event') {
+            if (eventName === "agent_event") {
               const payload = data as StreamAgentEventData;
               const agentEvent = payload.event;
 
@@ -1923,8 +2041,8 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
                 };
 
                 if (
-                  agentEvent.type === 'message_update' &&
-                  agentEvent.messageType === 'assistant'
+                  agentEvent.type === "message_update" &&
+                  agentEvent.messageType === "assistant"
                 ) {
                   const streamingAssistant = getStreamingAssistantMessage(agentEvent.message);
                   if (streamingAssistant) {
@@ -1935,30 +2053,26 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
                   }
                 }
 
-                if (agentEvent.type === 'message_end') {
+                if (agentEvent.type === "message_end") {
                   didPersistAnyMessage = true;
                   const optimisticNode = createOptimisticNode({
                     message: agentEvent.message,
                     parentId: optimisticParentId,
-                    api: input.api,
                     modelId: input.modelId,
                   });
 
                   optimisticParentId = optimisticNode.id;
 
                   const nextMessages =
-                    placeholderMessageId && agentEvent.messageType === 'user'
+                    placeholderMessageId && agentEvent.messageType === "user"
                       ? replaceOptimisticMessageNode(
                           state.messagesBySession[key] ?? [],
                           placeholderMessageId,
-                          optimisticNode
+                          optimisticNode,
                         )
-                      : upsertOptimisticMessageNode(
-                          state.messagesBySession[key] ?? [],
-                          optimisticNode
-                        );
+                      : upsertOptimisticMessageNode(state.messagesBySession[key] ?? [], optimisticNode);
 
-                  if (agentEvent.messageType === 'user') {
+                  if (agentEvent.messageType === "user") {
                     placeholderMessageId = null;
                   }
 
@@ -1967,7 +2081,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
                     [key]: nextMessages,
                   };
 
-                  if (agentEvent.messageType === 'assistant') {
+                  if (agentEvent.messageType === "assistant") {
                     nextState.streamingAssistantBySession = {
                       ...state.streamingAssistantBySession,
                       [key]: null,
@@ -1980,17 +2094,26 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
               return;
             }
 
-            if (eventName === 'node_persisted') {
+            if (eventName === "node_persisted") {
               const persistedData = data as StreamNodePersistedEventData;
 
               didPersistAnyMessage = true;
               optimisticParentId = persistedData.node.id;
-              if (persistedData.node.message.role === 'user') {
+              if (persistedData.node.message.role === "user") {
                 placeholderMessageId = null;
               }
 
+              syncPersistedNodeQueryData(
+                {
+                  projectId: input.projectId,
+                  artifactId: input.artifactId,
+                },
+                input.sessionId,
+                persistedData.node,
+              );
+
               set((state) => ({
-                ...applyPersistedNodeToSessionState(state, key, persistedData.node),
+                ...applyPersistedNodeToSessionState(state, key, persistedData.node as MessageNode),
                 lastSeqBySession: {
                   ...state.lastSeqBySession,
                   [key]: Math.max(state.lastSeqBySession[key] ?? 0, persistedData.seq),
@@ -1999,7 +2122,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
               return;
             }
 
-            if (eventName === 'error') {
+            if (eventName === "error") {
               const errorData = data as StreamErrorEventData;
 
               set((state) => ({
@@ -2008,7 +2131,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
                   [key]: state.liveRunBySession[key]
                     ? {
                         ...state.liveRunBySession[key],
-                        status: 'failed',
+                        status: "failed",
                         finishedAt: new Date().toISOString(),
                       }
                     : null,
@@ -2029,7 +2152,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
               return;
             }
 
-            if (eventName === 'done') {
+            if (eventName === "done") {
               const doneData = data as StreamDoneEventData;
 
               set((state) => ({
@@ -2055,7 +2178,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
             }
           },
         },
-        controller.signal
+        controller.signal,
       );
 
       await get().loadMessages({
@@ -2066,11 +2189,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
       });
 
       set((state) => ({
-        pendingPromptsBySession: removePendingPrompt(
-          state.pendingPromptsBySession,
-          key,
-          pending.id
-        ),
+        pendingPromptsBySession: removePendingPrompt(state.pendingPromptsBySession, key, pending.id),
         streamingAssistantBySession: {
           ...state.streamingAssistantBySession,
           [key]: null,
@@ -2083,18 +2202,14 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
             ...state.messagesBySession,
             [key]: rewrite.snapshot,
           },
-          pendingPromptsBySession: removePendingPrompt(
-            state.pendingPromptsBySession,
-            key,
-            pending.id
-          ),
+          pendingPromptsBySession: removePendingPrompt(state.pendingPromptsBySession, key, pending.id),
           liveRunBySession: {
             ...state.liveRunBySession,
             [key]: error.liveRun,
           },
           isStreamingBySession: {
             ...state.isStreamingBySession,
-            [key]: error.liveRun.status === 'running',
+            [key]: error.liveRun.status === "running",
           },
           streamingAssistantBySession: {
             ...state.streamingAssistantBySession,
@@ -2130,11 +2245,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
         }
 
         set((state) => ({
-          pendingPromptsBySession: removePendingPrompt(
-            state.pendingPromptsBySession,
-            key,
-            pending.id
-          ),
+          pendingPromptsBySession: removePendingPrompt(state.pendingPromptsBySession, key, pending.id),
           errorsBySession: {
             ...state.errorsBySession,
             [key]: aborted ? null : message,
@@ -2154,11 +2265,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
             ...state.messagesBySession,
             [key]: rewrite.snapshot,
           },
-          pendingPromptsBySession: removePendingPrompt(
-            state.pendingPromptsBySession,
-            key,
-            pending.id
-          ),
+          pendingPromptsBySession: removePendingPrompt(state.pendingPromptsBySession, key, pending.id),
           streamingAssistantBySession: {
             ...state.streamingAssistantBySession,
             [key]: null,
@@ -2178,7 +2285,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
             state.pendingPromptsBySession,
             key,
             pending.id,
-            message
+            message,
           ),
           errorsBySession: {
             ...state.errorsBySession,
@@ -2205,7 +2312,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
       set((state) => ({
         isStreamingBySession: {
           ...state.isStreamingBySession,
-          [key]: state.liveRunBySession[key]?.status === 'running',
+          [key]: state.liveRunBySession[key]?.status === "running",
         },
       }));
     }
@@ -2215,7 +2322,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     const key = getSessionKey(session);
     const liveRun = get().liveRunBySession[key];
 
-    if (!liveRun?.runId || liveRun.status !== 'running') {
+    if (!liveRun?.runId || liveRun.status !== "running") {
       return;
     }
 

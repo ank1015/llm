@@ -1,31 +1,22 @@
-'use client';
+"use client";
 
-import { create } from 'zustand';
+import { create } from "zustand";
 
-import type { ArtifactDirOverviewDto, SessionSummaryDto } from '@/lib/client-api';
+import type { ArtifactDirOverviewDto, SessionSummaryDto } from "@/lib/client-api";
 
 type SidebarStoreState = {
   projectName: string | null;
   artifactDirs: ArtifactDirOverviewDto[];
   isLoading: boolean;
-
   setProjectName: (name: string) => void;
   setArtifactDirs: (dirs: ArtifactDirOverviewDto[]) => void;
   setIsLoading: (loading: boolean) => void;
-
-  /** Optimistically insert a new session into an artifact's session list. */
   addSession: (artifactId: string, session: SessionSummaryDto) => void;
-
-  /** Optimistically rename a session across all artifacts. */
   renameSession: (sessionId: string, sessionName: string) => void;
-
-  /** Optimistically remove a session from an artifact. */
   removeSession: (artifactId: string, sessionId: string) => void;
-
-  /** Optimistically replace an artifact's canonical id/name before a server refresh lands. */
   renameArtifact: (
     artifactId: string,
-    artifact: Pick<ArtifactDirOverviewDto, 'id' | 'name' | 'description' | 'createdAt'>
+    artifact: Pick<ArtifactDirOverviewDto, "id" | "name" | "description" | "createdAt">,
   ) => void;
 };
 
@@ -41,7 +32,7 @@ export const useSidebarStore = create<SidebarStoreState>((set) => ({
   addSession: (artifactId, session) =>
     set((state) => ({
       artifactDirs: state.artifactDirs.map((dir) =>
-        dir.id === artifactId ? { ...dir, sessions: [session, ...dir.sessions] } : dir
+        dir.id === artifactId ? { ...dir, sessions: [session, ...dir.sessions] } : dir,
       ),
     })),
 
@@ -49,7 +40,9 @@ export const useSidebarStore = create<SidebarStoreState>((set) => ({
     set((state) => ({
       artifactDirs: state.artifactDirs.map((dir) => ({
         ...dir,
-        sessions: dir.sessions.map((s) => (s.sessionId === sessionId ? { ...s, sessionName } : s)),
+        sessions: dir.sessions.map((session: SessionSummaryDto) =>
+          session.sessionId === sessionId ? { ...session, sessionName } : session,
+        ),
       })),
     })),
 
@@ -59,9 +52,11 @@ export const useSidebarStore = create<SidebarStoreState>((set) => ({
         dir.id === artifactId
           ? {
               ...dir,
-              sessions: dir.sessions.filter((session) => session.sessionId !== sessionId),
+              sessions: dir.sessions.filter(
+                (session: SessionSummaryDto) => session.sessionId !== sessionId,
+              ),
             }
-          : dir
+          : dir,
       ),
     })),
 
@@ -76,7 +71,7 @@ export const useSidebarStore = create<SidebarStoreState>((set) => ({
               description: artifact.description,
               createdAt: artifact.createdAt,
             }
-          : dir
+          : dir,
       ),
     })),
 }));

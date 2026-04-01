@@ -1,6 +1,15 @@
-'use client';
+"use client";
 
-import { create } from 'zustand';
+import { create } from "zustand";
+
+import {
+  createTerminal as createTerminalApi,
+  deleteTerminal as deleteTerminalApi,
+  listTerminals as listTerminalsApi,
+  openTerminalSocket,
+} from "@/lib/client-api";
+import { getBrowserQueryClient } from "@/lib/query-client";
+import { queryKeys } from "@/lib/query-keys";
 
 import type {
   ArtifactContext,
@@ -11,14 +20,7 @@ import type {
   TerminalOutputMessage,
   TerminalServerMessage,
   TerminalSummaryDto,
-} from '@/lib/client-api';
-
-import {
-  createTerminal as createTerminalApi,
-  deleteTerminal as deleteTerminalApi,
-  listTerminals as listTerminalsApi,
-  openTerminalSocket,
-} from '@/lib/client-api';
+} from "@/lib/client-api";
 
 const DEFAULT_DOCK_HEIGHT_PX = 320;
 const MIN_DOCK_HEIGHT_PX = 180;
@@ -28,8 +30,7 @@ const RECONNECT_BASE_DELAY_MS = 500;
 const RECONNECT_MAX_DELAY_MS = 2_000;
 const FILESYSTEM_EPOCH_THROTTLE_MS = 1_500;
 
-type TerminalConnectionState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting';
-
+type TerminalConnectionState = "disconnected" | "connecting" | "connected" | "reconnecting";
 type TerminalReplayFrame = TerminalOutputMessage | TerminalExitMessage | TerminalErrorMessage;
 
 export type TerminalDockState = {
@@ -84,7 +85,7 @@ const replayBytesByTerminal = new Map<string, number>();
 const filesystemEpochTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 function toErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : 'Unexpected terminal error.';
+  return error instanceof Error ? error.message : "Unexpected terminal error.";
 }
 
 function createInitialDockState(): TerminalDockState {
@@ -107,14 +108,14 @@ export function getTerminalArtifactKey(projectId: string, artifactId: string): s
 
 export function getTerminalRecordKey(
   ctx: ArtifactContext | { projectId: string; artifactId: string },
-  terminalId: string
+  terminalId: string,
 ): string {
   return `${getTerminalArtifactKey(ctx.projectId, ctx.artifactId)}::${terminalId}`;
 }
 
 function getArtifactDockState(
-  state: Pick<TerminalStoreState, 'dockByArtifact'>,
-  artifactKey: string
+  state: Pick<TerminalStoreState, "dockByArtifact">,
+  artifactKey: string,
 ): TerminalDockState {
   return state.dockByArtifact[artifactKey] ?? createInitialDockState();
 }
@@ -128,7 +129,7 @@ function clampDockHeight(heightPx: number, containerHeightPx?: number): number {
 }
 
 function createTerminalRecord(
-  terminal: TerminalSummaryDto | TerminalMetadataDto
+  terminal: TerminalSummaryDto | TerminalMetadataDto,
 ): ArtifactTerminalRecord {
   const metadata = terminal as Partial<TerminalMetadataDto>;
 
@@ -136,7 +137,7 @@ function createTerminalRecord(
     ...terminal,
     cwdAtLaunch: metadata.cwdAtLaunch ?? null,
     shell: metadata.shell ?? null,
-    connectionState: 'disconnected',
+    connectionState: "disconnected",
     socketError: null,
     lastSeq: 0,
     bufferVersion: 0,
@@ -146,7 +147,7 @@ function createTerminalRecord(
 
 function mergeTerminalRecord(
   existing: ArtifactTerminalRecord | undefined,
-  terminal: TerminalSummaryDto | TerminalMetadataDto
+  terminal: TerminalSummaryDto | TerminalMetadataDto,
 ): ArtifactTerminalRecord {
   if (!existing) {
     return createTerminalRecord(terminal);
@@ -163,11 +164,11 @@ function mergeTerminalRecord(
 }
 
 function getFrameByteLength(frame: TerminalReplayFrame): number {
-  if (frame.type === 'output') {
+  if (frame.type === "output") {
     return frame.data.length;
   }
 
-  if (frame.type === 'error') {
+  if (frame.type === "error") {
     return frame.message.length + frame.code.length;
   }
 
@@ -194,10 +195,57 @@ function clearFilesystemEpochTimer(artifactKey: string): void {
   filesystemEpochTimers.delete(artifactKey);
 }
 
+function toTerminalMetadata(record: ArtifactTerminalRecord): TerminalMetadataDto | null {
+  if (!record.cwdAtLaunch || !record.shell) {
+    return null;
+  }
+
+  return {
+    ...record,
+    cwdAtLaunch: record.cwdAtLaunch,
+    shell: record.shell,
+  };
+}
+
+function syncTerminalSummaryCache(ctx: ArtifactContext, summary: TerminalSummaryDto): void {
+  const queryClient = getBrowserQueryClient();
+  queryClient.setQueryData<TerminalSummaryDto[]>(queryKeys.terminals.list(ctx), (current) => {
+    const previous = current ?? [];
+    const index = previous.findIndex((terminal) => terminal.id === summary.id);
+
+    if (index === -1) {
+      return [...previous, summary];
+    }
+
+    const next = [...previous];
+    next[index] = summary;
+    return next;
+  });
+}
+
+function syncTerminalRecordCache(ctx: ArtifactContext, record: ArtifactTerminalRecord): void {
+  syncTerminalSummaryCache(ctx, record);
+
+  const metadata = toTerminalMetadata(record);
+  if (!metadata) {
+    return;
+  }
+
+  getBrowserQueryClient().setQueryData(queryKeys.terminals.detail(ctx, record.id), metadata);
+}
+
+function removeTerminalFromCache(ctx: ArtifactContext, terminalId: string): void {
+  const queryClient = getBrowserQueryClient();
+  queryClient.setQueryData<TerminalSummaryDto[]>(queryKeys.terminals.list(ctx), (current) =>
+    (current ?? []).filter((terminal) => terminal.id !== terminalId),
+  );
+  queryClient.removeQueries({ queryKey: queryKeys.terminals.detail(ctx, terminalId) });
+}
+
 function clearTransportForTerminal(
   terminalRecordKey: string,
   preserveReplay = true,
-  syncState = true
+  syncState = true,
 ): void {
   clearReconnectTimer(terminalRecordKey);
   reconnectAttempts.delete(terminalRecordKey);
@@ -207,7 +255,7 @@ function clearTransportForTerminal(
   if (connection) {
     intentionalSocketClosures.add(terminalRecordKey);
     terminalSocketConnections.delete(terminalRecordKey);
-    connection.close(1000, 'Terminal detached');
+    connection.close(1000, "Terminal detached");
   }
 
   if (!preserveReplay) {
@@ -222,13 +270,22 @@ function clearTransportForTerminal(
         return state;
       }
 
+      const nextRecord = {
+        ...existing,
+        connectionState: "disconnected" as const,
+      };
+      syncTerminalRecordCache(
+        {
+          projectId: nextRecord.projectId,
+          artifactId: nextRecord.artifactId,
+        },
+        nextRecord,
+      );
+
       return {
         terminalsById: {
           ...state.terminalsById,
-          [terminalRecordKey]: {
-            ...existing,
-            connectionState: 'disconnected',
-          },
+          [terminalRecordKey]: nextRecord,
         },
       };
     });
@@ -294,7 +351,7 @@ function scheduleFilesystemEpochBump(artifactKey: string): void {
 function pickDefaultTerminalId(
   terminalIds: string[],
   terminalsById: Record<string, ArtifactTerminalRecord>,
-  artifactCtx: ArtifactContext
+  artifactCtx: ArtifactContext,
 ): string | null {
   for (let index = terminalIds.length - 1; index >= 0; index -= 1) {
     const terminalId = terminalIds[index];
@@ -303,7 +360,7 @@ function pickDefaultTerminalId(
     }
 
     const record = terminalsById[getTerminalRecordKey(artifactCtx, terminalId)];
-    if (record?.status === 'running') {
+    if (record?.status === "running") {
       return terminalId;
     }
   }
@@ -337,21 +394,17 @@ function pickFallbackTerminalId(terminalIds: string[], closedTerminalId: string)
 function shouldReconnectTerminal(terminalRecordKey: string): boolean {
   const state = useTerminalStore.getState();
   const terminal = state.terminalsById[terminalRecordKey];
-  if (!terminal || terminal.status !== 'running') {
+  if (!terminal || terminal.status !== "running") {
     return false;
   }
 
   const artifactKey = getTerminalArtifactKey(terminal.projectId, terminal.artifactId);
   const dock = getArtifactDockState(state, artifactKey);
-  if (
-    state.activeArtifactKey !== artifactKey ||
-    !dock.open ||
-    dock.activeTerminalId !== terminal.id
-  ) {
+  if (state.activeArtifactKey !== artifactKey || !dock.open || dock.activeTerminalId !== terminal.id) {
     return false;
   }
 
-  if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+  if (typeof document !== "undefined" && document.visibilityState !== "visible") {
     return false;
   }
 
@@ -379,7 +432,7 @@ function scheduleTerminalReconnect(terminalRecordKey: string): void {
         projectId: terminal.projectId,
         artifactId: terminal.artifactId,
       },
-      terminal.id
+      terminal.id,
     );
   }, delay);
 
@@ -393,12 +446,7 @@ function attachTerminalSocket(ctx: ArtifactContext, terminalId: string): void {
   const terminalRecordKey = getTerminalRecordKey(ctx, terminalId);
   const terminal = state.terminalsById[terminalRecordKey];
 
-  if (
-    !terminal ||
-    state.activeArtifactKey !== artifactKey ||
-    !dock.open ||
-    dock.activeTerminalId !== terminalId
-  ) {
+  if (!terminal || state.activeArtifactKey !== artifactKey || !dock.open || dock.activeTerminalId !== terminalId) {
     return;
   }
 
@@ -414,16 +462,24 @@ function attachTerminalSocket(ctx: ArtifactContext, terminalId: string): void {
 
   clearReconnectTimer(terminalRecordKey);
 
-  useTerminalStore.setState((currentState) => ({
-    terminalsById: {
-      ...currentState.terminalsById,
-      [terminalRecordKey]: {
-        ...(currentState.terminalsById[terminalRecordKey] ?? terminal),
-        connectionState: reconnectAttempts.has(terminalRecordKey) ? 'reconnecting' : 'connecting',
-        socketError: null,
+  useTerminalStore.setState((currentState) => {
+    const existing = currentState.terminalsById[terminalRecordKey] ?? terminal;
+    const nextRecord = {
+      ...existing,
+      connectionState: reconnectAttempts.has(terminalRecordKey)
+        ? "reconnecting"
+        : "connecting",
+      socketError: null,
+    } satisfies ArtifactTerminalRecord;
+    syncTerminalRecordCache(ctx, nextRecord);
+
+    return {
+      terminalsById: {
+        ...currentState.terminalsById,
+        [terminalRecordKey]: nextRecord,
       },
-    },
-  }));
+    };
+  });
 
   const connection = openTerminalSocket(
     {
@@ -434,25 +490,30 @@ function attachTerminalSocket(ctx: ArtifactContext, terminalId: string): void {
     },
     {
       onMessage: (message: TerminalServerMessage) => {
-        if (message.type === 'ready') {
+        if (message.type === "ready") {
           reconnectAttempts.delete(terminalRecordKey);
-          useTerminalStore.setState((currentState) => ({
-            terminalsById: {
-              ...currentState.terminalsById,
-              [terminalRecordKey]: {
-                ...mergeTerminalRecord(
-                  currentState.terminalsById[terminalRecordKey],
-                  message.terminal
-                ),
-                connectionState: 'connected',
-                socketError: null,
+          useTerminalStore.setState((currentState) => {
+            const nextRecord = {
+              ...mergeTerminalRecord(
+                currentState.terminalsById[terminalRecordKey],
+                message.terminal,
+              ),
+              connectionState: "connected" as const,
+              socketError: null,
+            };
+            syncTerminalRecordCache(ctx, nextRecord);
+
+            return {
+              terminalsById: {
+                ...currentState.terminalsById,
+                [terminalRecordKey]: nextRecord,
               },
-            },
-          }));
+            };
+          });
           return;
         }
 
-        if (message.type === 'output') {
+        if (message.type === "output") {
           pushReplayFrame(terminalRecordKey, message);
           scheduleFilesystemEpochBump(artifactKey);
           useTerminalStore.setState((currentState) => {
@@ -461,23 +522,26 @@ function attachTerminalSocket(ctx: ArtifactContext, terminalId: string): void {
               return currentState;
             }
 
+            const nextRecord = {
+              ...existing,
+              lastSeq: message.seq,
+              bufferVersion: existing.bufferVersion + 1,
+              lastActiveAt: new Date().toISOString(),
+              socketError: null,
+            };
+            syncTerminalRecordCache(ctx, nextRecord);
+
             return {
               terminalsById: {
                 ...currentState.terminalsById,
-                [terminalRecordKey]: {
-                  ...existing,
-                  lastSeq: message.seq,
-                  bufferVersion: existing.bufferVersion + 1,
-                  lastActiveAt: new Date().toISOString(),
-                  socketError: null,
-                },
+                [terminalRecordKey]: nextRecord,
               },
             };
           });
           return;
         }
 
-        if (message.type === 'error') {
+        if (message.type === "error") {
           pushReplayFrame(terminalRecordKey, message);
           useTerminalStore.setState((currentState) => {
             const existing = currentState.terminalsById[terminalRecordKey];
@@ -485,15 +549,18 @@ function attachTerminalSocket(ctx: ArtifactContext, terminalId: string): void {
               return currentState;
             }
 
+            const nextRecord = {
+              ...existing,
+              lastSeq: message.seq,
+              bufferVersion: existing.bufferVersion + 1,
+              socketError: message.message,
+            };
+            syncTerminalRecordCache(ctx, nextRecord);
+
             return {
               terminalsById: {
                 ...currentState.terminalsById,
-                [terminalRecordKey]: {
-                  ...existing,
-                  lastSeq: message.seq,
-                  bufferVersion: existing.bufferVersion + 1,
-                  socketError: message.message,
-                },
+                [terminalRecordKey]: nextRecord,
               },
             };
           });
@@ -508,20 +575,23 @@ function attachTerminalSocket(ctx: ArtifactContext, terminalId: string): void {
             return currentState;
           }
 
+          const nextRecord = {
+            ...existing,
+            status: "exited" as const,
+            exitCode: message.exitCode,
+            signal: message.signal,
+            exitedAt: message.exitedAt,
+            lastSeq: message.seq,
+            bufferVersion: existing.bufferVersion + 1,
+            connectionState: "disconnected" as const,
+            socketError: null,
+          };
+          syncTerminalRecordCache(ctx, nextRecord);
+
           return {
             terminalsById: {
               ...currentState.terminalsById,
-              [terminalRecordKey]: {
-                ...existing,
-                status: 'exited',
-                exitCode: message.exitCode,
-                signal: message.signal,
-                exitedAt: message.exitedAt,
-                lastSeq: message.seq,
-                bufferVersion: existing.bufferVersion + 1,
-                connectionState: 'disconnected',
-                socketError: null,
-              },
+              [terminalRecordKey]: nextRecord,
             },
           };
         });
@@ -539,13 +609,16 @@ function attachTerminalSocket(ctx: ArtifactContext, terminalId: string): void {
             return currentState;
           }
 
+          const nextRecord = {
+            ...existing,
+            connectionState: "disconnected" as const,
+          };
+          syncTerminalRecordCache(ctx, nextRecord);
+
           return {
             terminalsById: {
               ...currentState.terminalsById,
-              [terminalRecordKey]: {
-                ...existing,
-                connectionState: 'disconnected',
-              },
+              [terminalRecordKey]: nextRecord,
             },
           };
         });
@@ -561,18 +634,21 @@ function attachTerminalSocket(ctx: ArtifactContext, terminalId: string): void {
             return currentState;
           }
 
+          const nextRecord = {
+            ...existing,
+            socketError: error.message,
+          };
+          syncTerminalRecordCache(ctx, nextRecord);
+
           return {
             terminalsById: {
               ...currentState.terminalsById,
-              [terminalRecordKey]: {
-                ...existing,
-                socketError: error.message,
-              },
+              [terminalRecordKey]: nextRecord,
             },
           };
         });
       },
-    }
+    },
   );
 
   terminalSocketConnections.set(terminalRecordKey, connection);
@@ -580,7 +656,7 @@ function attachTerminalSocket(ctx: ArtifactContext, terminalId: string): void {
 
 export function getTerminalReplayFrames(
   ctx: ArtifactContext | { projectId: string; artifactId: string },
-  terminalId: string
+  terminalId: string,
 ): TerminalReplayFrame[] {
   return replayFramesByTerminal.get(getTerminalRecordKey(ctx, terminalId)) ?? [];
 }
@@ -640,6 +716,7 @@ export const useTerminalStore = create<TerminalStoreState>((set, get) => ({
   },
 
   ensureHydrated: async (ctx, force = false) => {
+    const queryClient = getBrowserQueryClient();
     const artifactKey = getTerminalArtifactKey(ctx.projectId, ctx.artifactId);
     const dock = getArtifactDockState(get(), artifactKey);
     if (dock.hasHydrated && !force) {
@@ -658,7 +735,14 @@ export const useTerminalStore = create<TerminalStoreState>((set, get) => ({
     }));
 
     try {
-      const terminals = await listTerminalsApi(ctx);
+      if (force) {
+        await queryClient.invalidateQueries({ queryKey: queryKeys.terminals.list(ctx) });
+      }
+
+      const terminals = await queryClient.fetchQuery({
+        queryKey: queryKeys.terminals.list(ctx),
+        queryFn: () => listTerminalsApi(ctx),
+      });
 
       set((state) => {
         const previousDock = getArtifactDockState(state, artifactKey);
@@ -668,19 +752,19 @@ export const useTerminalStore = create<TerminalStoreState>((set, get) => ({
 
         for (const terminal of terminals) {
           const terminalRecordKey = getTerminalRecordKey(ctx, terminal.id);
-          nextTerminalsById[terminalRecordKey] = mergeTerminalRecord(
-            nextTerminalsById[terminalRecordKey],
-            terminal
-          );
+          const nextRecord = mergeTerminalRecord(nextTerminalsById[terminalRecordKey], terminal);
+          nextTerminalsById[terminalRecordKey] = nextRecord;
+          syncTerminalSummaryCache(ctx, nextRecord);
           previousTerminalIds.delete(terminal.id);
         }
 
         for (const previousTerminalId of previousTerminalIds) {
           delete nextTerminalsById[getTerminalRecordKey(ctx, previousTerminalId)];
           clearTransportForTerminal(getTerminalRecordKey(ctx, previousTerminalId), false, false);
+          removeTerminalFromCache(ctx, previousTerminalId);
         }
 
-        const activeTerminalId = terminalIds.includes(previousDock.activeTerminalId ?? '')
+        const activeTerminalId = terminalIds.includes(previousDock.activeTerminalId ?? "")
           ? previousDock.activeTerminalId
           : pickDefaultTerminalId(terminalIds, nextTerminalsById, ctx);
 
@@ -822,6 +906,7 @@ export const useTerminalStore = create<TerminalStoreState>((set, get) => ({
   },
 
   createTerminal: async (ctx, input) => {
+    const queryClient = getBrowserQueryClient();
     const artifactKey = getTerminalArtifactKey(ctx.projectId, ctx.artifactId);
     set((state) => ({
       dockByArtifact: {
@@ -836,18 +921,22 @@ export const useTerminalStore = create<TerminalStoreState>((set, get) => ({
 
     try {
       const metadata = await createTerminalApi(ctx, input);
+      queryClient.setQueryData(queryKeys.terminals.detail(ctx, metadata.id), metadata);
+      syncTerminalSummaryCache(ctx, metadata);
 
       set((state) => {
         const previousDock = getArtifactDockState(state, artifactKey);
         const nextTerminalIds = [...previousDock.terminalIds, metadata.id];
+        const nextRecord = mergeTerminalRecord(
+          state.terminalsById[getTerminalRecordKey(ctx, metadata.id)],
+          metadata,
+        );
+        syncTerminalRecordCache(ctx, nextRecord);
 
         return {
           terminalsById: {
             ...state.terminalsById,
-            [getTerminalRecordKey(ctx, metadata.id)]: mergeTerminalRecord(
-              state.terminalsById[getTerminalRecordKey(ctx, metadata.id)],
-              metadata
-            ),
+            [getTerminalRecordKey(ctx, metadata.id)]: nextRecord,
           },
           dockByArtifact: {
             ...state.dockByArtifact,
@@ -863,6 +952,8 @@ export const useTerminalStore = create<TerminalStoreState>((set, get) => ({
           },
         };
       });
+
+      await queryClient.invalidateQueries({ queryKey: queryKeys.terminals.list(ctx) });
 
       if (get().activeArtifactKey === artifactKey) {
         attachTerminalSocket(ctx, metadata.id);
@@ -884,6 +975,7 @@ export const useTerminalStore = create<TerminalStoreState>((set, get) => ({
   },
 
   deleteTerminal: async (ctx, terminalId) => {
+    const queryClient = getBrowserQueryClient();
     const artifactKey = getTerminalArtifactKey(ctx.projectId, ctx.artifactId);
     const terminalRecordKey = getTerminalRecordKey(ctx, terminalId);
 
@@ -893,13 +985,16 @@ export const useTerminalStore = create<TerminalStoreState>((set, get) => ({
         return state;
       }
 
+      const nextRecord = {
+        ...existing,
+        isDeleting: true,
+      };
+      syncTerminalRecordCache(ctx, nextRecord);
+
       return {
         terminalsById: {
           ...state.terminalsById,
-          [terminalRecordKey]: {
-            ...existing,
-            isDeleting: true,
-          },
+          [terminalRecordKey]: nextRecord,
         },
       };
     });
@@ -908,6 +1003,11 @@ export const useTerminalStore = create<TerminalStoreState>((set, get) => ({
 
     try {
       await deleteTerminalApi(ctx, terminalId);
+      removeTerminalFromCache(ctx, terminalId);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.terminals.list(ctx) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.terminals.detail(ctx, terminalId) }),
+      ]);
     } catch (error) {
       set((state) => {
         const existing = state.terminalsById[terminalRecordKey];
@@ -923,13 +1023,16 @@ export const useTerminalStore = create<TerminalStoreState>((set, get) => ({
           };
         }
 
+        const nextRecord = {
+          ...existing,
+          isDeleting: false,
+        };
+        syncTerminalRecordCache(ctx, nextRecord);
+
         return {
           terminalsById: {
             ...state.terminalsById,
-            [terminalRecordKey]: {
-              ...existing,
-              isDeleting: false,
-            },
+            [terminalRecordKey]: nextRecord,
           },
           dockByArtifact: {
             ...state.dockByArtifact,
@@ -967,6 +1070,7 @@ export const useTerminalStore = create<TerminalStoreState>((set, get) => ({
           [artifactKey]: {
             ...previousDock,
             error: null,
+            open: nextTerminalIds.length > 0 ? previousDock.open : false,
             terminalIds: nextTerminalIds,
             activeTerminalId: nextActiveTerminalId,
           },
@@ -995,14 +1099,17 @@ export const useTerminalStore = create<TerminalStoreState>((set, get) => ({
         return state;
       }
 
+      const nextRecord = {
+        ...existing,
+        cols,
+        rows,
+      };
+      syncTerminalRecordCache(ctx, nextRecord);
+
       return {
         terminalsById: {
           ...state.terminalsById,
-          [terminalRecordKey]: {
-            ...existing,
-            cols,
-            rows,
-          },
+          [terminalRecordKey]: nextRecord,
         },
       };
     });
