@@ -2,7 +2,12 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import {
+  createFetchResponse,
+  createGitHubSkillArchive,
+} from '../../helpers/github-skill-archive.js';
 
 const { setConfig } = await import('../../../src/core/config.js');
 const { Project } = await import('../../../src/core/project/project.js');
@@ -10,8 +15,11 @@ const { ArtifactDir } = await import('../../../src/core/artifact-dir/artifact-di
 const { Session } = await import('../../../src/core/session/session.js');
 const { projectRoutes } = await import('../../../src/routes/projects.js');
 const { artifactDirRoutes } = await import('../../../src/routes/artifact-dirs.js');
+const { skillRoutes } = await import('../../../src/routes/skills.js');
 const { terminalRoutes } = await import('../../../src/routes/terminals.js');
 const { resetTerminalRegistry } = await import('../../../src/core/terminal/terminal-registry.js');
+const { resetSessionRunRegistry, sessionRunRegistry } =
+  await import('../../../src/core/session/run-registry.js');
 
 let projectsRoot: string;
 let dataRoot: string;
@@ -58,9 +66,12 @@ beforeEach(async () => {
   dataRoot = await mkdtemp(join(tmpdir(), 'llm-server-resource-data-'));
   setConfig({ projectsRoot, dataRoot });
   resetTerminalRegistry(() => createFakePtyProcess());
+  resetSessionRunRegistry();
 });
 
 afterEach(async () => {
+  vi.unstubAllGlobals();
+  resetSessionRunRegistry();
   resetTerminalRegistry();
   await rm(projectsRoot, { recursive: true, force: true });
   await rm(dataRoot, { recursive: true, force: true });
@@ -152,12 +163,28 @@ describe('project, artifact, and terminal routes', () => {
     });
   });
 
-  it('handles artifact explorer and file mutations and leaves skill routes absent', async () => {
+  it('lists available registry skills', async () => {
+    const response = await jsonRequest(skillRoutes, '/skills', 'GET');
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual([
+      expect.objectContaining({
+        name: 'pdf',
+        link: 'https://github.com/anthropics/skills/tree/main/skills/pdf',
+        description: expect.stringContaining('PDF files'),
+      }),
+    ]);
+  });
+
+  it('handles artifact explorer, file mutations, and installed skill routes', async () => {
     await Project.create({ name: 'Artifacts Project' });
     await ArtifactDir.create('artifacts-project', { name: 'Assets' });
 
     const artifactDir = await ArtifactDir.getById('artifacts-project', 'assets');
     await writeFile(join(artifactDir.dirPath, 'alpha.txt'), 'artifact body', 'utf8');
+    const archive = await createGitHubSkillArchive();
+    const fetchMock = vi.fn(async () => createFetchResponse(archive));
+    vi.stubGlobal('fetch', fetchMock);
 
     const explorerResponse = await jsonRequest(
       artifactDirRoutes,
@@ -225,15 +252,145 @@ describe('project, artifact, and terminal routes', () => {
       '/projects/artifacts-project/artifacts/assets/skills',
       'GET'
     );
-    expect(skillGetResponse.status).toBe(404);
+    expect(skillGetResponse.status).toBe(200);
+    expect(await skillGetResponse.json()).toEqual([]);
 
     const skillPostResponse = await jsonRequest(
       artifactDirRoutes,
       '/projects/artifacts-project/artifacts/assets/skills',
       'POST',
-      { skillName: 'anything' }
+      { skillName: 'pdf' }
     );
-    expect(skillPostResponse.status).toBe(404);
+    expect(skillPostResponse.status).toBe(200);
+    expect(await skillPostResponse.json()).toMatchObject({
+      name: 'pdf',
+      path: '.max/skills/pdf/SKILL.md',
+    });
+
+    const installedSkillListResponse = await jsonRequest(
+      artifactDirRoutes,
+      '/projects/artifacts-project/artifacts/assets/skills',
+      'GET'
+    );
+    expect(installedSkillListResponse.status).toBe(200);
+    expect(await installedSkillListResponse.json()).toEqual([
+      expect.objectContaining({
+        name: 'pdf',
+        path: '.max/skills/pdf/SKILL.md',
+      }),
+    ]);
+
+    await writeFile(
+      join(artifactDir.dirPath, '.max', 'skills', 'pdf', 'stale.txt'),
+      'stale',
+      'utf8'
+    );
+
+    const reloadResponse = await jsonRequest(
+      artifactDirRoutes,
+      '/projects/artifacts-project/artifacts/assets/skills/pdf/reload',
+      'POST'
+    );
+    expect(reloadResponse.status).toBe(200);
+    expect(await reloadResponse.json()).toMatchObject({
+      name: 'pdf',
+      path: '.max/skills/pdf/SKILL.md',
+    });
+
+    const deleteSkillResponse = await jsonRequest(
+      artifactDirRoutes,
+      '/projects/artifacts-project/artifacts/assets/skills/pdf',
+      'DELETE'
+    );
+    expect(deleteSkillResponse.status).toBe(200);
+    expect(await deleteSkillResponse.json()).toEqual({
+      deleted: true,
+      skillName: 'pdf',
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns skill route errors for invalid, duplicate, missing, and active-run mutations', async () => {
+    await Project.create({ name: 'Skill Errors Project' });
+    await ArtifactDir.create('skill-errors-project', { name: 'Assets' });
+
+    const archive = await createGitHubSkillArchive();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => createFetchResponse(archive))
+    );
+
+    const missingNameResponse = await jsonRequest(
+      artifactDirRoutes,
+      '/projects/skill-errors-project/artifacts/assets/skills',
+      'POST',
+      {}
+    );
+    expect(missingNameResponse.status).toBe(400);
+
+    const unknownSkillResponse = await jsonRequest(
+      artifactDirRoutes,
+      '/projects/skill-errors-project/artifacts/assets/skills',
+      'POST',
+      { skillName: 'unknown' }
+    );
+    expect(unknownSkillResponse.status).toBe(400);
+
+    const installResponse = await jsonRequest(
+      artifactDirRoutes,
+      '/projects/skill-errors-project/artifacts/assets/skills',
+      'POST',
+      { skillName: 'pdf' }
+    );
+    expect(installResponse.status).toBe(200);
+
+    const duplicateInstallResponse = await jsonRequest(
+      artifactDirRoutes,
+      '/projects/skill-errors-project/artifacts/assets/skills',
+      'POST',
+      { skillName: 'pdf' }
+    );
+    expect(duplicateInstallResponse.status).toBe(409);
+
+    const deleteInstalledSkillResponse = await jsonRequest(
+      artifactDirRoutes,
+      '/projects/skill-errors-project/artifacts/assets/skills/pdf',
+      'DELETE'
+    );
+    expect(deleteInstalledSkillResponse.status).toBe(200);
+
+    const missingReloadResponse = await jsonRequest(
+      artifactDirRoutes,
+      '/projects/skill-errors-project/artifacts/assets/skills/pdf/reload',
+      'POST'
+    );
+    expect(missingReloadResponse.status).toBe(404);
+
+    const missingDeleteResponse = await jsonRequest(
+      artifactDirRoutes,
+      '/projects/skill-errors-project/artifacts/assets/skills/pdf',
+      'DELETE'
+    );
+    expect(missingDeleteResponse.status).toBe(404);
+
+    let releaseRun: (() => void) | null = null;
+    const blockRun = new Promise<{ messageCount: number }>((resolve) => {
+      releaseRun = () => resolve({ messageCount: 0 });
+    });
+    sessionRunRegistry.startRun({
+      sessionKey: 'skill-errors-project:assets:session-1',
+      sessionId: 'session-1',
+      mode: 'prompt',
+      execute: async () => blockRun,
+    });
+
+    const activeRunResponse = await jsonRequest(
+      artifactDirRoutes,
+      '/projects/skill-errors-project/artifacts/assets/skills/pdf/reload',
+      'POST'
+    );
+    expect(activeRunResponse.status).toBe(409);
+    releaseRun?.();
   });
 
   it('creates, lists, gets, and deletes terminals with local DTOs', async () => {
