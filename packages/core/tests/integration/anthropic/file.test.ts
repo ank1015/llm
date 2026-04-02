@@ -4,8 +4,8 @@ import { fileURLToPath } from 'node:url';
 
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { streamAnthropic } from '../../../src/providers/anthropic/index.js';
 import { getModel } from '../../../src/models/index.js';
+import { streamAnthropic } from '../../../src/providers/anthropic/index.js';
 import { describeIfAvailable, getIntegrationEnv } from '../helpers/live.js';
 
 import type { BaseAssistantMessage, Context, Model } from '../../../src/types/index.js';

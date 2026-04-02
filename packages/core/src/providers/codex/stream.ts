@@ -6,7 +6,6 @@ import { validateToolArguments } from '../../utils/validation.js';
 import { getCodexErrorDetails } from './errors.js';
 import { buildParams, createClient, getMockCodexMessage, mapStopReason } from './utils.js';
 
-import type { StreamFunction } from '../../utils/types.js';
 import type {
   AssistantResponseContent,
   AssistantThinkingContent,
@@ -17,6 +16,7 @@ import type {
   CodexProviderOptions,
   TextContent,
 } from '../../types/index.js';
+import type { StreamFunction } from '../../utils/types.js';
 import type {
   Response,
   ResponseCreateParamsStreaming,

@@ -5,7 +5,6 @@ import { parseStreamingJson } from '../../utils/json-parse.js';
 import { getAnthropicErrorDetails } from './errors.js';
 import { buildParams, createClient, getMockAnthropicMessage, mapStopReason } from './utils.js';
 
-import type { StreamFunction } from '../../utils/types.js';
 import type {
   AnthropicProviderOptions,
   AssistantResponseContent,
@@ -16,6 +15,7 @@ import type {
   Model,
   TextContent,
 } from '../../types/index.js';
+import type { StreamFunction } from '../../utils/types.js';
 import type { MessageCreateParamsStreaming } from '@anthropic-ai/sdk/resources';
 import type {
   Message as AnthropicMessage,

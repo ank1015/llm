@@ -5,7 +5,6 @@ import { getAnthropicErrorDetails } from '../anthropic/errors.js';
 
 import { buildParams, createClient, getMockClaudeCodeMessage, mapStopReason } from './utils.js';
 
-import type { StreamFunction } from '../../utils/types.js';
 import type {
   AssistantResponseContent,
   AssistantThinkingContent,
@@ -16,6 +15,7 @@ import type {
   Model,
   TextContent,
 } from '../../types/index.js';
+import type { StreamFunction } from '../../utils/types.js';
 import type { MessageCreateParamsStreaming } from '@anthropic-ai/sdk/resources';
 import type {
   Message as AnthropicMessage,

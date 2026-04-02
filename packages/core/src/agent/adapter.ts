@@ -6,7 +6,6 @@ import type {
   AgentEngine,
   AgentEngineConfig,
   AgentError,
-  AgentEvent,
   AgentEventAdapter,
   AgentEventAdapterOptions,
   AgentRunOptions,
@@ -37,9 +36,10 @@ export function createEventAdapter(
     });
 
     const assistantMessageId = options.assistantMessageId ?? generateUUID();
-    const placeholderAssistant = (
-      adapterOptions.createPlaceholderAssistant ?? getMockMessage
-    )(config.provider.model, assistantMessageId);
+    const placeholderAssistant = (adapterOptions.createPlaceholderAssistant ?? getMockMessage)(
+      config.provider.model,
+      assistantMessageId
+    );
 
     await safelyObserve(async () => {
       await adapterOptions.onEvent?.({
@@ -240,10 +240,7 @@ function adaptConfig(
   };
 }
 
-function wrapTool(
-  tool: AgentTool,
-  adapterOptions: AgentEventAdapterOptions
-): AgentTool {
+function wrapTool(tool: AgentTool, adapterOptions: AgentEventAdapterOptions): AgentTool {
   return {
     ...tool,
     execute: async (input) => {

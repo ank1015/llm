@@ -3,8 +3,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { streamCodex } from '../../../src/providers/codex/stream.js';
 import { getMockCodexMessage } from '../../../src/providers/codex/utils.js';
-import { AssistantStreamError } from '../../../src/utils/event-stream.js';
 import * as codexProviderUtils from '../../../src/providers/codex/utils.js';
+import { AssistantStreamError } from '../../../src/utils/event-stream.js';
 
 import type { CodexProviderOptions, Context, Model } from '../../../src/types/index.js';
 
@@ -41,7 +41,9 @@ describe('Codex Responses stream errors', () => {
     vi.restoreAllMocks();
   });
 
-  function mockCodexClient(factory: () => Promise<AsyncIterable<unknown>> | AsyncIterable<unknown>) {
+  function mockCodexClient(
+    factory: () => Promise<AsyncIterable<unknown>> | AsyncIterable<unknown>
+  ) {
     vi.spyOn(codexProviderUtils, 'createClient').mockReturnValue({
       responses: {
         create: vi.fn(async () => factory()),

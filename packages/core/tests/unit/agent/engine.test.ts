@@ -1,8 +1,8 @@
 import { Type } from '@sinclair/typebox';
 import { describe, expect, it, vi } from 'vitest';
 
-import { buildUserMessage } from '../../../src/agent/utils.js';
 import { runAgent, stepAgent } from '../../../src/agent/engine.js';
+import { buildUserMessage } from '../../../src/agent/utils.js';
 import { getModel } from '../../../src/models/index.js';
 
 import type {
@@ -71,9 +71,7 @@ function createToolCall(
   };
 }
 
-function createConfig(
-  overrides: Partial<AgentEngineConfig> = {}
-): AgentEngineConfig {
+function createConfig(overrides: Partial<AgentEngineConfig> = {}): AgentEngineConfig {
   return {
     tools: [],
     provider: {
@@ -119,9 +117,7 @@ describe('stepAgent', () => {
       })),
     } satisfies AgentTool;
 
-    const assistantMessage = createAssistantMessage([
-      createToolCall('calculator', { a: 1, b: 2 }),
-    ]);
+    const assistantMessage = createAssistantMessage([createToolCall('calculator', { a: 1, b: 2 })]);
 
     const config = createConfig({
       tools: [tool],
@@ -170,7 +166,9 @@ describe('stepAgent', () => {
     expect(result.continue).toBe(true);
     expect(result.newMessages[0]).toMatchObject({
       role: 'assistant',
-      content: expect.arrayContaining([{ type: 'thinking', thinkingText: 'intermediate reasoning' }]),
+      content: expect.arrayContaining([
+        { type: 'thinking', thinkingText: 'intermediate reasoning' },
+      ]),
     });
     expect(result.newMessages[1]).toMatchObject({
       role: 'toolResult',
@@ -380,9 +378,7 @@ describe('stepAgent', () => {
 
     const notFoundResult = await stepAgent(
       createConfig({
-        modelInvoker: vi.fn(async () =>
-          createAssistantMessage([createToolCall('missing', {})])
-        ),
+        modelInvoker: vi.fn(async () => createAssistantMessage([createToolCall('missing', {})])),
       }),
       createState()
     );
@@ -413,9 +409,7 @@ describe('stepAgent', () => {
     const throwingResult = await stepAgent(
       createConfig({
         tools: [throwingTool],
-        modelInvoker: vi.fn(async () =>
-          createAssistantMessage([createToolCall('thrower', {})])
-        ),
+        modelInvoker: vi.fn(async () => createAssistantMessage([createToolCall('thrower', {})])),
       }),
       createState()
     );

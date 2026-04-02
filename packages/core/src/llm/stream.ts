@@ -6,8 +6,8 @@
 
 import { getProviderStream } from '../providers/registry.js';
 
-import type { AssistantMessageEventStream } from '../utils/event-stream.js';
 import type { Api, Context, Model, OptionsForApi } from '../types/index.js';
+import type { AssistantMessageEventStream } from '../utils/event-stream.js';
 
 /**
  * Stream a chat request using the specified provider.

@@ -56,6 +56,9 @@ type ToolExecutionResult =
       errorDetails?: ToolResultMessage['error'];
     };
 
+// The main turn loop is intentionally kept in one place so retries, hooks,
+// message appends, and tool execution stay readable as a single flow.
+// eslint-disable-next-line sonarjs/cognitive-complexity
 export async function stepAgent(
   config: AgentEngineConfig,
   state: AgentRunState,
@@ -72,17 +75,12 @@ export async function stepAgent(
 
   const maxTurns = config.limits?.maxTurns;
   if (typeof maxTurns === 'number' && state.turns >= maxTurns) {
-    return finalizeError(
-      config,
-      state,
-      [],
-      {
-        phase: 'limit',
-        message: `Max turns exceeded: ${state.turns} >= ${maxTurns}`,
-        canRetry: false,
-        attempts: 1,
-      }
-    );
+    return finalizeError(config, state, [], {
+      phase: 'limit',
+      message: `Max turns exceeded: ${state.turns} >= ${maxTurns}`,
+      canRetry: false,
+      attempts: 1,
+    });
   }
 
   let context: Context = {
@@ -98,18 +96,13 @@ export async function stepAgent(
       const preparedContext = await config.hooks.prepareContext({ context, state, config });
       context = preparedContext;
     } catch (cause) {
-      return finalizeError(
-        config,
-        state,
-        [],
-        {
-          phase: 'hook',
-          message: getErrorMessage(cause),
-          canRetry: false,
-          attempts: 1,
-          cause,
-        }
-      );
+      return finalizeError(config, state, [], {
+        phase: 'hook',
+        message: getErrorMessage(cause),
+        canRetry: false,
+        attempts: 1,
+        cause,
+      });
     }
   }
 
@@ -149,18 +142,13 @@ export async function stepAgent(
         assistantMessage = transformedMessage as BaseAssistantMessage<Api>;
       }
     } catch (cause) {
-      return finalizeError(
-        config,
-        state,
-        [],
-        {
-          phase: 'hook',
-          message: getErrorMessage(cause),
-          canRetry: false,
-          attempts: 1,
-          cause,
-        }
-      );
+      return finalizeError(config, state, [], {
+        phase: 'hook',
+        message: getErrorMessage(cause),
+        canRetry: false,
+        attempts: 1,
+        cause,
+      });
     }
   }
 
@@ -215,9 +203,9 @@ export async function stepAgent(
     }
 
     let toolCall = rawToolCall;
-    let originalTool = config.tools.find((candidate) => candidate.name === rawToolCall.name);
+    const originalTool = config.tools.find((candidate) => candidate.name === rawToolCall.name);
 
-  if (config.hooks?.prepareToolCall) {
+    if (config.hooks?.prepareToolCall) {
       try {
         const preparedToolCall = await config.hooks.prepareToolCall({
           assistantMessage,
@@ -230,23 +218,23 @@ export async function stepAgent(
           toolCall = preparedToolCall;
         }
       } catch (cause) {
-        return finalizeError(
-          config,
-          nextState,
-          newMessages,
-          {
-            phase: 'hook',
-            message: getErrorMessage(cause),
-            canRetry: false,
-            attempts: 1,
-            cause,
-          }
-        );
+        return finalizeError(config, nextState, newMessages, {
+          phase: 'hook',
+          message: getErrorMessage(cause),
+          canRetry: false,
+          attempts: 1,
+          cause,
+        });
       }
     }
 
     const tool = config.tools.find((candidate) => candidate.name === toolCall.name);
-    const executionResult = await executeToolCall(tool, toolCall, nextState.messages, options.signal);
+    const executionResult = await executeToolCall(
+      tool,
+      toolCall,
+      nextState.messages,
+      options.signal
+    );
 
     if ('aborted' in executionResult) {
       return {
@@ -275,18 +263,13 @@ export async function stepAgent(
           toolResultMessage = formattedToolResult;
         }
       } catch (cause) {
-        return finalizeError(
-          config,
-          nextState,
-          newMessages,
-          {
-            phase: 'hook',
-            message: getErrorMessage(cause),
-            canRetry: false,
-            attempts: 1,
-            cause,
-          }
-        );
+        return finalizeError(config, nextState, newMessages, {
+          phase: 'hook',
+          message: getErrorMessage(cause),
+          canRetry: false,
+          attempts: 1,
+          cause,
+        });
       }
     }
 
@@ -355,6 +338,8 @@ function appendGenericMessage(state: AgentRunState, message: Message): AgentRunS
   };
 }
 
+// Retry orchestration spans hooks, abort handling, and normalized error mapping.
+// eslint-disable-next-line sonarjs/cognitive-complexity
 async function invokeModelWithRetry(
   config: AgentEngineConfig,
   state: AgentRunState,
@@ -425,7 +410,11 @@ async function invokeModelWithRetry(
         return { aborted: true, attempts: attempt };
       }
 
-      if ('canRetry' in normalizedFailure && normalizedFailure.canRetry && attempt <= retryPolicy.maxRetries) {
+      if (
+        'canRetry' in normalizedFailure &&
+        normalizedFailure.canRetry &&
+        attempt <= retryPolicy.maxRetries
+      ) {
         const delayMs = getRetryDelayMs(retryPolicy, attempt);
         await safelyObserve(async () => {
           await config.hooks?.onModelRetry?.({
@@ -591,9 +580,7 @@ function createModelErrorFromAssistant(
     message:
       assistantMessage.error?.message ||
       assistantMessage.errorMessage ||
-      (assistantMessage.stopReason === 'aborted'
-        ? 'Model call was aborted'
-        : 'Model call failed'),
+      (assistantMessage.stopReason === 'aborted' ? 'Model call was aborted' : 'Model call failed'),
     canRetry: assistantMessage.error?.canRetry ?? false,
     attempts,
     assistantMessage,
@@ -632,9 +619,7 @@ function normalizeModelFailure(
   const error: AgentError = {
     phase: 'model',
     message:
-      assistantMessage?.error?.message ||
-      assistantMessage?.errorMessage ||
-      getErrorMessage(cause),
+      assistantMessage?.error?.message || assistantMessage?.errorMessage || getErrorMessage(cause),
     canRetry,
     attempts,
     cause,
@@ -655,9 +640,7 @@ function normalizeModelFailure(
   };
 }
 
-function resolveRetryPolicy(
-  policy: Partial<AgentRetryPolicy> | undefined
-): AgentRetryPolicy {
+function resolveRetryPolicy(policy: Partial<AgentRetryPolicy> | undefined): AgentRetryPolicy {
   return {
     ...DEFAULT_AGENT_RETRY_POLICY,
     ...policy,
@@ -686,12 +669,12 @@ async function sleepWithAbort(
       resolve('completed');
     }, delayMs);
 
-    const onAbort = () => {
+    const onAbort = (): void => {
       cleanup();
       resolve('aborted');
     };
 
-    const cleanup = () => {
+    const cleanup = (): void => {
       clearTimeout(timeout);
       signal?.removeEventListener('abort', onAbort);
     };
@@ -720,10 +703,7 @@ async function safelyNotifyMessage(
   }
 }
 
-function buildToolErrorDetails(
-  cause: unknown,
-  message: string
-): ToolResultMessage['error'] {
+function buildToolErrorDetails(cause: unknown, message: string): ToolResultMessage['error'] {
   const errorDetails: ToolResultMessage['error'] =
     cause instanceof Error ? { message: cause.message, name: cause.name } : { message };
   if (cause instanceof Error && cause.stack) {

@@ -4,8 +4,8 @@ import { stream } from '../../../src/llm/stream.js';
 import { registerProvider } from '../../../src/providers/registry.js';
 import { EventStream } from '../../../src/utils/event-stream.js';
 
-import type { AssistantMessageEventStream } from '../../../src/utils/event-stream.js';
 import type { Context, Model } from '../../../src/types/index.js';
+import type { AssistantMessageEventStream } from '../../../src/utils/event-stream.js';
 
 // Helper to create mock model
 function createMockModel<T extends string>(api: T): Model<any> {

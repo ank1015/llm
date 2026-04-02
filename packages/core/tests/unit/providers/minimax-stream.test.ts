@@ -2,8 +2,8 @@ import { RateLimitError } from '@anthropic-ai/sdk/error';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { streamMinimax } from '../../../src/providers/minimax/stream.js';
-import { AssistantStreamError } from '../../../src/utils/event-stream.js';
 import * as minimaxUtils from '../../../src/providers/minimax/utils.js';
+import { AssistantStreamError } from '../../../src/utils/event-stream.js';
 
 import type { Context, MiniMaxProviderOptions, Model } from '../../../src/types/index.js';
 
@@ -39,6 +39,18 @@ describe('MiniMax stream errors', () => {
     vi.restoreAllMocks();
   });
 
+  function createThrowingAsyncIterable(error: unknown): AsyncIterable<never> {
+    return {
+      [Symbol.asyncIterator]() {
+        return {
+          async next() {
+            throw error;
+          },
+        };
+      },
+    };
+  }
+
   function mockRetryableMinimaxStream() {
     const headers = new Headers({ 'request-id': 'req_test_123' });
     const error = new RateLimitError(
@@ -57,11 +69,7 @@ describe('MiniMax stream errors', () => {
 
     vi.spyOn(minimaxUtils, 'createClient').mockReturnValue({
       messages: {
-        stream: () => ({
-          async *[Symbol.asyncIterator]() {
-            throw error;
-          },
-        }),
+        stream: () => createThrowingAsyncIterable(error),
       },
     } as any);
   }
