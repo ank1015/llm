@@ -12,6 +12,7 @@ import { Project } from '../project/project.js';
 import { ensureDir, pathExists } from '../storage/fs.js';
 
 import { persistCompletedTurnCompaction } from './compaction.js';
+import { createSessionContextReframingLoader } from './context-reframing.js';
 import {
   buildPromptUserMessage,
   cloneUserMessage,
@@ -568,6 +569,7 @@ export class Session {
         path: this.sessionPath,
         branch: input.branch,
         headId: input.headId,
+        loadMessages: this.createContextReframingLoader(input.execution.modelId),
         saveNode: this.createSessionNodeSaver({
           branch: input.branch,
           modelId: input.execution.modelId,
@@ -607,6 +609,15 @@ export class Session {
         branchName,
         error: error instanceof Error ? error.message : String(error),
       });
+    });
+  }
+
+  private createContextReframingLoader(modelId: CuratedModelId) {
+    return createSessionContextReframingLoader({
+      projectId: this.projectId,
+      artifactDirId: this.artifactDirId,
+      sessionId: this.sessionId,
+      modelId,
     });
   }
 
