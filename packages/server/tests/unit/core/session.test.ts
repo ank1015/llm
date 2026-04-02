@@ -14,6 +14,8 @@ import type { SessionNodeSaveContext } from '@ank1015/llm-sdk/session';
 const mockCreateAllTools = vi.fn();
 const mockCreateCheckpointSummaryPrompt = vi.fn();
 const mockCreateSystemPrompt = vi.fn();
+const mockGetRegisteredSkill = vi.fn();
+const mockListRegisteredSkills = vi.fn();
 const mockAgent = vi.fn();
 const mockLlm = vi.fn();
 
@@ -21,6 +23,8 @@ vi.mock('@ank1015/llm-agents', () => ({
   createAllTools: mockCreateAllTools,
   createCheckpointSummaryPrompt: mockCreateCheckpointSummaryPrompt,
   createSystemPrompt: mockCreateSystemPrompt,
+  getRegisteredSkill: mockGetRegisteredSkill,
+  listRegisteredSkills: mockListRegisteredSkills,
 }));
 
 vi.mock('@ank1015/llm-sdk', async (importOriginal) => {

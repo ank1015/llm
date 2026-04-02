@@ -9,8 +9,12 @@ import type { Api, BaseAssistantMessage, Message } from '@ank1015/llm-sdk';
 
 const mockLlm = vi.fn();
 const mockCreateTurnCompactionPrompt = vi.fn(() => 'turn compaction prompt');
+const mockGetRegisteredSkill = vi.fn();
+const mockListRegisteredSkills = vi.fn();
 
 vi.mock('@ank1015/llm-agents', () => ({
+  getRegisteredSkill: mockGetRegisteredSkill,
+  listRegisteredSkills: mockListRegisteredSkills,
   createTurnCompactionPrompt: mockCreateTurnCompactionPrompt,
 }));
 

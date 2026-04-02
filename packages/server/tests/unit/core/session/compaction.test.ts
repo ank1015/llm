@@ -7,11 +7,15 @@ const mockLlm = vi.fn();
 const mockCreateTurnCompactionPrompt = vi.fn(() => 'turn compaction prompt');
 const mockCreateOngoingTurnCompactionPrompt = vi.fn(() => 'ongoing turn compaction prompt');
 const mockCreateUltraCompactionPrompt = vi.fn(() => 'ultra compaction prompt');
+const mockGetRegisteredSkill = vi.fn();
+const mockListRegisteredSkills = vi.fn();
 
 vi.mock('@ank1015/llm-agents', () => ({
   createOngoingTurnCompactionPrompt: mockCreateOngoingTurnCompactionPrompt,
   createTurnCompactionPrompt: mockCreateTurnCompactionPrompt,
   createUltraCompactionPrompt: mockCreateUltraCompactionPrompt,
+  getRegisteredSkill: mockGetRegisteredSkill,
+  listRegisteredSkills: mockListRegisteredSkills,
 }));
 
 vi.mock('@ank1015/llm-sdk', async (importOriginal) => {

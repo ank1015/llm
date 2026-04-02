@@ -8,18 +8,14 @@ import { readSession } from '@ank1015/llm-sdk/session';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Api } from '@ank1015/llm-core';
-import type {
-  AgentEvent,
-  AgentResult,
-  AgentRun,
-  CuratedModelId,
-  Message,
-} from '@ank1015/llm-sdk';
+import type { AgentEvent, AgentResult, AgentRun, CuratedModelId, Message } from '@ank1015/llm-sdk';
 import type { SessionNodeSaveContext } from '@ank1015/llm-sdk/session';
 
 const mockCreateAllTools = vi.fn();
 const mockCreateCheckpointSummaryPrompt = vi.fn();
 const mockCreateSystemPrompt = vi.fn();
+const mockGetRegisteredSkill = vi.fn();
+const mockListRegisteredSkills = vi.fn();
 const mockAgent = vi.fn();
 const mockLlm = vi.fn();
 
@@ -27,6 +23,8 @@ vi.mock('@ank1015/llm-agents', () => ({
   createAllTools: mockCreateAllTools,
   createCheckpointSummaryPrompt: mockCreateCheckpointSummaryPrompt,
   createSystemPrompt: mockCreateSystemPrompt,
+  getRegisteredSkill: mockGetRegisteredSkill,
+  listRegisteredSkills: mockListRegisteredSkills,
 }));
 
 vi.mock('@ank1015/llm-sdk', async (importOriginal) => {
@@ -42,9 +40,8 @@ const { setConfig } = await import('../../../src/core/config.js');
 const { Project } = await import('../../../src/core/project/project.js');
 const { ArtifactDir } = await import('../../../src/core/artifact-dir/artifact-dir.js');
 const { Session } = await import('../../../src/core/session/session.js');
-const { resetSessionRunRegistry, sessionRunRegistry } = await import(
-  '../../../src/core/session/run-registry.js'
-);
+const { resetSessionRunRegistry, sessionRunRegistry } =
+  await import('../../../src/core/session/run-registry.js');
 const { sessionRoutes } = await import('../../../src/routes/sessions.js');
 
 type MockAgentScenario = {
@@ -454,7 +451,9 @@ describe('session routes', () => {
       ])
     );
 
-    mockLlm.mockResolvedValue(buildAssistantMessage('"Generated Session Name"', 'codex/gpt-5.4-mini'));
+    mockLlm.mockResolvedValue(
+      buildAssistantMessage('"Generated Session Name"', 'codex/gpt-5.4-mini')
+    );
 
     const generatedResponse = await jsonRequest(
       `/projects/${PROJECT_ID}/artifacts/${ARTIFACT_ID}/sessions/${session.sessionId}/generate-name`,
@@ -612,10 +611,12 @@ describe('session routes', () => {
 
     const mainTree = await session.getMessageTree();
     const firstUserNode = mainTree.nodes.find(
-      (node) => node.message.role === 'user' && getVisibleUserText(node.message) === 'First main prompt'
+      (node) =>
+        node.message.role === 'user' && getVisibleUserText(node.message) === 'First main prompt'
     );
     const secondUserNode = mainTree.nodes.find(
-      (node) => node.message.role === 'user' && getVisibleUserText(node.message) === 'Second main prompt'
+      (node) =>
+        node.message.role === 'user' && getVisibleUserText(node.message) === 'Second main prompt'
     );
     const mainLeafNodeId = mainTree.persistedLeafNodeId;
     expect(firstUserNode).toBeDefined();

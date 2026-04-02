@@ -14,12 +14,16 @@ import type { SessionNodeSaveContext } from '@ank1015/llm-sdk/session';
 const mockCreateAllTools = vi.fn();
 const mockCreateCheckpointSummaryPrompt = vi.fn();
 const mockCreateSystemPrompt = vi.fn();
+const mockGetRegisteredSkill = vi.fn();
+const mockListRegisteredSkills = vi.fn();
 const mockAgent = vi.fn();
 
 vi.mock('@ank1015/llm-agents', () => ({
   createAllTools: mockCreateAllTools,
   createCheckpointSummaryPrompt: mockCreateCheckpointSummaryPrompt,
   createSystemPrompt: mockCreateSystemPrompt,
+  getRegisteredSkill: mockGetRegisteredSkill,
+  listRegisteredSkills: mockListRegisteredSkills,
 }));
 
 vi.mock('@ank1015/llm-sdk', async (importOriginal) => {
@@ -99,6 +103,7 @@ function createMockRun(sessionPath: string, resultPromise: Promise<AgentResult>)
     sessionPath,
     async *[Symbol.asyncIterator]() {
       await resultPromise;
+      yield* [];
     },
     drain: () => resultPromise,
     then: resultPromise.then.bind(resultPromise),
