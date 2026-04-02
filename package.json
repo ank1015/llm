@@ -8,7 +8,6 @@
     "build": "turbo run build",
     "build:packages": "turbo run build --filter=@ank1015/llm-types --filter=@ank1015/llm-app-contracts --filter=@ank1015/llm-core --filter=@ank1015/llm-sdk --filter=@ank1015/llm-agents",
     "dev": "turbo run dev",
-    "agent:cli": "pnpm --filter @ank1015/llm-agents agent:cli",
     "dev:native-app": "pnpm --filter @ank1015/llm-native-app start",
     "dev:web-app": "pnpm --filter @ank1015/llm-web-app dev",
     "start:web-app": "pnpm --filter @ank1015/llm-web-app start",

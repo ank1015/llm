@@ -4,8 +4,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { getRegisteredSkill, type RegisteredSkillEntry } from '../skills/registry.js';
-
-import { createArtifactSkillWorkspaceLayout } from './skill.js';
+import { createArtifactSkillWorkspaceLayout } from '../skills/workspace.js';
 
 export interface CreateSystemPromptOptions {
   projectName: string;
