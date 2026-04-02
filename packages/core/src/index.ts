@@ -13,4 +13,5 @@ import './providers/zai/index.js';
 export * from './agent/index.js';
 export * from './llm/index.js';
 export * from './models/index.js';
+export * from './providers/index.js';
 export * from './types/index.js';
