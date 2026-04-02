@@ -5,15 +5,15 @@ import { join } from 'node:path';
 import { Type } from '@sinclair/typebox';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 
-import { agent, getText, tool, userMessage } from '../../src/index.js';
-import { resetSdkConfig, setSdkConfig } from '../../src/config.js';
-import { setProviderCredentials } from '../../src/keys.js';
-import { loadSessionMessages } from '../../src/session.js';
 import {
   collectStreamEvents,
   describeIfAvailable,
   getIntegrationEnv,
 } from '../../../core/tests/integration/helpers/live.js';
+import { resetSdkConfig, setSdkConfig } from '../../src/config.js';
+import { agent, getText, tool, userMessage } from '../../src/index.js';
+import { setProviderCredentials } from '../../src/keys.js';
+import { loadSessionMessages } from '../../src/session.js';
 
 import type { AgentEvent, Message } from '../../src/index.js';
 
@@ -68,14 +68,18 @@ describeIfOpenAI('SDK agent() OpenAI integration', () => {
 
     expect(result.sessionPath.startsWith(sessionsBaseDir)).toBe(true);
     expect(result.sessionPath.endsWith('.jsonl')).toBe(true);
-    expect(result.messages[0]).toEqual(buildUserTextMessage('Reply with exactly SDK_AGENT_AWAIT_OK'));
+    expect(result.messages[0]).toEqual(
+      buildUserTextMessage('Reply with exactly SDK_AGENT_AWAIT_OK')
+    );
     expect(result.newMessages.length).toBeGreaterThan(0);
     expect(result.finalAssistantMessage).toBeDefined();
     expect(result.totalTokens).toBeGreaterThan(0);
     expect(getText(result.finalAssistantMessage)).toContain('SDK_AGENT_AWAIT_OK');
 
     const loaded = await loadSessionMessages({ path: result.sessionPath });
-    expect(loaded?.messages[0]).toEqual(buildUserTextMessage('Reply with exactly SDK_AGENT_AWAIT_OK'));
+    expect(loaded?.messages[0]).toEqual(
+      buildUserTextMessage('Reply with exactly SDK_AGENT_AWAIT_OK')
+    );
     expect(loaded?.messages.at(-1)?.role).toBe('assistant');
   }, 60000);
 
@@ -104,7 +108,9 @@ describeIfOpenAI('SDK agent() OpenAI integration', () => {
       throw new Error(result.error.message);
     }
 
-    expect(result.messages[0]).toEqual(buildUserTextMessage('Reply with exactly SDK_AGENT_STREAM_OK'));
+    expect(result.messages[0]).toEqual(
+      buildUserTextMessage('Reply with exactly SDK_AGENT_STREAM_OK')
+    );
     expect(getText(result.finalAssistantMessage)).toContain('SDK_AGENT_STREAM_OK');
   }, 60000);
 
@@ -125,9 +131,7 @@ describeIfOpenAI('SDK agent() OpenAI integration', () => {
       reasoningEffort: 'low',
       system:
         'Call the lookup_magic_value tool exactly once. After you receive the tool result, do not call any more tools. Respond with exactly the returned tool text and nothing else.',
-      inputMessages: [
-        buildUserTextMessage('What is the integration magic value?'),
-      ],
+      inputMessages: [buildUserTextMessage('What is the integration magic value?')],
       tools: [lookupMagicValue],
       maxTurns: 6,
       overrideProviderSetting: {
@@ -145,7 +149,9 @@ describeIfOpenAI('SDK agent() OpenAI integration', () => {
 
     expect(events.some((event: AgentEvent) => event.type === 'tool_execution_start')).toBe(true);
     expect(events.some((event: AgentEvent) => event.type === 'tool_execution_end')).toBe(true);
-    expect(result.messages[0]).toEqual(buildUserTextMessage('What is the integration magic value?'));
+    expect(result.messages[0]).toEqual(
+      buildUserTextMessage('What is the integration magic value?')
+    );
     expect(result.newMessages.some((message: Message) => message.role === 'toolResult')).toBe(true);
     expect(getText(result.finalAssistantMessage)).toContain('SDK_AGENT_TOOL_OK_2718');
 

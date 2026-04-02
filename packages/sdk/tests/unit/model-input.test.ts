@@ -4,13 +4,13 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { CuratedModelIds, isCuratedModelId } from '../../src/index.js';
 import {
   DEFAULT_KEYS_FILE_PATH,
   getSdkConfig,
   resetSdkConfig,
   setSdkConfig,
 } from '../../src/config.js';
+import { CuratedModelIds, isCuratedModelId } from '../../src/index.js';
 import { setProviderCredentials } from '../../src/keys.js';
 import { resolveModelInput } from '../../src/model-input.js';
 
@@ -24,7 +24,9 @@ async function createTempKeysFile(): Promise<string> {
 
 afterEach(async () => {
   resetSdkConfig();
-  await Promise.all(tempDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
+  await Promise.all(
+    tempDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true }))
+  );
 });
 
 describe('model input', () => {

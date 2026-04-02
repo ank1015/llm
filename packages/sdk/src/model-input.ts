@@ -3,6 +3,7 @@ import { getModel } from '@ank1015/llm-core';
 import { getSdkConfig } from './config.js';
 import { resolveProviderCredentials } from './keys.js';
 
+import type { ResolveProviderCredentialsError } from './keys.js';
 import type {
   AnthropicProviderOptions,
   ClaudeCodeProviderOptions,
@@ -12,11 +13,12 @@ import type {
   OpenAIProviderOptions,
   Provider,
 } from '@ank1015/llm-core';
-import type { ResolveProviderCredentialsError } from './keys.js';
 
 export const ReasoningEfforts = ['low', 'medium', 'high', 'xhigh'] as const;
 
 export type ReasoningEffort = (typeof ReasoningEfforts)[number];
+
+const CLAUDE_CODE_API = 'claude-code' as const;
 
 const OPENAI_MODEL_CATALOG = {
   'openai/gpt-5.4': 'gpt-5.4',
@@ -73,7 +75,7 @@ export interface SupportedProviderOptionsByApi {
   openai: OpenAIProviderOptions;
   codex: CodexProviderOptions;
   anthropic: AnthropicProviderOptions;
-  'claude-code': ClaudeCodeProviderOptions;
+  [CLAUDE_CODE_API]: ClaudeCodeProviderOptions;
   google: GoogleProviderOptions;
 }
 
@@ -83,18 +85,17 @@ export type ProviderOptionsForApi<TApi extends keyof SupportedProviderOptionsByA
 export type SupportedProviderOptions =
   SupportedProviderOptionsByApi[keyof SupportedProviderOptionsByApi];
 
-export type ProviderOptionsForModelId<TModelId extends string> =
-  TModelId extends OpenAIModelId
-    ? OpenAIProviderOptions
-    : TModelId extends CodexModelId
-      ? CodexProviderOptions
-      : TModelId extends AnthropicModelId
-        ? AnthropicProviderOptions
-        : TModelId extends ClaudeCodeModelId
-          ? ClaudeCodeProviderOptions
-          : TModelId extends GoogleModelId
-            ? GoogleProviderOptions
-            : SupportedProviderOptions;
+export type ProviderOptionsForModelId<TModelId extends string> = TModelId extends OpenAIModelId
+  ? OpenAIProviderOptions
+  : TModelId extends CodexModelId
+    ? CodexProviderOptions
+    : TModelId extends AnthropicModelId
+      ? AnthropicProviderOptions
+      : TModelId extends ClaudeCodeModelId
+        ? ClaudeCodeProviderOptions
+        : TModelId extends GoogleModelId
+          ? GoogleProviderOptions
+          : SupportedProviderOptions;
 
 export interface ResolveModelInputInput<TModelId extends string = string> {
   modelId: TModelId;
@@ -114,14 +115,14 @@ export interface CoreModelNotFoundError {
   code: 'core_model_not_found';
   message: string;
   modelId: CuratedModelId;
-  api: 'openai' | 'codex' | 'anthropic' | 'claude-code' | 'google';
+  api: 'openai' | 'codex' | 'anthropic' | typeof CLAUDE_CODE_API | 'google';
   providerModelId: string;
 }
 
 type OpenAICredentialsError = ResolveProviderCredentialsError<'openai'>;
 type CodexCredentialsError = ResolveProviderCredentialsError<'codex'>;
 type AnthropicCredentialsError = ResolveProviderCredentialsError<'anthropic'>;
-type ClaudeCodeCredentialsError = ResolveProviderCredentialsError<'claude-code'>;
+type ClaudeCodeCredentialsError = ResolveProviderCredentialsError<typeof CLAUDE_CODE_API>;
 type GoogleCredentialsError = ResolveProviderCredentialsError<'google'>;
 
 export type ResolveModelInputError =
@@ -165,12 +166,12 @@ export interface ResolvedAnthropicModelInput {
 
 export interface ResolvedClaudeCodeModelInput {
   ok: true;
-  api: 'claude-code';
+  api: typeof CLAUDE_CODE_API;
   modelId: ClaudeCodeModelId;
   keysFilePath: string;
-  model: Model<'claude-code'>;
+  model: Model<typeof CLAUDE_CODE_API>;
   providerOptions: ClaudeCodeProviderOptions;
-  provider: Provider<'claude-code'>;
+  provider: Provider<typeof CLAUDE_CODE_API>;
 }
 
 export interface ResolvedGoogleModelInput {
@@ -323,10 +324,7 @@ async function resolveOpenAIModelInput(
     ...credentialsResult.credentials,
     ...buildOpenAICompatibleReasoning(reasoningEffort),
   };
-  const providerOptions = mergeProviderOptions(
-    baseProviderOptions,
-    overrideProviderSetting
-  );
+  const providerOptions = mergeProviderOptions(baseProviderOptions, overrideProviderSetting);
 
   return {
     ok: true,
@@ -380,10 +378,7 @@ async function resolveCodexModelInput(
     ...credentialsResult.credentials,
     ...buildOpenAICompatibleReasoning(reasoningEffort),
   };
-  const providerOptions = mergeProviderOptions(
-    baseProviderOptions,
-    overrideProviderSetting
-  );
+  const providerOptions = mergeProviderOptions(baseProviderOptions, overrideProviderSetting);
 
   return {
     ok: true,
@@ -437,10 +432,7 @@ async function resolveAnthropicModelInput(
     ...credentialsResult.credentials,
     ...buildAnthropicAdaptiveThinking(model.id, reasoningEffort),
   };
-  const providerOptions = mergeProviderOptions(
-    baseProviderOptions,
-    overrideProviderSetting
-  );
+  const providerOptions = mergeProviderOptions(baseProviderOptions, overrideProviderSetting);
 
   return {
     ok: true,
@@ -463,7 +455,7 @@ async function resolveClaudeCodeModelInput(
   keysFilePath: string
 ): Promise<ResolveModelInputResult> {
   const providerModelId = CLAUDE_CODE_MODEL_CATALOG[modelId];
-  const model = getModel('claude-code', providerModelId);
+  const model = getModel(CLAUDE_CODE_API, providerModelId);
 
   if (!model) {
     return {
@@ -474,13 +466,13 @@ async function resolveClaudeCodeModelInput(
         code: 'core_model_not_found',
         message: `Core model "${providerModelId}" was not found for ${modelId}`,
         modelId,
-        api: 'claude-code',
+        api: CLAUDE_CODE_API,
         providerModelId,
       },
     };
   }
 
-  const credentialsResult = await resolveProviderCredentials(keysFilePath, 'claude-code');
+  const credentialsResult = await resolveProviderCredentials(keysFilePath, CLAUDE_CODE_API);
   if (!credentialsResult.ok) {
     return {
       ok: false,
@@ -494,14 +486,11 @@ async function resolveClaudeCodeModelInput(
     ...credentialsResult.credentials,
     ...buildAnthropicAdaptiveThinking(model.id, reasoningEffort),
   };
-  const providerOptions = mergeProviderOptions(
-    baseProviderOptions,
-    overrideProviderSetting
-  );
+  const providerOptions = mergeProviderOptions(baseProviderOptions, overrideProviderSetting);
 
   return {
     ok: true,
-    api: 'claude-code',
+    api: CLAUDE_CODE_API,
     modelId,
     keysFilePath,
     model,
@@ -551,10 +540,7 @@ async function resolveGoogleModelInput(
     ...credentialsResult.credentials,
     ...buildGoogleThinkingConfig(model.id, reasoningEffort),
   };
-  const providerOptions = mergeProviderOptions(
-    baseProviderOptions,
-    overrideProviderSetting
-  );
+  const providerOptions = mergeProviderOptions(baseProviderOptions, overrideProviderSetting);
 
   return {
     ok: true,
@@ -588,7 +574,11 @@ function buildOpenAICompatibleReasoning(
 type AnthropicAdaptiveEffort = 'low' | 'medium' | 'high' | 'max';
 
 function buildAnthropicAdaptiveThinking(
-  modelId: AnthropicModelId | ClaudeCodeModelId | Model<'anthropic'>['id'] | Model<'claude-code'>['id'],
+  modelId:
+    | AnthropicModelId
+    | ClaudeCodeModelId
+    | Model<'anthropic'>['id']
+    | Model<typeof CLAUDE_CODE_API>['id'],
   reasoningEffort: ReasoningEffort | undefined
 ): Pick<AnthropicProviderOptions, 'thinking' | 'output_config'> {
   const effort = mapAnthropicEffort(modelId, reasoningEffort);
@@ -612,7 +602,11 @@ function buildAnthropicAdaptiveThinking(
 }
 
 function mapAnthropicEffort(
-  modelId: AnthropicModelId | ClaudeCodeModelId | Model<'anthropic'>['id'] | Model<'claude-code'>['id'],
+  modelId:
+    | AnthropicModelId
+    | ClaudeCodeModelId
+    | Model<'anthropic'>['id']
+    | Model<typeof CLAUDE_CODE_API>['id'],
   reasoningEffort: ReasoningEffort | undefined
 ): AnthropicAdaptiveEffort | undefined {
   if (!reasoningEffort) {
