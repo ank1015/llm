@@ -1,11 +1,27 @@
-"use client";
+'use client';
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+
+import { invalidateQueryKeys } from './utils';
+
+import type {
+  ArtifactContext,
+  CreateArtifactDirInput,
+  CreateProjectInput,
+  InstallArtifactSkillInput,
+  ProjectFileIndexInput,
+  RenameArtifactDirInput,
+  RenameArtifactPathInput,
+  RenameProjectInput,
+  UpdateProjectImageInput,
+  UpdateArtifactFileInput,
+} from '@/lib/client-api';
 
 import {
   createArtifactCheckpoint,
   createArtifactDir,
   createProject,
+  deleteArtifactSkill,
   deleteArtifactDir,
   deleteArtifactPath,
   deleteProject,
@@ -18,8 +34,12 @@ import {
   getProject,
   getProjectFileIndex,
   getProjectOverview,
+  installArtifactSkill,
   listArtifactDirs,
+  listInstalledArtifactSkills,
   listProjects,
+  listRegisteredSkills,
+  reloadArtifactSkill,
   renameArtifactDir,
   renameArtifactPath,
   rollbackArtifactCheckpoint,
@@ -27,22 +47,10 @@ import {
   toggleProjectArchive,
   updateArtifactFile,
   updateProjectImage,
-} from "@/lib/client-api";
-import { queryKeys } from "@/lib/query-keys";
+} from '@/lib/client-api';
+import { queryKeys } from '@/lib/query-keys';
 
-import { invalidateQueryKeys } from "./utils";
 
-import type {
-  ArtifactContext,
-  CreateArtifactDirInput,
-  CreateProjectInput,
-  ProjectFileIndexInput,
-  RenameArtifactDirInput,
-  RenameArtifactPathInput,
-  RenameProjectInput,
-  UpdateProjectImageInput,
-  UpdateArtifactFileInput,
-} from "@/lib/client-api";
 
 export function useProjectsQuery() {
   return useQuery({
@@ -65,10 +73,7 @@ export function useProjectOverviewQuery(projectId: string) {
   });
 }
 
-export function useProjectFileIndexQuery(
-  projectId: string,
-  input?: ProjectFileIndexInput,
-) {
+export function useProjectFileIndexQuery(projectId: string, input?: ProjectFileIndexInput) {
   return useQuery({
     queryKey: queryKeys.projects.fileIndex(projectId, input),
     queryFn: () => getProjectFileIndex(projectId, input),
@@ -82,10 +87,31 @@ export function useArtifactDirsQuery(projectId: string) {
   });
 }
 
+export function useRegisteredSkillsQuery(options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: queryKeys.skills.list(),
+    queryFn: listRegisteredSkills,
+    enabled: options?.enabled ?? true,
+  });
+}
+
 export function useArtifactDirQuery(ctx: ArtifactContext) {
   return useQuery({
     queryKey: queryKeys.artifacts.detail(ctx),
     queryFn: () => getArtifactDir(ctx),
+  });
+}
+
+export function useInstalledArtifactSkillsQuery(
+  ctx: ArtifactContext,
+  options?: {
+    enabled?: boolean;
+  }
+) {
+  return useQuery({
+    queryKey: queryKeys.artifacts.skills(ctx),
+    queryFn: () => listInstalledArtifactSkills(ctx),
+    enabled: options?.enabled ?? true,
   });
 }
 
@@ -102,7 +128,7 @@ export function useArtifactCheckpointsQuery(ctx: ArtifactContext) {
     queryFn: () => getArtifactCheckpoints(ctx),
     refetchInterval: (query) => {
       const data = query.state.data;
-      return data?.checkpoints.some((checkpoint) => checkpoint.summaryStatus === "pending")
+      return data?.checkpoints.some((checkpoint) => checkpoint.summaryStatus === 'pending')
         ? 4_000
         : false;
     },
@@ -113,7 +139,7 @@ export function useArtifactCheckpointDiffQuery(
   ctx: ArtifactContext,
   options?: {
     enabled?: boolean;
-  },
+  }
 ) {
   return useQuery({
     queryKey: queryKeys.artifacts.checkpointDiff(ctx),
@@ -122,7 +148,7 @@ export function useArtifactCheckpointDiffQuery(
   });
 }
 
-export function useArtifactExplorerQuery(ctx: ArtifactContext, path = "") {
+export function useArtifactExplorerQuery(ctx: ArtifactContext, path = '') {
   return useQuery({
     queryKey: queryKeys.artifacts.explorer(ctx, path),
     queryFn: () => getArtifactExplorer(ctx, path),
@@ -134,7 +160,7 @@ export function useArtifactFileQuery(
   input: {
     path: string;
     maxBytes?: number;
-  },
+  }
 ) {
   return useQuery({
     queryKey: queryKeys.artifacts.file(ctx, input),
@@ -261,6 +287,39 @@ export function useDeleteArtifactDirMutation(ctx: ArtifactContext) {
         queryKeys.projects.overview(ctx.projectId),
         queryKeys.projects.fileIndexRoot(ctx.projectId),
       ]);
+    },
+  });
+}
+
+export function useInstallArtifactSkillMutation(ctx: ArtifactContext) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: InstallArtifactSkillInput) => installArtifactSkill(ctx, input),
+    onSuccess: async () => {
+      await invalidateQueryKeys(queryClient, [queryKeys.artifacts.skills(ctx)]);
+    },
+  });
+}
+
+export function useReloadArtifactSkillMutation(ctx: ArtifactContext) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (skillName: string) => reloadArtifactSkill(ctx, skillName),
+    onSuccess: async () => {
+      await invalidateQueryKeys(queryClient, [queryKeys.artifacts.skills(ctx)]);
+    },
+  });
+}
+
+export function useDeleteArtifactSkillMutation(ctx: ArtifactContext) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (skillName: string) => deleteArtifactSkill(ctx, skillName),
+    onSuccess: async () => {
+      await invalidateQueryKeys(queryClient, [queryKeys.artifacts.skills(ctx)]);
     },
   });
 }

@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 export {
   useArtifactCheckpointDiffQuery,
@@ -11,13 +11,18 @@ export {
   useCreateArtifactCheckpointMutation,
   useCreateArtifactDirMutation,
   useCreateProjectMutation,
+  useDeleteArtifactSkillMutation,
   useDeleteArtifactDirMutation,
   useDeleteArtifactPathMutation,
   useDeleteProjectMutation,
+  useInstalledArtifactSkillsQuery,
+  useInstallArtifactSkillMutation,
   useProjectFileIndexQuery,
   useProjectOverviewQuery,
   useProjectQuery,
   useProjectsQuery,
+  useRegisteredSkillsQuery,
+  useReloadArtifactSkillMutation,
   useRollbackArtifactCheckpointMutation,
   useRenameArtifactDirMutation,
   useRenameArtifactPathMutation,
@@ -25,12 +30,12 @@ export {
   useToggleProjectArchiveMutation,
   useUpdateArtifactFileMutation,
   useUpdateProjectImageMutation,
-} from "./projects";
+} from './projects';
 export {
   usePromptSessionMutation,
   useSessionMessagesQuery,
   useSessionTreeQuery,
-} from "./conversation";
+} from './conversation';
 export {
   useCreateSessionMutation,
   useDeleteSessionMutation,
@@ -38,18 +43,18 @@ export {
   useSessionQuery,
   useSessionsQuery,
   useRenameSessionMutation,
-} from "./sessions";
+} from './sessions';
 export {
   useClearKeyMutation,
   useKeyDetailsQuery,
   useKeysQuery,
   useReloadKeyMutation,
   useSetKeyMutation,
-} from "./keys";
-export { useModelsQuery } from "./models";
+} from './keys';
+export { useModelsQuery } from './models';
 export {
   useCreateTerminalMutation,
   useDeleteTerminalMutation,
   useTerminalQuery,
   useTerminalsQuery,
-} from "./terminals";
+} from './terminals';
