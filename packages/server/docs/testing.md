@@ -8,6 +8,18 @@ The server package now has three test layers:
 
 `test:live` is opt-in and expects Codex credentials in the SDK central keystore at `~/.llm-sdk/keys.env`.
 
+## Standard package checks
+
+For routine local validation, use:
+
+```bash
+pnpm --filter @ank1015/llm-server build
+pnpm --filter @ank1015/llm-server typecheck
+pnpm --filter @ank1015/llm-server test
+```
+
+`lint` is also available, but the package currently has known lint debt that is separate from the docs and metadata cleanup.
+
 ## Preferred local keystore setup
 
 Set the credentials directly in the central SDK keystore before running live tests:
@@ -31,7 +43,7 @@ pnpm --filter @ank1015/llm-server test:live
 If the local server is already running, you can also populate the same keystore through the keys route:
 
 ```bash
-curl -X PUT http://127.0.0.1:3000/api/keys/codex \
+curl -X PUT http://127.0.0.1:8001/api/keys/codex \
   -H 'Content-Type: application/json' \
   -d '{
     "credentials": {
@@ -42,3 +54,9 @@ curl -X PUT http://127.0.0.1:3000/api/keys/codex \
 ```
 
 That route writes into the SDK central keystore used by the live session route tests.
+
+## Related docs
+
+- `README.md` for the package overview and command list
+- `docs/architecture.md` for route and storage layout
+- `docs/configuration.md` for host, port, and filesystem defaults

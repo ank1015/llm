@@ -1,7 +1,8 @@
 {
   "name": "@ank1015/llm-server",
   "version": "0.0.3",
-  "description": "Node-only Hono orchestration server for projects, artifact directories, agent sessions, and bundled skills",
+  "private": true,
+  "description": "Private Node-only Hono orchestration server for projects, artifact directories, agent sessions, and installable skills",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -15,13 +16,6 @@
       "import": "./dist/contracts/index.js"
     }
   },
-  "files": [
-    "dist",
-    "docs",
-    "README.md",
-    "CHANGELOG.md",
-    "LICENSE"
-  ],
   "scripts": {
     "build": "rm -rf dist coverage *.tsbuildinfo && tsc",
     "dev": "sh -c 'tsc && tsc --watch --preserveWatchOutput & TSC_PID=$!; trap \"kill $TSC_PID\" EXIT; node --watch dist/server.js'",
@@ -34,8 +28,7 @@
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src tests vitest.config.ts",
-    "clean": "rm -rf dist coverage *.tsbuildinfo",
-    "prepack": "pnpm run build"
+    "clean": "rm -rf dist coverage *.tsbuildinfo"
   },
   "keywords": [
     "llm",
@@ -56,9 +49,6 @@
   "homepage": "https://github.com/ank1015/llm/tree/main/packages/server",
   "bugs": {
     "url": "https://github.com/ank1015/llm/issues"
-  },
-  "publishConfig": {
-    "access": "public"
   },
   "dependencies": {
     "@ank1015/llm-agents": "workspace:^",
