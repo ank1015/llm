@@ -1,7 +1,8 @@
 {
-  "name": "web",
+  "name": "@ank1015/llm-web-app",
   "version": "0.1.0",
   "private": true,
+  "description": "Private Next.js web client for the llm server workspace",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -10,11 +11,11 @@
     "test": "vitest run",
     "test:unit": "vitest run",
     "typecheck": "tsc --noEmit",
-    "clean": "node ../../scripts/remove-paths.mjs .next out"
+    "clean": "node ../../scripts/remove-paths.mjs .next out coverage tsconfig.tsbuildinfo"
   },
   "dependencies": {
-    "@ank1015/llm-sdk": "link:../../packages/sdk",
-    "@ank1015/llm-server": "link:../../packages/server",
+    "@ank1015/llm-sdk": "workspace:^",
+    "@ank1015/llm-server": "workspace:^",
     "@hugeicons/core-free-icons": "^4.0.0",
     "@hugeicons/react": "^1.1.6",
     "@radix-ui/react-dialog": "^1.1.15",
