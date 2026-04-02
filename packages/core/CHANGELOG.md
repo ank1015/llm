@@ -6,6 +6,8 @@ The format is based on Keep a Changelog and this package follows SemVer once its
 
 ## [Unreleased]
 
+## [0.0.5] - 2026-04-02
+
 ### Added
 
 - Package-level README, provider notes, release checklist, and core package guide.
