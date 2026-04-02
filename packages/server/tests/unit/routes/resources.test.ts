@@ -167,7 +167,10 @@ describe('project, artifact, and terminal routes', () => {
     expect(explorerResponse.status).toBe(200);
     expect(await explorerResponse.json()).toMatchObject({
       path: '',
-      entries: [{ name: 'alpha.txt', type: 'file' }],
+      entries: [
+        { name: '.max', type: 'directory' },
+        { name: 'alpha.txt', type: 'file' },
+      ],
     });
 
     const fileResponse = await jsonRequest(
