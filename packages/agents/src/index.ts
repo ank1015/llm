@@ -4,3 +4,5 @@ export { createSystemPrompt } from './system-prompts/general-agant.js';
 export { createOngoingTurnCompactionPrompt } from './system-prompts/ongoing-turn-compaction.js';
 export { createTurnCompactionPrompt } from './system-prompts/turn-compaction.js';
 export { createUltraCompactionPrompt } from './system-prompts/ultra-compaction.js';
+export { getRegisteredSkill, listRegisteredSkills } from './skills/registry.js';
+export type { RegisteredSkillEntry, RegisteredSkillSource } from './skills/registry.js';
