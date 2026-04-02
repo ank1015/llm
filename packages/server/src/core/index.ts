@@ -9,6 +9,20 @@ export {
   artifactCheckpointService,
 } from './artifact-checkpoint/service.js';
 export { Session } from './session/session.js';
+export { compactOngoingTurn, compactTurn, compactUltra } from './session/compaction.js';
+export {
+  appendSessionCompactionNode,
+  createSessionCompactionNode,
+  deleteSessionCompactionSidecar,
+  getSessionCompactionNodes,
+  getSessionCompactionSidecarPath,
+} from './session/compaction-storage.js';
+export { persistCompletedTurnCompaction } from './session/compaction.js';
+export {
+  createSessionContextReframingLoader,
+  reframeSessionHistoryForContext,
+} from './session/context-reframing.js';
+export { estimateMessagesTokenCount, estimateTextTokenCount } from './session/token-count.js';
 export {
   terminalRegistry,
   resetTerminalRegistry,
