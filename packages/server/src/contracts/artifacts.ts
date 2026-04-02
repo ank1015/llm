@@ -52,6 +52,45 @@ export const ArtifactDirDeleteResponseSchema = Type.Object(
 );
 export type ArtifactDirDeleteResponse = Static<typeof ArtifactDirDeleteResponseSchema>;
 
+export const RegisteredSkillDtoSchema = Type.Object(
+  {
+    name: Type.String(),
+    link: Type.String(),
+    description: Type.String(),
+  },
+  { additionalProperties: false }
+);
+export type RegisteredSkillDto = Static<typeof RegisteredSkillDtoSchema>;
+
+export const RegisteredSkillListResponseSchema = Type.Array(RegisteredSkillDtoSchema);
+export type RegisteredSkillListResponse = Static<typeof RegisteredSkillListResponseSchema>;
+
+export const ArtifactInstalledSkillDtoSchema = Type.Object(
+  {
+    ...RegisteredSkillDtoSchema.properties,
+    path: Type.String(),
+  },
+  { additionalProperties: false }
+);
+export type ArtifactInstalledSkillDto = Static<typeof ArtifactInstalledSkillDtoSchema>;
+
+export const InstallArtifactSkillRequestSchema = Type.Object(
+  {
+    skillName: Type.Optional(Type.String()),
+  },
+  { additionalProperties: false }
+);
+export type InstallArtifactSkillRequest = Static<typeof InstallArtifactSkillRequestSchema>;
+
+export const DeleteArtifactSkillResponseSchema = Type.Object(
+  {
+    deleted: Type.Literal(true),
+    skillName: Type.String(),
+  },
+  { additionalProperties: false }
+);
+export type DeleteArtifactSkillResponse = Static<typeof DeleteArtifactSkillResponseSchema>;
+
 export const ArtifactFilesListResponseSchema = Type.Array(Type.String());
 export type ArtifactFilesListResponse = Static<typeof ArtifactFilesListResponseSchema>;
 
