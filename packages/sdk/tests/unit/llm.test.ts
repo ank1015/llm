@@ -1,8 +1,8 @@
+import { stream } from '@ank1015/llm-core';
 import { describe, expect, it, vi, afterEach } from 'vitest';
 
 import { llm, LlmInputError, LlmRunConsumptionError } from '../../src/llm.js';
 import { resolveModelInput } from '../../src/model-input.js';
-import { stream } from '@ank1015/llm-core';
 
 import type { BaseAssistantEvent, BaseAssistantMessage } from '@ank1015/llm-core';
 

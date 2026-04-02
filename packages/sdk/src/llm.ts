@@ -5,14 +5,6 @@ import { stream } from '@ank1015/llm-core';
 import { resolveModelInput } from './model-input.js';
 
 import type {
-  Api,
-  BaseAssistantEvent,
-  BaseAssistantMessage,
-  Context,
-  Message,
-  Tool,
-} from '@ank1015/llm-core';
-import type {
   AnthropicModelId,
   ClaudeCodeModelId,
   CodexModelId,
@@ -23,6 +15,14 @@ import type {
   ReasoningEffort,
   ResolveModelInputError,
 } from './model-input.js';
+import type {
+  Api,
+  BaseAssistantEvent,
+  BaseAssistantMessage,
+  Context,
+  Message,
+  Tool,
+} from '@ank1015/llm-core';
 
 type SetupFailure = {
   modelId: string;
@@ -61,8 +61,7 @@ export interface LlmInput<TModelId extends CuratedModelId = CuratedModelId> {
 }
 
 export interface LlmRun<TApi extends Api = Api>
-  extends AsyncIterable<BaseAssistantEvent<TApi>>,
-    PromiseLike<BaseAssistantMessage<TApi>> {
+  extends AsyncIterable<BaseAssistantEvent<TApi>>, PromiseLike<BaseAssistantMessage<TApi>> {
   drain(): Promise<BaseAssistantMessage<TApi>>;
   catch<TResult = never>(
     onRejected?: ((reason: unknown) => TResult | PromiseLike<TResult>) | null
@@ -145,7 +144,9 @@ export function llm<TModelId extends CuratedModelId>(
     drain,
     then<TResult1 = BaseAssistantMessage<ApiForModelId<TModelId>>, TResult2 = never>(
       onFulfilled?:
-        | ((value: BaseAssistantMessage<ApiForModelId<TModelId>>) => TResult1 | PromiseLike<TResult1>)
+        | ((
+            value: BaseAssistantMessage<ApiForModelId<TModelId>>
+          ) => TResult1 | PromiseLike<TResult1>)
         | null,
       onRejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
     ): Promise<TResult1 | TResult2> {
@@ -156,7 +157,9 @@ export function llm<TModelId extends CuratedModelId>(
     ): Promise<BaseAssistantMessage<ApiForModelId<TModelId>> | TResult> {
       return drain().catch(onRejected);
     },
-    finally(onFinally?: (() => void) | null): Promise<BaseAssistantMessage<ApiForModelId<TModelId>>> {
+    finally(
+      onFinally?: (() => void) | null
+    ): Promise<BaseAssistantMessage<ApiForModelId<TModelId>>> {
       return drain().finally(onFinally);
     },
   };

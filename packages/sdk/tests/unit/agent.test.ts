@@ -2,19 +2,20 @@ import { appendFile, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { createEventAdapter } from '@ank1015/llm-core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  AgentInputError,
-  AgentRunConsumptionError,
-  agent,
-} from '../../src/index.js';
 import { resetSdkConfig, setSdkConfig } from '../../src/config.js';
-import { appendSessionMessage, getSessionHead, loadSessionMessages } from '../../src/session.js';
+import { AgentInputError, AgentRunConsumptionError, agent } from '../../src/index.js';
 import { resolveModelInput } from '../../src/model-input.js';
-import { createEventAdapter } from '@ank1015/llm-core';
+import { appendSessionMessage, getSessionHead, loadSessionMessages } from '../../src/session.js';
 
-import type { AgentEvent, BaseAssistantMessage, Message, SessionNodeSaver } from '../../src/index.js';
+import type {
+  AgentEvent,
+  BaseAssistantMessage,
+  Message,
+  SessionNodeSaver,
+} from '../../src/index.js';
 
 vi.mock('../../src/model-input.js', () => ({
   resolveModelInput: vi.fn(),
@@ -34,7 +35,9 @@ const tempDirectories: string[] = [];
 afterEach(async () => {
   vi.clearAllMocks();
   resetSdkConfig();
-  await Promise.all(tempDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
+  await Promise.all(
+    tempDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true }))
+  );
 });
 
 async function createTempDirectory(): Promise<string> {
@@ -50,7 +53,9 @@ describe('agent', () => {
 
     const assistantMessage = buildAssistantMessage({
       id: 'assistant-1',
-      content: [{ type: 'toolCall', name: 'lookup_magic_value', arguments: {}, toolCallId: 'tool-1' }],
+      content: [
+        { type: 'toolCall', name: 'lookup_magic_value', arguments: {}, toolCallId: 'tool-1' },
+      ],
       stopReason: 'toolUse',
     });
     const toolResultMessage = buildToolResultMessage();
@@ -562,14 +567,22 @@ function installAdapter(
     state: { messages: Message[]; turns: number; totalTokens: number; totalCost: number };
     newMessages: Message[];
     aborted: boolean;
-    error?: { phase: 'model' | 'tool' | 'limit' | 'hook'; message: string; canRetry: boolean; attempts: number };
+    error?: {
+      phase: 'model' | 'tool' | 'limit' | 'hook';
+      message: string;
+      canRetry: boolean;
+      attempts: number;
+    };
   }>
 ): void {
-  mockedCreateEventAdapter.mockImplementation((_engine, adapterOptions) => ({
-    run: (config, state, options) => runImplementation(config, state, options, adapterOptions),
-    step: vi.fn(),
-    getPendingToolCalls: () => new Set(),
-  }) as never);
+  mockedCreateEventAdapter.mockImplementation(
+    (_engine, adapterOptions) =>
+      ({
+        run: (config, state, options) => runImplementation(config, state, options, adapterOptions),
+        step: vi.fn(),
+        getPendingToolCalls: () => new Set(),
+      }) as never
+  );
 }
 
 function mockResolvedModelInput(): void {
@@ -622,14 +635,12 @@ function buildAssistantMessage(input: {
     timestamp: 1,
     duration: 10,
     stopReason: input.stopReason ?? 'stop',
-    content:
-      input.content ??
-      [
-        {
-          type: 'response',
-          response: [{ type: 'text', content: 'done' }],
-        },
-      ],
+    content: input.content ?? [
+      {
+        type: 'response',
+        response: [{ type: 'text', content: 'done' }],
+      },
+    ],
     usage: {
       input: 1,
       output: 1,

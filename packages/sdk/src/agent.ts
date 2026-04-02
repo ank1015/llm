@@ -3,8 +3,21 @@ import { randomUUID } from 'node:crypto';
 import { agentEngine, createEventAdapter, defaultModelInvoker } from '@ank1015/llm-core';
 
 import { resolveModelInput } from './model-input.js';
-import { createSessionPath, createSessionAppender, ensureSession, loadSessionMessages } from './session.js';
+import {
+  createSessionPath,
+  createSessionAppender,
+  ensureSession,
+  loadSessionMessages,
+} from './session.js';
 
+import type { ApiForModelId } from './llm.js';
+import type {
+  CuratedModelId,
+  ProviderOptionsForModelId,
+  ReasoningEffort,
+  ResolveModelInputError,
+} from './model-input.js';
+import type { SessionAppender, SessionMessagesLoader, SessionNodeSaver } from './session.js';
 import type {
   AgentEngineConfig,
   AgentError,
@@ -15,14 +28,6 @@ import type {
   BaseAssistantMessage,
   Message,
 } from '@ank1015/llm-core';
-import type { ApiForModelId } from './llm.js';
-import type {
-  CuratedModelId,
-  ProviderOptionsForModelId,
-  ReasoningEffort,
-  ResolveModelInputError,
-} from './model-input.js';
-import type { SessionAppender, SessionMessagesLoader, SessionNodeSaver } from './session.js';
 
 export const DEFAULT_AGENT_MAX_TURNS = 20;
 
@@ -32,13 +37,7 @@ type SetupFailure = {
   error: ResolveModelInputError;
 };
 
-export type AgentFailurePhase =
-  | 'session'
-  | 'model'
-  | 'tool'
-  | 'limit'
-  | 'hook'
-  | 'aborted';
+export type AgentFailurePhase = 'session' | 'model' | 'tool' | 'limit' | 'hook' | 'aborted';
 
 export interface AgentFailure {
   phase: AgentFailurePhase;
@@ -99,8 +98,7 @@ export interface AgentFailureResult {
 export type AgentResult<TApi extends Api = Api> = AgentSuccessResult<TApi> | AgentFailureResult;
 
 export interface AgentRun<TApi extends Api = Api>
-  extends AsyncIterable<AgentEvent>,
-    PromiseLike<AgentResult<TApi>> {
+  extends AsyncIterable<AgentEvent>, PromiseLike<AgentResult<TApi>> {
   readonly sessionPath: string;
   drain(): Promise<AgentResult<TApi>>;
   catch<TResult = never>(
@@ -342,7 +340,7 @@ async function executeAgent<TModelId extends CuratedModelId>(
 
     if (input.signal?.aborted) {
       run.end(
-        createFailureResult<ApiForModelId<TModelId>>({
+        createFailureResult({
           sessionPath,
           sessionId,
           branch,
@@ -443,7 +441,7 @@ async function executeAgent<TModelId extends CuratedModelId>(
 
     if (persistenceFailure) {
       run.end(
-        createFailureResult<ApiForModelId<TModelId>>({
+        createFailureResult({
           sessionPath,
           sessionId,
           branch,
@@ -461,7 +459,7 @@ async function executeAgent<TModelId extends CuratedModelId>(
 
     if (coreResult.aborted) {
       run.end(
-        createFailureResult<ApiForModelId<TModelId>>({
+        createFailureResult({
           sessionPath,
           sessionId,
           branch,
@@ -483,7 +481,7 @@ async function executeAgent<TModelId extends CuratedModelId>(
 
     if (coreResult.error) {
       run.end(
-        createFailureResult<ApiForModelId<TModelId>>({
+        createFailureResult({
           sessionPath,
           sessionId,
           branch,
@@ -516,7 +514,7 @@ async function executeAgent<TModelId extends CuratedModelId>(
     });
   } catch (error) {
     run.end(
-      createFailureResult<ApiForModelId<TModelId>>({
+      createFailureResult({
         sessionPath,
         sessionId,
         branch,
@@ -550,7 +548,9 @@ async function resolveAgentSession(
     path: session.path,
     branch: state.requestedBranch,
     ...(input.session?.headId !== undefined ? { headId: input.session.headId } : {}),
-    ...(input.session?.loadMessages !== undefined ? { messagesLoader: input.session.loadMessages } : {}),
+    ...(input.session?.loadMessages !== undefined
+      ? { messagesLoader: input.session.loadMessages }
+      : {}),
   });
 
   if (!loaded) {
@@ -606,7 +606,7 @@ function fromCoreAgentError(error: AgentError): AgentFailure {
   };
 }
 
-function createFailureResult<TApi extends Api>(
+function createFailureResult(
   input: Omit<AgentFailureResult, 'ok'> & { error: AgentFailure }
 ): AgentFailureResult {
   return {
@@ -624,10 +624,7 @@ function createFailureResult<TApi extends Api>(
   };
 }
 
-function normalizeTopLevelFailure(
-  error: unknown,
-  signal: AbortSignal | undefined
-): AgentFailure {
+function normalizeTopLevelFailure(error: unknown, signal: AbortSignal | undefined): AgentFailure {
   if (isAbortLike(error, signal)) {
     return {
       phase: 'aborted',
@@ -648,7 +645,9 @@ function isAbortLike(error: unknown, signal: AbortSignal | undefined): boolean {
     return true;
   }
 
-  return error instanceof Error && (error.name === 'AbortError' || error.name === 'APIUserAbortError');
+  return (
+    error instanceof Error && (error.name === 'AbortError' || error.name === 'APIUserAbortError')
+  );
 }
 
 function getErrorMessage(error: unknown): string {

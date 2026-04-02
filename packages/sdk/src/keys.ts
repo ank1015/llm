@@ -1,6 +1,8 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
+import { getSdkConfig } from './config.js';
+
 export const KnownKeyProviders = [
   'openai',
   'codex',
@@ -273,6 +275,16 @@ export async function resolveProviderCredentials<TProvider extends KeyProvider>(
 
     throw error;
   }
+}
+
+export async function getAvailableKeyProviders(
+  filePath: string = getSdkConfig().keysFilePath
+): Promise<KeyProvider[]> {
+  const values = await readExistingKeysFile(filePath);
+
+  return KnownKeyProviders.filter(
+    (provider): provider is KeyProvider => resolveProviderCredentialsFromValues(provider, values).ok
+  );
 }
 
 export async function upsertKeysFileValues(

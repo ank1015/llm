@@ -4,13 +4,13 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, expect, it } from 'vitest';
 
-import { getText, llm, userMessage } from '../../src/index.js';
-import { setProviderCredentials } from '../../src/keys.js';
 import {
   collectStreamEvents,
   describeIfAvailable,
   getIntegrationEnv,
 } from '../../../core/tests/integration/helpers/live.js';
+import { getText, llm, userMessage } from '../../src/index.js';
+import { setProviderCredentials } from '../../src/keys.js';
 
 import type { BaseAssistantEvent } from '../../src/index.js';
 
@@ -41,7 +41,9 @@ describeIfOpenAI('SDK llm() OpenAI integration', () => {
       modelId: 'openai/gpt-5.4-mini',
       keysFilePath,
       reasoningEffort: 'low',
-      messages: [userMessage('Reply with exactly SDK_OPENAI_AWAIT_OK', { id: 'user-sdk-openai-await-ok' })],
+      messages: [
+        userMessage('Reply with exactly SDK_OPENAI_AWAIT_OK', { id: 'user-sdk-openai-await-ok' }),
+      ],
       overrideProviderSetting: {
         max_output_tokens: 64,
       },
@@ -61,7 +63,9 @@ describeIfOpenAI('SDK llm() OpenAI integration', () => {
       modelId: 'openai/gpt-5.4-mini',
       keysFilePath,
       reasoningEffort: 'low',
-      messages: [userMessage('Reply with exactly SDK_OPENAI_STREAM_OK', { id: 'user-sdk-openai-stream-ok' })],
+      messages: [
+        userMessage('Reply with exactly SDK_OPENAI_STREAM_OK', { id: 'user-sdk-openai-stream-ok' }),
+      ],
       overrideProviderSetting: {
         max_output_tokens: 64,
       },
@@ -73,7 +77,9 @@ describeIfOpenAI('SDK llm() OpenAI integration', () => {
 
     expect(events.length).toBeGreaterThan(0);
     expect(events[0]?.type).toBe('start');
-    expect(events.some((event: BaseAssistantEvent<'openai'>) => event.type === 'text_delta')).toBe(true);
+    expect(events.some((event: BaseAssistantEvent<'openai'>) => event.type === 'text_delta')).toBe(
+      true
+    );
     expect(events.some((event: BaseAssistantEvent<'openai'>) => event.type === 'done')).toBe(true);
     expect(result.id).toBe('sdk-openai-stream-1');
     expect(getText(result)).toContain('SDK_OPENAI_STREAM_OK');

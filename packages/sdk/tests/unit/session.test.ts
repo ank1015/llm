@@ -4,6 +4,7 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { resetSdkConfig, setSdkConfig } from '../../src/config.js';
 import {
   appendSessionCustom,
   appendSessionMessage,
@@ -18,7 +19,6 @@ import {
   loadSessionMessages,
   readSession,
 } from '../../src/session.js';
-import { resetSdkConfig, setSdkConfig } from '../../src/config.js';
 
 import type { Message, SessionNodeSaver } from '../../src/index.js';
 
@@ -26,7 +26,9 @@ const tempDirectories: string[] = [];
 
 afterEach(async () => {
   resetSdkConfig();
-  await Promise.all(tempDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
+  await Promise.all(
+    tempDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true }))
+  );
 });
 
 async function createTempDirectory(): Promise<string> {
@@ -85,10 +87,7 @@ describe('session helpers', () => {
     expect(session?.nodes).toHaveLength(2);
 
     const loaded = await loadSessionMessages({ path: first.path });
-    expect(loaded?.messages).toEqual([
-      buildUserMessage('hello'),
-      buildUserMessage('world'),
-    ]);
+    expect(loaded?.messages).toEqual([buildUserMessage('hello'), buildUserMessage('world')]);
 
     const head = await getSessionHead(first.path);
     expect(head?.type).toBe('message');
@@ -207,10 +206,7 @@ describe('session helpers', () => {
       headId: custom.node.id,
     });
 
-    expect(loaded?.messages).toEqual([
-      buildUserMessage('main-1'),
-      buildUserMessage('main-2'),
-    ]);
+    expect(loaded?.messages).toEqual([buildUserMessage('main-1'), buildUserMessage('main-2')]);
 
     const node = await getSessionNode(first.path, custom.node.id);
     expect(node).toEqual(custom.node);
@@ -234,10 +230,7 @@ describe('session helpers', () => {
 
     expect(loaded?.branch).toBe('feature');
     expect(loaded?.head.id).toBe(second.node.id);
-    expect(loaded?.messages).toEqual([
-      buildUserMessage('main-1'),
-      buildUserMessage('main-2'),
-    ]);
+    expect(loaded?.messages).toEqual([buildUserMessage('main-1'), buildUserMessage('main-2')]);
 
     const featureNode = await appendSessionMessage({
       path: first.path,
