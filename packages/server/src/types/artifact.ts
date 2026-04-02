@@ -1,4 +1,3 @@
-
 /** Type of an entry in the artifact file explorer */
 export type ArtifactExplorerEntryType = 'file' | 'directory';
 
@@ -77,12 +76,17 @@ export interface CreateArtifactDirInput {
   description?: string;
 }
 
-export const CHECKPOINT_SUMMARY_STATUSES = [
-  'pending',
-  'ready',
-  'failed',
-  'unavailable',
-] as const;
+export interface RegisteredSkill {
+  name: string;
+  link: string;
+  description: string;
+}
+
+export interface ArtifactInstalledSkill extends RegisteredSkill {
+  path: string;
+}
+
+export const CHECKPOINT_SUMMARY_STATUSES = ['pending', 'ready', 'failed', 'unavailable'] as const;
 
 export type CheckpointSummaryStatus = (typeof CHECKPOINT_SUMMARY_STATUSES)[number];
 

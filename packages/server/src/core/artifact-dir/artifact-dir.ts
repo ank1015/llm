@@ -18,8 +18,11 @@ import {
   parseGitIgnoreRules,
   shouldIgnoreArtifactIndexPath,
 } from './index-ignore.js';
+import { artifactSkillSyncService } from './skills.js';
+import { ensureArtifactTempWorkspace } from './temp-workspace.js';
 
 // import type { AddSkillResult, DeleteSkillResult, InstalledSkillEntry } from '../skills.js';
+import type { IgnoreRule } from './index-ignore.js';
 import type {
   ArtifactDirMetadata,
   ArtifactExplorerEntry,
@@ -27,9 +30,9 @@ import type {
   ArtifactExplorerResult,
   ArtifactFileIndexResult,
   ArtifactFileResult,
+  ArtifactInstalledSkill,
   CreateArtifactDirInput,
 } from '../../types/index.js';
-import type { IgnoreRule } from './index-ignore.js';
 
 const DEFAULT_MAX_FILE_BYTES = 200_000;
 const MAX_ALLOWED_FILE_BYTES = 2_000_000;
@@ -69,16 +72,23 @@ export class ArtifactDir {
     await ensureDir(dirPath);
     await ensureDir(dataPath);
 
-    const metadata: ArtifactDirMetadata = {
-      id,
-      name: input.name,
-      description: input.description ?? null,
-      createdAt: new Date().toISOString(),
-    };
+    try {
+      await ensureArtifactTempWorkspace(dirPath);
 
-    await writeMetadata(dataPath, metadata);
+      const metadata: ArtifactDirMetadata = {
+        id,
+        name: input.name,
+        description: input.description ?? null,
+        createdAt: new Date().toISOString(),
+      };
 
-    return new ArtifactDir(dirPath, dataPath);
+      await writeMetadata(dataPath, metadata);
+
+      return new ArtifactDir(dirPath, dataPath);
+    } catch (error) {
+      await Promise.allSettled([removeDir(dirPath), removeDir(dataPath)]);
+      throw error;
+    }
   }
 
   /** List all artifact directories in a project. */
@@ -431,6 +441,22 @@ export class ArtifactDir {
       newPath: resolvedNext.relativePath,
       type: targetStats.isDirectory() ? 'directory' : 'file',
     };
+  }
+
+  async getInstalledSkills(): Promise<ArtifactInstalledSkill[]> {
+    return artifactSkillSyncService.listInstalledSkills(this.dirPath);
+  }
+
+  async installSkill(skillName: string): Promise<ArtifactInstalledSkill> {
+    return artifactSkillSyncService.installSkill(this.dirPath, skillName);
+  }
+
+  async reloadSkill(skillName: string): Promise<ArtifactInstalledSkill> {
+    return artifactSkillSyncService.reloadSkill(this.dirPath, skillName);
+  }
+
+  async deleteSkill(skillName: string): Promise<void> {
+    return artifactSkillSyncService.deleteSkill(this.dirPath, skillName);
   }
 
   /** Recursively index files and directories in this artifact directory (for mentions/search). */

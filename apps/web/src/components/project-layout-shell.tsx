@@ -1,36 +1,35 @@
-"use client";
+'use client';
 
-import {
-  ArrowLeft01Icon,
-  ComputerTerminal01Icon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { useParams, usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowLeft01Icon, ComputerTerminal01Icon } from '@hugeicons/core-free-icons';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { useParams, usePathname, useRouter } from 'next/navigation';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
+import type { ArtifactContext } from '@/lib/client-api';
+
+import { ArtifactCheckpointControls } from '@/components/artifact-checkpoint-controls';
+import { ArtifactCommandMenu } from '@/components/artifact-command-menu';
 import {
   ArtifactPreviewDrawer,
   getClampedArtifactDrawerWidth,
-} from "@/components/artifact-workspace";
-import { ArtifactCheckpointControls } from "@/components/artifact-checkpoint-controls";
-import { ProjectHeaderBreadcrumb } from "@/components/project-header-breadcrumb";
-import { ProjectSidebar } from "@/components/project-sidebar";
-import { ProjectTerminalPanel } from "@/components/project-terminal-panel";
+} from '@/components/artifact-workspace';
+import { ProjectHeaderBreadcrumb } from '@/components/project-header-breadcrumb';
+import { ProjectSidebar } from '@/components/project-sidebar';
+import { ProjectTerminalPanel } from '@/components/project-terminal-panel';
 import {
   getProjectSettingsReturnPathStorageKey,
   SettingsButton,
-} from "@/components/settings-button";
-import { ThemeToggle } from "@/components/theme-toggle";
-import { useArtifactFilesStore } from "@/stores/artifact-files-store";
-import { useTerminalStore } from "@/stores/terminals-store";
+} from '@/components/settings-button';
+import { ThemeToggle } from '@/components/theme-toggle';
+import { useArtifactFilesStore } from '@/stores/artifact-files-store';
+import { useTerminalStore } from '@/stores/terminals-store';
 
-import type { ArtifactContext } from "@/lib/client-api";
 
 const DEFAULT_DRAWER_RATIO = 0.5;
 const MIN_DRAWER_WIDTH = 320;
-const DRAWER_RATIO_STORAGE_KEY = "artifact-file-drawer-ratio";
+const DRAWER_RATIO_STORAGE_KEY = 'artifact-file-drawer-ratio';
 const MAX_DRAWER_WIDTH_RATIO = 0.66;
-const TERMINAL_SHORTCUT_LABEL = "Ctrl+`";
+const TERMINAL_SHORTCUT_LABEL = 'Ctrl+`';
 
 function clampDrawerRatio(nextRatio: number): number {
   if (!Number.isFinite(nextRatio)) {
@@ -41,7 +40,7 @@ function clampDrawerRatio(nextRatio: number): number {
 }
 
 function getInitialDrawerRatio(): number {
-  if (typeof window === "undefined") {
+  if (typeof window === 'undefined') {
     return DEFAULT_DRAWER_RATIO;
   }
 
@@ -75,10 +74,10 @@ export function ProjectLayoutShell({
   const [isDrawerResizing, setIsDrawerResizing] = useState(false);
   const artifactKey = artifactId ? `${projectId}::${artifactId}` : null;
   const previewMode = useArtifactFilesStore((state) =>
-    artifactKey ? (state.previewModeByArtifact[artifactKey] ?? null) : null,
+    artifactKey ? (state.previewModeByArtifact[artifactKey] ?? null) : null
   );
   const terminalDockOpen = useTerminalStore((state) =>
-    artifactKey ? (state.dockByArtifact[artifactKey]?.open ?? false) : false,
+    artifactKey ? (state.dockByArtifact[artifactKey]?.open ?? false) : false
   );
   const toggleTerminalDock = useTerminalStore((state) => state.toggleDock);
   const drawerVisible = Boolean(artifactId && previewMode);
@@ -90,14 +89,14 @@ export function ProjectLayoutShell({
             artifactId,
           }
         : null,
-    [artifactId, projectId],
+    [artifactId, projectId]
   );
   const isSettingsRoute =
     pathname === `/${projectId}/settings` || pathname.startsWith(`/${projectId}/settings/`);
   const terminalAvailable = Boolean(artifactId && !isSettingsRoute);
 
   useEffect(() => {
-    if (typeof window === "undefined") {
+    if (typeof window === 'undefined') {
       return;
     }
 
@@ -139,17 +138,17 @@ export function ProjectLayoutShell({
       <div ref={containerRef} className="relative flex h-[100dvh] min-w-0 flex-1 overflow-hidden">
         <div
           className={[
-            "flex min-w-0 flex-1 flex-col overflow-hidden transition-[padding-right] ease-out",
-            isDrawerResizing ? "duration-0" : "duration-300",
-          ].join(" ")}
-          style={{ paddingRight: drawerVisible ? `${drawerWidth + 4}px` : "0px" }}
+            'flex min-w-0 flex-1 flex-col overflow-hidden transition-[padding-right] ease-out',
+            isDrawerResizing ? 'duration-0' : 'duration-300',
+          ].join(' ')}
+          style={{ paddingRight: drawerVisible ? `${drawerWidth + 4}px` : '0px' }}
         >
           <header className="flex h-12 shrink-0 items-center gap-3 px-3">
             {isSettingsRoute ? (
               <button
                 type="button"
                 onClick={() => {
-                  if (typeof window !== "undefined") {
+                  if (typeof window !== 'undefined') {
                     const storageKey = getProjectSettingsReturnPathStorageKey(projectId);
                     const returnPath = window.sessionStorage.getItem(storageKey);
 
@@ -196,15 +195,15 @@ export function ProjectLayoutShell({
                     }
 
                     void Promise.resolve(toggleTerminalDock(artifactContext)).catch(
-                      () => undefined,
+                      () => undefined
                     );
                   }}
                   className={[
-                    "inline-flex size-8 cursor-pointer items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/12 dark:focus-visible:ring-white/12",
+                    'inline-flex size-8 cursor-pointer items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/12 dark:focus-visible:ring-white/12',
                     terminalDockOpen
-                      ? "bg-black/[0.06] text-black dark:bg-white/[0.08] dark:text-white"
-                      : "text-black/60 hover:bg-accent hover:text-black dark:text-white/62 dark:hover:bg-accent dark:hover:text-white",
-                  ].join(" ")}
+                      ? 'bg-black/[0.06] text-black dark:bg-white/[0.08] dark:text-white'
+                      : 'text-black/60 hover:bg-accent hover:text-black dark:text-white/62 dark:hover:bg-accent dark:hover:text-white',
+                  ].join(' ')}
                   aria-label={`Toggle terminal (${TERMINAL_SHORTCUT_LABEL})`}
                   title={`Toggle terminal (${TERMINAL_SHORTCUT_LABEL})`}
                 >
@@ -224,6 +223,15 @@ export function ProjectLayoutShell({
           </header>
 
           <main className="min-h-0 min-w-0 flex-1 overflow-hidden">{children}</main>
+
+          {artifactContext && !isSettingsRoute ? (
+            <ArtifactCommandMenu
+              key={`${artifactContext.projectId}:${artifactContext.artifactId}`}
+              enabled
+              projectId={artifactContext.projectId}
+              artifactId={artifactContext.artifactId}
+            />
+          ) : null}
 
           {terminalAvailable && artifactContext ? (
             <ProjectTerminalPanel artifactContext={artifactContext} />

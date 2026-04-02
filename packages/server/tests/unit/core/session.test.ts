@@ -8,18 +8,14 @@ import { readSession } from '@ank1015/llm-sdk/session';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Api } from '@ank1015/llm-core';
-import type {
-  AgentEvent,
-  AgentResult,
-  AgentRun,
-  CuratedModelId,
-  Message,
-} from '@ank1015/llm-sdk';
+import type { AgentEvent, AgentResult, AgentRun, CuratedModelId, Message } from '@ank1015/llm-sdk';
 import type { SessionNodeSaveContext } from '@ank1015/llm-sdk/session';
 
 const mockCreateAllTools = vi.fn();
 const mockCreateCheckpointSummaryPrompt = vi.fn();
 const mockCreateSystemPrompt = vi.fn();
+const mockGetRegisteredSkill = vi.fn();
+const mockListRegisteredSkills = vi.fn();
 const mockAgent = vi.fn();
 const mockLlm = vi.fn();
 
@@ -27,6 +23,8 @@ vi.mock('@ank1015/llm-agents', () => ({
   createAllTools: mockCreateAllTools,
   createCheckpointSummaryPrompt: mockCreateCheckpointSummaryPrompt,
   createSystemPrompt: mockCreateSystemPrompt,
+  getRegisteredSkill: mockGetRegisteredSkill,
+  listRegisteredSkills: mockListRegisteredSkills,
 }));
 
 vi.mock('@ank1015/llm-sdk', async (importOriginal) => {
@@ -328,6 +326,7 @@ describe('Session', () => {
         expect(input.reasoningEffort).toBe('medium');
         expect(input.system).toBe('system prompt');
         expect(Array.isArray(input.tools)).toBe(true);
+        expect(typeof (input.session as { loadMessages?: unknown }).loadMessages).toBe('function');
       },
     });
 
@@ -366,6 +365,9 @@ describe('Session', () => {
     queueAgentScenario({
       events,
       newMessages: [assistantMessage],
+      onCall: (input) => {
+        expect(typeof (input.session as { loadMessages?: unknown }).loadMessages).toBe('function');
+      },
     });
 
     const session = await createSession();
@@ -452,8 +454,9 @@ describe('Session', () => {
     expect(editedUserMessage?.role).toBe('user');
     expect(
       editedUserMessage?.role === 'user'
-        ? editedUserMessage.content.find((block) => block.type === 'text' && !block.metadata?.hiddenFromUI)
-            ?.content
+        ? editedUserMessage.content.find(
+            (block) => block.type === 'text' && !block.metadata?.hiddenFromUI
+          )?.content
         : undefined
     ).toBe('Edited prompt');
 
@@ -463,7 +466,9 @@ describe('Session', () => {
 
   it('generates names with llm output and falls back when llm fails', async () => {
     const namedSession = await createSession();
-    mockLlm.mockResolvedValueOnce(buildAssistantMessage('Research Plan', 'google/gemini-3-flash-preview'));
+    mockLlm.mockResolvedValueOnce(
+      buildAssistantMessage('Research Plan', 'google/gemini-3-flash-preview')
+    );
 
     const generatedName = await namedSession.generateName('How should we plan this migration?');
     expect(generatedName).toBe('Research Plan');

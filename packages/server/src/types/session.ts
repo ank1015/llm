@@ -10,6 +10,14 @@ export const DEFAULT_SESSION_NAME = 'Untitled Session';
 export const DEFAULT_ACTIVE_BRANCH = 'main';
 export const DEFAULT_REASONING_EFFORT: ReasoningEffort = 'high';
 export const SESSION_FILE_EXTENSION = '.jsonl';
+export const SESSION_COMPACTION_FILE_SUFFIX = '.compactions.jsonl';
+export const SESSION_COMPACTION_NODE_TYPES = [
+  'turn_compact',
+  'ultra_compact',
+  'ongoing_turn_compact',
+] as const;
+
+export type SessionCompactionNodeType = (typeof SESSION_COMPACTION_NODE_TYPES)[number];
 
 export interface SessionHeaderMetadata {
   modelId: CuratedModelId;
@@ -41,6 +49,60 @@ export interface SessionSummary {
   updatedAt: string | null;
   nodeCount: number;
 }
+
+export interface SessionCompactionNodeBase {
+  id: string;
+  type: SessionCompactionNodeType;
+  createdAt: string;
+  /** Branch whose history this compaction record applies to */
+  branchName: string;
+  /** Earliest message node replaced by this compaction record */
+  firstNodeId: string;
+  /** Latest message node replaced by this compaction record */
+  lastNodeId: string;
+  compactionSummary: string;
+}
+
+export interface SessionTurnCompactionNode extends SessionCompactionNodeBase {
+  type: 'turn_compact';
+}
+
+export interface SessionUltraCompactionNode extends SessionCompactionNodeBase {
+  type: 'ultra_compact';
+}
+
+export interface SessionOngoingTurnCompactionNode extends SessionCompactionNodeBase {
+  type: 'ongoing_turn_compact';
+}
+
+export type SessionCompactionNode =
+  | SessionTurnCompactionNode
+  | SessionUltraCompactionNode
+  | SessionOngoingTurnCompactionNode;
+
+export interface CreateSessionCompactionNodeInputBase {
+  branchName: string;
+  firstNodeId: string;
+  lastNodeId: string;
+  compactionSummary: string;
+}
+
+export interface CreateSessionTurnCompactionNodeInput extends CreateSessionCompactionNodeInputBase {
+  type: 'turn_compact';
+}
+
+export interface CreateSessionUltraCompactionNodeInput extends CreateSessionCompactionNodeInputBase {
+  type: 'ultra_compact';
+}
+
+export interface CreateSessionOngoingTurnCompactionNodeInput extends CreateSessionCompactionNodeInputBase {
+  type: 'ongoing_turn_compact';
+}
+
+export type CreateSessionCompactionNodeInput =
+  | CreateSessionTurnCompactionNodeInput
+  | CreateSessionUltraCompactionNodeInput
+  | CreateSessionOngoingTurnCompactionNodeInput;
 
 export interface CreateSessionOptions {
   name?: string;

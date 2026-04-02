@@ -1,19 +1,31 @@
+import { Hono } from 'hono';
+
 import {
   ArtifactExplorerQuerySchema,
   ArtifactFileQuerySchema,
   ArtifactRawFileQuerySchema,
   CreateArtifactDirRequestSchema,
   DeleteArtifactPathQuerySchema,
+  InstallArtifactSkillRequestSchema,
   RenameArtifactDirRequestSchema,
   RenameArtifactPathRequestSchema,
   UpdateArtifactFileRequestSchema,
 } from '../contracts/index.js';
-import { Hono } from 'hono';
-
+import {
+  ArtifactSkillAlreadyInstalledError,
+  ArtifactSkillNotInstalledError,
+  ArtifactSkillSourceError,
+  UnknownArtifactSkillError,
+} from '../core/artifact-dir/skills.js';
 import { ArtifactDir } from '../core/index.js';
 import { sessionRunRegistry } from '../core/session/run-registry.js';
 import { terminalRegistry } from '../core/terminal/terminal-registry.js';
-import { toArtifactDirDto, toTerminalSummaryDto } from '../http/contracts.js';
+import {
+  toArtifactDirDto,
+  toArtifactInstalledSkillDto,
+  toDeleteArtifactSkillResponse,
+  toTerminalSummaryDto,
+} from '../http/contracts.js';
 import { readJsonBody, validateSchema } from '../http/validation.js';
 
 import type {
@@ -24,10 +36,13 @@ import type {
   ArtifactFileDto,
   ArtifactFileQuery,
   ArtifactFilesListResponse,
+  ArtifactInstalledSkillDto,
   ArtifactRawFileQuery,
   CreateArtifactDirRequest,
+  DeleteArtifactSkillResponse,
   DeleteArtifactPathQuery,
   DeleteArtifactPathResponse,
+  InstallArtifactSkillRequest,
   RenameArtifactDirRequest,
   RenameArtifactPathRequest,
   RenameArtifactPathResponse,
@@ -39,6 +54,7 @@ const BASE = '/projects/:projectId/artifacts';
 const NOT_FOUND_MSG = 'Artifact directory not found';
 const FILE_READ_DEFAULT_MAX_BYTES = 200_000;
 const PATH_QUERY_REQUIRED_MESSAGE = 'path query parameter is required';
+const SKILL_NAME_REQUIRED_MESSAGE = 'skillName is required';
 const NOT_FOUND_IN_PROJECT_FRAGMENT = 'not found in project';
 const INVALID_PATH_MESSAGE = 'Invalid path';
 const INVALID_REQUEST_BODY_MESSAGE = 'Invalid request body';
@@ -171,6 +187,22 @@ artifactDirRoutes.get(`${BASE}/:artifactDirId/files`, async (c) => {
     const dir = await ArtifactDir.getById(projectId, artifactDirId);
     const files = await dir.listArtifacts();
     return c.json<ArtifactFilesListResponse>(files);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : NOT_FOUND_MSG;
+    return c.json({ error: message }, 404);
+  }
+});
+
+/** GET /api/projects/:projectId/artifacts/:artifactDirId/skills — List installed artifact skills */
+artifactDirRoutes.get(`${BASE}/:artifactDirId/skills`, async (c) => {
+  const { projectId, artifactDirId } = c.req.param();
+
+  try {
+    const dir = await ArtifactDir.getById(projectId, artifactDirId);
+    const skills = await dir.getInstalledSkills();
+    return c.json<ArtifactInstalledSkillDto[]>(
+      skills.map((skill) => toArtifactInstalledSkillDto(skill))
+    );
   } catch (e) {
     const message = e instanceof Error ? e.message : NOT_FOUND_MSG;
     return c.json({ error: message }, 404);
@@ -322,6 +354,70 @@ artifactDirRoutes.get(`${BASE}/:artifactDirId/file/raw`, async (c) => {
   }
 });
 
+/** POST /api/projects/:projectId/artifacts/:artifactDirId/skills — Install a registered skill */
+artifactDirRoutes.post(`${BASE}/:artifactDirId/skills`, async (c) => {
+  const { projectId, artifactDirId } = c.req.param();
+  const rawBody = await readJsonBody(c);
+  if (rawBody !== undefined) {
+    const validation = validateSchema(
+      c,
+      InstallArtifactSkillRequestSchema,
+      rawBody,
+      INVALID_REQUEST_BODY_MESSAGE
+    );
+    if (!validation.ok) {
+      return validation.response;
+    }
+  }
+
+  const body = (rawBody ?? {}) as InstallArtifactSkillRequest;
+  const skillName = body.skillName?.trim() ?? '';
+
+  if (!skillName) {
+    return c.json({ error: SKILL_NAME_REQUIRED_MESSAGE }, 400);
+  }
+
+  const liveRunResponse = getLiveRunConflictResponse(c, projectId, artifactDirId, 'install skills');
+  if (liveRunResponse) {
+    return liveRunResponse;
+  }
+
+  try {
+    const dir = await ArtifactDir.getById(projectId, artifactDirId);
+    const skill = await dir.installSkill(skillName);
+    return c.json<ArtifactInstalledSkillDto>(toArtifactInstalledSkillDto(skill));
+  } catch (e) {
+    const status = classifySkillErrorStatus(e);
+    const message = e instanceof Error ? e.message : 'Failed to install skill';
+    return c.json({ error: message }, status);
+  }
+});
+
+/** POST /api/projects/:projectId/artifacts/:artifactDirId/skills/:skillName/reload — Reload a registered skill */
+artifactDirRoutes.post(`${BASE}/:artifactDirId/skills/:skillName/reload`, async (c) => {
+  const { projectId, artifactDirId, skillName: rawSkillName } = c.req.param();
+  const skillName = rawSkillName?.trim() ?? '';
+
+  if (!skillName) {
+    return c.json({ error: SKILL_NAME_REQUIRED_MESSAGE }, 400);
+  }
+
+  const liveRunResponse = getLiveRunConflictResponse(c, projectId, artifactDirId, 'reload skills');
+  if (liveRunResponse) {
+    return liveRunResponse;
+  }
+
+  try {
+    const dir = await ArtifactDir.getById(projectId, artifactDirId);
+    const skill = await dir.reloadSkill(skillName);
+    return c.json<ArtifactInstalledSkillDto>(toArtifactInstalledSkillDto(skill));
+  } catch (e) {
+    const status = classifySkillErrorStatus(e);
+    const message = e instanceof Error ? e.message : 'Failed to reload skill';
+    return c.json({ error: message }, status);
+  }
+});
+
 /** PATCH /api/projects/:projectId/artifacts/:artifactDirId/path/rename — Rename a file or directory */
 artifactDirRoutes.patch(`${BASE}/:artifactDirId/path/rename`, async (c) => {
   const { projectId, artifactDirId } = c.req.param();
@@ -394,6 +490,31 @@ artifactDirRoutes.delete(`${BASE}/:artifactDirId/path`, async (c) => {
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Failed to delete artifact path';
     const status = classifyPathMutationErrorStatus(message);
+    return c.json({ error: message }, status);
+  }
+});
+
+/** DELETE /api/projects/:projectId/artifacts/:artifactDirId/skills/:skillName — Remove an installed registered skill */
+artifactDirRoutes.delete(`${BASE}/:artifactDirId/skills/:skillName`, async (c) => {
+  const { projectId, artifactDirId, skillName: rawSkillName } = c.req.param();
+  const skillName = rawSkillName?.trim() ?? '';
+
+  if (!skillName) {
+    return c.json({ error: SKILL_NAME_REQUIRED_MESSAGE }, 400);
+  }
+
+  const liveRunResponse = getLiveRunConflictResponse(c, projectId, artifactDirId, 'delete skills');
+  if (liveRunResponse) {
+    return liveRunResponse;
+  }
+
+  try {
+    const dir = await ArtifactDir.getById(projectId, artifactDirId);
+    await dir.deleteSkill(skillName);
+    return c.json<DeleteArtifactSkillResponse>(toDeleteArtifactSkillResponse(skillName));
+  } catch (e) {
+    const status = classifySkillErrorStatus(e);
+    const message = e instanceof Error ? e.message : 'Failed to delete skill';
     return c.json({ error: message }, status);
   }
 });
@@ -515,6 +636,53 @@ function classifyArtifactDirRenameErrorStatus(message: string): 404 | 409 | 500 
   }
 
   return 500;
+}
+
+function classifySkillErrorStatus(error: unknown): 400 | 404 | 409 | 500 | 502 {
+  if (error instanceof UnknownArtifactSkillError) {
+    return 400;
+  }
+
+  if (error instanceof ArtifactSkillNotInstalledError) {
+    return 404;
+  }
+
+  if (error instanceof ArtifactSkillAlreadyInstalledError) {
+    return 409;
+  }
+
+  if (error instanceof ArtifactSkillSourceError) {
+    return 502;
+  }
+
+  const message = error instanceof Error ? error.message : '';
+  if (
+    message === NOT_FOUND_MSG ||
+    message.includes(NOT_FOUND_IN_PROJECT_FRAGMENT) ||
+    message.includes('not found')
+  ) {
+    return 404;
+  }
+
+  return 500;
+}
+
+function getLiveRunConflictResponse(
+  c: { json: (body: unknown, status?: number) => Response },
+  projectId: string,
+  artifactDirId: string,
+  action: string
+): Response | null {
+  if (!sessionRunRegistry.hasActiveRunForArtifact(projectId, artifactDirId)) {
+    return null;
+  }
+
+  return c.json(
+    {
+      error: `Artifact directory "${artifactDirId}" has an active live run and cannot ${action}`,
+    },
+    409
+  );
 }
 
 function inferContentType(path: string): string {

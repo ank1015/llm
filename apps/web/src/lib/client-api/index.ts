@@ -8,7 +8,7 @@ export {
   streamConversation,
   streamEditConversation,
   streamRetryConversation,
-} from "./conversation";
+} from './conversation';
 export type {
   AttachRunRequest,
   CancelRunRequest,
@@ -20,14 +20,15 @@ export type {
   StreamRequest,
   StreamRetryRequest,
   TurnSettings,
-} from "./conversation";
-export { clearKey, getKeyDetails, listKeys, reloadKey, setKey } from "./keys";
-export type { KeyCredentialsInput } from "./keys";
-export { listModels } from "./models";
+} from './conversation';
+export { clearKey, getKeyDetails, listKeys, reloadKey, setKey } from './keys';
+export type { KeyCredentialsInput } from './keys';
+export { listModels } from './models';
 export {
   createArtifactCheckpoint,
   createArtifactDir,
   createProject,
+  deleteArtifactSkill,
   deleteArtifactDir,
   deleteArtifactPath,
   deleteProject,
@@ -42,8 +43,12 @@ export {
   getProject,
   getProjectFileIndex,
   getProjectOverview,
+  installArtifactSkill,
   listArtifactDirs,
+  listInstalledArtifactSkills,
   listProjects,
+  listRegisteredSkills,
+  reloadArtifactSkill,
   renameArtifactDir,
   renameArtifactPath,
   rollbackArtifactCheckpoint,
@@ -51,18 +56,19 @@ export {
   toggleProjectArchive,
   updateArtifactFile,
   updateProjectImage,
-} from "./projects";
+} from './projects';
 export type {
   ArtifactContext,
   CreateArtifactDirInput,
   CreateProjectInput,
+  InstallArtifactSkillInput,
   ProjectFileIndexInput,
   RenameArtifactDirInput,
   RenameArtifactPathInput,
   RenameProjectInput,
   UpdateArtifactFileInput,
   UpdateProjectImageInput,
-} from "./projects";
+} from './projects';
 export {
   createSession,
   deleteSession,
@@ -70,25 +76,21 @@ export {
   getSession,
   listSessions,
   renameSession,
-} from "./sessions";
-export type {
-  CreateSessionInput,
-  GenerateSessionNameInput,
-  RenameSessionInput,
-} from "./sessions";
+} from './sessions';
+export type { CreateSessionInput, GenerateSessionNameInput, RenameSessionInput } from './sessions';
 export {
   createTerminal,
   deleteTerminal,
   getTerminal,
   listTerminals,
   openTerminalSocket,
-} from "./terminals";
+} from './terminals';
 export type {
   OpenTerminalSocketRequest,
   TerminalSocketConnection,
   TerminalSocketHandlers,
-} from "./terminals";
-export { resolveServerBaseUrl, SERVER_BASE } from "./http";
+} from './terminals';
+export { resolveServerBaseUrl, SERVER_BASE } from './http';
 export type {
   ArtifactDirOverviewDto,
   ArtifactDirDeleteResponse,
@@ -102,14 +104,17 @@ export type {
   ArtifactExplorerResult,
   ArtifactFileDto,
   ArtifactFilesListResponse,
+  ArtifactInstalledSkillDto,
   CancelSessionRunResponse,
   CreateArtifactDirRequest,
   CreateProjectRequest,
   CreateSessionRequest,
   CreateTerminalRequest,
   CuratedModelIdContract,
+  DeleteArtifactSkillResponse,
   DeleteArtifactPathResponse,
   DeleteKeyResponse,
+  InstallArtifactSkillRequest,
   KeyCredentialFieldDto,
   DeleteSessionResponse,
   DeleteTerminalResponse,
@@ -126,6 +131,7 @@ export type {
   ProjectFileIndexEntryDto,
   ProjectFileIndexResult,
   ProjectOverviewDto,
+  RegisteredSkillDto,
   ReasoningEffortContract,
   ReloadKeyResponse,
   RenameArtifactDirRequest,
@@ -160,4 +166,4 @@ export type {
   TerminalSummaryDto,
   UpdateArtifactFileRequest,
   UpdateProjectImageRequest,
-} from "@ank1015/llm-server/contracts";
+} from '@ank1015/llm-server/contracts';

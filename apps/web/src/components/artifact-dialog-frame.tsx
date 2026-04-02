@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { createPortal } from "react-dom";
-import { useEffect } from "react";
+import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 export function ArtifactDialogFrame({
   title,
@@ -18,25 +18,33 @@ export function ArtifactDialogFrame({
 }) {
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
+      if (event.key === 'Escape') {
         onClose();
       }
     }
 
-    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown);
     return () => {
-      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener('keydown', handleKeyDown);
     };
   }, [onClose]);
 
-  if (typeof document === "undefined") {
+  if (typeof document === 'undefined') {
     return null;
   }
 
   return createPortal(
     <div
       className="fixed inset-0 z-[60] flex items-center justify-center bg-black/24 px-4 backdrop-blur-[10px]"
-      onClick={onClose}
+      onPointerDown={(event) => {
+        event.stopPropagation();
+      }}
+      onClick={(event) => {
+        event.stopPropagation();
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
     >
       <div
         role="dialog"
@@ -55,6 +63,6 @@ export function ArtifactDialogFrame({
         <div className="mt-5 flex items-center justify-end gap-2">{footer}</div>
       </div>
     </div>,
-    document.body,
+    document.body
   );
 }

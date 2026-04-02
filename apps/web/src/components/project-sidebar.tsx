@@ -1,5 +1,4 @@
-"use client";
-import { useQueryClient } from "@tanstack/react-query";
+'use client';
 import {
   AccountSetting03Icon,
   ArrowRight01Icon,
@@ -15,55 +14,51 @@ import {
   PencilEdit02Icon,
   PencilEdit01Icon,
   ReloadIcon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { createPortal } from "react-dom";
-import { useEffect } from "react";
-import { useParams, usePathname, useRouter } from "next/navigation";
-import { useRef, useState } from "react";
-import { toast } from "sonner";
-
-import { ArtifactDialogFrame } from "@/components/artifact-dialog-frame";
-import { TypewriterSessionName } from "@/components/typewriter-session-name";
-import {
-  useArtifactDirsQuery,
-  useArtifactExplorerQuery,
-  useCreateArtifactDirMutation,
-  useDeleteArtifactDirMutation,
-  useRenameArtifactDirMutation,
-} from "@/hooks/api/projects";
-import {
-  useDeleteSessionMutation,
-  useRenameSessionMutation,
-  useSessionsQuery,
-} from "@/hooks/api/sessions";
-import { useArtifactFilesStore } from "@/stores/artifact-files-store";
-import { useChatStore } from "@/stores/chat-store";
-import { useUiStore } from "@/stores/ui-store";
-import { useSidebarStore } from "@/stores/sidebar-store";
-import { queryKeys } from "@/lib/query-keys";
+} from '@hugeicons/core-free-icons';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useParams, usePathname, useRouter } from 'next/navigation';
+import { useEffect , useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { toast } from 'sonner';
 
 import type {
   ArtifactContext,
   ArtifactDirDto,
   ArtifactExplorerEntry,
   SessionSummaryDto,
-} from "@/lib/client-api";
+} from '@/lib/client-api';
+
+import { ArtifactDialogFrame } from '@/components/artifact-dialog-frame';
+import { TypewriterSessionName } from '@/components/typewriter-session-name';
+import {
+  useArtifactDirsQuery,
+  useArtifactExplorerQuery,
+  useCreateArtifactDirMutation,
+  useDeleteArtifactDirMutation,
+  useRenameArtifactDirMutation,
+} from '@/hooks/api/projects';
+import {
+  useDeleteSessionMutation,
+  useRenameSessionMutation,
+  useSessionsQuery,
+} from '@/hooks/api/sessions';
+import { queryKeys } from '@/lib/query-keys';
+import { useArtifactFilesStore } from '@/stores/artifact-files-store';
+import { useChatStore } from '@/stores/chat-store';
+import { useSidebarStore } from '@/stores/sidebar-store';
+import { useUiStore } from '@/stores/ui-store';
+
 
 const MENU_WIDTH = 176;
 const MENU_HEIGHT = 92;
 const MENU_OFFSET = 8;
 const VIEWPORT_PADDING = 12;
-const ROOT_EXPANDED_DIRECTORIES: Record<string, boolean> = { "": true };
+const ROOT_EXPANDED_DIRECTORIES: Record<string, boolean> = { '': true };
 
 function SidebarGlyph({ className }: { className?: string }) {
   return (
-    <svg
-      viewBox="0 0 100 100"
-      aria-hidden="true"
-      className={className}
-      fill="none"
-    >
+    <svg viewBox="0 0 100 100" aria-hidden="true" className={className} fill="none">
       <path
         d="M50 10 L50 90 M10 50 L90 50 M21.72 21.72 L78.28 78.28 M21.72 78.28 L78.28 21.72"
         stroke="currentColor"
@@ -85,7 +80,10 @@ function getRecentSessions(sessions: SessionSummaryDto[]): SessionSummaryDto[] {
 }
 
 function normalizeRelativePath(path: string): string {
-  return path.replace(/\\/g, "/").replace(/^\/+|\/+$/g, "").trim();
+  return path
+    .replace(/\\/g, '/')
+    .replace(/^\/+|\/+$/g, '')
+    .trim();
 }
 
 function getArtifactKey(ctx: ArtifactContext): string {
@@ -101,7 +99,11 @@ function RecentThreadsSection({
 }) {
   const router = useRouter();
   const { sessionId: activeSessionId } = useParams<{ sessionId?: string }>();
-  const { data: sessions = [], isPending, isError } = useSessionsQuery({
+  const {
+    data: sessions = [],
+    isPending,
+    isError,
+  } = useSessionsQuery({
     projectId,
     artifactId,
   });
@@ -111,9 +113,7 @@ function RecentThreadsSection({
   return (
     <div className="shrink-0">
       <div className="flex items-center gap-2 px-3 pb-1 pt-5">
-        <span className="text-[14px] text-black/38 dark:text-white/40">
-          Recent Threads
-        </span>
+        <span className="text-[14px] text-black/38 dark:text-white/40">Recent Threads</span>
         <div className="flex-1" />
         <button
           type="button"
@@ -127,12 +127,7 @@ function RecentThreadsSection({
           className="inline-flex h-6 w-6 items-center justify-center rounded-md text-black/42 transition-colors hover:bg-accent hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/12 dark:text-white/44 dark:hover:bg-accent dark:hover:text-white dark:focus-visible:ring-white/12"
           aria-label="Go to artifact page"
         >
-          <HugeiconsIcon
-            icon={PencilEdit02Icon}
-            size={16}
-            color="currentColor"
-            strokeWidth={1.8}
-          />
+          <HugeiconsIcon icon={PencilEdit02Icon} size={16} color="currentColor" strokeWidth={1.8} />
         </button>
       </div>
 
@@ -176,13 +171,7 @@ function RecentThreadsSection({
   );
 }
 
-function SettingsSidebarSection({
-  projectId,
-  pathname,
-}: {
-  projectId: string;
-  pathname: string;
-}) {
+function SettingsSidebarSection({ projectId, pathname }: { projectId: string; pathname: string }) {
   const router = useRouter();
   const generalHref = `/${projectId}/settings/general`;
   const modelsHref = `/${projectId}/settings/models`;
@@ -201,11 +190,11 @@ function SettingsSidebarSection({
             type="button"
             onClick={() => router.push(generalHref)}
             className={[
-              "group flex h-10 items-center gap-2 whitespace-nowrap rounded-lg pl-2 pr-1 text-left text-[14px] font-medium transition-colors",
+              'group flex h-10 items-center gap-2 whitespace-nowrap rounded-lg pl-2 pr-1 text-left text-[14px] font-medium transition-colors',
               isGeneralActive
-                ? "bg-accent text-black dark:text-white"
-                : "text-black/80 hover:bg-accent dark:text-white/82",
-            ].join(" ")}
+                ? 'bg-accent text-black dark:text-white'
+                : 'text-black/80 hover:bg-accent dark:text-white/82',
+            ].join(' ')}
           >
             <HugeiconsIcon
               icon={AccountSetting03Icon}
@@ -220,11 +209,11 @@ function SettingsSidebarSection({
             type="button"
             onClick={() => router.push(modelsHref)}
             className={[
-              "group flex h-10 items-center gap-2 whitespace-nowrap rounded-lg pl-2 pr-1 text-left text-[14px] font-medium transition-colors",
+              'group flex h-10 items-center gap-2 whitespace-nowrap rounded-lg pl-2 pr-1 text-left text-[14px] font-medium transition-colors',
               isModelsActive
-                ? "bg-accent text-black dark:text-white"
-                : "text-black/80 hover:bg-accent dark:text-white/82",
-            ].join(" ")}
+                ? 'bg-accent text-black dark:text-white'
+                : 'text-black/80 hover:bg-accent dark:text-white/82',
+            ].join(' ')}
           >
             <HugeiconsIcon
               icon={Key01Icon}
@@ -262,16 +251,13 @@ function RecentThreadRow({
     <div
       onClick={() => router.push(`/${projectId}/${artifactId}/${session.sessionId}`)}
       className={[
-        "group flex h-10 cursor-pointer items-center gap-2 rounded-lg pl-2 pr-1 whitespace-nowrap text-[14px] font-medium transition-colors",
+        'group flex h-10 cursor-pointer items-center gap-2 rounded-lg pl-2 pr-1 whitespace-nowrap text-[14px] font-medium transition-colors',
         isActive || isMenuOpen
-          ? "bg-accent text-black dark:text-white"
-          : "text-black/80 hover:bg-accent dark:text-white/82",
-      ].join(" ")}
+          ? 'bg-accent text-black dark:text-white'
+          : 'text-black/80 hover:bg-accent dark:text-white/82',
+      ].join(' ')}
     >
-      <TypewriterSessionName
-        name={session.sessionName}
-        className="min-w-0 flex-1 truncate"
-      />
+      <TypewriterSessionName name={session.sessionName} className="min-w-0 flex-1 truncate" />
       <RecentThreadActionsMenu
         session={session}
         projectId={projectId}
@@ -315,11 +301,8 @@ function FileTreeRows({
 
   if (isError) {
     return (
-      <p
-        className="py-2 text-xs text-[#FF6363]"
-        style={{ paddingLeft: `${8 + depth * 12}px` }}
-      >
-        {error instanceof Error ? error.message : "Could not load files."}
+      <p className="py-2 text-xs text-[#FF6363]" style={{ paddingLeft: `${8 + depth * 12}px` }}>
+        {error instanceof Error ? error.message : 'Could not load files.'}
       </p>
     );
   }
@@ -335,7 +318,7 @@ function FileTreeRows({
   return (
     <>
       {listing.entries.map((entry) =>
-        entry.type === "directory" ? (
+        entry.type === 'directory' ? (
           <FileTreeDirectoryRow
             key={entry.path}
             ctx={ctx}
@@ -354,7 +337,7 @@ function FileTreeRows({
             isSelected={selectedFilePath === entry.path}
             onSelectFile={onSelectFile}
           />
-        ),
+        )
       )}
     </>
   );
@@ -393,9 +376,9 @@ function FileTreeDirectoryRow({
             color="currentColor"
             strokeWidth={1.8}
             className={[
-              "shrink-0 text-black/42 transition-transform dark:text-white/42",
-              isExpanded ? "rotate-90" : "rotate-0",
-            ].join(" ")}
+              'shrink-0 text-black/42 transition-transform dark:text-white/42',
+              isExpanded ? 'rotate-90' : 'rotate-0',
+            ].join(' ')}
           />
           <HugeiconsIcon
             icon={Folder01Icon}
@@ -440,11 +423,11 @@ function FileTreeFileRow({
         type="button"
         onClick={() => onSelectFile(entry.path)}
         className={[
-          "group flex h-9 w-full items-center gap-1 rounded-lg px-2 pr-1 text-left text-[13px] font-medium transition-colors",
+          'group flex h-9 w-full items-center gap-1 rounded-lg px-2 pr-1 text-left text-[13px] font-medium transition-colors',
           isSelected
-            ? "bg-accent text-black dark:text-white"
-            : "text-black/74 hover:bg-accent dark:text-white/76",
-        ].join(" ")}
+            ? 'bg-accent text-black dark:text-white'
+            : 'text-black/74 hover:bg-accent dark:text-white/76',
+        ].join(' ')}
       >
         <HugeiconsIcon
           icon={File01Icon}
@@ -459,13 +442,7 @@ function FileTreeFileRow({
   );
 }
 
-function FilesSection({
-  projectId,
-  artifactId,
-}: {
-  projectId: string;
-  artifactId: string;
-}) {
+function FilesSection({ projectId, artifactId }: { projectId: string; artifactId: string }) {
   const queryClient = useQueryClient();
   const artifactContext = {
     projectId,
@@ -474,11 +451,10 @@ function FilesSection({
   const artifactKey = getArtifactKey(artifactContext);
   const [isOpen, setIsOpen] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [expandedDirectories, setExpandedDirectories] = useState<Record<string, boolean>>(
-    ROOT_EXPANDED_DIRECTORIES,
-  );
+  const [expandedDirectories, setExpandedDirectories] =
+    useState<Record<string, boolean>>(ROOT_EXPANDED_DIRECTORIES);
   const selectedFilePath = useArtifactFilesStore(
-    (state) => state.selectedFileByArtifact[artifactKey] ?? null,
+    (state) => state.selectedFileByArtifact[artifactKey] ?? null
   );
   const closePreview = useArtifactFilesStore((state) => state.closePreview);
   const openFile = useArtifactFilesStore((state) => state.openFile);
@@ -522,17 +498,16 @@ function FilesSection({
           type="button"
           onClick={() => setIsOpen((current) => !current)}
           className="inline-flex h-6 w-6 items-center justify-center rounded-md text-black/42 transition-colors hover:bg-accent hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/12 dark:text-white/44 dark:hover:bg-accent dark:hover:text-white dark:focus-visible:ring-white/12"
-          aria-label={isOpen ? "Collapse files section" : "Expand files section"}
+          aria-label={isOpen ? 'Collapse files section' : 'Expand files section'}
         >
           <HugeiconsIcon
             icon={ArrowRight01Icon}
             size={16}
             color="currentColor"
             strokeWidth={1.8}
-            className={[
-              "shrink-0 transition-transform",
-              isOpen ? "rotate-90" : "rotate-0",
-            ].join(" ")}
+            className={['shrink-0 transition-transform', isOpen ? 'rotate-90' : 'rotate-0'].join(
+              ' '
+            )}
           />
         </button>
         <span className="text-[14px] text-black/38 dark:text-white/40">Files</span>
@@ -551,7 +526,7 @@ function FilesSection({
             size={15}
             color="currentColor"
             strokeWidth={1.8}
-            className={isRefreshing ? "animate-spin" : undefined}
+            className={isRefreshing ? 'animate-spin' : undefined}
           />
         </button>
         <button
@@ -560,12 +535,7 @@ function FilesSection({
           className="inline-flex h-6 w-6 items-center justify-center rounded-md text-black/42 transition-colors hover:bg-accent hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/12 dark:text-white/44 dark:hover:bg-accent dark:hover:text-white dark:focus-visible:ring-white/12"
           aria-label="Collapse all folders"
         >
-          <HugeiconsIcon
-            icon={CollapseIcon}
-            size={15}
-            color="currentColor"
-            strokeWidth={1.8}
-          />
+          <HugeiconsIcon icon={CollapseIcon} size={15} color="currentColor" strokeWidth={1.8} />
         </button>
       </div>
 
@@ -606,17 +576,15 @@ function ArtifactActionsMenu({
   const renameArtifact = useRenameArtifactDirMutation(artifactContext);
   const deleteArtifact = useDeleteArtifactDirMutation(artifactContext);
   const [isOpen, setIsOpen] = useState(false);
-  const [activeDialog, setActiveDialog] = useState<"rename" | "delete" | null>(null);
+  const [activeDialog, setActiveDialog] = useState<'rename' | 'delete' | null>(null);
   const [renameValue, setRenameValue] = useState(artifact.name);
-  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(
-    null,
-  );
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
   function updateMenuPosition() {
-    if (typeof window === "undefined" || !triggerRef.current) {
+    if (typeof window === 'undefined' || !triggerRef.current) {
       return;
     }
 
@@ -629,17 +597,17 @@ function ArtifactActionsMenu({
 
     const top = shouldOpenAbove
       ? Math.max(VIEWPORT_PADDING, rect.top - MENU_HEIGHT - MENU_OFFSET)
-      : Math.min(
-          viewportHeight - MENU_HEIGHT - VIEWPORT_PADDING,
-          rect.bottom + MENU_OFFSET,
-        );
+      : Math.min(viewportHeight - MENU_HEIGHT - VIEWPORT_PADDING, rect.bottom + MENU_OFFSET);
     const preferredLeft = rect.right + MENU_OFFSET;
     const left =
       preferredLeft + MENU_WIDTH <= viewportWidth - VIEWPORT_PADDING
         ? preferredLeft
         : Math.max(
             VIEWPORT_PADDING,
-            Math.min(rect.left - MENU_WIDTH - MENU_OFFSET, viewportWidth - MENU_WIDTH - VIEWPORT_PADDING),
+            Math.min(
+              rect.left - MENU_WIDTH - MENU_OFFSET,
+              viewportWidth - MENU_WIDTH - VIEWPORT_PADDING
+            )
           );
 
     setMenuPosition({ top, left });
@@ -661,7 +629,7 @@ function ArtifactActionsMenu({
     }
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
+      if (event.key === 'Escape') {
         setIsOpen(false);
         onMenuOpenChange(false);
       }
@@ -674,22 +642,22 @@ function ArtifactActionsMenu({
     const frame = window.requestAnimationFrame(() => {
       updateMenuPosition();
     });
-    window.addEventListener("pointerdown", handlePointerDown);
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("resize", handleViewportChange);
-    window.addEventListener("scroll", handleViewportChange, true);
+    window.addEventListener('pointerdown', handlePointerDown);
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('resize', handleViewportChange);
+    window.addEventListener('scroll', handleViewportChange, true);
 
     return () => {
       window.cancelAnimationFrame(frame);
-      window.removeEventListener("pointerdown", handlePointerDown);
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("resize", handleViewportChange);
-      window.removeEventListener("scroll", handleViewportChange, true);
+      window.removeEventListener('pointerdown', handlePointerDown);
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('resize', handleViewportChange);
+      window.removeEventListener('scroll', handleViewportChange, true);
     };
   }, [isOpen, onMenuOpenChange]);
 
   useEffect(() => {
-    if (activeDialog !== "rename") {
+    if (activeDialog !== 'rename') {
       return;
     }
 
@@ -704,8 +672,8 @@ function ArtifactActionsMenu({
   }, [activeDialog, artifact.name]);
 
   const items = [
-    { label: "Rename", icon: PencilEdit01Icon, action: "rename" },
-    { label: "Delete", icon: Delete03Icon, action: "delete" },
+    { label: 'Rename', icon: PencilEdit01Icon, action: 'rename' },
+    { label: 'Delete', icon: Delete03Icon, action: 'delete' },
   ] as const;
 
   async function handleRename() {
@@ -721,10 +689,10 @@ function ArtifactActionsMenu({
 
     try {
       await renameArtifact.mutateAsync({ name: trimmedName });
-      toast.success("Artifact renamed.");
+      toast.success('Artifact renamed.');
       setActiveDialog(null);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to rename artifact.");
+      toast.error(error instanceof Error ? error.message : 'Failed to rename artifact.');
     }
   }
 
@@ -735,10 +703,10 @@ function ArtifactActionsMenu({
 
     try {
       await deleteArtifact.mutateAsync();
-      toast.success("Artifact deleted.");
+      toast.success('Artifact deleted.');
       setActiveDialog(null);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to delete artifact.");
+      toast.error(error instanceof Error ? error.message : 'Failed to delete artifact.');
     }
   }
 
@@ -750,6 +718,9 @@ function ArtifactActionsMenu({
         aria-label={`More options for ${artifact.name}`}
         aria-haspopup="menu"
         aria-expanded={isOpen}
+        onPointerDown={(event) => {
+          event.stopPropagation();
+        }}
         onClick={(event) => {
           event.stopPropagation();
           if (isOpen) {
@@ -763,27 +734,28 @@ function ArtifactActionsMenu({
           onMenuOpenChange(true);
         }}
         className={[
-          "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-black/42 transition-all hover:bg-accent hover:text-black dark:text-white/44 dark:hover:bg-accent dark:hover:text-white",
+          'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-black/42 transition-all hover:bg-accent hover:text-black dark:text-white/44 dark:hover:bg-accent dark:hover:text-white',
           isMenuOpen
-            ? "pointer-events-auto opacity-100"
-            : "pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100",
-        ].join(" ")}
+            ? 'pointer-events-auto opacity-100'
+            : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100',
+        ].join(' ')}
       >
-        <HugeiconsIcon
-          icon={MoreHorizontalIcon}
-          size={16}
-          color="currentColor"
-          strokeWidth={1.8}
-        />
+        <HugeiconsIcon icon={MoreHorizontalIcon} size={16} color="currentColor" strokeWidth={1.8} />
       </button>
 
-      {isOpen && menuPosition && typeof document !== "undefined"
+      {isOpen && menuPosition && typeof document !== 'undefined'
         ? createPortal(
             <div
               ref={menuRef}
               role="menu"
               aria-label={`Actions for ${artifact.name}`}
               className="fixed z-50 w-44 overflow-hidden rounded-2xl border border-black/8 bg-white p-1.5 shadow-[0_16px_44px_rgba(0,0,0,0.08)] dark:border-white/10 dark:bg-[#171717] dark:shadow-[0_16px_44px_rgba(0,0,0,0.3)]"
+              onPointerDown={(event) => {
+                event.stopPropagation();
+              }}
+              onClick={(event) => {
+                event.stopPropagation();
+              }}
               style={{
                 top: menuPosition.top,
                 left: menuPosition.left,
@@ -794,31 +766,30 @@ function ArtifactActionsMenu({
                   key={item.label}
                   type="button"
                   role="menuitem"
-                  onClick={() => {
+                  onPointerDown={(event) => {
+                    event.stopPropagation();
+                  }}
+                  onClick={(event) => {
+                    event.stopPropagation();
                     setIsOpen(false);
                     onMenuOpenChange(false);
-                    if (item.action === "rename") {
+                    if (item.action === 'rename') {
                       setRenameValue(artifact.name);
                     }
                     setActiveDialog(item.action);
                   }}
                   className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-[0.83rem] font-medium text-black/78 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/12 dark:text-white/82 dark:focus-visible:ring-white/12"
                 >
-                  <HugeiconsIcon
-                    icon={item.icon}
-                    size={16}
-                    color="#FF6363"
-                    strokeWidth={1.8}
-                  />
+                  <HugeiconsIcon icon={item.icon} size={16} color="#FF6363" strokeWidth={1.8} />
                   <span>{item.label}</span>
                 </button>
               ))}
             </div>,
-            document.body,
+            document.body
           )
         : null}
 
-      {activeDialog === "rename" ? (
+      {activeDialog === 'rename' ? (
         <ArtifactDialogFrame
           title="Rename artifact"
           description="Update the artifact name."
@@ -845,7 +816,7 @@ function ArtifactActionsMenu({
                 disabled={!renameValue.trim() || renameArtifact.isPending}
                 className="inline-flex h-10 items-center justify-center rounded-xl bg-[#FF6363] px-4 text-sm font-medium text-white transition-opacity hover:opacity-92 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {renameArtifact.isPending ? "Saving..." : "Confirm"}
+                {renameArtifact.isPending ? 'Saving...' : 'Confirm'}
               </button>
             </>
           }
@@ -855,7 +826,7 @@ function ArtifactActionsMenu({
             value={renameValue}
             onChange={(event) => setRenameValue(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === "Enter") {
+              if (event.key === 'Enter') {
                 event.preventDefault();
                 void handleRename();
               }
@@ -866,7 +837,7 @@ function ArtifactActionsMenu({
         </ArtifactDialogFrame>
       ) : null}
 
-      {activeDialog === "delete" ? (
+      {activeDialog === 'delete' ? (
         <ArtifactDialogFrame
           title="Delete artifact"
           description="This Action cannot be reversed."
@@ -893,7 +864,7 @@ function ArtifactActionsMenu({
                 disabled={deleteArtifact.isPending}
                 className="inline-flex h-10 items-center justify-center rounded-xl bg-[#FF6363] px-4 text-sm font-medium text-white transition-opacity hover:opacity-92 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {deleteArtifact.isPending ? "Deleting..." : "Confirm"}
+                {deleteArtifact.isPending ? 'Deleting...' : 'Confirm'}
               </button>
             </>
           }
@@ -927,17 +898,15 @@ function RecentThreadActionsMenu({
   const clearSessionState = useChatStore((state) => state.clearSessionState);
   const setActiveSession = useChatStore((state) => state.setActiveSession);
   const [isOpen, setIsOpen] = useState(false);
-  const [activeDialog, setActiveDialog] = useState<"rename" | "delete" | null>(null);
+  const [activeDialog, setActiveDialog] = useState<'rename' | 'delete' | null>(null);
   const [renameValue, setRenameValue] = useState(session.sessionName);
-  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(
-    null,
-  );
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
   function updateMenuPosition() {
-    if (typeof window === "undefined" || !triggerRef.current) {
+    if (typeof window === 'undefined' || !triggerRef.current) {
       return;
     }
 
@@ -950,10 +919,7 @@ function RecentThreadActionsMenu({
 
     const top = shouldOpenAbove
       ? Math.max(VIEWPORT_PADDING, rect.top - MENU_HEIGHT - MENU_OFFSET)
-      : Math.min(
-          viewportHeight - MENU_HEIGHT - VIEWPORT_PADDING,
-          rect.bottom + MENU_OFFSET,
-        );
+      : Math.min(viewportHeight - MENU_HEIGHT - VIEWPORT_PADDING, rect.bottom + MENU_OFFSET);
     const preferredLeft = rect.right + MENU_OFFSET;
     const left =
       preferredLeft + MENU_WIDTH <= viewportWidth - VIEWPORT_PADDING
@@ -962,8 +928,8 @@ function RecentThreadActionsMenu({
             VIEWPORT_PADDING,
             Math.min(
               rect.left - MENU_WIDTH - MENU_OFFSET,
-              viewportWidth - MENU_WIDTH - VIEWPORT_PADDING,
-            ),
+              viewportWidth - MENU_WIDTH - VIEWPORT_PADDING
+            )
           );
 
     setMenuPosition({ top, left });
@@ -985,7 +951,7 @@ function RecentThreadActionsMenu({
     }
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
+      if (event.key === 'Escape') {
         setIsOpen(false);
         onMenuOpenChange(false);
       }
@@ -998,22 +964,22 @@ function RecentThreadActionsMenu({
     const frame = window.requestAnimationFrame(() => {
       updateMenuPosition();
     });
-    window.addEventListener("pointerdown", handlePointerDown);
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("resize", handleViewportChange);
-    window.addEventListener("scroll", handleViewportChange, true);
+    window.addEventListener('pointerdown', handlePointerDown);
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('resize', handleViewportChange);
+    window.addEventListener('scroll', handleViewportChange, true);
 
     return () => {
       window.cancelAnimationFrame(frame);
-      window.removeEventListener("pointerdown", handlePointerDown);
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("resize", handleViewportChange);
-      window.removeEventListener("scroll", handleViewportChange, true);
+      window.removeEventListener('pointerdown', handlePointerDown);
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('resize', handleViewportChange);
+      window.removeEventListener('scroll', handleViewportChange, true);
     };
   }, [isOpen, onMenuOpenChange]);
 
   useEffect(() => {
-    if (activeDialog !== "rename") {
+    if (activeDialog !== 'rename') {
       return;
     }
 
@@ -1028,8 +994,8 @@ function RecentThreadActionsMenu({
   }, [activeDialog, session.sessionName]);
 
   const items = [
-    { label: "Rename", icon: PencilEdit01Icon, action: "rename" },
-    { label: "Delete", icon: Delete03Icon, action: "delete" },
+    { label: 'Rename', icon: PencilEdit01Icon, action: 'rename' },
+    { label: 'Delete', icon: Delete03Icon, action: 'delete' },
   ] as const;
 
   async function handleRename() {
@@ -1049,10 +1015,10 @@ function RecentThreadActionsMenu({
         name: trimmedName,
       });
       sidebarRenameSession(session.sessionId, response.sessionName);
-      toast.success("Thread renamed.");
+      toast.success('Thread renamed.');
       setActiveDialog(null);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to rename thread.");
+      toast.error(error instanceof Error ? error.message : 'Failed to rename thread.');
     }
   }
 
@@ -1071,10 +1037,10 @@ function RecentThreadActionsMenu({
         router.push(`/${projectId}/${artifactId}`);
       }
 
-      toast.success("Thread deleted.");
+      toast.success('Thread deleted.');
       setActiveDialog(null);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to delete thread.");
+      toast.error(error instanceof Error ? error.message : 'Failed to delete thread.');
     }
   }
 
@@ -1103,15 +1069,10 @@ function RecentThreadActionsMenu({
         }}
         className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-black/42 transition-all hover:bg-accent hover:text-black dark:text-white/44 dark:hover:bg-accent dark:hover:text-white"
       >
-        <HugeiconsIcon
-          icon={MoreHorizontalIcon}
-          size={16}
-          color="currentColor"
-          strokeWidth={1.8}
-        />
+        <HugeiconsIcon icon={MoreHorizontalIcon} size={16} color="currentColor" strokeWidth={1.8} />
       </button>
 
-      {isOpen && menuPosition && typeof document !== "undefined"
+      {isOpen && menuPosition && typeof document !== 'undefined'
         ? createPortal(
             <div
               ref={menuRef}
@@ -1141,28 +1102,23 @@ function RecentThreadActionsMenu({
                     event.stopPropagation();
                     setIsOpen(false);
                     onMenuOpenChange(false);
-                    if (item.action === "rename") {
+                    if (item.action === 'rename') {
                       setRenameValue(session.sessionName);
                     }
                     setActiveDialog(item.action);
                   }}
                   className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-[0.83rem] font-medium text-black/78 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/12 dark:text-white/82 dark:focus-visible:ring-white/12"
                 >
-                  <HugeiconsIcon
-                    icon={item.icon}
-                    size={16}
-                    color="#FF6363"
-                    strokeWidth={1.8}
-                  />
+                  <HugeiconsIcon icon={item.icon} size={16} color="#FF6363" strokeWidth={1.8} />
                   <span>{item.label}</span>
                 </button>
               ))}
             </div>,
-            document.body,
+            document.body
           )
         : null}
 
-      {activeDialog === "rename" ? (
+      {activeDialog === 'rename' ? (
         <ArtifactDialogFrame
           title="Rename thread"
           description="Update the thread name."
@@ -1189,7 +1145,7 @@ function RecentThreadActionsMenu({
                 disabled={!renameValue.trim() || renameSession.isPending}
                 className="inline-flex h-10 items-center justify-center rounded-xl bg-[#FF6363] px-4 text-sm font-medium text-white transition-opacity hover:opacity-92 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {renameSession.isPending ? "Saving..." : "Confirm"}
+                {renameSession.isPending ? 'Saving...' : 'Confirm'}
               </button>
             </>
           }
@@ -1199,7 +1155,7 @@ function RecentThreadActionsMenu({
             value={renameValue}
             onChange={(event) => setRenameValue(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === "Enter") {
+              if (event.key === 'Enter') {
                 event.preventDefault();
                 void handleRename();
               }
@@ -1210,7 +1166,7 @@ function RecentThreadActionsMenu({
         </ArtifactDialogFrame>
       ) : null}
 
-      {activeDialog === "delete" ? (
+      {activeDialog === 'delete' ? (
         <ArtifactDialogFrame
           title="Delete thread"
           description="This Action cannot be reversed."
@@ -1237,7 +1193,7 @@ function RecentThreadActionsMenu({
                 disabled={deleteSession.isPending}
                 className="inline-flex h-10 items-center justify-center rounded-xl bg-[#FF6363] px-4 text-sm font-medium text-white transition-opacity hover:opacity-92 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {deleteSession.isPending ? "Deleting..." : "Confirm"}
+                {deleteSession.isPending ? 'Deleting...' : 'Confirm'}
               </button>
             </>
           }
@@ -1261,9 +1217,10 @@ export function ProjectSidebar() {
   const [isHovered, setIsHovered] = useState(false);
   const [openArtifactMenuId, setOpenArtifactMenuId] = useState<string | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [createName, setCreateName] = useState("");
+  const [createName, setCreateName] = useState('');
   const createInputRef = useRef<HTMLInputElement>(null);
-  const isSettingsRoute = pathname === `/${projectId}/settings` || pathname.startsWith(`/${projectId}/settings/`);
+  const isSettingsRoute =
+    pathname === `/${projectId}/settings` || pathname.startsWith(`/${projectId}/settings/`);
 
   const showToggleIcon = isSidebarCollapsed && isHovered;
 
@@ -1289,22 +1246,22 @@ export function ProjectSidebar() {
 
     try {
       const artifact = await createArtifact.mutateAsync({ name: trimmedName });
-      toast.success("Artifact created.");
+      toast.success('Artifact created.');
       setIsCreateDialogOpen(false);
-      setCreateName("");
+      setCreateName('');
       router.push(`/${projectId}/${artifact.id}`);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to create artifact.");
+      toast.error(error instanceof Error ? error.message : 'Failed to create artifact.');
     }
   }
 
   return (
     <aside
       className={[
-        "flex h-full shrink-0 flex-col overflow-hidden border-r transition-all duration-300 ease-in-out",
-        "border-black/6 bg-[#FCFBFC] dark:border-white/8 dark:bg-[#0E0E0E]",
-        isSidebarCollapsed ? "w-[50px] cursor-w-resize" : "w-[260px]",
-      ].join(" ")}
+        'flex h-full shrink-0 flex-col overflow-hidden border-r transition-all duration-300 ease-in-out',
+        'border-black/6 bg-[#FCFBFC] dark:border-white/8 dark:bg-[#0E0E0E]',
+        isSidebarCollapsed ? 'w-[50px] cursor-w-resize' : 'w-[260px]',
+      ].join(' ')}
       onMouseEnter={() => {
         if (isSidebarCollapsed) {
           setIsHovered(true);
@@ -1323,7 +1280,7 @@ export function ProjectSidebar() {
           type="button"
           onClick={(event) => {
             event.stopPropagation();
-            router.push("/");
+            router.push('/');
           }}
           className="group/logo relative flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center text-[0.82rem] font-medium text-black/72 transition-colors hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/12 dark:text-white/76 dark:hover:text-white dark:focus-visible:ring-white/12"
           aria-label="Go to home page"
@@ -1331,15 +1288,15 @@ export function ProjectSidebar() {
         >
           <div
             className={[
-              "relative flex h-[18px] w-[18px] items-center justify-center transition-transform duration-[1000ms] ease-out",
-              isSidebarCollapsed ? "rotate-[90deg]" : "rotate-0",
-            ].join(" ")}
+              'relative flex h-[18px] w-[18px] items-center justify-center transition-transform duration-[1000ms] ease-out',
+              isSidebarCollapsed ? 'rotate-[90deg]' : 'rotate-0',
+            ].join(' ')}
           >
             <SidebarGlyph
               className={[
-                "absolute h-[18px] w-[18px] text-black transition-[opacity,transform] duration-200 group-hover/logo:animate-spin dark:text-white",
-                showToggleIcon ? "opacity-0" : "opacity-100",
-              ].join(" ")}
+                'absolute h-[18px] w-[18px] text-black transition-[opacity,transform] duration-200 group-hover/logo:animate-spin dark:text-white',
+                showToggleIcon ? 'opacity-0' : 'opacity-100',
+              ].join(' ')}
             />
             <HugeiconsIcon
               icon={PanelLeftOpenIcon}
@@ -1347,9 +1304,9 @@ export function ProjectSidebar() {
               color="currentColor"
               strokeWidth={1.8}
               className={[
-                "absolute rotate-[90deg] text-black/58 transition-[opacity,transform] duration-200 dark:text-white/62",
-                showToggleIcon ? "opacity-100" : "opacity-0",
-              ].join(" ")}
+                'absolute rotate-[90deg] text-black/58 transition-[opacity,transform] duration-200 dark:text-white/62',
+                showToggleIcon ? 'opacity-100' : 'opacity-0',
+              ].join(' ')}
             />
           </div>
         </button>
@@ -1398,14 +1355,12 @@ export function ProjectSidebar() {
       {!isSidebarCollapsed && !artifactId && !isSettingsRoute ? (
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="flex items-center gap-2 px-3 pb-1 pt-5">
-            <span className="text-[14px] text-black/38 dark:text-white/40">
-              Artifacts
-            </span>
+            <span className="text-[14px] text-black/38 dark:text-white/40">Artifacts</span>
             <div className="flex-1" />
             <button
               type="button"
               onClick={() => {
-                setCreateName("");
+                setCreateName('');
                 setIsCreateDialogOpen(true);
               }}
               className="inline-flex h-6 w-6 items-center justify-center rounded-md text-black/42 transition-colors hover:bg-accent hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/12 dark:text-white/44 dark:hover:bg-accent dark:hover:text-white dark:focus-visible:ring-white/12"
@@ -1441,11 +1396,11 @@ export function ProjectSidebar() {
                   <div
                     key={artifact.id}
                     className={[
-                      "group flex h-10 items-center gap-2 whitespace-nowrap rounded-lg pl-2 pr-1 text-[14px] font-medium text-black/80 transition-colors dark:text-white/82",
+                      'group flex h-10 items-center gap-2 whitespace-nowrap rounded-lg pl-2 pr-1 text-[14px] font-medium text-black/80 transition-colors dark:text-white/82',
                       openArtifactMenuId === artifact.id || artifactId === artifact.id
-                        ? "bg-accent"
-                        : "hover:bg-accent",
-                    ].join(" ")}
+                        ? 'bg-accent'
+                        : 'hover:bg-accent',
+                    ].join(' ')}
                     onClick={() => router.push(`/${projectId}/${artifact.id}`)}
                   >
                     <HugeiconsIcon
@@ -1497,7 +1452,7 @@ export function ProjectSidebar() {
                     disabled={!createName.trim() || createArtifact.isPending}
                     className="inline-flex h-10 items-center justify-center rounded-xl bg-[#FF6363] px-4 text-sm font-medium text-white transition-opacity hover:opacity-92 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {createArtifact.isPending ? "Creating..." : "Create"}
+                    {createArtifact.isPending ? 'Creating...' : 'Create'}
                   </button>
                 </>
               }
@@ -1507,7 +1462,7 @@ export function ProjectSidebar() {
                 value={createName}
                 onChange={(event) => setCreateName(event.target.value)}
                 onKeyDown={(event) => {
-                  if (event.key === "Enter") {
+                  if (event.key === 'Enter') {
                     event.preventDefault();
                     void handleCreateArtifact();
                   }

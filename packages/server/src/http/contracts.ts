@@ -1,23 +1,15 @@
 import type {
-  ArtifactDirMetadata,
-  ArtifactCheckpoint,
-  ArtifactCheckpointDiffFile,
-  ProjectMetadata,
-  SessionMessageNode,
-  SessionMetadata,
-  SessionSummary,
-  TerminalMetadata,
-  TerminalSummary,
-} from '../types/index.js';
-import type {
   ArtifactDirDto,
+  ArtifactInstalledSkillDto,
   ArtifactCheckpointDto,
   ArtifactCheckpointDiffFileDto,
   ArtifactCheckpointDiffResponse,
   ArtifactCheckpointListResponse,
   ArtifactDirOverviewDto,
+  DeleteArtifactSkillResponse,
   LiveRunSummaryDto,
   ProjectDto,
+  RegisteredSkillDto,
   SessionMetadataDto,
   SessionSummaryDto,
   SessionTreeResponse,
@@ -25,6 +17,19 @@ import type {
   TerminalSummaryDto,
 } from '../contracts/index.js';
 import type { LiveRunSummary } from '../core/session/run-registry.js';
+import type {
+  ArtifactDirMetadata,
+  ArtifactInstalledSkill,
+  ArtifactCheckpoint,
+  ArtifactCheckpointDiffFile,
+  ProjectMetadata,
+  RegisteredSkill,
+  SessionMessageNode,
+  SessionMetadata,
+  SessionSummary,
+  TerminalMetadata,
+  TerminalSummary,
+} from '../types/index.js';
 
 export function toProjectDto(project: ProjectMetadata): ProjectDto {
   return {
@@ -46,18 +51,40 @@ export function toArtifactDirDto(artifactDir: ArtifactDirMetadata): ArtifactDirD
   };
 }
 
+export function toRegisteredSkillDto(skill: RegisteredSkill): RegisteredSkillDto {
+  return {
+    name: skill.name,
+    link: skill.link,
+    description: skill.description,
+  };
+}
+
+export function toArtifactInstalledSkillDto(
+  skill: ArtifactInstalledSkill
+): ArtifactInstalledSkillDto {
+  return {
+    ...toRegisteredSkillDto(skill),
+    path: skill.path,
+  };
+}
+
+export function toDeleteArtifactSkillResponse(skillName: string): DeleteArtifactSkillResponse {
+  return {
+    deleted: true,
+    skillName,
+  };
+}
+
 export function toArtifactCheckpointDto(checkpoint: ArtifactCheckpoint): ArtifactCheckpointDto {
   return checkpoint;
 }
 
-export function toArtifactCheckpointListResponse(
-  result: {
-    hasRepository: boolean;
-    dirty: boolean;
-    headCommitHash: string | null;
-    checkpoints: ArtifactCheckpoint[];
-  }
-): ArtifactCheckpointListResponse {
+export function toArtifactCheckpointListResponse(result: {
+  hasRepository: boolean;
+  dirty: boolean;
+  headCommitHash: string | null;
+  checkpoints: ArtifactCheckpoint[];
+}): ArtifactCheckpointListResponse {
   return {
     hasRepository: result.hasRepository,
     dirty: result.dirty,
@@ -72,14 +99,12 @@ export function toArtifactCheckpointDiffFileDto(
   return file;
 }
 
-export function toArtifactCheckpointDiffResponse(
-  result: {
-    hasRepository: boolean;
-    headCommitHash: string | null;
-    dirty: boolean;
-    files: ArtifactCheckpointDiffFile[];
-  }
-): ArtifactCheckpointDiffResponse {
+export function toArtifactCheckpointDiffResponse(result: {
+  hasRepository: boolean;
+  headCommitHash: string | null;
+  dirty: boolean;
+  files: ArtifactCheckpointDiffFile[];
+}): ArtifactCheckpointDiffResponse {
   return {
     hasRepository: result.hasRepository,
     headCommitHash: result.headCommitHash,

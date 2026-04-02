@@ -4,21 +4,29 @@ import { dirname, join } from 'node:path';
 
 import { createAllTools, createSystemPrompt } from '@ank1015/llm-agents';
 import { agent, getText, llm, userMessage } from '@ank1015/llm-sdk';
-import {
-  createSession as createSdkSession,
-  readSession,
-} from '@ank1015/llm-sdk/session';
+import { createSession as createSdkSession, readSession } from '@ank1015/llm-sdk/session';
 
 import { ArtifactDir } from '../artifact-dir/artifact-dir.js';
 import { getConfig } from '../config.js';
 import { Project } from '../project/project.js';
 import { ensureDir, pathExists } from '../storage/fs.js';
+
+import { persistCompletedTurnCompaction } from './compaction.js';
+import { createSessionContextReframingLoader } from './context-reframing.js';
 import {
   buildPromptUserMessage,
   cloneUserMessage,
   rewriteUserMessageVisibleText,
 } from './user-message.js';
 
+import type {
+  CreateSessionOptions,
+  PromptInput,
+  SessionHeaderMetadata,
+  SessionMessageNode,
+  SessionMetadata,
+  SessionSummary,
+} from '../../types/index.js';
 import type {
   AgentEvent,
   AgentResult,
@@ -36,14 +44,6 @@ import type {
   SessionNode as StoredSessionNode,
   SessionNodeSaver,
 } from '@ank1015/llm-sdk/session';
-import type {
-  CreateSessionOptions,
-  PromptInput,
-  SessionHeaderMetadata,
-  SessionMessageNode,
-  SessionMetadata,
-  SessionSummary,
-} from '../../types/index.js';
 
 type SessionExecutionConfig = {
   modelId: CuratedModelId;
@@ -192,7 +192,7 @@ function parseHeaderMetadata(
       ? (modelId as CuratedModelId)
       : legacyModelId
         ? (legacyModelId as CuratedModelId)
-        : fallbackModelId ?? null;
+        : (fallbackModelId ?? null);
 
   if (!resolvedModelId) {
     throw new Error(`Session "${header.id}" is missing required header metadata "modelId"`);
@@ -205,7 +205,7 @@ function parseHeaderMetadata(
         ? metadata['activeBranch']
         : getLegacyString(headerRecord, 'branch')
           ? (getLegacyString(headerRecord, 'branch') as string)
-        : DEFAULT_ACTIVE_BRANCH,
+          : DEFAULT_ACTIVE_BRANCH,
   };
 }
 
@@ -345,7 +345,10 @@ export class Session {
     const summaries = await Promise.all(
       sessionPaths.map(async (sessionPath): Promise<SessionSummary | null> => {
         try {
-          const [session, fileStats] = await Promise.all([readSession(sessionPath), stat(sessionPath)]);
+          const [session, fileStats] = await Promise.all([
+            readSession(sessionPath),
+            stat(sessionPath),
+          ]);
           if (!session) {
             return null;
           }
@@ -405,7 +408,9 @@ export class Session {
         system:
           "You are a conversation naming assistant. Given the user's first message, generate a short, descriptive topic name (2-6 words) for the conversation. Reply with ONLY the topic name, nothing else. No quotes, no punctuation at the end, no explanation.",
       });
-      const generatedName = getText(response).trim().replace(/^["']|["']$/g, '');
+      const generatedName = getText(response)
+        .trim()
+        .replace(/^["']|["']$/g, '');
       const nextName = generatedName || fallbackGeneratedName(query);
 
       await this.updateName(nextName);
@@ -564,6 +569,7 @@ export class Session {
         path: this.sessionPath,
         branch: input.branch,
         headId: input.headId,
+        loadMessages: this.createContextReframingLoader(input.execution.modelId),
         saveNode: this.createSessionNodeSaver({
           branch: input.branch,
           modelId: input.execution.modelId,
@@ -579,11 +585,40 @@ export class Session {
       ? await this.collectStreamedRun(run, input.options.onEvent)
       : await run;
 
+    this.scheduleCompletedTurnCompaction(input.branch, [input.userMessage, ...result.newMessages]);
+
     if (!result.ok && result.error.phase !== 'aborted') {
       throw new Error(result.error.message);
     }
 
     return result.newMessages;
+  }
+
+  private scheduleCompletedTurnCompaction(branchName: string, turnMessages: Message[]): void {
+    void persistCompletedTurnCompaction({
+      projectId: this.projectId,
+      artifactDirId: this.artifactDirId,
+      sessionId: this.sessionId,
+      branchName,
+      turnMessages,
+    }).catch((error: unknown) => {
+      console.error('[session-compaction] Failed to persist completed turn compaction', {
+        projectId: this.projectId,
+        artifactDirId: this.artifactDirId,
+        sessionId: this.sessionId,
+        branchName,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+  }
+
+  private createContextReframingLoader(modelId: CuratedModelId) {
+    return createSessionContextReframingLoader({
+      projectId: this.projectId,
+      artifactDirId: this.artifactDirId,
+      sessionId: this.sessionId,
+      modelId,
+    });
   }
 
   private createSessionNodeSaver(config: SessionNodeSaverConfig): SessionNodeSaver {

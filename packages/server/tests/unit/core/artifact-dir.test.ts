@@ -47,6 +47,36 @@ describe('ArtifactDir', () => {
       description: 'Research findings',
     });
     expect(metadata.createdAt).toBeTruthy();
+
+    expect(await pathExists(join(artifact.dirPath, '.max'))).toBe(true);
+    expect(await pathExists(join(artifact.dirPath, '.max', 'skills'))).toBe(true);
+    expect(await pathExists(join(artifact.dirPath, '.max', 'temp', 'scripts'))).toBe(true);
+    expect(await pathExists(join(artifact.dirPath, '.max', 'temp', 'package.json'))).toBe(true);
+    expect(await pathExists(join(artifact.dirPath, '.max', 'temp', 'tsconfig.json'))).toBe(true);
+    expect(
+      await pathExists(
+        join(artifact.dirPath, '.max', 'temp', 'node_modules', '@ank1015', 'llm-agents')
+      )
+    ).toBe(true);
+    expect(await pathExists(join(artifact.dirPath, '.max', 'temp', 'node_modules', 'tsx'))).toBe(
+      true
+    );
+    expect(
+      await pathExists(join(artifact.dirPath, '.max', 'temp', 'node_modules', '.bin', 'tsx'))
+    ).toBe(true);
+
+    const tempPackage = JSON.parse(
+      (await artifact.readArtifactFile('.max/temp/package.json')).content
+    ) as {
+      private?: boolean;
+      type?: string;
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+    expect(tempPackage.private).toBe(true);
+    expect(tempPackage.type).toBe('module');
+    expect(tempPackage.dependencies?.['@ank1015/llm-agents']).toBeTruthy();
+    expect(tempPackage.devDependencies?.tsx).toBeTruthy();
   });
 
   it('lists, loads, renames, and deletes artifact directories', async () => {
@@ -88,6 +118,7 @@ describe('ArtifactDir', () => {
     expect(explorer).toMatchObject({
       path: '',
       entries: [
+        expect.objectContaining({ name: '.max', type: 'directory' }),
         expect.objectContaining({ name: 'notes', type: 'directory' }),
         expect.objectContaining({ name: 'report.md', type: 'file' }),
       ],

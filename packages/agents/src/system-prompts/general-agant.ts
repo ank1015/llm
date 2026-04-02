@@ -1,8 +1,11 @@
-import { join, resolve } from 'node:path';
 import { existsSync, readFileSync } from 'fs';
-import { createArtifactSkillWorkspaceLayout, listInstalledSkillsInLayout, SkillHelperProjectConfig, SkillRegistryEntry, WorkspaceInstalledSkillEntry } from './skill.js';
+import { readdir } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { getRegisteredSkill, type RegisteredSkillEntry } from '../skills/registry.js';
+
+import { createArtifactSkillWorkspaceLayout } from './skill.js';
 
 export interface CreateSystemPromptOptions {
   projectName: string;
@@ -25,7 +28,6 @@ ${content}
 </${name}>`;
 }
 
-
 export async function createSystemPrompt({
   projectName,
   projectDir,
@@ -40,7 +42,6 @@ export async function createSystemPrompt({
   agent_state,
   current_date,
 }: CreateSystemPromptOptions): Promise<string> {
-
   const now = new Date();
   const artifactMaxDir = join(artifactDir, '.max');
   const artifactSkillsDir = join(artifactMaxDir, 'skills');
@@ -54,16 +55,16 @@ export async function createSystemPrompt({
   const soul = readFileSync(SOUL_PATH, 'utf-8');
   const availableSkills = await formatInstalledSkills(artifactDir);
 
-
   const identitySection =
-    identity ?? `You are Max. Max is an intelligent assistant. Max is an expert generalist and helps the user with all sorts of tasks. Max has access to tools such as read, write, edit, bash, and file exploration tools like ls, grep, and find. Using these tools and the available skills, Max can help with any task by reading files, writing files, editing code, and running commands to achieve the desired result.
+    identity ??
+    `You are Max. Max is an intelligent assistant. Max is an expert generalist and helps the user with all sorts of tasks. Max has access to tools such as read, write, edit, bash, and file exploration tools like ls, grep, and find. Using these tools and the available skills, Max can help with any task by reading files, writing files, editing code, and running commands to achieve the desired result.
 
 ## MAX SOUL
 ${soul}
-    `
+    `;
 
-  const toolsSection = 
-    tools ?? 
+  const toolsSection =
+    tools ??
     `- read: Read file contents
 - bash: Execute bash commands
 - edit: Make precise edits to files by replacing exact text
@@ -83,9 +84,9 @@ ${soul}
 - Max should be concise in responses.
 - Max should show file paths clearly when working with files.`;
 
-  const skillsSection = 
+  const skillsSection =
     skills ??
-        `- Max is a generalist and can help with any kind of task. Skills help Max perform specialized tasks in the way the user expects.
+    `- Max is a generalist and can help with any kind of task. Skills help Max perform specialized tasks in the way the user expects.
 - A skill is an artifact-local folder containing a SKILL.md plus optional scripts, references, or assets.
 - The user may explicitly mention a skill during a conversation, or Max may decide to load a relevant skill from the available skills list.
 - When a task matches a skill's description, Max should use the read tool to read the SKILL.md at the listed path before proceeding.
@@ -146,9 +147,6 @@ ${currentDateSection}
 `;
 
   return prompt;
-
-
-
 }
 
 async function formatInstalledSkills(artifactDir: string): Promise<string> {
@@ -168,40 +166,59 @@ async function formatInstalledSkills(artifactDir: string): Promise<string> {
     .join('\n');
 }
 
-export interface InstalledSkillEntry extends SkillRegistryEntry {
+export interface InstalledSkillEntry extends Pick<
+  RegisteredSkillEntry,
+  'name' | 'link' | 'description'
+> {
   artifactDir: string;
   maxDir: string;
   skillsDir: string;
   tempDir: string;
   directory: string;
-  helperProject?: SkillHelperProjectConfig;
+  path: string;
 }
 
 export async function listInstalledSkills(artifactDir: string): Promise<InstalledSkillEntry[]> {
   const resolvedArtifactDir = resolve(artifactDir);
   const layout = createArtifactSkillWorkspaceLayout(resolvedArtifactDir);
-  const installedSkills = await listInstalledSkillsInLayout(layout);
-  return installedSkills.map((skill) =>
-    toPublicInstalledSkill(layout.rootDir, layout.stateDir, skill)
-  );
-}
+  if (!existsSync(layout.skillsDir)) {
+    return [];
+  }
 
-function toPublicInstalledSkill(
-  artifactDir: string,
-  maxDir: string,
-  skill: WorkspaceInstalledSkillEntry
-): InstalledSkillEntry {
-  return {
-    name: skill.name,
-    description: skill.description,
-    path: skill.path,
-    artifactDir,
-    maxDir,
-    skillsDir: skill.skillsDir,
-    tempDir: skill.tempDir,
-    directory: skill.directory,
-    ...(skill.helperProject ? { helperProject: skill.helperProject } : {}),
-  };
+  const entries = await readdir(layout.skillsDir, { withFileTypes: true });
+  const installedSkills: InstalledSkillEntry[] = [];
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+
+    const registeredSkill = await getRegisteredSkill(entry.name);
+    if (!registeredSkill) {
+      continue;
+    }
+
+    const directory = join(layout.skillsDir, entry.name);
+    const skillPath = join(directory, 'SKILL.md');
+    if (!existsSync(skillPath)) {
+      continue;
+    }
+
+    installedSkills.push({
+      name: registeredSkill.name,
+      link: registeredSkill.link,
+      description: registeredSkill.description,
+      path: skillPath,
+      artifactDir: layout.rootDir,
+      maxDir: layout.stateDir,
+      skillsDir: layout.skillsDir,
+      tempDir: layout.tempDir,
+      directory,
+    });
+  }
+
+  installedSkills.sort((left, right) => left.name.localeCompare(right.name));
+  return installedSkills;
 }
 function resolveSoulPath(): string {
   const siblingPath = fileURLToPath(new URL('./SOUL.md', import.meta.url));

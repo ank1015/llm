@@ -6,7 +6,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createApp } from '../../../src/app.js';
 import { resetSessionRunRegistry } from '../../../src/core/session/run-registry.js';
-import { createTempServerConfig, jsonRequest, readSseEvents } from '../../helpers/server-fixture.js';
+import {
+  createTempServerConfig,
+  jsonRequest,
+  readSseEvents,
+} from '../../helpers/server-fixture.js';
 
 import type { Api } from '@ank1015/llm-core';
 import type { AgentResult, AgentRun, CuratedModelId, Message } from '@ank1015/llm-sdk';
@@ -16,12 +20,16 @@ const {
   mockCreateAllTools,
   mockCreateCheckpointSummaryPrompt,
   mockCreateSystemPrompt,
+  mockGetRegisteredSkill,
+  mockListRegisteredSkills,
   mockAgent,
   mockLlm,
 } = vi.hoisted(() => ({
   mockCreateAllTools: vi.fn(),
   mockCreateCheckpointSummaryPrompt: vi.fn(),
   mockCreateSystemPrompt: vi.fn(),
+  mockGetRegisteredSkill: vi.fn(),
+  mockListRegisteredSkills: vi.fn(),
   mockAgent: vi.fn(),
   mockLlm: vi.fn(),
 }));
@@ -30,6 +38,8 @@ vi.mock('@ank1015/llm-agents', () => ({
   createAllTools: mockCreateAllTools,
   createCheckpointSummaryPrompt: mockCreateCheckpointSummaryPrompt,
   createSystemPrompt: mockCreateSystemPrompt,
+  getRegisteredSkill: mockGetRegisteredSkill,
+  listRegisteredSkills: mockListRegisteredSkills,
 }));
 
 vi.mock('@ank1015/llm-sdk', async (importOriginal) => {
@@ -111,6 +121,7 @@ function createMockAgentRun(sessionPath: string, resultPromise: Promise<AgentRes
     sessionPath,
     async *[Symbol.asyncIterator]() {
       await resultPromise;
+      yield* [];
     },
     drain: () => resultPromise,
     then: resultPromise.then.bind(resultPromise),
@@ -300,7 +311,9 @@ describe('mounted app session routes', () => {
       expect.arrayContaining(['ready', 'node_persisted', 'done'])
     );
 
-    mockLlm.mockResolvedValue(buildAssistantMessage('Mounted Generated Name', 'codex/gpt-5.4-mini'));
+    mockLlm.mockResolvedValue(
+      buildAssistantMessage('Mounted Generated Name', 'codex/gpt-5.4-mini')
+    );
 
     const renameResponse = await jsonRequest(
       app,

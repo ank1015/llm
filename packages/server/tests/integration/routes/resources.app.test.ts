@@ -1,13 +1,17 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createApp } from '../../../src/app.js';
-import { Session } from '../../../src/core/session/session.js';
 import { ArtifactDir } from '../../../src/core/artifact-dir/artifact-dir.js';
+import { Session } from '../../../src/core/session/session.js';
 import { resetTerminalRegistry } from '../../../src/core/terminal/terminal-registry.js';
 import { createFakePtyFactory } from '../../helpers/fake-pty.js';
+import {
+  createFetchResponse,
+  createGitHubSkillArchive,
+} from '../../helpers/github-skill-archive.js';
 import { createTempServerConfig, jsonRequest } from '../../helpers/server-fixture.js';
 
 let cleanup: (() => Promise<void>) | null = null;
@@ -23,6 +27,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  vi.unstubAllGlobals();
   await cleanup?.();
   cleanup = null;
 });
@@ -52,7 +57,11 @@ describe('mounted app resource routes', () => {
 
     const artifactDir = await ArtifactDir.getById('project-alpha', 'research');
     await mkdir(join(artifactDir.dirPath, 'notes'), { recursive: true });
-    await writeFile(join(artifactDir.dirPath, 'notes', 'todo.txt'), 'ship mounted app tests', 'utf8');
+    await writeFile(
+      join(artifactDir.dirPath, 'notes', 'todo.txt'),
+      'ship mounted app tests',
+      'utf8'
+    );
 
     const overviewResponse = await app.request('/api/projects/project-alpha/overview');
     expect(overviewResponse.status).toBe(200);
@@ -69,7 +78,9 @@ describe('mounted app resource routes', () => {
       ],
     });
 
-    const fileIndexResponse = await app.request('/api/projects/project-alpha/file-index?query=todo');
+    const fileIndexResponse = await app.request(
+      '/api/projects/project-alpha/file-index?query=todo'
+    );
     expect(fileIndexResponse.status).toBe(200);
     expect(await fileIndexResponse.json()).toMatchObject({
       projectId: 'project-alpha',
@@ -112,7 +123,9 @@ describe('mounted app resource routes', () => {
     await jsonRequest(app, '/api/projects/terminal-project/artifacts', 'POST', { name: 'Shell' });
     await jsonRequest(app, '/api/projects/terminal-project/artifacts/shell/terminals', 'POST', {});
 
-    const listResponse = await app.request('/api/projects/terminal-project/artifacts/shell/terminals');
+    const listResponse = await app.request(
+      '/api/projects/terminal-project/artifacts/shell/terminals'
+    );
     expect(listResponse.status).toBe(200);
     expect(await listResponse.json()).toEqual([
       expect.objectContaining({
@@ -120,6 +133,49 @@ describe('mounted app resource routes', () => {
         status: 'running',
         projectId: 'terminal-project',
         artifactId: 'shell',
+      }),
+    ]);
+  });
+
+  it('serves registry skills and installs artifact skills through /api', async () => {
+    const archive = await createGitHubSkillArchive();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => createFetchResponse(archive))
+    );
+
+    await jsonRequest(app, '/api/projects', 'POST', { name: 'Skills Project' });
+    await jsonRequest(app, '/api/projects/skills-project/artifacts', 'POST', { name: 'Docs' });
+
+    const availableResponse = await app.request('/api/skills');
+    expect(availableResponse.status).toBe(200);
+    expect(await availableResponse.json()).toEqual([
+      expect.objectContaining({
+        name: 'pdf',
+        link: 'https://github.com/anthropics/skills/tree/main/skills/pdf',
+      }),
+    ]);
+
+    const installResponse = await jsonRequest(
+      app,
+      '/api/projects/skills-project/artifacts/docs/skills',
+      'POST',
+      { skillName: 'pdf' }
+    );
+    expect(installResponse.status).toBe(200);
+    expect(await installResponse.json()).toMatchObject({
+      name: 'pdf',
+      path: '.max/skills/pdf/SKILL.md',
+    });
+
+    const installedResponse = await app.request(
+      '/api/projects/skills-project/artifacts/docs/skills'
+    );
+    expect(installedResponse.status).toBe(200);
+    expect(await installedResponse.json()).toEqual([
+      expect.objectContaining({
+        name: 'pdf',
+        path: '.max/skills/pdf/SKILL.md',
       }),
     ]);
   });
