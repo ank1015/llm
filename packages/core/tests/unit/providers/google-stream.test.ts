@@ -2,8 +2,8 @@ import { ApiError } from '@google/genai';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { streamGoogle } from '../../../src/providers/google/stream.js';
-import { AssistantStreamError } from '../../../src/utils/event-stream.js';
 import * as googleProviderUtils from '../../../src/providers/google/utils.js';
+import { AssistantStreamError } from '../../../src/utils/event-stream.js';
 
 import type { Context, GoogleProviderOptions, Model } from '../../../src/types/index.js';
 
@@ -37,7 +37,21 @@ describe('Google stream errors', () => {
     vi.restoreAllMocks();
   });
 
-  function mockGoogleClient(factory: () => Promise<AsyncIterable<unknown>> | AsyncIterable<unknown>) {
+  function createThrowingAsyncIterable(error: unknown): AsyncIterable<never> {
+    return {
+      [Symbol.asyncIterator]() {
+        return {
+          async next() {
+            throw error;
+          },
+        };
+      },
+    };
+  }
+
+  function mockGoogleClient(
+    factory: () => Promise<AsyncIterable<unknown>> | AsyncIterable<unknown>
+  ) {
     vi.spyOn(googleProviderUtils, 'createClient').mockReturnValue({
       models: {
         generateContentStream: vi.fn(async () => factory()),
@@ -46,14 +60,14 @@ describe('Google stream errors', () => {
   }
 
   it('marks retryable Gemini backend errors on the result', async () => {
-    mockGoogleClient(() => ({
-      async *[Symbol.asyncIterator]() {
-        throw new ApiError({
+    mockGoogleClient(() =>
+      createThrowingAsyncIterable(
+        new ApiError({
           status: 503,
           message: 'The service may be temporarily overloaded or down.',
-        });
-      },
-    }));
+        })
+      )
+    );
 
     const stream = streamGoogle(model, context, options, 'test-msg-1');
 
@@ -71,15 +85,15 @@ describe('Google stream errors', () => {
   });
 
   it('marks billing and precondition errors as non-retryable on drain()', async () => {
-    mockGoogleClient(() => ({
-      async *[Symbol.asyncIterator]() {
-        throw new ApiError({
+    mockGoogleClient(() =>
+      createThrowingAsyncIterable(
+        new ApiError({
           status: 400,
           message:
             'Gemini API free tier is not available in your country. Please enable billing on your project in Google AI Studio.',
-        });
-      },
-    }));
+        })
+      )
+    );
 
     const stream = streamGoogle(model, context, options, 'test-msg-2');
 

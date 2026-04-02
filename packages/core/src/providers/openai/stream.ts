@@ -6,7 +6,6 @@ import { getOpenAIErrorDetails } from '../utils/chat-errors.js';
 
 import { buildParams, createClient, getMockOpenaiMessage, mapStopReason } from './utils.js';
 
-import type { StreamFunction } from '../../utils/types.js';
 import type {
   AssistantResponseContent,
   AssistantThinkingContent,
@@ -17,6 +16,7 @@ import type {
   OpenAIProviderOptions,
   TextContent,
 } from '../../types/index.js';
+import type { StreamFunction } from '../../utils/types.js';
 import type {
   Response,
   ResponseCreateParamsStreaming,
@@ -24,7 +24,6 @@ import type {
   ResponseOutputMessage,
   ResponseReasoningItem,
 } from 'openai/resources/responses/responses.js';
-
 
 export const streamOpenAI: StreamFunction<'openai'> = (
   model: Model<'openai'>,
@@ -76,7 +75,10 @@ export const streamOpenAI: StreamFunction<'openai'> = (
       }
       output.usage.cost = calculateCost(model, output.usage);
       output.stopReason = mapStopReason(response.status);
-      if (output.content.some((block) => block.type === 'toolCall') && output.stopReason === 'stop') {
+      if (
+        output.content.some((block) => block.type === 'toolCall') &&
+        output.stopReason === 'stop'
+      ) {
         output.stopReason = 'toolUse';
       }
     };

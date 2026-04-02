@@ -111,11 +111,10 @@ const NON_RETRYABLE_TYPES = new Set([
   'invalid_request_error',
 ]);
 
-const RETRYABLE_CODES = new Set([
-  'rate_limit_exceeded',
-  'websocket_connection_limit_reached',
-]);
+const RETRYABLE_CODES = new Set(['rate_limit_exceeded', 'websocket_connection_limit_reached']);
 
+// Codex error retryability depends on status, typed SDK errors, and response metadata.
+// eslint-disable-next-line sonarjs/cognitive-complexity
 export function canRetryCodexError(error: unknown): boolean {
   if (error instanceof APIUserAbortError) {
     return false;
@@ -136,10 +135,7 @@ export function canRetryCodexError(error: unknown): boolean {
     }
 
     if (status === 429) {
-      if (
-        (code && NON_RETRYABLE_CODES.has(code)) ||
-        (type && NON_RETRYABLE_TYPES.has(type))
-      ) {
+      if ((code && NON_RETRYABLE_CODES.has(code)) || (type && NON_RETRYABLE_TYPES.has(type))) {
         return false;
       }
 
@@ -153,10 +149,7 @@ export function canRetryCodexError(error: unknown): boolean {
     return false;
   }
 
-  if (
-    (code && NON_RETRYABLE_CODES.has(code)) ||
-    (type && NON_RETRYABLE_TYPES.has(type))
-  ) {
+  if ((code && NON_RETRYABLE_CODES.has(code)) || (type && NON_RETRYABLE_TYPES.has(type))) {
     return false;
   }
 

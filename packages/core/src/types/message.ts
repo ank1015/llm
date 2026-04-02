@@ -6,7 +6,7 @@
  */
 
 import type { Api } from './api.js';
-import type { Content, ImageContent } from './content.js';
+import type { Content } from './content.js';
 import type { Model } from './model.js';
 import type { NativeResponseForApi } from './providers/index.js';
 

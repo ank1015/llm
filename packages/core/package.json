@@ -13,6 +13,7 @@
   },
   "files": [
     "dist",
+    "docs",
     "README.md",
     "CHANGELOG.md",
     "LICENSE"
@@ -26,12 +27,14 @@
     "test:coverage": "vitest run tests/unit --coverage",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src tests scripts vitest.config.ts vitest.setup.ts",
+    "lint": "eslint src tests vitest.config.ts vitest.setup.ts",
+    "release:check": "pnpm run build && pnpm run typecheck && pnpm run lint && pnpm run test:unit && pnpm run test:coverage",
     "clean": "node ../../scripts/remove-paths.mjs dist coverage --tsbuildinfo",
-    "prepack": "pnpm run build",
+    "prepack": "pnpm run release:check",
     "prepublishOnly": "node ../../scripts/ensure-pnpm-publish.mjs"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^2.1.0",
     "vitest": "^2.1.0"
   },
   "keywords": [

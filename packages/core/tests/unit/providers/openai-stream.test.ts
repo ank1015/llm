@@ -3,8 +3,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { streamOpenAI } from '../../../src/providers/openai/stream.js';
 import { getMockOpenaiMessage } from '../../../src/providers/openai/utils.js';
-import { AssistantStreamError } from '../../../src/utils/event-stream.js';
 import * as openaiProviderUtils from '../../../src/providers/openai/utils.js';
+import { AssistantStreamError } from '../../../src/utils/event-stream.js';
 
 import type { Context, Model, OpenAIProviderOptions } from '../../../src/types/index.js';
 
@@ -38,7 +38,9 @@ describe('OpenAI Responses stream errors', () => {
     vi.restoreAllMocks();
   });
 
-  function mockResponsesClient(factory: () => Promise<AsyncIterable<unknown>> | AsyncIterable<unknown>) {
+  function mockResponsesClient(
+    factory: () => Promise<AsyncIterable<unknown>> | AsyncIterable<unknown>
+  ) {
     vi.spyOn(openaiProviderUtils, 'createClient').mockReturnValue({
       responses: {
         create: vi.fn(async () => factory()),
@@ -86,8 +88,7 @@ describe('OpenAI Responses stream errors', () => {
       {
         type: 'insufficient_quota',
         code: 'insufficient_quota',
-        message:
-          'You exceeded your current quota, please check your plan and billing details',
+        message: 'You exceeded your current quota, please check your plan and billing details',
       },
       undefined,
       new Headers({ 'x-request-id': 'req_test_123' })

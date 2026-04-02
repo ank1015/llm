@@ -11,12 +11,7 @@ import {
   stepAgent,
 } from '../../../src/agent/index.js';
 import { getModel } from '../../../src/models/index.js';
-
-import {
-  describeIfAvailable,
-  getAssistantText,
-  getIntegrationEnv,
-} from '../helpers/live.js';
+import { describeIfAvailable, getAssistantText, getIntegrationEnv } from '../helpers/live.js';
 
 import type {
   AgentEngineConfig,
@@ -82,8 +77,7 @@ describeIfGoogle('Google Agent Integration', () => {
             hookOrder.push('prepareContext');
             return {
               ...context,
-              systemPrompt:
-                'Reply with exactly CONTEXT_HOOK_OK. Do not add any other words.',
+              systemPrompt: 'Reply with exactly CONTEXT_HOOK_OK. Do not add any other words.',
             };
           },
           beforeModel: ({ attempt }) => {
@@ -133,8 +127,7 @@ describeIfGoogle('Google Agent Integration', () => {
 
     const result = await stepAgent(
       createGoogleConfig({
-        systemPrompt:
-          'If a tool can answer the request, you must call that tool before answering.',
+        systemPrompt: 'If a tool can answer the request, you must call that tool before answering.',
         tools: [tool as any],
       }),
       createState([
@@ -185,8 +178,7 @@ describeIfGoogle('Google Agent Integration', () => {
 
     const result = await adapter.step(
       createGoogleConfig({
-        systemPrompt:
-          'If a tool can answer the request, you must call that tool before answering.',
+        systemPrompt: 'If a tool can answer the request, you must call that tool before answering.',
         tools: [tool as any],
       }),
       createState([
@@ -210,14 +202,10 @@ describeIfGoogle('Google Agent Integration', () => {
     expect(eventTypes).toContain('tool_execution_update');
     expect(eventTypes).toContain('tool_execution_end');
     expect(
-      events.some(
-        (event) => event.type === 'message_start' && event.messageType === 'toolResult'
-      )
+      events.some((event) => event.type === 'message_start' && event.messageType === 'toolResult')
     ).toBe(true);
     expect(
-      events.some(
-        (event) => event.type === 'message_end' && event.messageType === 'toolResult'
-      )
+      events.some((event) => event.type === 'message_end' && event.messageType === 'toolResult')
     ).toBe(true);
   }, 45000);
 
@@ -272,7 +260,9 @@ describeIfGoogle('Google Agent Integration', () => {
     const result = await adapter.step(
       createGoogleConfig(),
       createState([
-        buildUserMessage('Tell me a very long story about interstellar exploration and keep going.'),
+        buildUserMessage(
+          'Tell me a very long story about interstellar exploration and keep going.'
+        ),
       ]),
       {
         signal: controller.signal,

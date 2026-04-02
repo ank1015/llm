@@ -4,8 +4,8 @@ import { fileURLToPath } from 'node:url';
 
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { streamOpenAI } from '../../../src/providers/openai/index.js';
 import { getModel } from '../../../src/models/index.js';
+import { streamOpenAI } from '../../../src/providers/openai/index.js';
 import { describeIfAvailable, getIntegrationEnv } from '../helpers/live.js';
 
 import type { BaseAssistantMessage, Context, Model } from '../../../src/types/index.js';
@@ -144,7 +144,12 @@ describeIfOpenAI('OpenAI File Input Integration', () => {
       ],
     };
 
-    const result = await streamOpenAI(model, context, { apiKey }, 'openai-tool-result-file-msg-1').drain();
+    const result = await streamOpenAI(
+      model,
+      context,
+      { apiKey },
+      'openai-tool-result-file-msg-1'
+    ).drain();
     const responseText = getResponseText(result);
 
     expect(result.stopReason).not.toBe('error');

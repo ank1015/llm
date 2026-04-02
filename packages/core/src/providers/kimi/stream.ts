@@ -7,9 +7,9 @@ import {
 
 import { buildParams } from './utils.js';
 
+import type { Context, KimiProviderOptions, Model } from '../../types/index.js';
 import type { StreamFunction } from '../../utils/types.js';
 import type { ChatStreamConfig } from '../utils/index.js';
-import type { Context, KimiProviderOptions, Model } from '../../types/index.js';
 
 const config: ChatStreamConfig<'kimi'> = {
   mapStopReason: mapChatStopReason,

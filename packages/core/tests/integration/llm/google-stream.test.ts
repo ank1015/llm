@@ -4,7 +4,6 @@ import '../../../src/providers/google/index.js';
 
 import { stream } from '../../../src/llm/stream.js';
 import { getModel } from '../../../src/models/index.js';
-
 import { collectStreamEvents, describeIfAvailable, getIntegrationEnv } from '../helpers/live.js';
 
 import type { BaseAssistantEvent, Context, Model } from '../../../src/types/index.js';

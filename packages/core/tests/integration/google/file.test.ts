@@ -4,8 +4,8 @@ import { fileURLToPath } from 'node:url';
 
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { streamGoogle } from '../../../src/providers/google';
 import { getModel } from '../../../src/models/index.js';
+import { streamGoogle } from '../../../src/providers/google';
 import { describeIfAvailable, getIntegrationEnv } from '../helpers/live.js';
 
 import type { BaseAssistantMessage, Context, Model } from '../../../src/types/index.js';
@@ -144,7 +144,12 @@ describeIfGoogle('Google File Input Integration', () => {
       ],
     };
 
-    const result = await streamGoogle(model, context, { apiKey }, 'google-tool-result-file-msg-1').drain();
+    const result = await streamGoogle(
+      model,
+      context,
+      { apiKey },
+      'google-tool-result-file-msg-1'
+    ).drain();
     const responseText = getResponseText(result);
 
     expect(result.stopReason).not.toBe('error');

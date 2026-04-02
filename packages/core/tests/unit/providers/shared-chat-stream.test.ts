@@ -3,9 +3,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { streamCerebras } from '../../../src/providers/cerebras/stream.js';
 import { streamOpenRouter } from '../../../src/providers/openrouter/stream.js';
+import * as sharedProviderUtils from '../../../src/providers/utils/index.js';
 import { streamZai } from '../../../src/providers/zai/stream.js';
 import { AssistantStreamError } from '../../../src/utils/event-stream.js';
-import * as sharedProviderUtils from '../../../src/providers/utils/index.js';
 
 import type {
   Context,
@@ -50,6 +50,18 @@ describe('Shared chat stream provider errors', () => {
     vi.restoreAllMocks();
   });
 
+  function createThrowingAsyncIterable(error: unknown): AsyncIterable<never> {
+    return {
+      [Symbol.asyncIterator]() {
+        return {
+          async next() {
+            throw error;
+          },
+        };
+      },
+    };
+  }
+
   function mockSharedClient(factory: () => AsyncIterable<unknown>) {
     vi.spyOn(sharedProviderUtils, 'createChatCompletionClient').mockReturnValue({
       chat: {
@@ -62,11 +74,7 @@ describe('Shared chat stream provider errors', () => {
 
   it('surfaces retryable Cerebras timeout errors on the result', async () => {
     const error = new APIConnectionTimeoutError({ message: 'Request timed out.' });
-    mockSharedClient(() => ({
-      async *[Symbol.asyncIterator]() {
-        throw error;
-      },
-    }));
+    mockSharedClient(() => createThrowingAsyncIterable(error));
 
     const stream = streamCerebras(cerebrasModel, context, cerebrasOptions, 'test-msg-1');
 
@@ -94,11 +102,7 @@ describe('Shared chat stream provider errors', () => {
       new Headers({ 'x-request-id': 'req_test_123' })
     );
 
-    mockSharedClient(() => ({
-      async *[Symbol.asyncIterator]() {
-        throw error;
-      },
-    }));
+    mockSharedClient(() => createThrowingAsyncIterable(error));
 
     const stream = streamOpenRouter(openRouterModel, context, openRouterOptions, 'test-msg-2');
 

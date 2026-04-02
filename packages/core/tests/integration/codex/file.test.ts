@@ -4,8 +4,8 @@ import { fileURLToPath } from 'node:url';
 
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { streamCodex } from '../../../src/providers/codex';
 import { getModel } from '../../../src/models/index.js';
+import { streamCodex } from '../../../src/providers/codex';
 import { describeIfAvailable } from '../helpers/live.js';
 
 import type {
@@ -169,7 +169,12 @@ describeIfCodex('Codex File Input Integration', () => {
       ],
     };
 
-    const result = await streamCodex(model, context, getOptions(), 'codex-tool-result-file-msg-1').drain();
+    const result = await streamCodex(
+      model,
+      context,
+      getOptions(),
+      'codex-tool-result-file-msg-1'
+    ).drain();
     const responseText = getResponseText(result);
 
     expect(result.stopReason).not.toBe('error');

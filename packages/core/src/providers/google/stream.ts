@@ -5,7 +5,6 @@ import { validateToolArguments } from '../../utils/validation.js';
 import { getGoogleErrorDetails } from './errors.js';
 import { buildParams, createClient, mapStopReason } from './utils.js';
 
-import type { StreamFunction } from '../../utils/types.js';
 import type {
   AssistantResponseContent,
   AssistantThinkingContent,
@@ -16,6 +15,7 @@ import type {
   Model,
   TextContent,
 } from '../../types/index.js';
+import type { StreamFunction } from '../../utils/types.js';
 import type { GenerateContentResponse, Part } from '@google/genai';
 
 export const streamGoogle: StreamFunction<'google'> = (
