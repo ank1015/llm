@@ -21,7 +21,6 @@ pnpm clean            # Remove build artifacts
 # Development
 pnpm dev:native-app   # Start the Expo native app
 pnpm dev:web-app      # Start the web app
-pnpm agent:cli        # Start the local agents package CLI
 
 # Production
 pnpm start:web-app    # Start the web app
@@ -36,7 +35,7 @@ packages/
   core/               # @ank1015/llm-core - Stateless runtime built on top of types
   sdk/                # @ank1015/llm-sdk - Opinionated wrappers over core
   sdk-adapters/       # @ank1015/llm-sdk-adapters - Node keys/session adapter implementations
-  agents/             # @ank1015/llm-agents - General-purpose agent tools, skills, and helper-backed workflows
+  agents/             # @ank1015/llm-agents - General-purpose agent tools, system prompts, and skill-registry helpers
   extension/          # @ank1015/llm-extension - Chrome RPC bridge
   native-app/         # @ank1015/llm-native-app - Expo mobile client for the server
   web-app/            # @ank1015/llm-web-app - Next.js web client for the server
@@ -60,11 +59,11 @@ Bottom up, these are the currently documented base layers:
 5. `@ank1015/llm-sdk-adapters`
    Concrete Node-oriented adapters used by app/server layers. It currently provides file-system and in-memory implementations for keys and sessions, and no longer owns usage tracking or key-management UI code.
 6. `@ank1015/llm-agents`
-   Node-only general-purpose agent package built on top of the sdk stack. It owns the monorepo's filesystem/shell tool layer, system prompt construction, bundled skill runtime, helper-backed skills like `ai-images`, and the local CLI runner.
+   Node-only general-purpose agent package built on top of the sdk stack. It owns the monorepo's filesystem/shell tool layer, system prompt construction, and the skill-registry helpers used by the server stack.
 7. `@ank1015/llm-extension`
    Independent Chrome RPC package. It provides the Manifest V3 extension, native messaging host, TCP bridge, and Node client used to call Chrome APIs and debugger helpers from local processes.
 8. `@ank1015/llm-server`
-   Node-only Hono orchestration server built on top of the SDK and agents layers. It manages projects, artifact directories, agent sessions, bundled skills, and SSE-backed live session runs over a filesystem-backed workspace model.
+   Node-only Hono orchestration server built on top of the SDK and agents layers. It manages projects, artifact directories, agent sessions, installable skills, and SSE-backed live session runs over a filesystem-backed workspace model.
 9. `@ank1015/llm-web-app`
    Private Next.js web client for the server stack. It consumes `@ank1015/llm-app-contracts` through a local `client-api` layer and provides the projects, artifacts, sessions, and streaming conversation UI.
 10. `@ank1015/llm-native-app`
@@ -95,7 +94,7 @@ More package summaries can be added here as the stack above `types` and `core` i
 - [packages/core/AGENTS.md](packages/core/AGENTS.md) - Stateless runtime layer
 - [packages/sdk/AGENTS.md](packages/sdk/AGENTS.md) - Runtime-neutral SDK wrappers, credential resolution, and session helpers
 - [packages/sdk-adapters/AGENTS.md](packages/sdk-adapters/AGENTS.md) - Concrete Node file-system and in-memory keys/session adapters
-- [packages/agents/AGENTS.md](packages/agents/AGENTS.md) - General-purpose agent tools, bundled skills, helper-backed workflows, and local CLI
+- [packages/agents/AGENTS.md](packages/agents/AGENTS.md) - General-purpose agent tools, system prompts, and skill-registry helpers
 - [packages/extension/AGENTS.md](packages/extension/AGENTS.md) - Chrome RPC bridge, native host, and Node client
 - [packages/native-app/AGENTS.md](packages/native-app/AGENTS.md) - Expo mobile client for projects, artifacts, sessions, and streaming conversation
 - [packages/web-app/AGENTS.md](packages/web-app/AGENTS.md) - Next.js web client for projects, artifacts, sessions, and streaming conversation

@@ -32,7 +32,6 @@ npm-debug.log*
 pnpm-debug.log*
 packages/*/*.tgz
 
-packages/agents/.skill-tester/
 packages/agents/.sessions/
 packages/agents/temp/
 .agents
