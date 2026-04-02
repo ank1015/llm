@@ -18,8 +18,8 @@ import {
   parseGitIgnoreRules,
   shouldIgnoreArtifactIndexPath,
 } from './index-ignore.js';
+import { artifactSkillSyncService } from './skills.js';
 import { ensureArtifactTempWorkspace } from './temp-workspace.js';
-
 
 // import type { AddSkillResult, DeleteSkillResult, InstalledSkillEntry } from '../skills.js';
 import type { IgnoreRule } from './index-ignore.js';
@@ -30,6 +30,7 @@ import type {
   ArtifactExplorerResult,
   ArtifactFileIndexResult,
   ArtifactFileResult,
+  ArtifactInstalledSkill,
   CreateArtifactDirInput,
 } from '../../types/index.js';
 
@@ -440,6 +441,22 @@ export class ArtifactDir {
       newPath: resolvedNext.relativePath,
       type: targetStats.isDirectory() ? 'directory' : 'file',
     };
+  }
+
+  async getInstalledSkills(): Promise<ArtifactInstalledSkill[]> {
+    return artifactSkillSyncService.listInstalledSkills(this.dirPath);
+  }
+
+  async installSkill(skillName: string): Promise<ArtifactInstalledSkill> {
+    return artifactSkillSyncService.installSkill(this.dirPath, skillName);
+  }
+
+  async reloadSkill(skillName: string): Promise<ArtifactInstalledSkill> {
+    return artifactSkillSyncService.reloadSkill(this.dirPath, skillName);
+  }
+
+  async deleteSkill(skillName: string): Promise<void> {
+    return artifactSkillSyncService.deleteSkill(this.dirPath, skillName);
   }
 
   /** Recursively index files and directories in this artifact directory (for mentions/search). */
