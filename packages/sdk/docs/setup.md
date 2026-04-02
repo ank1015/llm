@@ -38,6 +38,7 @@ Use `@ank1015/llm-sdk/keys` to read, write, or seed credentials:
 
 ```ts
 import {
+  getAvailableKeyProviders,
   getProviderCredentialSpec,
   readKeysFile,
   resolveProviderCredentials,
@@ -49,10 +50,11 @@ await setProviderCredentials('/tmp/keys.env', 'openai', {
 });
 
 const values = await readKeysFile('/tmp/keys.env');
+const availableProviders = await getAvailableKeyProviders('/tmp/keys.env');
 const resolved = await resolveProviderCredentials('/tmp/keys.env', 'openai');
 const spec = getProviderCredentialSpec('openai');
 
-console.log(values, resolved, spec);
+console.log(values, availableProviders, resolved, spec);
 ```
 
 Credential fields used by the curated providers:
@@ -67,6 +69,7 @@ Credential fields used by the curated providers:
 
 Notes:
 
+- `getAvailableKeyProviders()` lets callers inspect which providers are configured without reading or returning the secret values themselves.
 - `setProviderCredentials()` writes the canonical env names for the provider.
 - `resolveProviderCredentials()` returns a structured error instead of throwing when the file is missing or required fields are absent.
 - `ANTHROPIC_API_KEYS` and `CHATGPT_ACCOUNT_ID` are still recognized as aliases when resolving existing files.

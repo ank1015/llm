@@ -25,6 +25,7 @@ pnpm --filter @ank1015/llm-sdk release:check
 - `src/session.ts` - JSONL session creation, traversal, and append helpers
 - `src/messages.ts`, `src/response.ts`, `src/tool.ts` - authoring and response utilities
 - `docs/` - package-facing consumer docs
+- `skills/llm-sdk/` - repo-local Codex skill for using this package from other agents
 - `tests/unit/` - local unit coverage for helper behavior
 - `tests/integration/` - live-provider integration coverage
 
@@ -34,3 +35,4 @@ pnpm --filter @ank1015/llm-sdk release:check
 - Treat `README.md`, `docs/`, and `CHANGELOG.md` as part of the public package surface.
 - When adding provider support, update `model-input.ts`, keys-file docs, and tests together.
 - Preserve the documented subpath exports for `config`, `keys`, and `session`; if they change, update the docs in the same change.
+- Keep `skills/llm-sdk/` aligned with the published sdk docs when the developer-facing workflow changes.

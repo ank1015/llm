@@ -4,7 +4,9 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { resetSdkConfig, setSdkConfig } from '../../src/config.js';
 import {
+  getAvailableKeyProviders,
   getProviderCredentialSpec,
   parseKeysFile,
   readKeysFile,
@@ -24,7 +26,10 @@ async function createTempFile(fileName = 'keys.env'): Promise<string> {
 }
 
 afterEach(async () => {
-  await Promise.all(tempDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
+  resetSdkConfig();
+  await Promise.all(
+    tempDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true }))
+  );
 });
 
 describe('keys', () => {
@@ -128,6 +133,38 @@ CODEX_CHATGPT_ACCOUNT_ID=acc=123
           path: filePath,
         },
       });
+    });
+  });
+
+  describe('getAvailableKeyProviders', () => {
+    it('returns only providers with complete credentials', async () => {
+      const filePath = await createTempFile();
+      await writeFile(
+        filePath,
+        [
+          'OPENAI_API_KEY=sk-openai',
+          'CODEX_API_KEY=codex-key',
+          'CODEX_CHATGPT_ACCOUNT_ID=acc-123',
+          'ANTHROPIC_API_KEYS=sk-ant-test',
+          'CLAUDE_CODE_OAUTH_TOKEN=oauth-token',
+        ].join('\n'),
+        'utf8'
+      );
+
+      expect(await getAvailableKeyProviders(filePath)).toEqual(['openai', 'codex', 'anthropic']);
+    });
+
+    it('uses the configured default keys path and returns an empty list when the file is missing', async () => {
+      const filePath = await createTempFile();
+      setSdkConfig({ keysFilePath: filePath });
+
+      expect(await getAvailableKeyProviders()).toEqual([]);
+
+      await setProviderCredentials(filePath, 'google', {
+        apiKey: 'google-key',
+      });
+
+      expect(await getAvailableKeyProviders()).toEqual(['google']);
     });
   });
 
