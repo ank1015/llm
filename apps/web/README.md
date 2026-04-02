@@ -1,36 +1,67 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# @ank1015/llm-web-app
 
-## Getting Started
+Private Next.js client for browsing projects, opening artifacts, streaming sessions, managing keys, and attaching terminals against the local `@ank1015/llm-server` backend.
 
-First, run the development server:
+## Status
+
+This app is workspace-only and is not intended to be published to npm.
+
+It talks to the server backend over HTTP and WebSocket APIs, defaulting to `http://localhost:8001`.
+
+## Commands
+
+From the repo root:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm dev:web-app
+pnpm start:web-app
+pnpm --filter @ank1015/llm-web-app build
+pnpm --filter @ank1015/llm-web-app typecheck
+pnpm --filter @ank1015/llm-web-app lint
+pnpm --filter @ank1015/llm-web-app test
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+From the app directory:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+pnpm --dir apps/web dev
+pnpm --dir apps/web build
+pnpm --dir apps/web typecheck
+pnpm --dir apps/web lint
+pnpm --dir apps/web test
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Environment
 
-## Learn More
+- `NEXT_PUBLIC_LLM_SERVER_BASE_URL` overrides the default backend URL
+- default server URL: `http://localhost:8001`
+- terminal sockets are derived from the same base URL
 
-To learn more about Next.js, take a look at the following resources:
+## What It Contains
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- project browser and archive views
+- project workspace layout with artifact file browsing
+- artifact chat/session UI with SSE streaming
+- terminal panel with WebSocket-backed shells
+- key and model selection flows backed by the server contracts
+- local Zustand stores and React Query hooks for app state
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Module Map
 
-## Deploy on Vercel
+- `src/app/` - App Router entrypoints for the home screen and project-scoped pages
+- `src/components/` - project shell, artifact workspace, chat, terminal, and UI building blocks
+- `src/lib/client-api/` - typed HTTP and WebSocket client layer over `@ank1015/llm-server`
+- `src/hooks/api/` - React Query hooks around the client-api layer
+- `src/stores/` - Zustand stores for sessions, terminals, composer state, and UI state
+- `src/lib/messages/` - chat formatting, mentions, and working-trace helpers
+- `tests/unit/` - unit coverage for client-api helpers, stores, hooks, and major UI components
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Docs
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `docs/architecture.md` - high-level UI and data-flow map
+- `docs/testing.md` - package-local validation commands and test coverage notes
+
+## Notes
+
+- This app is wired into the repo workspace as `@ank1015/llm-web-app`, so the root `dev:web-app` and `start:web-app` scripts target the real package.
+- The current app lint run is green but still emits a few warnings; those are left as-is in this cleanup pass.
