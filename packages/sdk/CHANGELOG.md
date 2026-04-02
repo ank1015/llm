@@ -6,6 +6,8 @@ The format is based on Keep a Changelog and this package follows SemVer once its
 
 ## [Unreleased]
 
+## [0.0.4] - 2026-04-02
+
 ### Added
 
 - Package-level README, package guide, setup notes, and release checklist.
@@ -16,7 +18,12 @@ The format is based on Keep a Changelog and this package follows SemVer once its
 - Hardened `prepack` to run `release:check` before creating a tarball.
 - Added a dedicated `release:check` script for build, typecheck, lint, unit test, and coverage validation.
 - Promoted `@sinclair/typebox` to a runtime dependency so the published `.d.ts` surface resolves cleanly for consumers.
+- Added `@modelcontextprotocol/sdk` so downstream TypeScript installs resolve the Google SDK type graph cleanly.
 - Added the missing Vitest V8 coverage dependency and cleaned the package lint baseline.
+
+### Removed
+
+- Removed the repo-local sdk skill document so the package surface is focused on published docs and runtime APIs.
 
 ## [0.0.3]
 
