@@ -6,16 +6,16 @@ import { promisify } from 'node:util';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ArtifactDir } from '../../../src/core/artifact-dir/artifact-dir.js';
 import {
   ArtifactCheckpointNoChangesError,
   ArtifactCheckpointService,
 } from '../../../src/core/artifact-checkpoint/service.js';
+import { ArtifactDir } from '../../../src/core/artifact-dir/artifact-dir.js';
 import { setConfig } from '../../../src/core/config.js';
 import { Project } from '../../../src/core/project/project.js';
 
-import type { AgentInput, AgentRun, AgentTool } from '@ank1015/llm-sdk';
 import type { ArtifactCheckpointMetadata } from '../../../src/types/index.js';
+import type { AgentInput, AgentRun, AgentTool } from '@ank1015/llm-sdk';
 
 const execFileAsync = promisify(execFile);
 
@@ -106,6 +106,7 @@ describe('ArtifactCheckpointService', () => {
       expect(agentCalls).toHaveLength(1);
     });
     expect(agentCalls[0]?.modelId).toBe('google/gemini-3-flash-preview');
+    expect(agentCalls[0]?.maxTurns).toBe(Number.MAX_SAFE_INTEGER);
     expect((agentCalls[0]?.tools as AgentTool[] | undefined)?.length).toBeGreaterThan(0);
     expect(promptCalls).toEqual([
       {
@@ -116,7 +117,10 @@ describe('ArtifactCheckpointService', () => {
       },
     ]);
 
-    const pendingMetadata = await readCheckpointMetadata(artifactDir.dataPath, checkpoint.commitHash);
+    const pendingMetadata = await readCheckpointMetadata(
+      artifactDir.dataPath,
+      checkpoint.commitHash
+    );
     expect(pendingMetadata).toMatchObject({
       commitHash: checkpoint.commitHash,
       summaryStatus: 'pending',
@@ -504,8 +508,19 @@ function buildAssistantMessage(text: string) {
 function createMockAgentRun(resultPromise: Promise<unknown>, sessionPath: string): AgentRun {
   return {
     sessionPath,
-    async *[Symbol.asyncIterator]() {
-      await resultPromise;
+    [Symbol.asyncIterator](): AsyncIterator<never> {
+      let resolved = false;
+
+      return {
+        next: async () => {
+          if (!resolved) {
+            resolved = true;
+            await resultPromise;
+          }
+
+          return { done: true, value: undefined as never };
+        },
+      };
     },
     drain: () => resultPromise as never,
     then: resultPromise.then.bind(resultPromise),
@@ -518,7 +533,10 @@ async function readCheckpointMetadata(
   artifactDataPath: string,
   commitHash: string
 ): Promise<ArtifactCheckpointMetadata> {
-  const content = await readFile(join(artifactDataPath, 'checkpoints', `${commitHash}.json`), 'utf8');
+  const content = await readFile(
+    join(artifactDataPath, 'checkpoints', `${commitHash}.json`),
+    'utf8'
+  );
   return JSON.parse(content) as ArtifactCheckpointMetadata;
 }
 

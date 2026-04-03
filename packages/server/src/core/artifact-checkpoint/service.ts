@@ -10,8 +10,6 @@ import { ArtifactDir } from '../artifact-dir/artifact-dir.js';
 import { Project } from '../project/project.js';
 import { ensureDir, pathExists, readJson, writeJson } from '../storage/fs.js';
 
-import type { AgentTool } from '@ank1015/llm-core';
-import type { CuratedModelId } from '@ank1015/llm-sdk';
 import type {
   ArtifactCheckpoint,
   ArtifactCheckpointDiffChangeType,
@@ -22,6 +20,8 @@ import type {
   ArtifactCheckpointRollbackResult,
   CheckpointSummaryStatus,
 } from '../../types/index.js';
+import type { AgentTool } from '@ank1015/llm-core';
+import type { CuratedModelId } from '@ank1015/llm-sdk';
 
 const execFileAsync = promisify(execFile);
 
@@ -32,6 +32,7 @@ const CHECKPOINT_DIRECTORY_NAME = 'checkpoints';
 const CHECKPOINT_SUMMARY_SESSIONS_DIRECTORY_NAME = 'checkpoint-summaries';
 const CHECKPOINT_COMMIT_SUBJECT_PREFIX = 'checkpoint:';
 const MAX_DIFF_TEXT_BYTES = 200_000;
+const SERVER_AGENT_MAX_TURNS = Number.MAX_SAFE_INTEGER;
 const EXCLUDED_GIT_CLEAN_PATTERNS = ['.max/temp/', '.max/skills/'] as const;
 const EXCLUDED_PATH_SPECS = [
   ':(exclude).max/temp',
@@ -148,7 +149,9 @@ export class ArtifactCheckpointService {
       };
       await this.writeCheckpointMetadata(artifactDir.dataPath, metadata);
 
-      this.trackBackgroundTask(this.generateCheckpointSummary(projectId, artifactDirId, commitHash));
+      this.trackBackgroundTask(
+        this.generateCheckpointSummary(projectId, artifactDirId, commitHash)
+      );
 
       return {
         commitHash,
@@ -289,7 +292,10 @@ export class ArtifactCheckpointService {
   private async withArtifactLock<T>(lockKey: string, callback: () => Promise<T>): Promise<T> {
     const currentTail = this.mutationLocks.get(lockKey) ?? Promise.resolve();
     const nextRun = currentTail.catch(() => undefined).then(callback);
-    const nextTail = nextRun.then(() => undefined, () => undefined);
+    const nextTail = nextRun.then(
+      () => undefined,
+      () => undefined
+    );
     this.mutationLocks.set(lockKey, nextTail);
 
     try {
@@ -373,7 +379,9 @@ export class ArtifactCheckpointService {
     }
   }
 
-  private async readWorkingTreeStatusEntries(artifactDir: string): Promise<WorkingTreeStatusEntry[]> {
+  private async readWorkingTreeStatusEntries(
+    artifactDir: string
+  ): Promise<WorkingTreeStatusEntry[]> {
     const output = await this.runGit(artifactDir, [
       'status',
       '--porcelain=v1',
@@ -589,6 +597,7 @@ export class ArtifactCheckpointService {
           ),
         ],
         tools: Object.values(createAllTools(artifactDir.dirPath)) as unknown as AgentTool[],
+        maxTurns: SERVER_AGENT_MAX_TURNS,
         session: {
           path: this.getCheckpointSummarySessionPath(artifactDir.dataPath, commitHash),
         },
@@ -629,7 +638,10 @@ export class ArtifactCheckpointService {
     artifactDataPath: string,
     commitHash: string
   ): Promise<ArtifactCheckpointMetadata | null> {
-    const metadataPath = join(this.getCheckpointMetadataDir(artifactDataPath), `${commitHash}.json`);
+    const metadataPath = join(
+      this.getCheckpointMetadataDir(artifactDataPath),
+      `${commitHash}.json`
+    );
     if (!(await pathExists(metadataPath))) {
       return null;
     }

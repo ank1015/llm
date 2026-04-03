@@ -77,6 +77,7 @@ const DEFAULT_SESSION_NAME = 'Untitled Session';
 const DEFAULT_ACTIVE_BRANCH = 'main';
 const DEFAULT_REASONING_EFFORT: ReasoningEffort = 'high';
 const DEFAULT_NAMING_MODEL_ID = 'google/gemini-3-flash-preview' as const;
+const SERVER_AGENT_MAX_TURNS = Number.MAX_SAFE_INTEGER;
 
 function getSessionsBaseDir(projectId: string, artifactDirId: string): string {
   const { dataRoot } = getConfig();
@@ -564,6 +565,7 @@ export class Session {
       system: input.agentConfig.systemPrompt,
       tools: input.agentConfig.tools,
       reasoningEffort: input.execution.reasoningEffort,
+      maxTurns: SERVER_AGENT_MAX_TURNS,
       ...(input.options?.signal ? { signal: input.options.signal } : {}),
       session: {
         path: this.sessionPath,
@@ -612,7 +614,9 @@ export class Session {
     });
   }
 
-  private createContextReframingLoader(modelId: CuratedModelId) {
+  private createContextReframingLoader(
+    modelId: CuratedModelId
+  ): ReturnType<typeof createSessionContextReframingLoader> {
     return createSessionContextReframingLoader({
       projectId: this.projectId,
       artifactDirId: this.artifactDirId,

@@ -324,6 +324,7 @@ describe('Session', () => {
       onCall: (input) => {
         expect(input.modelId).toBe(overrideModelId);
         expect(input.reasoningEffort).toBe('medium');
+        expect(input.maxTurns).toBe(Number.MAX_SAFE_INTEGER);
         expect(input.system).toBe('system prompt');
         expect(Array.isArray(input.tools)).toBe(true);
         expect(typeof (input.session as { loadMessages?: unknown }).loadMessages).toBe('function');
@@ -366,6 +367,7 @@ describe('Session', () => {
       events,
       newMessages: [assistantMessage],
       onCall: (input) => {
+        expect(input.maxTurns).toBe(Number.MAX_SAFE_INTEGER);
         expect(typeof (input.session as { loadMessages?: unknown }).loadMessages).toBe('function');
       },
     });
