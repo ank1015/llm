@@ -1,12 +1,14 @@
 # @ank1015/llm-core
 
-Stateless multi-provider LLM runtime with normalized streaming events, preserved native provider responses, and a lightweight agent loop.
+Stateless multi-provider runtime for LLM chat, image generation, preserved native provider responses, and a lightweight agent loop.
 
 ## What You Get
 
 - A single `stream()` entry point for built-in providers
 - `complete()` built on top of the same streaming path
+- A dedicated `generateImage()` entry point for built-in image providers
 - Typed model catalogs and helpers like `getModel()`, `getModels()`, and `calculateCost()`
+- Typed image model helpers like `getImageModel()`, `getImageModels()`, `getImageProviders()`, and `calculateImageCost()`
 - A normalized assistant message format with text, reasoning, tool-call, and usage blocks
 - A small stateless agent engine with tool execution, retries, hooks, and adapter helpers
 
@@ -31,6 +33,13 @@ pnpm add @ank1015/llm-core @sinclair/typebox
 - OpenRouter
 
 Provider auth notes and integration-test env vars are documented in [docs/providers.md](./docs/providers.md).
+
+## Supported Image Providers
+
+- OpenAI Images API: `gpt-image-1.5`
+- Google Gemini native image generation: `gemini-3.1-flash-image-preview`, `gemini-3-pro-image-preview`
+
+Image-provider notes and the image runtime surface are documented in [docs/images.md](./docs/images.md).
 
 ## Quick Start
 
@@ -137,6 +146,42 @@ if (model) {
   console.log(providers.length, openaiModels.length, cost.total);
 }
 ```
+
+## Image Generation
+
+`generateImage()` is a separate non-streaming runtime for image providers. It returns normalized `content`, an `images` convenience array, normalized image usage with computed `usage.cost`, and the preserved provider-native response.
+
+```ts
+import { generateImage, getImageModel } from '@ank1015/llm-core';
+
+const model = getImageModel('openai', 'gpt-image-1.5');
+
+if (!model) {
+  throw new Error('Image model not found');
+}
+
+const result = await generateImage(
+  model,
+  {
+    prompt: 'Create a studio product shot of a silver robot watering a bonsai tree.',
+  },
+  {
+    apiKey: process.env.OPENAI_API_KEY!,
+    background: 'transparent',
+    quality: 'high',
+  },
+  'img-1'
+);
+
+console.log(result.images[0]?.mimeType);
+console.log(result.usage.totalTokens);
+console.log(result.usage.cost.total);
+console.log(result.response);
+```
+
+Google image generation uses the same `generateImage()` surface, but may return both text and image blocks in `result.content`.
+
+Image usage comes from the provider-native response. Image cost is derived locally from the built-in image model pricing with `calculateImageCost()`.
 
 ## Tool Calling
 

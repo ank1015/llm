@@ -6,6 +6,14 @@ The format is based on Keep a Changelog and this package follows SemVer once its
 
 ## [Unreleased]
 
+### Added
+
+- Added a dedicated image-generation runtime with `generateImage()`, image model catalogs, and a separate image provider registry.
+- Added built-in image providers for OpenAI Images API and Google Gemini native image generation.
+- Added normalized image result types with preserved native responses and modality-aware image usage accounting.
+- Added image-model pricing metadata and `calculateImageCost()` support for computed image spend.
+- Added unit coverage for the image public API and provider normalization paths.
+
 ## [0.0.5] - 2026-04-02
 
 ### Added
