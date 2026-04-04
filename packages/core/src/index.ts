@@ -10,6 +10,7 @@ import './providers/kimi/index.js';
 import './providers/minimax/index.js';
 import './providers/openai/index.js';
 import './providers/openrouter/index.js';
+import './videos/providers/google/index.js';
 import './providers/zai/index.js';
 
 export * from './agent/index.js';
@@ -18,3 +19,4 @@ export * from './llm/index.js';
 export * from './models/index.js';
 export * from './providers/index.js';
 export * from './types/index.js';
+export * from './videos/index.js';
