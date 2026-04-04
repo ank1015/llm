@@ -7,3 +7,5 @@ export * from './content.js';
 export * from './agent-types.js';
 export * from './image.js';
 export * from './image-providers/index.js';
+export * from './video.js';
+export * from './video-providers/index.js';
