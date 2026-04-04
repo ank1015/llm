@@ -1,15 +1,17 @@
 # @ank1015/llm-core
 
-Stateless multi-provider runtime for LLM chat, image generation, video generation, preserved native provider responses, and a lightweight agent loop.
+Stateless multi-provider runtime for LLM chat, image generation, music generation, video generation, preserved native provider responses, and a lightweight agent loop.
 
 ## What You Get
 
 - A single `stream()` entry point for built-in providers
 - `complete()` built on top of the same streaming path
 - A dedicated `generateImage()` entry point for built-in image providers
+- A dedicated `generateMusic()` entry point for built-in music providers
 - A dedicated `generateVideo()` entry point for built-in video providers
 - Typed model catalogs and helpers like `getModel()`, `getModels()`, and `calculateCost()`
 - Typed image model helpers like `getImageModel()`, `getImageModels()`, `getImageProviders()`, and `calculateImageCost()`
+- Typed music model helpers like `getMusicModel()`, `getMusicModels()`, `getMusicProviders()`, and `calculateMusicCost()`
 - Typed video model helpers like `getVideoModel()`, `getVideoModels()`, `getVideoProviders()`, and `calculateVideoCost()`
 - A normalized assistant message format with text, reasoning, tool-call, and usage blocks
 - A small stateless agent engine with tool execution, retries, hooks, and adapter helpers
@@ -42,6 +44,12 @@ Provider auth notes and integration-test env vars are documented in [docs/provid
 - Google Gemini native image generation: `gemini-3.1-flash-image-preview`, `gemini-3-pro-image-preview`
 
 Image-provider notes and the image runtime surface are documented in [docs/images.md](./docs/images.md).
+
+## Supported Music Providers
+
+- Google Lyria: `lyria-3-clip-preview`, `lyria-3-pro-preview`
+
+Music-provider notes and the music runtime surface are documented in [docs/music.md](./docs/music.md).
 
 ## Supported Video Providers
 
@@ -190,6 +198,39 @@ console.log(result.response);
 Google image generation uses the same `generateImage()` surface, but may return both text and image blocks in `result.content`.
 
 Image usage comes from the provider-native response. Image cost is derived locally from the built-in image model pricing with `calculateImageCost()`.
+
+## Music Generation
+
+`generateMusic()` is a separate non-streaming runtime for music providers. It returns normalized `content`, a `tracks` convenience array, normalized music usage with request-based `usage.cost`, and the preserved provider-native response.
+
+```ts
+import { generateMusic, getMusicModel } from '@ank1015/llm-core';
+
+const model = getMusicModel('google', 'lyria-3-pro-preview');
+
+if (!model) {
+  throw new Error('Music model not found');
+}
+
+const result = await generateMusic(
+  model,
+  {
+    prompt: 'An atmospheric ambient track with soft piano, distant choir, and a slow build.',
+  },
+  {
+    apiKey: process.env.GEMINI_API_KEY!,
+    responseMimeType: 'audio/wav',
+  },
+  'music-1'
+);
+
+console.log(result.tracks[0]?.mimeType);
+console.log(result.usage.totalTokens);
+console.log(result.usage.cost.total);
+console.log(result.response);
+```
+
+Google Lyria uses `generateContent()` and may return lyrics or structural notes as text blocks alongside the generated audio track. Music cost is derived locally from the built-in per-request model pricing with `calculateMusicCost()`.
 
 ## Video Generation
 
