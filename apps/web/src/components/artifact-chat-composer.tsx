@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import {
   ArrowUp02Icon,
@@ -6,23 +6,20 @@ import {
   Folder01Icon,
   Pdf02Icon,
   PlusSignIcon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
+} from '@hugeicons/core-free-icons';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 
-import type { Attachment } from "@ank1015/llm-sdk";
+import type { ProjectFileIndexEntryDto } from '@/lib/client-api';
+import type { SessionRef } from '@/stores/types';
+import type { Attachment } from '@ank1015/llm-sdk';
 
-import { PromptModelPicker } from "@/components/prompt-model-picker";
-import {
-  PromptInput,
-  PromptInputActions,
-  PromptInputTextarea,
-} from "@/components/prompt-input";
-import { PromptReasoningPicker } from "@/components/prompt-reasoning-picker";
-import { generateSessionName } from "@/lib/client-api";
-import { cn } from "@/lib/utils";
+import { PromptInput, PromptInputActions, PromptInputTextarea } from '@/components/prompt-input';
+import { PromptModelPicker } from '@/components/prompt-model-picker';
+import { PromptReasoningPicker } from '@/components/prompt-reasoning-picker';
+import { generateSessionName } from '@/lib/client-api';
 import {
   buildFileLabel,
   extractActiveMention,
@@ -36,35 +33,34 @@ import {
   removeMentionBeforeCaret,
   replaceMentionToken,
   type MentionRange,
-} from "@/lib/messages/composer-mentions";
-import { getBrowserQueryClient } from "@/lib/query-client";
-import { queryKeys } from "@/lib/query-keys";
-import { useArtifactFilesStore } from "@/stores/artifact-files-store";
-import { useChatSettingsStore } from "@/stores/chat-settings-store";
-import { useChatStore } from "@/stores/chat-store";
-import { useComposerStore } from "@/stores/composer-store";
-import { useSessionsStore } from "@/stores/sessions-store";
-import { useSidebarStore } from "@/stores/sidebar-store";
+} from '@/lib/messages/composer-mentions';
+import { getBrowserQueryClient } from '@/lib/query-client';
+import { queryKeys } from '@/lib/query-keys';
+import { cn } from '@/lib/utils';
+import { useArtifactFilesStore } from '@/stores/artifact-files-store';
+import { useChatSettingsStore } from '@/stores/chat-settings-store';
+import { useChatStore } from '@/stores/chat-store';
+import { useComposerStore } from '@/stores/composer-store';
+import { useSessionsStore } from '@/stores/sessions-store';
+import { useSidebarStore } from '@/stores/sidebar-store';
 
-import type { SessionRef } from "@/stores/types";
-import type { ProjectFileIndexEntryDto } from "@/lib/client-api";
 
-const PDF_MIME_TYPE = "application/pdf";
+const PDF_MIME_TYPE = 'application/pdf';
 const ATTACHMENT_ACCEPT = `image/*,${PDF_MIME_TYPE}`;
 const EMPTY_ATTACHMENTS: Attachment[] = [];
-const LOG_PREFIX = "[artifact-chat]";
+const LOG_PREFIX = '[artifact-chat]';
 
 function isAbortError(error: unknown): boolean {
   if (!error) {
     return false;
   }
 
-  if (typeof DOMException !== "undefined" && error instanceof DOMException) {
-    return error.name === "AbortError";
+  if (typeof DOMException !== 'undefined' && error instanceof DOMException) {
+    return error.name === 'AbortError';
   }
 
   if (error instanceof Error) {
-    return error.name === "AbortError" || error.message.toLowerCase().includes("abort");
+    return error.name === 'AbortError' || error.message.toLowerCase().includes('abort');
   }
 
   return false;
@@ -75,7 +71,7 @@ function getErrorMessage(error: unknown): string {
     return error.message;
   }
 
-  return "Failed to send message.";
+  return 'Failed to send message.';
 }
 
 function isSupportedAttachmentFile(file: File): boolean {
@@ -83,11 +79,11 @@ function isSupportedAttachmentFile(file: File): boolean {
     return true;
   }
 
-  return file.type.startsWith("image/");
+  return file.type.startsWith('image/');
 }
 
 function formatAttachmentSize(size: number | undefined): string | null {
-  if (typeof size !== "number" || !Number.isFinite(size) || size <= 0) {
+  if (typeof size !== 'number' || !Number.isFinite(size) || size <= 0) {
     return null;
   }
 
@@ -104,14 +100,14 @@ function formatAttachmentSize(size: number | undefined): string | null {
 
 function getAttachmentSessionFallbackName(attachments: Attachment[]): string {
   if (attachments.length === 1) {
-    return attachments[0]?.fileName ?? "Attachment";
+    return attachments[0]?.fileName ?? 'Attachment';
   }
 
   return `${attachments.length} attachments`;
 }
 
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
-  let binary = "";
+  let binary = '';
   const bytes = new Uint8Array(buffer);
 
   for (const byte of bytes) {
@@ -126,21 +122,19 @@ async function toAttachment(file: File): Promise<Attachment> {
 
   return {
     id:
-      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
         ? crypto.randomUUID()
         : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    type: file.type === PDF_MIME_TYPE ? "file" : "image",
+    type: file.type === PDF_MIME_TYPE ? 'file' : 'image',
     fileName: file.name,
-    mimeType: file.type || (file.name.toLowerCase().endsWith(".pdf") ? PDF_MIME_TYPE : ""),
+    mimeType: file.type || (file.name.toLowerCase().endsWith('.pdf') ? PDF_MIME_TYPE : ''),
     size: file.size,
     content,
   };
 }
 
-function eventHasFiles(event: {
-  dataTransfer?: DataTransfer | null;
-}): boolean {
-  return Array.from(event.dataTransfer?.types ?? []).includes("Files");
+function eventHasFiles(event: { dataTransfer?: DataTransfer | null }): boolean {
+  return Array.from(event.dataTransfer?.types ?? []).includes('Files');
 }
 
 function summarizeAttachments(attachments: Attachment[]): Array<{
@@ -148,7 +142,7 @@ function summarizeAttachments(attachments: Attachment[]): Array<{
   fileName: string;
   mimeType: string;
   size?: number;
-  type: Attachment["type"];
+  type: Attachment['type'];
 }> {
   return attachments.map((attachment) => ({
     id: attachment.id,
@@ -169,7 +163,7 @@ export function ArtifactChatComposer({
   sessionId?: string;
 }) {
   const router = useRouter();
-  const [localDraft, setLocalDraft] = useState("");
+  const [localDraft, setLocalDraft] = useState('');
   const [localAttachments, setLocalAttachments] = useState<Attachment[]>([]);
   const [activeMention, setActiveMention] = useState<MentionRange | null>(null);
   const [mentionResults, setMentionResults] = useState<ProjectFileIndexEntryDto[]>([]);
@@ -185,13 +179,13 @@ export function ArtifactChatComposer({
   const currentSession = sessionId ? ({ sessionId } satisfies SessionRef) : null;
 
   const composerDraft = useComposerStore((state) =>
-    sessionId ? (state.draftsBySession[sessionId] ?? "") : "",
+    sessionId ? (state.draftsBySession[sessionId] ?? '') : ''
   );
   const composerAttachments = useComposerStore((state) =>
-    sessionId ? (state.attachmentsBySession[sessionId] ?? EMPTY_ATTACHMENTS) : EMPTY_ATTACHMENTS,
+    sessionId ? (state.attachmentsBySession[sessionId] ?? EMPTY_ATTACHMENTS) : EMPTY_ATTACHMENTS
   );
   const editState = useComposerStore((state) =>
-    sessionId ? (state.editStateBySession[sessionId] ?? null) : null,
+    sessionId ? (state.editStateBySession[sessionId] ?? null) : null
   );
   const setComposerDraft = useComposerStore((state) => state.setDraft);
   const addComposerAttachment = useComposerStore((state) => state.addAttachment);
@@ -211,7 +205,7 @@ export function ArtifactChatComposer({
   const loadMessages = useChatStore((state) => state.loadMessages);
   const abortStream = useChatStore((state) => state.abortStream);
   const isStreaming = useChatStore((state) =>
-    sessionId ? (state.isStreamingBySession[sessionId] ?? false) : false,
+    sessionId ? (state.isStreamingBySession[sessionId] ?? false) : false
   );
 
   const sidebarAddSession = useSidebarStore((state) => state.addSession);
@@ -221,19 +215,11 @@ export function ArtifactChatComposer({
   const attachments = currentSession ? composerAttachments : localAttachments;
   const isEditing = Boolean(currentSession && editState);
   const attachmentsAreLocked = Boolean(editState?.hasFixedAttachments);
-  const placeholderText = currentSession ? "Ask me anything..." : "Ask about this artifact or start a thread…";
+  const placeholderText = currentSession
+    ? 'Ask me anything...'
+    : 'Ask about this artifact or start a thread…';
   const canSubmit = draft.trim().length > 0 || attachments.length > 0;
   const isMentionOpen = activeMention !== null;
-
-  useEffect(() => {
-    const textarea = textareaRef.current;
-    if (!textarea) {
-      return;
-    }
-
-    textarea.style.height = "0px";
-    textarea.style.height = `${Math.min(textarea.scrollHeight, 220)}px`;
-  }, [draft]);
 
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -260,7 +246,7 @@ export function ArtifactChatComposer({
         const files = await searchProjectFiles(
           projectId,
           activeMention.query,
-          MENTION_SEARCH_LIMIT,
+          MENTION_SEARCH_LIMIT
         );
         if (mentionRequestIdRef.current !== currentRequestId) {
           return;
@@ -268,7 +254,7 @@ export function ArtifactChatComposer({
 
         const ranked = rankProjectFiles(files, activeMention.query).slice(
           0,
-          MENTION_DROPDOWN_LIMIT,
+          MENTION_DROPDOWN_LIMIT
         );
         setMentionResults(ranked);
         setHighlightedMentionIndex((current) => {
@@ -283,7 +269,7 @@ export function ArtifactChatComposer({
           return;
         }
 
-        const message = error instanceof Error ? error.message : "Failed to load files.";
+        const message = error instanceof Error ? error.message : 'Failed to load files.';
         setMentionResults([]);
         setMentionError(message);
       } finally {
@@ -293,8 +279,7 @@ export function ArtifactChatComposer({
       }
     };
 
-    const debounceMs =
-      activeMention.query.trim().length === 0 ? 0 : MENTION_SEARCH_DEBOUNCE_MS;
+    const debounceMs = activeMention.query.trim().length === 0 ? 0 : MENTION_SEARCH_DEBOUNCE_MS;
     const timeout = window.setTimeout(() => {
       void runSearch();
     }, debounceMs);
@@ -349,8 +334,8 @@ export function ArtifactChatComposer({
 
   function handleAttachmentAdd(attachment: Attachment) {
     if (attachmentsAreLocked) {
-      toast.error("Attachments are fixed while editing this message.", {
-        id: "artifact-edit-attachment-locked",
+      toast.error('Attachments are fixed while editing this message.', {
+        id: 'artifact-edit-attachment-locked',
       });
       return;
     }
@@ -374,8 +359,8 @@ export function ArtifactChatComposer({
 
   function handleAttachmentRemove(attachmentId: string) {
     if (attachmentsAreLocked) {
-      toast.error("Attachments are fixed while editing this message.", {
-        id: "artifact-edit-attachment-locked",
+      toast.error('Attachments are fixed while editing this message.', {
+        id: 'artifact-edit-attachment-locked',
       });
       return;
     }
@@ -388,13 +373,15 @@ export function ArtifactChatComposer({
       return;
     }
 
-    setLocalAttachments((current) => current.filter((attachment) => attachment.id !== attachmentId));
+    setLocalAttachments((current) =>
+      current.filter((attachment) => attachment.id !== attachmentId)
+    );
   }
 
   async function handleAttachmentFiles(files: FileList | File[]) {
     if (attachmentsAreLocked) {
-      toast.error("Attachments are fixed while editing this message.", {
-        id: "artifact-edit-attachment-locked",
+      toast.error('Attachments are fixed while editing this message.', {
+        id: 'artifact-edit-attachment-locked',
       });
       return;
     }
@@ -408,8 +395,8 @@ export function ArtifactChatComposer({
     const rejected = nextFiles.filter((file) => !isSupportedAttachmentFile(file));
 
     if (rejected.length > 0) {
-      toast.error("Only images and PDFs are supported.", {
-        id: "artifact-attachment-type-error",
+      toast.error('Only images and PDFs are supported.', {
+        id: 'artifact-attachment-type-error',
       });
     }
 
@@ -419,13 +406,13 @@ export function ArtifactChatComposer({
         handleAttachmentAdd(attachment);
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to read attachment.";
+      const message = error instanceof Error ? error.message : 'Failed to read attachment.';
       toast.error(message, {
-        id: "artifact-attachment-read-error",
+        id: 'artifact-attachment-read-error',
       });
     } finally {
       if (fileInputRef.current) {
-        fileInputRef.current.value = "";
+        fileInputRef.current.value = '';
       }
     }
   }
@@ -456,7 +443,7 @@ export function ArtifactChatComposer({
   }
 
   function handleTextareaKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key === "Backspace" && !event.metaKey && !event.ctrlKey && !event.altKey) {
+    if (event.key === 'Backspace' && !event.metaKey && !event.ctrlKey && !event.altKey) {
       const textarea = event.currentTarget;
       const selectionStart = textarea.selectionStart;
       const selectionEnd = textarea.selectionEnd;
@@ -485,7 +472,7 @@ export function ArtifactChatComposer({
       return;
     }
 
-    if (event.key === "Escape") {
+    if (event.key === 'Escape') {
       event.preventDefault();
       setMentionState(null);
       return;
@@ -495,21 +482,21 @@ export function ArtifactChatComposer({
       return;
     }
 
-    if (event.key === "ArrowDown") {
+    if (event.key === 'ArrowDown') {
       event.preventDefault();
       setHighlightedMentionIndex((current) => (current + 1) % mentionResults.length);
       return;
     }
 
-    if (event.key === "ArrowUp") {
+    if (event.key === 'ArrowUp') {
       event.preventDefault();
       setHighlightedMentionIndex((current) =>
-        current === 0 ? mentionResults.length - 1 : Math.max(0, current - 1),
+        current === 0 ? mentionResults.length - 1 : Math.max(0, current - 1)
       );
       return;
     }
 
-    if ((event.key === "Enter" && !event.shiftKey) || event.key === "Tab") {
+    if ((event.key === 'Enter' && !event.shiftKey) || event.key === 'Tab') {
       event.preventDefault();
       const selected = mentionResults[highlightedMentionIndex];
       if (selected) {
@@ -526,7 +513,7 @@ export function ArtifactChatComposer({
 
     if (currentSession && isStreaming) {
       try {
-        console.debug(LOG_PREFIX, "abort requested", {
+        console.debug(LOG_PREFIX, 'abort requested', {
           sessionId,
           projectId,
           artifactId,
@@ -542,7 +529,7 @@ export function ArtifactChatComposer({
         }
 
         toast.error(getErrorMessage(error), {
-          id: "artifact-stop-error",
+          id: 'artifact-stop-error',
         });
       }
       return;
@@ -551,7 +538,7 @@ export function ArtifactChatComposer({
     try {
       if (currentSession) {
         if (editState) {
-          console.debug(LOG_PREFIX, "submit edit", {
+          console.debug(LOG_PREFIX, 'submit edit', {
             sessionId: currentSession.sessionId,
             projectId,
             artifactId,
@@ -563,7 +550,7 @@ export function ArtifactChatComposer({
 
           setComposerDraft({
             session: currentSession,
-            draft: "",
+            draft: '',
           });
           setMentionState(null);
 
@@ -585,7 +572,7 @@ export function ArtifactChatComposer({
         markSubmitted(currentSession);
         setMentionState(null);
 
-        console.debug(LOG_PREFIX, "submit existing session", {
+        console.debug(LOG_PREFIX, 'submit existing session', {
           sessionId: currentSession.sessionId,
           projectId,
           artifactId,
@@ -609,9 +596,9 @@ export function ArtifactChatComposer({
 
       const submittedAttachments = attachments;
       const initialSessionName =
-        prompt.length > 0 ? "New chat" : getAttachmentSessionFallbackName(submittedAttachments);
+        prompt.length > 0 ? 'New chat' : getAttachmentSessionFallbackName(submittedAttachments);
 
-      console.debug(LOG_PREFIX, "create session before send", {
+      console.debug(LOG_PREFIX, 'create session before send', {
         projectId,
         artifactId,
         initialSessionName,
@@ -626,14 +613,14 @@ export function ArtifactChatComposer({
         {
           sessionName: initialSessionName,
           modelId: selectedModelId,
-        },
+        }
       );
 
       const nextSession = {
         sessionId: created.sessionId,
       } satisfies SessionRef;
 
-      console.debug(LOG_PREFIX, "created session", {
+      console.debug(LOG_PREFIX, 'created session', {
         sessionId: created.sessionId,
         route: `/${projectId}/${artifactId}/${created.sessionId}`,
       });
@@ -647,7 +634,7 @@ export function ArtifactChatComposer({
         nodeCount: 0,
       });
 
-      setLocalDraft("");
+      setLocalDraft('');
       setLocalAttachments([]);
       setMentionState(null);
 
@@ -659,7 +646,7 @@ export function ArtifactChatComposer({
         force: true,
       });
 
-      console.debug(LOG_PREFIX, "start stream after create", {
+      console.debug(LOG_PREFIX, 'start stream after create', {
         sessionId: created.sessionId,
         prompt,
         modelId: selectedModelId,
@@ -686,10 +673,10 @@ export function ArtifactChatComposer({
           {
             sessionId: created.sessionId,
             query: prompt,
-          },
+          }
         )
           .then((result) => {
-            console.debug(LOG_PREFIX, "generated session name", result);
+            console.debug(LOG_PREFIX, 'generated session name', result);
             sidebarRenameSession(created.sessionId, result.sessionName);
 
             const queryClient = getBrowserQueryClient();
@@ -706,7 +693,7 @@ export function ArtifactChatComposer({
             ]);
           })
           .catch((error) => {
-            console.debug(LOG_PREFIX, "generate session name failed", error);
+            console.debug(LOG_PREFIX, 'generate session name failed', error);
           });
       }
     } catch (error) {
@@ -722,7 +709,7 @@ export function ArtifactChatComposer({
       }
 
       toast.error(getErrorMessage(error), {
-        id: "artifact-send-error",
+        id: 'artifact-send-error',
       });
     }
   }
@@ -731,6 +718,7 @@ export function ArtifactChatComposer({
     <PromptInput
       value={draft}
       onValueChange={handleInputChange}
+      maxHeight={220}
       onSubmit={() => {
         void handleSubmit();
       }}
@@ -760,7 +748,7 @@ export function ArtifactChatComposer({
 
         event.preventDefault();
         event.stopPropagation();
-        event.dataTransfer.dropEffect = "copy";
+        event.dataTransfer.dropEffect = 'copy';
       }}
       onDragLeave={(event) => {
         if (attachmentsAreLocked) {
@@ -828,18 +816,13 @@ export function ArtifactChatComposer({
             const sizeLabel = formatAttachmentSize(attachment.size);
             const dataUrl = `data:${attachment.mimeType};base64,${attachment.content}`;
 
-            if (attachment.type === "image") {
+            if (attachment.type === 'image') {
               return (
                 <div
                   key={attachment.id}
                   className="relative overflow-hidden rounded-2xl border border-black/8 bg-accent dark:border-white/10"
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={dataUrl}
-                    alt={attachment.fileName}
-                    className="h-14 w-14 object-cover"
-                  />
+                  <img src={dataUrl} alt={attachment.fileName} className="h-14 w-14 object-cover" />
                   <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-black/55 px-1.5 py-0.5">
                     <div className="truncate text-[9px] font-medium text-white">
                       {attachment.fileName}
@@ -876,7 +859,7 @@ export function ArtifactChatComposer({
                     {attachment.fileName}
                   </div>
                   <div className="text-[0.67rem] leading-4 text-black/45 dark:text-white/42">
-                    {sizeLabel ?? "Document"}
+                    {sizeLabel ?? 'Document'}
                   </div>
                 </div>
                 <button
@@ -917,14 +900,14 @@ export function ArtifactChatComposer({
                     handleMentionSelect(entry);
                   }}
                   className={cn(
-                    "flex w-full items-center gap-2 rounded-xl px-2.5 py-1.5 text-left transition-colors",
+                    'flex w-full items-center gap-2 rounded-xl px-2.5 py-1.5 text-left transition-colors',
                     index === highlightedMentionIndex
-                      ? "bg-black/[0.06] dark:bg-white/[0.08]"
-                      : "hover:bg-black/[0.04] dark:hover:bg-white/[0.05]",
+                      ? 'bg-black/[0.06] dark:bg-white/[0.08]'
+                      : 'hover:bg-black/[0.04] dark:hover:bg-white/[0.05]'
                   )}
                 >
                   <HugeiconsIcon
-                    icon={entry.type === "directory" ? Folder01Icon : File01Icon}
+                    icon={entry.type === 'directory' ? Folder01Icon : File01Icon}
                     size={15}
                     color="currentColor"
                     strokeWidth={1.8}
@@ -946,7 +929,7 @@ export function ArtifactChatComposer({
       <PromptInputTextarea
         data-chat-composer-textarea
         ref={textareaRef}
-        placeholder={isEditing ? "Edit your message…" : placeholderText}
+        placeholder={isEditing ? 'Edit your message…' : placeholderText}
         className="px-1 py-2 text-[15px] leading-[1.8] placeholder:text-black/30 dark:placeholder:text-white/24"
         maxLength={200000}
         onChange={handleTextareaInteraction}
@@ -963,8 +946,8 @@ export function ArtifactChatComposer({
             type="button"
             onClick={() => {
               if (attachmentsAreLocked) {
-                toast.error("Attachments are fixed while editing this message.", {
-                  id: "artifact-edit-attachment-locked",
+                toast.error('Attachments are fixed while editing this message.', {
+                  id: 'artifact-edit-attachment-locked',
                 });
                 return;
               }
@@ -976,16 +959,11 @@ export function ArtifactChatComposer({
             aria-label="Add attachment"
             title={
               attachmentsAreLocked
-                ? "Attachments are fixed while editing this message"
-                : "Add attachment"
+                ? 'Attachments are fixed while editing this message'
+                : 'Add attachment'
             }
           >
-            <HugeiconsIcon
-              icon={PlusSignIcon}
-              size={18}
-              color="currentColor"
-              strokeWidth={1.9}
-            />
+            <HugeiconsIcon icon={PlusSignIcon} size={18} color="currentColor" strokeWidth={1.9} />
           </button>
 
           <PromptModelPicker />
@@ -999,23 +977,18 @@ export function ArtifactChatComposer({
           }}
           disabled={!isStreaming && !canSubmit}
           className={[
-            "inline-flex h-8 w-8 items-center justify-center rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/12 disabled:cursor-not-allowed dark:focus-visible:ring-white/12",
+            'inline-flex h-8 w-8 items-center justify-center rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/12 disabled:cursor-not-allowed dark:focus-visible:ring-white/12',
             isStreaming || canSubmit
-              ? "bg-[#FF6363] text-white hover:bg-[#f25454]"
-              : "bg-accent text-black/28 dark:text-white/26",
-          ].join(" ")}
-          aria-label={isStreaming ? "Stop generation" : "Send prompt"}
-          title={isStreaming ? "Stop generation" : "Send prompt"}
+              ? 'bg-[#FF6363] text-white hover:bg-[#f25454]'
+              : 'bg-accent text-black/28 dark:text-white/26',
+          ].join(' ')}
+          aria-label={isStreaming ? 'Stop generation' : 'Send prompt'}
+          title={isStreaming ? 'Stop generation' : 'Send prompt'}
         >
           {isStreaming ? (
             <span className="h-3 w-3 rounded-[2px] bg-current" />
           ) : (
-            <HugeiconsIcon
-              icon={ArrowUp02Icon}
-              size={16}
-              color="currentColor"
-              strokeWidth={1.9}
-            />
+            <HugeiconsIcon icon={ArrowUp02Icon} size={16} color="currentColor" strokeWidth={1.9} />
           )}
         </button>
       </PromptInputActions>
@@ -1023,8 +996,8 @@ export function ArtifactChatComposer({
       {isDragActive ? (
         <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-3xl border border-dashed border-black/18 bg-white/72 text-sm text-black/72 backdrop-blur-sm dark:border-white/22 dark:bg-black/28 dark:text-white/78">
           {attachmentsAreLocked
-            ? "Attachments are fixed while editing this message"
-            : "Drop images or PDFs to attach"}
+            ? 'Attachments are fixed while editing this message'
+            : 'Drop images or PDFs to attach'}
         </div>
       ) : null}
     </PromptInput>
