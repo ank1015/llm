@@ -1,14 +1,16 @@
 # @ank1015/llm-core
 
-Stateless multi-provider runtime for LLM chat, image generation, preserved native provider responses, and a lightweight agent loop.
+Stateless multi-provider runtime for LLM chat, image generation, video generation, preserved native provider responses, and a lightweight agent loop.
 
 ## What You Get
 
 - A single `stream()` entry point for built-in providers
 - `complete()` built on top of the same streaming path
 - A dedicated `generateImage()` entry point for built-in image providers
+- A dedicated `generateVideo()` entry point for built-in video providers
 - Typed model catalogs and helpers like `getModel()`, `getModels()`, and `calculateCost()`
 - Typed image model helpers like `getImageModel()`, `getImageModels()`, `getImageProviders()`, and `calculateImageCost()`
+- Typed video model helpers like `getVideoModel()`, `getVideoModels()`, `getVideoProviders()`, and `calculateVideoCost()`
 - A normalized assistant message format with text, reasoning, tool-call, and usage blocks
 - A small stateless agent engine with tool execution, retries, hooks, and adapter helpers
 
@@ -40,6 +42,12 @@ Provider auth notes and integration-test env vars are documented in [docs/provid
 - Google Gemini native image generation: `gemini-3.1-flash-image-preview`, `gemini-3-pro-image-preview`
 
 Image-provider notes and the image runtime surface are documented in [docs/images.md](./docs/images.md).
+
+## Supported Video Providers
+
+- Google Veo: `veo-3.1-generate-preview`, `veo-3.1-fast-generate-preview`, `veo-3.1-lite-generate-preview`
+
+Video-provider notes and the video runtime surface are documented in [docs/videos.md](./docs/videos.md).
 
 ## Quick Start
 
@@ -182,6 +190,41 @@ console.log(result.response);
 Google image generation uses the same `generateImage()` surface, but may return both text and image blocks in `result.content`.
 
 Image usage comes from the provider-native response. Image cost is derived locally from the built-in image model pricing with `calculateImageCost()`.
+
+## Video Generation
+
+`generateVideo()` is a separate non-streaming runtime for video providers. It waits for long-running provider operations to complete, then returns normalized `videos`, the preserved operation, the preserved provider-native response, and normalized video usage with estimated `usage.cost` when model pricing is available.
+
+```ts
+import { generateVideo, getVideoModel } from '@ank1015/llm-core';
+
+const model = getVideoModel('google', 'veo-3.1-generate-preview');
+
+if (!model) {
+  throw new Error('Video model not found');
+}
+
+const result = await generateVideo(
+  model,
+  {
+    prompt: 'A slow cinematic drone reveal of a misty rainforest waterfall at sunrise.',
+  },
+  {
+    apiKey: process.env.GEMINI_API_KEY!,
+    aspectRatio: '16:9',
+    durationSeconds: 4,
+    pollIntervalMs: 5000,
+  },
+  'video-1'
+);
+
+console.log(result.videos[0]?.uri);
+console.log(result.operation.done);
+console.log(result.usage.cost?.total);
+console.log(result.response);
+```
+
+Google Veo does not currently expose provider-native usage metadata for this runtime, so core estimates `usage.cost` from the built-in per-second model pricing plus the resolved request settings like `durationSeconds`, `resolution`, and `numberOfVideos`.
 
 ## Tool Calling
 
