@@ -121,6 +121,26 @@ const hookState = vi.hoisted(() => ({
       mutateAsync: ReturnType<typeof vi.fn>;
     }
   >,
+  setMutations: {
+    codex: {
+      isPending: false,
+      mutateAsync: vi.fn(),
+    },
+    'claude-code': {
+      isPending: false,
+      mutateAsync: vi.fn(),
+    },
+    openai: {
+      isPending: false,
+      mutateAsync: vi.fn(),
+    },
+  } as Record<
+    string,
+    {
+      isPending: boolean;
+      mutateAsync: ReturnType<typeof vi.fn>;
+    }
+  >,
 }));
 
 vi.mock('sonner', () => ({
@@ -135,10 +155,7 @@ vi.mock('@/hooks/api', () => ({
   }),
   useKeyDetailsQuery: (provider: string) => hookState.detailsByProvider[provider],
   useReloadKeyMutation: (provider: string) => hookState.reloadMutations[provider],
-  useSetKeyMutation: () => ({
-    isPending: false,
-    mutateAsync: vi.fn(),
-  }),
+  useSetKeyMutation: (provider: string) => hookState.setMutations[provider],
 }));
 
 describe('ProjectModelSettingsPanel', () => {
@@ -249,6 +266,18 @@ describe('ProjectModelSettingsPanel', () => {
       isPending: false,
       mutateAsync: vi.fn(),
     };
+    hookState.setMutations.codex = {
+      isPending: false,
+      mutateAsync: vi.fn().mockResolvedValue({ ok: true }),
+    };
+    hookState.setMutations['claude-code'] = {
+      isPending: false,
+      mutateAsync: vi.fn().mockResolvedValue({ ok: true }),
+    };
+    hookState.setMutations.openai = {
+      isPending: false,
+      mutateAsync: vi.fn().mockResolvedValue({ ok: true }),
+    };
 
     toastState.success.mockClear();
     toastState.error.mockClear();
@@ -305,6 +334,47 @@ describe('ProjectModelSettingsPanel', () => {
 
     expect(
       screen.queryByRole('button', { name: /reload codex credentials/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the edit control only for non-auto-load providers with stored credentials', () => {
+    render(<ProjectModelSettingsPanel />);
+
+    expect(screen.getByRole('button', { name: /edit openai credentials/i })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /edit codex credentials/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /edit claude code credentials/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it('opens the edit dialog and saves updated credentials without enabling the provider', async () => {
+    render(<ProjectModelSettingsPanel />);
+
+    fireEvent.click(screen.getByRole('button', { name: /edit openai credentials/i }));
+
+    expect(screen.getByRole('heading', { name: /edit openai credentials/i })).toBeInTheDocument();
+
+    const apiKeyInput = screen.getByLabelText(/api key/i) as HTMLInputElement;
+    expect(apiKeyInput.value).toBe('openai-token');
+
+    fireEvent.change(apiKeyInput, {
+      target: {
+        value: 'openai-token-updated',
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
+
+    await waitFor(() => {
+      expect(hookState.setMutations.openai.mutateAsync).toHaveBeenCalledWith({
+        apiKey: 'openai-token-updated',
+      });
+    });
+    expect(toastState.success).toHaveBeenCalledWith('Credentials updated.');
+    expect(useChatSettingsStore.getState().isProviderEnabled('openai')).toBe(false);
+    expect(
+      screen.queryByRole('heading', { name: /edit openai credentials/i })
     ).not.toBeInTheDocument();
   });
 });

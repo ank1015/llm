@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowRight01Icon, ReloadIcon } from '@hugeicons/core-free-icons';
+import { ArrowRight01Icon, PencilEdit01Icon, ReloadIcon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -17,7 +17,6 @@ import {
 } from '@/hooks/api';
 import { useChatSettingsStore } from '@/stores/chat-settings-store';
 
-
 type ModelProvider = {
   api: Api;
   label: string;
@@ -25,6 +24,13 @@ type ModelProvider = {
     modelId: CuratedModelId;
     label: string;
   }>;
+};
+
+type CredentialsDialogMode = 'connect' | 'edit';
+
+type CredentialsDialogState = {
+  mode: CredentialsDialogMode;
+  provider: ModelProvider;
 };
 
 const AUTO_LOAD_KEY_PROVIDERS = new Set<KeyProviderContract>(['codex', 'claude-code']);
@@ -109,12 +115,14 @@ function SettingsToggle({
 function ProviderCredentialsDialog({
   provider,
   providerLabel,
+  mode,
   open,
   onClose,
   onSaved,
 }: {
   provider: KeyProviderContract;
   providerLabel: string;
+  mode: CredentialsDialogMode;
   open: boolean;
   onClose: () => void;
   onSaved: () => void;
@@ -125,6 +133,12 @@ function ProviderCredentialsDialog({
   const [draftValues, setDraftValues] = useState<Record<string, string> | null>(null);
   const supportsAutoLoad = AUTO_LOAD_KEY_PROVIDERS.has(provider);
   const isBusy = saveCredentials.isPending || reloadCredentials.isPending;
+  const dialogTitle =
+    mode === 'edit' ? `Edit ${providerLabel} credentials` : `Connect ${providerLabel}`;
+  const dialogDescription =
+    mode === 'edit'
+      ? 'Update the credentials stored for this provider.'
+      : 'Enter the credentials required to enable this provider in the prompt input.';
 
   const handleClose = useCallback(() => {
     setDraftValues(null);
@@ -175,7 +189,7 @@ function ProviderCredentialsDialog({
 
     try {
       await saveCredentials.mutateAsync(payload);
-      toast.success('Credentials saved.');
+      toast.success(mode === 'edit' ? 'Credentials updated.' : 'Credentials saved.');
       onSaved();
       handleClose();
     } catch (error) {
@@ -237,12 +251,8 @@ function ProviderCredentialsDialog({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="space-y-1">
-          <h2 className="text-lg font-medium text-black dark:text-white">
-            Connect {providerLabel}
-          </h2>
-          <p className="text-sm leading-6 text-black/52 dark:text-white/54">
-            Enter the credentials required to enable this provider in the prompt input.
-          </p>
+          <h2 className="text-lg font-medium text-black dark:text-white">{dialogTitle}</h2>
+          <p className="text-sm leading-6 text-black/52 dark:text-white/54">{dialogDescription}</p>
           {supportsAutoLoad ? (
             <p className="text-[12px] leading-5 text-black/38 dark:text-white/38">
               Auto load reads existing local auth for this provider and fills the shared keys file.
@@ -338,7 +348,7 @@ function ProviderRow({
   provider: ModelProvider;
   collapsed: boolean;
   onToggleCollapsed: () => void;
-  onRequestCredentials: (provider: ModelProvider) => void;
+  onRequestCredentials: (provider: ModelProvider, mode: CredentialsDialogMode) => void;
 }) {
   const keyProvider = provider.api as KeyProviderContract;
   const detailsQuery = useKeyDetailsQuery(keyProvider);
@@ -355,6 +365,7 @@ function ProviderRow({
       })
     : false;
   const showReloadCredentialsButton = supportsAutoLoad && hasCredentials;
+  const showEditCredentialsButton = !supportsAutoLoad && hasCredentials;
 
   async function handleReloadCredentials() {
     if (!showReloadCredentialsButton || reloadCredentials.isPending) {
@@ -395,7 +406,7 @@ function ProviderRow({
 
     if (!isProviderEnabled) {
       if (!hasCredentials) {
-        onRequestCredentials(provider);
+        onRequestCredentials(provider, 'connect');
         return;
       }
 
@@ -482,12 +493,32 @@ function ProviderRow({
           </div>
         </div>
 
-        <SettingsToggle
-          checked={isProviderEnabled}
-          disabled={detailsQuery.isPending}
-          onToggle={handleProviderToggle}
-          ariaLabel={`${isProviderEnabled ? 'Disable' : 'Enable'} ${provider.label}`}
-        />
+        <div className="flex items-center gap-2">
+          {showEditCredentialsButton ? (
+            <button
+              type="button"
+              onClick={() => onRequestCredentials(provider, 'edit')}
+              disabled={detailsQuery.isPending}
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-black/42 transition-colors hover:bg-accent hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/12 disabled:pointer-events-none disabled:opacity-60 dark:text-white/44 dark:hover:bg-accent dark:hover:text-white dark:focus-visible:ring-white/12"
+              aria-label={`Edit ${provider.label} credentials`}
+              title={`Edit ${provider.label} credentials`}
+            >
+              <HugeiconsIcon
+                icon={PencilEdit01Icon}
+                size={15}
+                color="currentColor"
+                strokeWidth={1.8}
+              />
+            </button>
+          ) : null}
+
+          <SettingsToggle
+            checked={isProviderEnabled}
+            disabled={detailsQuery.isPending}
+            onToggle={handleProviderToggle}
+            ariaLabel={`${isProviderEnabled ? 'Disable' : 'Enable'} ${provider.label}`}
+          />
+        </div>
       </div>
 
       <div
@@ -536,7 +567,8 @@ function ProviderRow({
 
 export function ProjectModelSettingsPanel() {
   const { data, isPending, isError } = useModelsQuery();
-  const [credentialsProvider, setCredentialsProvider] = useState<ModelProvider | null>(null);
+  const [credentialsDialogState, setCredentialsDialogState] =
+    useState<CredentialsDialogState | null>(null);
   const [collapsedProviders, setCollapsedProviders] = useState<Partial<Record<Api, boolean>>>({});
 
   const providers = useMemo<ModelProvider[]>(
@@ -584,28 +616,38 @@ export function ProjectModelSettingsPanel() {
                     [provider.api]: !(current[provider.api] ?? false),
                   }))
                 }
-                onRequestCredentials={setCredentialsProvider}
+                onRequestCredentials={(nextProvider, mode) =>
+                  setCredentialsDialogState({
+                    provider: nextProvider,
+                    mode,
+                  })
+                }
               />
             ))}
           </div>
         )}
       </div>
 
-      {credentialsProvider ? (
+      {credentialsDialogState ? (
         <ProviderCredentialsDialog
-          provider={credentialsProvider.api as KeyProviderContract}
-          providerLabel={credentialsProvider.label}
+          provider={credentialsDialogState.provider.api as KeyProviderContract}
+          providerLabel={credentialsDialogState.provider.label}
+          mode={credentialsDialogState.mode}
           open
-          onClose={() => setCredentialsProvider(null)}
+          onClose={() => setCredentialsDialogState(null)}
           onSaved={() => {
+            if (credentialsDialogState.mode !== 'connect') {
+              return;
+            }
+
             useChatSettingsStore.getState().setProviderEnabled({
-              api: credentialsProvider.api,
+              api: credentialsDialogState.provider.api,
               enabled: true,
-              modelIds: credentialsProvider.models.map((model) => model.modelId),
+              modelIds: credentialsDialogState.provider.models.map((model) => model.modelId),
             });
             setCollapsedProviders((current) => ({
               ...current,
-              [credentialsProvider.api]: false,
+              [credentialsDialogState.provider.api]: false,
             }));
           }}
         />
