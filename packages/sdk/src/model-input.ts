@@ -572,6 +572,7 @@ function buildOpenAICompatibleReasoning(
 }
 
 type AnthropicAdaptiveEffort = 'low' | 'medium' | 'high' | 'max';
+const ANTHROPIC_EPHEMERAL_CACHE_CONTROL = { type: 'ephemeral' } as const;
 
 function buildAnthropicAdaptiveThinking(
   modelId:
@@ -580,7 +581,7 @@ function buildAnthropicAdaptiveThinking(
     | Model<'anthropic'>['id']
     | Model<typeof CLAUDE_CODE_API>['id'],
   reasoningEffort: ReasoningEffort | undefined
-): Pick<AnthropicProviderOptions, 'thinking' | 'output_config'> {
+): Pick<AnthropicProviderOptions, 'thinking' | 'output_config' | 'cache_control'> {
   const effort = mapAnthropicEffort(modelId, reasoningEffort);
 
   if (effort) {
@@ -588,6 +589,7 @@ function buildAnthropicAdaptiveThinking(
       thinking: {
         type: 'adaptive',
       },
+      cache_control: ANTHROPIC_EPHEMERAL_CACHE_CONTROL,
       output_config: {
         effort,
       },
@@ -598,6 +600,7 @@ function buildAnthropicAdaptiveThinking(
     thinking: {
       type: 'adaptive',
     },
+    cache_control: ANTHROPIC_EPHEMERAL_CACHE_CONTROL,
   };
 }
 
