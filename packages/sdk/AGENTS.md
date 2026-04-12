@@ -1,6 +1,6 @@
 # @ank1015/llm-sdk
 
-Opinionated SDK package for credential-backed `llm()` calls, stateful `agent()` runs, and JSONL session helpers.
+Opinionated SDK package for credential-backed `llm()` calls, path-first `image()` generation, stateful `agent()` runs, and JSONL session helpers.
 
 ## Commands
 
@@ -16,7 +16,8 @@ pnpm --filter @ank1015/llm-sdk release:check
 
 ## Module Map
 
-- `src/index.ts` - package root exports for `llm()`, `agent()`, helpers, and shared types
+- `src/index.ts` - package root exports for `llm()`, `image()`, `agent()`, helpers, and shared types
+- `src/image.ts` - path-first image generation/editing wrapper over the core image runtime
 - `src/llm.ts` - one-off model-call wrapper over core streaming
 - `src/agent.ts` - multi-turn agent runner with persisted session history
 - `src/model-input.ts` - curated model IDs and provider-option resolution
@@ -25,7 +26,7 @@ pnpm --filter @ank1015/llm-sdk release:check
 - `src/session.ts` - JSONL session creation, traversal, and append helpers
 - `src/messages.ts`, `src/response.ts`, `src/tool.ts` - authoring and response utilities
 - `docs/` - package-facing consumer docs
-- `skills/llm-sdk/` - repo-local Codex skill for using this package from other agents
+- `skills/llm-sdk/`, `skills/image-gen/` - repo-local Codex skills for using this package from other agents
 - `tests/unit/` - local unit coverage for helper behavior
 - `tests/integration/` - live-provider integration coverage
 

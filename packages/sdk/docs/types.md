@@ -4,6 +4,7 @@ All types used with `@ank1015/llm-sdk`. Import any of them directly from the SDK
 
 ```ts
 import type {
+  BaseImageResult,
   Message,
   UserMessage,
   ToolResultMessage,
@@ -11,12 +12,21 @@ import type {
   AssistantResponse,
   AssistantToolCall,
   Content,
+  ImageContent,
+  ImageUsage,
   Tool,
   AgentTool,
   AgentEvent,
   ToolDefinition,
   ToolContext,
   ToolResult,
+  ImageModelId,
+  ImageInput,
+  NanoBananaInput,
+  GptImageInput,
+  ImageResult,
+  NanoBananaSettings,
+  GptImageSettings,
   CuratedModelId,
   ReasoningEffort,
   LlmInput,
@@ -37,6 +47,94 @@ import type {
 
 ---
 
+## Image generation
+
+The SDK image surface is separate from chat and agent runs.
+
+```ts
+type ImageModelId = 'nano-banana' | 'nano-banana-pro' | 'gpt-image';
+
+type ImageInput = NanoBananaInput | GptImageInput;
+
+interface ImageResult {
+  model: ImageModelId;
+  api: 'google' | 'openai';
+  providerModelId: string;
+  path?: string;
+  paths: string[];
+  text: string;
+  usage: ImageUsage;
+  result: BaseImageResult;
+}
+```
+
+Use [image.md](./image.md) for the full input and settings guide.
+
+### `NanoBananaInput`
+
+```ts
+interface NanoBananaInput {
+  model: 'nano-banana' | 'nano-banana-pro';
+  prompt: string;
+  output: string;
+  imagePaths?: string[];
+  settings?: NanoBananaSettings;
+  keysFilePath?: string;
+  requestId?: string;
+  signal?: AbortSignal;
+}
+```
+
+### `GptImageInput`
+
+```ts
+interface GptImageInput {
+  model: 'gpt-image';
+  prompt: string;
+  output: string;
+  imagePaths?: string[];
+  maskPath?: string;
+  settings?: GptImageSettings;
+  keysFilePath?: string;
+  requestId?: string;
+  signal?: AbortSignal;
+}
+```
+
+### `NanoBananaSettings`
+
+```ts
+interface NanoBananaSettings {
+  aspectRatio?: string;
+  imageSize?: string;
+  personGeneration?: string;
+  prominentPeople?: string;
+  googleSearch?: boolean;
+  includeText?: boolean;
+}
+```
+
+### `GptImageSettings`
+
+```ts
+interface GptImageSettings {
+  size?: string;
+  quality?: string;
+  background?: string;
+  format?: string;
+  compression?: number;
+  moderation?: string;
+  count?: number;
+  fidelity?: string;
+}
+```
+
+### `ImageContent`, `ImageUsage`, and `BaseImageResult`
+
+These are re-exported from `@ank1015/llm-core` so callers can inspect the underlying normalized image result when needed.
+
+---
+
 ## Messages
 
 ### `Message`
@@ -44,11 +142,7 @@ import type {
 The union of all message types passed to `llm()`.
 
 ```ts
-type Message =
-  | UserMessage
-  | ToolResultMessage
-  | BaseAssistantMessage
-  | CustomMessage;
+type Message = UserMessage | ToolResultMessage | BaseAssistantMessage | CustomMessage;
 ```
 
 In practice you'll author `UserMessage` and `ToolResultMessage`. `BaseAssistantMessage` comes back from `llm()` calls and can be put directly into the history for multi-turn conversations.
@@ -68,9 +162,9 @@ A message from the user.
 ```ts
 interface UserMessage {
   role: 'user';
-  id: string;          // unique message id
-  content: Content;    // what the user said (text, image, file)
-  timestamp?: number;  // Unix ms (optional)
+  id: string; // unique message id
+  content: Content; // what the user said (text, image, file)
+  timestamp?: number; // Unix ms (optional)
 }
 ```
 
@@ -114,10 +208,7 @@ interface UserMessageOptions {
   timestamp?: number;
 }
 
-declare function userMessage(
-  content: string | Content,
-  options?: UserMessageOptions
-): UserMessage;
+declare function userMessage(content: string | Content, options?: UserMessageOptions): UserMessage;
 ```
 
 ---
@@ -129,18 +220,18 @@ Represents the result of executing a tool call. Add this to your message history
 ```ts
 interface ToolResultMessage<TDetails = unknown> {
   role: 'toolResult';
-  id: string;          // unique message id, you provide this
-  toolName: string;    // name of the tool that was called
-  toolCallId: string;  // from AssistantToolCall.toolCallId
-  content: Content;    // what the tool returned
-  details?: TDetails;  // optional structured data (not sent to model)
+  id: string; // unique message id, you provide this
+  toolName: string; // name of the tool that was called
+  toolCallId: string; // from AssistantToolCall.toolCallId
+  content: Content; // what the tool returned
+  details?: TDetails; // optional structured data (not sent to model)
   isError: boolean;
   error?: {
     message: string;
     name?: string;
     stack?: string;
   };
-  timestamp: number;   // Unix ms
+  timestamp: number; // Unix ms
 }
 ```
 
@@ -204,14 +295,14 @@ interface TextContent {
 
 interface ImageContent {
   type: 'image';
-  data: string;     // base64 encoded
+  data: string; // base64 encoded
   mimeType: string; // e.g. 'image/jpeg', 'image/png'
   metadata?: Record<string, unknown>;
 }
 
 interface FileContent {
   type: 'file';
-  data: string;     // base64 encoded
+  data: string; // base64 encoded
   mimeType: string; // e.g. 'application/pdf'
   filename: string;
   metadata?: Record<string, unknown>;
@@ -332,9 +423,9 @@ Full `ToolDefinition` shape:
 interface ToolDefinition<TParameters, TDetails = unknown, TName extends string = string> {
   name: TName;
   description: string;
-  parameters: TParameters;     // TypeBox schema
+  parameters: TParameters; // TypeBox schema
   execute: (
-    params: Static<TParameters>,  // typed args from the model
+    params: Static<TParameters>, // typed args from the model
     context: ToolContext<TDetails>
   ) => ToolResult<TDetails> | Promise<ToolResult<TDetails>>;
 }
@@ -348,8 +439,8 @@ The second argument to `execute`. Gives you access to the message history and a 
 
 ```ts
 interface ToolContext<TDetails = unknown> {
-  messages: readonly Message[];    // full message history at time of tool call
-  toolCallId: string;              // the tool call id
+  messages: readonly Message[]; // full message history at time of tool call
+  toolCallId: string; // the tool call id
   signal?: AbortSignal;
   update: (partialResult: ToolResult<TDetails>) => void | Promise<void>;
   // call update() to stream intermediate results before returning the final one
@@ -364,8 +455,8 @@ What your `execute` function returns.
 
 ```ts
 interface ToolResult<TDetails = unknown> {
-  content: Content;     // what to send back to the model
-  details?: TDetails;   // optional structured data stored in ToolResultMessage but not sent to model
+  content: Content; // what to send back to the model
+  details?: TDetails; // optional structured data stored in ToolResultMessage but not sent to model
 }
 ```
 
@@ -413,7 +504,7 @@ type ReasoningEffort = 'low' | 'medium' | 'high' | 'xhigh';
 Provider behavior in this SDK:
 
 - `openai` and `codex`: omitted means no standardized reasoning option is added.
-- `anthropic` and `claude-code`: adaptive thinking is enabled by default for the supported Claude 4.6 models. `ReasoningEffort` adjusts the adaptive effort level.
+- `anthropic` and `claude-code`: adaptive thinking and `cache_control: { type: 'ephemeral' }` are enabled by default for the supported Claude 4.6 models. `ReasoningEffort` adjusts the adaptive effort level.
 - `google`: omitted means the provider default thinking behavior is used.
 
 ---
@@ -592,7 +683,7 @@ type AgentEvent =
       type: 'message_update';
       messageType: 'assistant' | 'custom';
       messageId: string;
-      message: Message | BaseAssistantEvent;  // BaseAssistantEvent during streaming
+      message: Message | BaseAssistantEvent; // BaseAssistantEvent during streaming
     }
   | {
       type: 'message_end';
@@ -627,14 +718,14 @@ Custom loader for `agent({ session: { loadMessages } })`. Use this when you want
 
 ```ts
 type SessionMessagesLoader = (context: {
-  path: string;          // path to the .jsonl session file
-  branch: string;        // branch name being loaded
+  path: string; // path to the .jsonl session file
+  branch: string; // branch name being loaded
   session: {
     path: string;
     header: { type: 'session'; version: 1; id: string; createdAt: string; title?: string };
     nodes: SessionNode[];
   };
-  head: SessionNode | typeof session.header;  // the most recent node on the branch
+  head: SessionNode | typeof session.header; // the most recent node on the branch
   lineage: {
     path: string;
     sessionId: string;
@@ -656,13 +747,13 @@ Custom saver for `agent({ session: { saveNode } })`. Use this when you want cust
 
 ```ts
 type SessionNodeSaver = (context: {
-  path: string;    // path to the .jsonl session file
+  path: string; // path to the .jsonl session file
   session: {
     path: string;
     header: { type: 'session'; version: 1; id: string; createdAt: string; title?: string };
     nodes: SessionNode[];
   };
-  node: SessionNode;  // the node being saved
+  node: SessionNode; // the node being saved
 }) => void | Promise<void>;
 
 // SessionNode is one of:
