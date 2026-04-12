@@ -19,6 +19,7 @@ pnpm --filter @ank1015/llm-server test:unit
 pnpm --filter @ank1015/llm-server test:integration
 pnpm --filter @ank1015/llm-server test:live
 pnpm --filter @ank1015/llm-server start
+pnpm --filter @ank1015/llm-server test-skill -- --prompt "Open the target page"
 ```
 
 ## What It Contains
@@ -47,6 +48,7 @@ Repo-local callers can override filesystem paths through the internal config mod
 - `src/core/artifact-dir/` - artifact directory metadata, skill helpers, and temp workspace helpers
 - `src/core/session/` - session storage, prompt execution, live run registry, compaction, and context reframing
 - `src/core/terminal/` - terminal registry and PTY helpers
+- `src/test-skill.ts` - standalone CLI that runs the server agent prompt/tools with appended Chrome docs and exports a Markdown transcript
 - `src/contracts/` - route request and response schemas
 - `src/types/` - server-local DTO and model types
 - `docs/` - package-facing backend notes
@@ -61,3 +63,4 @@ Repo-local callers can override filesystem paths through the internal config mod
 
 - This package is intentionally private even though it has a clean package manifest and exported entrypoints for workspace consumers.
 - The current package-level lint command still has outstanding source warnings and errors; the docs here describe the package as it exists today without changing runtime behavior.
+- `test-skill` accepts `--prompt`, optional `--cwd`, and optional `--output`, then writes a conversation-style Markdown transcript after the run finishes.
