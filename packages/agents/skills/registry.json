@@ -1,5 +1,10 @@
 [
   {
+    "name": "chrome-controller",
+    "link": "https://github.com/ank1015/chrome-controller/tree/main/skill/chrome-controller",
+    "description": "Control Chrome with the `chrome-controller` CLI and build repeatable browser workflows with the root-package SDK. Use when you need to inspect or manipulate real browser tabs and pages, manage sessions/windows/tabs, navigate pages, snapshot and interact with elements, capture debugger/console/network state, manage cookies/storage/uploads/downloads, or convert an explored browser task into a reusable script with `connectChromeController`"
+  },
+  {
     "name": "docx",
     "link": "https://github.com/anthropics/skills/tree/main/skills/docx",
     "description": "Use this skill whenever the user wants to create, read, edit, or manipulate Word documents (.docx files). Triggers include: any mention of 'Word doc', 'word document', '.docx', or requests to produce professional documents with formatting like tables of contents, headings, page numbers, or letterheads. Also use when extracting or reorganizing content from .docx files, inserting or replacing images in documents, performing find-and-replace in Word files, working with tracked changes or comments, or converting content into a polished Word document. If the user asks for a 'report', 'memo', 'letter', 'template', or similar deliverable as a Word or .docx file, use this skill. Do NOT use for PDFs, spreadsheets, Google Docs, or general coding tasks unrelated to document generation."

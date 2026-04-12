@@ -8,6 +8,17 @@ describe('skills registry', () => {
 
     expect(skills).toEqual([
       expect.objectContaining({
+        name: 'chrome-controller',
+        link: 'https://github.com/ank1015/chrome-controller/tree/main/skill/chrome-controller',
+        description: expect.stringContaining('Control Chrome'),
+        source: {
+          owner: 'ank1015',
+          repo: 'chrome-controller',
+          ref: 'main',
+          subpath: 'skill/chrome-controller',
+        },
+      }),
+      expect.objectContaining({
         name: 'docx',
         link: 'https://github.com/anthropics/skills/tree/main/skills/docx',
         description: expect.stringContaining('Word documents'),
@@ -66,6 +77,9 @@ describe('skills registry', () => {
   });
 
   it('looks up a single registered skill by name', async () => {
+    await expect(getRegisteredSkill('chrome-controller')).resolves.toEqual(
+      expect.objectContaining({ name: 'chrome-controller' })
+    );
     await expect(getRegisteredSkill('docx')).resolves.toEqual(
       expect.objectContaining({ name: 'docx' })
     );
