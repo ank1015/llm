@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto';
 import { appendFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
-import { createAllTools, createSystemPrompt } from '@ank1015/llm-agents';
 import { agent, getText, llm, userMessage } from '@ank1015/llm-sdk';
 import { createSession as createSdkSession, readSession } from '@ank1015/llm-sdk/session';
 
@@ -11,6 +10,7 @@ import { getConfig } from '../config.js';
 import { Project } from '../project/project.js';
 import { ensureDir, pathExists } from '../storage/fs.js';
 
+import { createServerAgentConfig } from './agent-config.js';
 import { persistCompletedTurnCompaction } from './compaction.js';
 import { createSessionContextReframingLoader } from './context-reframing.js';
 import {
@@ -212,7 +212,8 @@ function parseHeaderMetadata(
 
 function toSessionMetadata(
   header: SessionHeaderNode,
-  fallbackModelId?: CuratedModelId | null
+  fallbackModelId?: CuratedModelId | null,
+  systemPrompt = ''
 ): SessionMetadata {
   const headerRecord = header as SessionHeaderNode & LegacyRecord;
   const metadata = parseHeaderMetadata(header, fallbackModelId);
@@ -225,6 +226,7 @@ function toSessionMetadata(
     modelId: metadata.modelId,
     createdAt: header.createdAt ?? legacyTimestamp ?? new Date(0).toISOString(),
     activeBranch: metadata.activeBranch ?? DEFAULT_ACTIVE_BRANCH,
+    systemPrompt,
   };
 }
 
@@ -390,8 +392,15 @@ export class Session {
   }
 
   async getMetadata(): Promise<SessionMetadata> {
-    const session = await this.getStoredSession();
-    return toSessionMetadata(session.header, resolveSessionModelId(session));
+    const [session, agentConfig] = await Promise.all([
+      this.getStoredSession(),
+      this.loadAgentConfig(),
+    ]);
+    return toSessionMetadata(
+      session.header,
+      resolveSessionModelId(session),
+      agentConfig.systemPrompt
+    );
   }
 
   async updateName(name: string): Promise<void> {
@@ -530,15 +539,12 @@ export class Session {
       artifactDir.getMetadata(),
     ]);
 
-    return {
-      systemPrompt: await createSystemPrompt({
-        projectName: projectMetadata.name,
-        projectDir: project.projectPath,
-        artifactName: artifactMetadata.name,
-        artifactDir: artifactDir.dirPath,
-      }),
-      tools: Object.values(createAllTools(artifactDir.dirPath)) as unknown as AgentTool[],
-    };
+    return createServerAgentConfig({
+      projectName: projectMetadata.name,
+      projectDir: project.projectPath,
+      artifactName: artifactMetadata.name,
+      artifactDir: artifactDir.dirPath,
+    });
   }
 
   private resolveExecutionConfig(

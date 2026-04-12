@@ -130,6 +130,7 @@ export function toSessionMetadataDto(session: SessionMetadata): SessionMetadataD
     modelId: session.modelId,
     createdAt: session.createdAt,
     activeBranch: session.activeBranch,
+    systemPrompt: session.systemPrompt,
   };
 }
 

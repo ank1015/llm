@@ -40,6 +40,7 @@ export interface SessionMetadata {
   modelId: CuratedModelId;
   createdAt: string;
   activeBranch: string;
+  systemPrompt: string;
 }
 
 export interface SessionSummary {

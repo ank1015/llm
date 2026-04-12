@@ -46,6 +46,7 @@ export const SessionMetadataDtoSchema = Type.Object(
     modelId: Type.String(),
     createdAt: Type.String(),
     activeBranch: Type.String(),
+    systemPrompt: Type.String(),
   },
   { additionalProperties: false }
 );
