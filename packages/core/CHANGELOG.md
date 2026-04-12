@@ -6,6 +6,8 @@ The format is based on Keep a Changelog and this package follows SemVer once its
 
 ## [Unreleased]
 
+## [0.0.6] - 2026-04-12
+
 ### Added
 
 - Added a dedicated image-generation runtime with `generateImage()`, image model catalogs, and a separate image provider registry.
@@ -25,6 +27,8 @@ The format is based on Keep a Changelog and this package follows SemVer once its
 - Added live Google Lyria integration coverage for clip, WAV, and image-guided music generation.
 - Added unit coverage for the video public API and Google Veo provider helpers.
 - Added live Google Veo integration coverage for interpolation, reference-image generation, image-to-video, and video extension.
+- Added provider option guides for Anthropic, OpenAI, Google, Z.AI, OpenRouter, and Codex covering reasoning and prompt-caching behavior.
+- Added a live multi-provider handoff integration test that carries a tool-backed conversation from Z.AI through Google, Anthropic, OpenAI, and Codex.
 
 ## [0.0.5] - 2026-04-02
 
