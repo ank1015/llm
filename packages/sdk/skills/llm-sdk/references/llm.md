@@ -125,7 +125,7 @@ type ReasoningEffort = 'low' | 'medium' | 'high' | 'xhigh';
 Notes:
 
 - `openai` and `codex`: if omitted, no standardized reasoning setting is added.
-- `anthropic` and `claude-code`: this SDK always enables adaptive thinking for the supported Claude 4.6 models. `reasoningEffort` sets the adaptive effort level. If omitted, adaptive thinking is still enabled and the provider default effort is used.
+- `anthropic` and `claude-code`: this SDK always enables adaptive thinking and `cache_control: { type: 'ephemeral' }` for the supported Claude 4.6 models. `reasoningEffort` sets the adaptive effort level. If omitted, adaptive thinking is still enabled and the provider default effort is used.
 - `google`: if omitted, no explicit thinking level is added and the provider default applies.
 
 ### `overrideProviderSetting`

@@ -1,16 +1,17 @@
-"use client";
+'use client';
 
-import { useParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useStickToBottom } from "use-stick-to-bottom";
+import { useParams } from 'next/navigation';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useStickToBottom } from 'use-stick-to-bottom';
 
-import { ArtifactChatComposer } from "@/components/artifact-chat-composer";
-import { ArtifactChatFileLinksProvider } from "@/components/chat-file-links-provider";
-import { ChatMessages } from "@/components/chat-messages";
-import { useRefreshArtifactFilesOnStreamComplete } from "@/hooks/use-refresh-artifact-files-on-stream-complete";
-import { useChatStore } from "@/stores/chat-store";
+import { ArtifactChatComposer } from '@/components/artifact-chat-composer';
+import { ArtifactChatFileLinksProvider } from '@/components/chat-file-links-provider';
+import { ChatMessages } from '@/components/chat-messages';
+import { useSessionQuery } from '@/hooks/api/sessions';
+import { useRefreshArtifactFilesOnStreamComplete } from '@/hooks/use-refresh-artifact-files-on-stream-complete';
+import { useChatStore } from '@/stores/chat-store';
 
-const EMPTY_MESSAGES: ReturnType<typeof useChatStore.getState>["messagesBySession"][string] = [];
+const EMPTY_MESSAGES: ReturnType<typeof useChatStore.getState>['messagesBySession'][string] = [];
 
 export function ArtifactSessionPanel() {
   const { projectId, artifactId, sessionId } = useParams<{
@@ -23,7 +24,7 @@ export function ArtifactSessionPanel() {
   const loadMessages = useChatStore((state) => state.loadMessages);
   const messages = useChatStore((state) => state.messagesBySession[sessionId] ?? EMPTY_MESSAGES);
   const streamingAssistant = useChatStore(
-    (state) => state.streamingAssistantBySession[sessionId] ?? null,
+    (state) => state.streamingAssistantBySession[sessionId] ?? null
   );
   const isStreaming = useChatStore((state) => state.isStreamingBySession[sessionId] ?? false);
   const isLoading = useChatStore((state) => state.isLoadingMessagesBySession[sessionId] ?? false);
@@ -35,8 +36,9 @@ export function ArtifactSessionPanel() {
       projectId,
       artifactId,
     }),
-    [artifactId, projectId],
+    [artifactId, projectId]
   );
+  const session = useSessionQuery(artifactContext, sessionId).data;
   const { scrollRef, contentRef } = useStickToBottom({
     stiffness: 1,
     damping: 0,
@@ -82,8 +84,7 @@ export function ArtifactSessionPanel() {
     };
   }, []);
 
-  const hasRenderableContent =
-    messages.length > 0 || isStreaming || Boolean(streamingAssistant);
+  const hasRenderableContent = messages.length > 0 || isStreaming || Boolean(streamingAssistant);
 
   return (
     <div className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
@@ -98,7 +99,7 @@ export function ArtifactSessionPanel() {
             style={{ paddingBottom: `${composerReserve + 80}px` }}
           >
             {hasRenderableContent ? (
-              <ChatMessages sessionId={sessionId} />
+              <ChatMessages sessionId={sessionId} systemPrompt={session?.systemPrompt ?? null} />
             ) : isLoading ? (
               <div className="flex min-h-[50vh] items-center justify-center px-6 py-16">
                 <p className="text-sm leading-7 text-black/46 dark:text-white/44">
@@ -125,7 +126,11 @@ export function ArtifactSessionPanel() {
           ref={composerRef}
           className="pointer-events-auto mx-auto flex w-full max-w-3xl flex-col items-start pb-4"
         >
-          <ArtifactChatComposer projectId={projectId} artifactId={artifactId} sessionId={sessionId} />
+          <ArtifactChatComposer
+            projectId={projectId}
+            artifactId={artifactId}
+            sessionId={sessionId}
+          />
         </div>
       </div>
     </div>

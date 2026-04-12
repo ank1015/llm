@@ -6,6 +6,10 @@ The format is based on Keep a Changelog and this package follows SemVer once its
 
 ## [Unreleased]
 
+### Added
+
+- Added package docs for the new `image()` SDK entrypoint, including path-first output behavior, SDK image aliases, and model-specific settings guidance.
+
 ## [0.0.4] - 2026-04-02
 
 ### Added

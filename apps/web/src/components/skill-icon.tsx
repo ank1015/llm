@@ -1,6 +1,13 @@
 'use client';
 
-import { AiBrain03Icon, Pdf02Icon } from '@hugeicons/core-free-icons';
+import {
+  AiBrain03Icon,
+  ChromeIcon,
+  Doc02Icon,
+  Pdf02Icon,
+  Ppt02Icon,
+  Xls02Icon,
+} from '@hugeicons/core-free-icons';
 import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react';
 
 import skillRegistryData from '@/lib/skills/registry.json';
@@ -14,7 +21,12 @@ type RegisteredSkillRecord = {
 
 const REGISTERED_SKILLS = skillRegistryData as RegisteredSkillRecord[];
 const EXPLICIT_SKILL_ICON_MAP: Record<string, IconSvgElement> = {
+  'chrome-controller': ChromeIcon,
+  docx: Doc02Icon,
+  llm: AiBrain03Icon,
   pdf: Pdf02Icon,
+  pptx: Ppt02Icon,
+  xlsx: Xls02Icon,
 };
 const DEFAULT_SKILL_ICON = AiBrain03Icon;
 const REGISTERED_SKILL_ICON_MAP = Object.fromEntries(

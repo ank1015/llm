@@ -167,13 +167,35 @@ describe('project, artifact, and terminal routes', () => {
     const response = await jsonRequest(skillRoutes, '/skills', 'GET');
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual([
-      expect.objectContaining({
-        name: 'pdf',
-        link: 'https://github.com/anthropics/skills/tree/main/skills/pdf',
-        description: expect.stringContaining('PDF files'),
-      }),
-    ]);
+    expect(await response.json()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: 'docx',
+          link: 'https://github.com/anthropics/skills/tree/main/skills/docx',
+          description: expect.stringContaining('Word documents'),
+        }),
+        expect.objectContaining({
+          name: 'llm',
+          link: 'https://github.com/ank1015/llm/tree/main/packages/sdk/skills/llm-sdk',
+          description: expect.stringContaining('@ank1015/llm-sdk'),
+        }),
+        expect.objectContaining({
+          name: 'pdf',
+          link: 'https://github.com/anthropics/skills/tree/main/skills/pdf',
+          description: expect.stringContaining('PDF files'),
+        }),
+        expect.objectContaining({
+          name: 'pptx',
+          link: 'https://github.com/anthropics/skills/tree/main/skills/pptx',
+          description: expect.stringContaining('.pptx file'),
+        }),
+        expect.objectContaining({
+          name: 'xlsx',
+          link: 'https://github.com/anthropics/skills/tree/main/skills/xlsx',
+          description: expect.stringContaining('spreadsheet file'),
+        }),
+      ])
+    );
   });
 
   it('handles artifact explorer, file mutations, and installed skill routes', async () => {

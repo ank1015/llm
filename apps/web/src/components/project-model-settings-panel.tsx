@@ -1,22 +1,21 @@
-"use client";
+'use client';
 
-import { createPortal } from "react-dom";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
+import { ArrowRight01Icon, PencilEdit01Icon, ReloadIcon } from '@hugeicons/core-free-icons';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { toast } from 'sonner';
 
-import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
+import type { KeyCredentialFieldDto, KeyProviderContract } from '@/lib/client-api';
+import type { Api, CuratedModelId } from '@ank1015/llm-sdk';
 
 import {
   useKeyDetailsQuery,
   useModelsQuery,
   useReloadKeyMutation,
   useSetKeyMutation,
-} from "@/hooks/api";
-import { useChatSettingsStore } from "@/stores/chat-settings-store";
-
-import type { KeyCredentialFieldDto, KeyProviderContract } from "@/lib/client-api";
-import type { Api, CuratedModelId } from "@ank1015/llm-sdk";
+} from '@/hooks/api';
+import { useChatSettingsStore } from '@/stores/chat-settings-store';
 
 type ModelProvider = {
   api: Api;
@@ -27,25 +26,32 @@ type ModelProvider = {
   }>;
 };
 
-const AUTO_LOAD_KEY_PROVIDERS = new Set<KeyProviderContract>(["codex", "claude-code"]);
+type CredentialsDialogMode = 'connect' | 'edit';
+
+type CredentialsDialogState = {
+  mode: CredentialsDialogMode;
+  provider: ModelProvider;
+};
+
+const AUTO_LOAD_KEY_PROVIDERS = new Set<KeyProviderContract>(['codex', 'claude-code']);
 
 function isCredentialFieldSensitive(field: KeyCredentialFieldDto): boolean {
   const normalized = field.option.toLowerCase();
-  return normalized.includes("key") || normalized.includes("token");
+  return normalized.includes('key') || normalized.includes('token');
 }
 
 function formatCredentialFieldLabel(field: KeyCredentialFieldDto): string {
-  if (field.option === "apiKey") {
-    return "API Key";
+  if (field.option === 'apiKey') {
+    return 'API Key';
   }
 
   return field.option
-    .replace(/-/g, " ")
-    .replace(/([a-z])([A-Z])/g, "$1 $2")
-    .split(" ")
+    .replace(/-/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .split(' ')
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
+    .join(' ');
 }
 
 function hasCompleteCredentials(input: {
@@ -54,7 +60,7 @@ function hasCompleteCredentials(input: {
 }): boolean {
   return input.fields.every((field) => {
     const value = input.credentials[field.option];
-    return typeof value === "string" && value.trim().length > 0;
+    return typeof value === 'string' && value.trim().length > 0;
   });
 }
 
@@ -63,15 +69,15 @@ function SettingsToggle({
   disabled,
   onToggle,
   ariaLabel,
-  size = "default",
+  size = 'default',
 }: {
   checked: boolean;
   disabled?: boolean;
   onToggle: () => void;
   ariaLabel: string;
-  size?: "default" | "small";
+  size?: 'default' | 'small';
 }) {
-  const isSmall = size === "small";
+  const isSmall = size === 'small';
 
   return (
     <button
@@ -82,23 +88,25 @@ function SettingsToggle({
       onClick={onToggle}
       disabled={disabled}
       className={[
-        isSmall ? "inline-flex h-5 w-8" : "inline-flex h-6 w-10",
-        "shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/12 disabled:cursor-not-allowed disabled:opacity-60 dark:focus-visible:ring-white/12",
+        isSmall ? 'inline-flex h-5 w-8' : 'inline-flex h-6 w-10',
+        'shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/12 disabled:cursor-not-allowed disabled:opacity-60 dark:focus-visible:ring-white/12',
         checked
-          ? "border-black bg-black dark:border-white dark:bg-white"
-          : "border-black/10 bg-black/6 dark:border-white/10 dark:bg-white/8",
-      ].join(" ")}
+          ? 'border-black bg-black dark:border-white dark:bg-white'
+          : 'border-black/10 bg-black/6 dark:border-white/10 dark:bg-white/8',
+      ].join(' ')}
     >
       <span
         className={[
-          isSmall ? "mt-[2px] ml-[2px] inline-flex h-[14px] w-[14px]" : "mt-[2px] ml-[2px] inline-flex h-[18px] w-[18px]",
-          "rounded-full transition-transform",
+          isSmall
+            ? 'mt-[2px] ml-[2px] inline-flex h-[14px] w-[14px]'
+            : 'mt-[2px] ml-[2px] inline-flex h-[18px] w-[18px]',
+          'rounded-full transition-transform',
           checked
             ? isSmall
-              ? "translate-x-3 bg-white dark:bg-black"
-              : "translate-x-4 bg-white dark:bg-black"
-            : "translate-x-0 bg-white dark:bg-[#0E0E0E]",
-        ].join(" ")}
+              ? 'translate-x-3 bg-white dark:bg-black'
+              : 'translate-x-4 bg-white dark:bg-black'
+            : 'translate-x-0 bg-white dark:bg-[#0E0E0E]',
+        ].join(' ')}
       />
     </button>
   );
@@ -107,12 +115,14 @@ function SettingsToggle({
 function ProviderCredentialsDialog({
   provider,
   providerLabel,
+  mode,
   open,
   onClose,
   onSaved,
 }: {
   provider: KeyProviderContract;
   providerLabel: string;
+  mode: CredentialsDialogMode;
   open: boolean;
   onClose: () => void;
   onSaved: () => void;
@@ -123,6 +133,12 @@ function ProviderCredentialsDialog({
   const [draftValues, setDraftValues] = useState<Record<string, string> | null>(null);
   const supportsAutoLoad = AUTO_LOAD_KEY_PROVIDERS.has(provider);
   const isBusy = saveCredentials.isPending || reloadCredentials.isPending;
+  const dialogTitle =
+    mode === 'edit' ? `Edit ${providerLabel} credentials` : `Connect ${providerLabel}`;
+  const dialogDescription =
+    mode === 'edit'
+      ? 'Update the credentials stored for this provider.'
+      : 'Enter the credentials required to enable this provider in the prompt input.';
 
   const handleClose = useCallback(() => {
     setDraftValues(null);
@@ -135,14 +151,14 @@ function ProviderCredentialsDialog({
     }
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape" && !isBusy) {
+      if (event.key === 'Escape' && !isBusy) {
         handleClose();
       }
     }
 
-    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown);
     return () => {
-      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener('keydown', handleKeyDown);
     };
   }, [handleClose, isBusy, open]);
 
@@ -160,24 +176,24 @@ function ProviderCredentialsDialog({
 
     const payload = Object.fromEntries(
       detailsQuery.data.fields
-        .map((field) => [field.option, nextValues[field.option]?.trim() ?? ""])
-        .filter((entry) => entry[1].length > 0),
+        .map((field) => [field.option, nextValues[field.option]?.trim() ?? ''])
+        .filter((entry) => entry[1].length > 0)
     );
 
     if (
-      detailsQuery.data.fields.some((field) => (payload[field.option] ?? "").trim().length === 0)
+      detailsQuery.data.fields.some((field) => (payload[field.option] ?? '').trim().length === 0)
     ) {
-      toast.error("Complete all required credential fields.");
+      toast.error('Complete all required credential fields.');
       return;
     }
 
     try {
       await saveCredentials.mutateAsync(payload);
-      toast.success("Credentials saved.");
+      toast.success(mode === 'edit' ? 'Credentials updated.' : 'Credentials saved.');
       onSaved();
       handleClose();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to save credentials.");
+      toast.error(error instanceof Error ? error.message : 'Failed to save credentials.');
     }
   }
 
@@ -198,19 +214,19 @@ function ProviderCredentialsDialog({
           credentials: nextDetails.credentials,
         })
       ) {
-        toast.success("Credentials loaded.");
+        toast.success('Credentials loaded.');
         onSaved();
         handleClose();
         return;
       }
 
-      toast.error("No local credentials were found.");
+      toast.error('No local credentials were found.');
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to auto load credentials.");
+      toast.error(error instanceof Error ? error.message : 'Failed to auto load credentials.');
     }
   }
 
-  if (!open || typeof document === "undefined") {
+  if (!open || typeof document === 'undefined') {
     return null;
   }
 
@@ -235,10 +251,8 @@ function ProviderCredentialsDialog({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="space-y-1">
-          <h2 className="text-lg font-medium text-black dark:text-white">Connect {providerLabel}</h2>
-          <p className="text-sm leading-6 text-black/52 dark:text-white/54">
-            Enter the credentials required to enable this provider in the prompt input.
-          </p>
+          <h2 className="text-lg font-medium text-black dark:text-white">{dialogTitle}</h2>
+          <p className="text-sm leading-6 text-black/52 dark:text-white/54">{dialogDescription}</p>
           {supportsAutoLoad ? (
             <p className="text-[12px] leading-5 text-black/38 dark:text-white/38">
               Auto load reads existing local auth for this provider and fills the shared keys file.
@@ -264,8 +278,8 @@ function ProviderCredentialsDialog({
                     </span>
                   </div>
                   <input
-                    type={isCredentialFieldSensitive(field) ? "password" : "text"}
-                    value={values[field.option] ?? ""}
+                    type={isCredentialFieldSensitive(field) ? 'password' : 'text'}
+                    value={values[field.option] ?? ''}
                     onChange={(event) =>
                       setDraftValues((current) => ({
                         ...(current ?? {}),
@@ -277,7 +291,7 @@ function ProviderCredentialsDialog({
                   />
                   {field.aliases.length > 0 ? (
                     <p className="text-[11px] leading-5 text-black/34 dark:text-white/34">
-                      Aliases: {field.aliases.join(", ")}
+                      Aliases: {field.aliases.join(', ')}
                     </p>
                   ) : null}
                 </label>
@@ -295,7 +309,7 @@ function ProviderCredentialsDialog({
                 disabled={detailsQuery.isPending || isBusy}
                 className="inline-flex h-10 items-center justify-center rounded-xl px-4 text-sm font-medium text-black/62 transition-colors hover:bg-accent hover:text-black disabled:cursor-not-allowed disabled:opacity-60 dark:text-white/62 dark:hover:bg-accent dark:hover:text-white"
               >
-                {reloadCredentials.isPending ? "Loading..." : "Auto load"}
+                {reloadCredentials.isPending ? 'Loading...' : 'Auto load'}
               </button>
             ) : null}
           </div>
@@ -315,13 +329,13 @@ function ProviderCredentialsDialog({
               disabled={detailsQuery.isPending || isBusy}
               className="inline-flex h-10 items-center justify-center rounded-xl bg-black px-4 text-sm font-medium text-white transition-opacity hover:opacity-92 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-black"
             >
-              {saveCredentials.isPending ? "Saving..." : "Save"}
+              {saveCredentials.isPending ? 'Saving...' : 'Save'}
             </button>
           </div>
         </div>
       </div>
     </div>,
-    document.body,
+    document.body
   );
 }
 
@@ -334,20 +348,51 @@ function ProviderRow({
   provider: ModelProvider;
   collapsed: boolean;
   onToggleCollapsed: () => void;
-  onRequestCredentials: (provider: ModelProvider) => void;
+  onRequestCredentials: (provider: ModelProvider, mode: CredentialsDialogMode) => void;
 }) {
   const keyProvider = provider.api as KeyProviderContract;
   const detailsQuery = useKeyDetailsQuery(keyProvider);
+  const reloadCredentials = useReloadKeyMutation(keyProvider);
   const isProviderEnabled = useChatSettingsStore((state) => state.isProviderEnabled(provider.api));
   const isModelEnabled = useChatSettingsStore((state) => state.isModelEnabled);
   const setProviderEnabled = useChatSettingsStore((state) => state.setProviderEnabled);
   const setModelEnabled = useChatSettingsStore((state) => state.setModelEnabled);
+  const supportsAutoLoad = AUTO_LOAD_KEY_PROVIDERS.has(keyProvider);
   const hasCredentials = detailsQuery.data
     ? hasCompleteCredentials({
         fields: detailsQuery.data.fields,
         credentials: detailsQuery.data.credentials,
       })
     : false;
+  const showReloadCredentialsButton = supportsAutoLoad && hasCredentials;
+  const showEditCredentialsButton = !supportsAutoLoad && hasCredentials;
+
+  async function handleReloadCredentials() {
+    if (!showReloadCredentialsButton || reloadCredentials.isPending) {
+      return;
+    }
+
+    try {
+      await reloadCredentials.mutateAsync();
+      const refreshed = await detailsQuery.refetch();
+      const nextDetails = refreshed.data;
+
+      if (
+        nextDetails &&
+        hasCompleteCredentials({
+          fields: nextDetails.fields,
+          credentials: nextDetails.credentials,
+        })
+      ) {
+        toast.success(`${provider.label} credentials reloaded.`);
+        return;
+      }
+
+      toast.error('No local credentials were found.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to reload credentials.');
+    }
+  }
 
   function handleProviderToggle() {
     if (detailsQuery.isPending) {
@@ -355,13 +400,13 @@ function ProviderRow({
     }
 
     if (detailsQuery.isError || !detailsQuery.data) {
-      toast.error("Could not load provider credentials.");
+      toast.error('Could not load provider credentials.');
       return;
     }
 
     if (!isProviderEnabled) {
       if (!hasCredentials) {
-        onRequestCredentials(provider);
+        onRequestCredentials(provider, 'connect');
         return;
       }
 
@@ -400,7 +445,9 @@ function ProviderRow({
         <div className="min-w-0 flex flex-1 items-start gap-3">
           <button
             type="button"
-            aria-label={collapsed ? `Expand ${provider.label} models` : `Collapse ${provider.label} models`}
+            aria-label={
+              collapsed ? `Expand ${provider.label} models` : `Collapse ${provider.label} models`
+            }
             onClick={onToggleCollapsed}
             disabled={!isProviderEnabled}
             className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-black/40 transition-colors hover:bg-accent hover:text-black disabled:cursor-default disabled:opacity-30 dark:text-white/40 dark:hover:bg-accent dark:hover:text-white"
@@ -410,30 +457,75 @@ function ProviderRow({
               size={14}
               color="currentColor"
               strokeWidth={1.9}
-              className={["transition-transform duration-200", collapsed ? "rotate-0" : "rotate-90"].join(" ")}
+              className={[
+                'transition-transform duration-200',
+                collapsed ? 'rotate-0' : 'rotate-90',
+              ].join(' ')}
             />
           </button>
 
           <div className="min-w-0 flex-1">
-            <h2 className="text-[16px] font-medium tracking-[-0.01em] text-black dark:text-white">
-              {provider.label}
-            </h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-[16px] font-medium tracking-[-0.01em] text-black dark:text-white">
+                {provider.label}
+              </h2>
+              {showReloadCredentialsButton ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleReloadCredentials();
+                  }}
+                  disabled={detailsQuery.isPending || reloadCredentials.isPending}
+                  className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-black/42 transition-colors hover:bg-accent hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/12 disabled:pointer-events-none disabled:opacity-60 dark:text-white/44 dark:hover:bg-accent dark:hover:text-white dark:focus-visible:ring-white/12"
+                  aria-label={`Reload ${provider.label} credentials`}
+                  title={`Reload ${provider.label} credentials`}
+                >
+                  <HugeiconsIcon
+                    icon={ReloadIcon}
+                    size={15}
+                    color="currentColor"
+                    strokeWidth={1.8}
+                    className={reloadCredentials.isPending ? 'animate-spin' : undefined}
+                  />
+                </button>
+              ) : null}
+            </div>
           </div>
         </div>
 
-        <SettingsToggle
-          checked={isProviderEnabled}
-          disabled={detailsQuery.isPending}
-          onToggle={handleProviderToggle}
-          ariaLabel={`${isProviderEnabled ? "Disable" : "Enable"} ${provider.label}`}
-        />
+        <div className="flex items-center gap-2">
+          {showEditCredentialsButton ? (
+            <button
+              type="button"
+              onClick={() => onRequestCredentials(provider, 'edit')}
+              disabled={detailsQuery.isPending}
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-black/42 transition-colors hover:bg-accent hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/12 disabled:pointer-events-none disabled:opacity-60 dark:text-white/44 dark:hover:bg-accent dark:hover:text-white dark:focus-visible:ring-white/12"
+              aria-label={`Edit ${provider.label} credentials`}
+              title={`Edit ${provider.label} credentials`}
+            >
+              <HugeiconsIcon
+                icon={PencilEdit01Icon}
+                size={15}
+                color="currentColor"
+                strokeWidth={1.8}
+              />
+            </button>
+          ) : null}
+
+          <SettingsToggle
+            checked={isProviderEnabled}
+            disabled={detailsQuery.isPending}
+            onToggle={handleProviderToggle}
+            ariaLabel={`${isProviderEnabled ? 'Disable' : 'Enable'} ${provider.label}`}
+          />
+        </div>
       </div>
 
       <div
         className={[
-          "grid overflow-hidden transition-[grid-template-rows,opacity,margin] duration-200 ease-out",
-          showModels ? "mt-1 grid-rows-[1fr] opacity-100" : "mt-0 grid-rows-[0fr] opacity-0",
-        ].join(" ")}
+          'grid overflow-hidden transition-[grid-template-rows,opacity,margin] duration-200 ease-out',
+          showModels ? 'mt-1 grid-rows-[1fr] opacity-100' : 'mt-0 grid-rows-[0fr] opacity-0',
+        ].join(' ')}
       >
         <div className="overflow-hidden">
           <div className="space-y-1 pb-1 pl-9">
@@ -441,10 +533,7 @@ function ProviderRow({
               const enabled = isModelEnabled(model.modelId);
 
               return (
-                <div
-                  key={model.modelId}
-                  className="flex items-center gap-4 py-2"
-                >
+                <div key={model.modelId} className="flex items-center gap-4 py-2">
                   <div className="min-w-0 flex-1">
                     <p className="text-[13px] font-medium text-black/76 dark:text-white/76">
                       {model.label}
@@ -464,7 +553,7 @@ function ProviderRow({
                         toast.error(result.reason);
                       }
                     }}
-                    ariaLabel={`${enabled ? "Disable" : "Enable"} ${model.label}`}
+                    ariaLabel={`${enabled ? 'Disable' : 'Enable'} ${model.label}`}
                   />
                 </div>
               );
@@ -478,7 +567,8 @@ function ProviderRow({
 
 export function ProjectModelSettingsPanel() {
   const { data, isPending, isError } = useModelsQuery();
-  const [credentialsProvider, setCredentialsProvider] = useState<ModelProvider | null>(null);
+  const [credentialsDialogState, setCredentialsDialogState] =
+    useState<CredentialsDialogState | null>(null);
   const [collapsedProviders, setCollapsedProviders] = useState<Partial<Record<Api, boolean>>>({});
 
   const providers = useMemo<ModelProvider[]>(
@@ -491,7 +581,7 @@ export function ProjectModelSettingsPanel() {
           label: model.label,
         })),
       })),
-    [data?.providers],
+    [data?.providers]
   );
 
   return (
@@ -526,28 +616,38 @@ export function ProjectModelSettingsPanel() {
                     [provider.api]: !(current[provider.api] ?? false),
                   }))
                 }
-                onRequestCredentials={setCredentialsProvider}
+                onRequestCredentials={(nextProvider, mode) =>
+                  setCredentialsDialogState({
+                    provider: nextProvider,
+                    mode,
+                  })
+                }
               />
             ))}
           </div>
         )}
       </div>
 
-      {credentialsProvider ? (
+      {credentialsDialogState ? (
         <ProviderCredentialsDialog
-          provider={credentialsProvider.api as KeyProviderContract}
-          providerLabel={credentialsProvider.label}
+          provider={credentialsDialogState.provider.api as KeyProviderContract}
+          providerLabel={credentialsDialogState.provider.label}
+          mode={credentialsDialogState.mode}
           open
-          onClose={() => setCredentialsProvider(null)}
+          onClose={() => setCredentialsDialogState(null)}
           onSaved={() => {
+            if (credentialsDialogState.mode !== 'connect') {
+              return;
+            }
+
             useChatSettingsStore.getState().setProviderEnabled({
-              api: credentialsProvider.api,
+              api: credentialsDialogState.provider.api,
               enabled: true,
-              modelIds: credentialsProvider.models.map((model) => model.modelId),
+              modelIds: credentialsDialogState.provider.models.map((model) => model.modelId),
             });
             setCollapsedProviders((current) => ({
               ...current,
-              [credentialsProvider.api]: false,
+              [credentialsDialogState.provider.api]: false,
             }));
           }}
         />

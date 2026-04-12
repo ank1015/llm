@@ -1,4 +1,5 @@
 export { agent, AgentInputError, AgentRunConsumptionError } from './agent.js';
+export { image, ImageInputError, ImageModelIds, isImageModelId } from './image.js';
 export { llm, LlmInputError, LlmRunConsumptionError } from './llm.js';
 export { toolResultMessage, userMessage } from './messages.js';
 export { getText, getThinking, getToolCalls } from './response.js';
@@ -13,6 +14,17 @@ export type {
   AgentRun,
   AgentSessionInput,
 } from './agent.js';
+export type {
+  GptImageInput,
+  GptImageSettings,
+  ImageInput,
+  ImageModelId,
+  ImageResult,
+  NanoBananaInput,
+  NanoBananaSettings,
+  ResolveImageInputError,
+  UnsupportedImageModelError,
+} from './image.js';
 export type { LlmInput, LlmRun } from './llm.js';
 export type { ToolResultMessageOptions, UserMessageOptions } from './messages.js';
 export type {
@@ -25,12 +37,7 @@ export type {
 } from './model-input.js';
 export type { AssistantResponseInput } from './response.js';
 export type { SessionMessagesLoader, SessionNodeSaver } from './session.js';
-export type {
-  ToolContext,
-  ToolDefinition,
-  ToolResult,
-  ToolUpdateCallback,
-} from './tool.js';
+export type { ToolContext, ToolDefinition, ToolResult, ToolUpdateCallback } from './tool.js';
 
 export type {
   Api,
@@ -43,7 +50,10 @@ export type {
   AssistantToolCall,
   BaseAssistantEvent,
   BaseAssistantMessage,
+  BaseImageResult,
   Content,
+  ImageContent,
+  ImageUsage,
   Message,
   Tool,
   ToolResultMessage,

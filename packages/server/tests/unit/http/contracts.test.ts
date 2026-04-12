@@ -15,6 +15,7 @@ import {
   toTerminalSummaryDto,
 } from '../../../src/http/contracts.js';
 
+import type { LiveRunSummary } from '../../../src/core/session/run-registry.js';
 import type {
   ArtifactCheckpoint,
   ArtifactDirMetadata,
@@ -25,7 +26,6 @@ import type {
   TerminalMetadata,
   TerminalSummary,
 } from '../../../src/types/index.js';
-import type { LiveRunSummary } from '../../../src/core/session/run-registry.js';
 
 describe('http/contracts', () => {
   it('maps project, artifact, session, and terminal DTOs without altering values', () => {
@@ -65,6 +65,7 @@ describe('http/contracts', () => {
       modelId: 'codex/gpt-5.4-mini',
       createdAt: '2026-03-30T00:00:00.000Z',
       activeBranch: 'main',
+      systemPrompt: 'You are a helpful assistant.',
     };
     const terminalSummary: TerminalSummary = {
       id: 'terminal-a',

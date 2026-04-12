@@ -227,6 +227,9 @@ describe('model input', () => {
         thinking: {
           type: 'adaptive',
         },
+        cache_control: {
+          type: 'ephemeral',
+        },
       },
       provider: {
         model: expect.objectContaining({
@@ -237,6 +240,9 @@ describe('model input', () => {
           apiKey: 'anthropic-key',
           thinking: {
             type: 'adaptive',
+          },
+          cache_control: {
+            type: 'ephemeral',
           },
         },
       },
@@ -269,6 +275,9 @@ describe('model input', () => {
         thinking: {
           type: 'adaptive',
         },
+        cache_control: {
+          type: 'ephemeral',
+        },
         output_config: {
           effort: 'max',
         },
@@ -282,6 +291,9 @@ describe('model input', () => {
           apiKey: 'anthropic-key',
           thinking: {
             type: 'adaptive',
+          },
+          cache_control: {
+            type: 'ephemeral',
           },
           output_config: {
             effort: 'max',
@@ -317,6 +329,9 @@ describe('model input', () => {
         thinking: {
           type: 'adaptive',
         },
+        cache_control: {
+          type: 'ephemeral',
+        },
         output_config: {
           effort: 'high',
         },
@@ -330,6 +345,9 @@ describe('model input', () => {
           apiKey: 'anthropic-key',
           thinking: {
             type: 'adaptive',
+          },
+          cache_control: {
+            type: 'ephemeral',
           },
           output_config: {
             effort: 'high',
@@ -369,6 +387,9 @@ describe('model input', () => {
         thinking: {
           type: 'adaptive',
         },
+        cache_control: {
+          type: 'ephemeral',
+        },
         output_config: {
           effort: 'medium',
         },
@@ -384,6 +405,9 @@ describe('model input', () => {
           billingHeader: 'x-billing-account: acc-123',
           thinking: {
             type: 'adaptive',
+          },
+          cache_control: {
+            type: 'ephemeral',
           },
           output_config: {
             effort: 'medium',

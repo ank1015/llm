@@ -71,23 +71,23 @@ If `await` / `.then()` / `.drain()` claims the run first, later iteration will t
 
 ```ts
 type AgentInput<TModelId extends CuratedModelId = CuratedModelId> = {
-  modelId: TModelId;                  // which model to use
-  inputMessages?: Message[];          // new messages for this run
-  system?: string;                    // system prompt
-  tools?: AgentTool[];                // executable tools
+  modelId: TModelId; // which model to use
+  inputMessages?: Message[]; // new messages for this run
+  system?: string; // system prompt
+  tools?: AgentTool[]; // executable tools
   session?: {
-    path?: string;                    // existing or new session file
-    branch?: string;                  // branch to continue, default 'main'
-    headId?: string;                  // specific node to continue from
-    title?: string;                   // title for a newly-created session
+    path?: string; // existing or new session file
+    branch?: string; // branch to continue, default 'main'
+    headId?: string; // specific node to continue from
+    title?: string; // title for a newly-created session
     loadMessages?: SessionMessagesLoader;
     saveNode?: SessionNodeSaver;
   };
-  reasoningEffort?: ReasoningEffort;  // 'low' | 'medium' | 'high' | 'xhigh'
+  reasoningEffort?: ReasoningEffort; // 'low' | 'medium' | 'high' | 'xhigh'
   overrideProviderSetting?: Partial<ProviderOptionsForModelId<TModelId>>;
-  keysFilePath?: string;              // custom path to keys file
-  signal?: AbortSignal;               // cancel the run
-  maxTurns?: number;                  // default 20
+  keysFilePath?: string; // custom path to keys file
+  signal?: AbortSignal; // cancel the run
+  maxTurns?: number; // default 20
 };
 ```
 
@@ -95,13 +95,13 @@ type AgentInput<TModelId extends CuratedModelId = CuratedModelId> = {
 
 Pick one of the supported model IDs:
 
-| Provider | Model IDs |
-|---|---|
-| `openai` | `openai/gpt-5.4`, `openai/gpt-5.4-pro`, `openai/gpt-5.4-mini`, `openai/gpt-5.4-nano`, `openai/gpt-5.3-codex` |
-| `codex` | `codex/gpt-5.4`, `codex/gpt-5.4-mini`, `codex/gpt-5.3-codex`, `codex/gpt-5.3-codex-spark` |
-| `anthropic` | `anthropic/claude-opus-4-6`, `anthropic/claude-sonnet-4-6` |
-| `claude-code` | `claude-code/claude-opus-4-6`, `claude-code/claude-sonnet-4-6` |
-| `google` | `google/gemini-3.1-pro-preview`, `google/gemini-3-flash-preview`, `google/gemini-3.1-flash-lite-preview` |
+| Provider      | Model IDs                                                                                                    |
+| ------------- | ------------------------------------------------------------------------------------------------------------ |
+| `openai`      | `openai/gpt-5.4`, `openai/gpt-5.4-pro`, `openai/gpt-5.4-mini`, `openai/gpt-5.4-nano`, `openai/gpt-5.3-codex` |
+| `codex`       | `codex/gpt-5.4`, `codex/gpt-5.4-mini`, `codex/gpt-5.3-codex`, `codex/gpt-5.3-codex-spark`                    |
+| `anthropic`   | `anthropic/claude-opus-4-6`, `anthropic/claude-sonnet-4-6`                                                   |
+| `claude-code` | `claude-code/claude-opus-4-6`, `claude-code/claude-sonnet-4-6`                                               |
+| `google`      | `google/gemini-3.1-pro-preview`, `google/gemini-3-flash-preview`, `google/gemini-3.1-flash-lite-preview`     |
 
 Import `CuratedModelId` if you need the TypeScript type.
 
@@ -112,7 +112,7 @@ The new messages for this run as a `Message[]`. See [types.md](./types.md) for t
 For a simple run, just pass a single user message:
 
 ```ts
-inputMessages: [userMessage('Hello')]
+inputMessages: [userMessage('Hello')];
 ```
 
 These are **not** the full conversation history. `agent()` loads previous messages from the session automatically, then appends `inputMessages` before running.
@@ -124,7 +124,7 @@ These are **not** the full conversation history. `agent()` loads previous messag
 Optional system prompt string.
 
 ```ts
-system: 'You are a coding agent that explains changes clearly.'
+system: 'You are a coding agent that explains changes clearly.';
 ```
 
 ### `tools`
@@ -191,7 +191,7 @@ type ReasoningEffort = 'low' | 'medium' | 'high' | 'xhigh';
 Notes:
 
 - `openai` and `codex`: if omitted, no standardized reasoning setting is added.
-- `anthropic` and `claude-code`: this SDK always enables adaptive thinking for the supported Claude 4.6 models. `reasoningEffort` sets the adaptive effort level. If omitted, adaptive thinking is still enabled and the provider default effort is used.
+- `anthropic` and `claude-code`: this SDK always enables adaptive thinking and `cache_control: { type: 'ephemeral' }` for the supported Claude 4.6 models. `reasoningEffort` sets the adaptive effort level. If omitted, adaptive thinking is still enabled and the provider default effort is used.
 - `google`: if omitted, no explicit thinking level is added and the provider default applies.
 
 ### `overrideProviderSetting`
@@ -227,9 +227,7 @@ Default: `20`
 ## Return value — `AgentRun`
 
 ```ts
-interface AgentRun
-  extends AsyncIterable<AgentEvent>,
-    PromiseLike<AgentResult> {
+interface AgentRun extends AsyncIterable<AgentEvent>, PromiseLike<AgentResult> {
   readonly sessionPath: string;
   drain(): Promise<AgentResult>;
 }

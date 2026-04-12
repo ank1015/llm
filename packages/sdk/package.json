@@ -18,6 +18,10 @@
       "types": "./dist/config.d.ts",
       "import": "./dist/config.js"
     },
+    "./image": {
+      "types": "./dist/image.d.ts",
+      "import": "./dist/image.js"
+    },
     "./keys": {
       "types": "./dist/keys.d.ts",
       "import": "./dist/keys.js"

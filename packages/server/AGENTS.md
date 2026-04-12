@@ -13,6 +13,7 @@ pnpm --filter @ank1015/llm-server test:unit
 pnpm --filter @ank1015/llm-server test:integration
 pnpm --filter @ank1015/llm-server test:live
 pnpm --filter @ank1015/llm-server start
+pnpm --filter @ank1015/llm-server test-skill -- --prompt "Open the target page"
 ```
 
 ## Module Map
@@ -25,6 +26,7 @@ pnpm --filter @ank1015/llm-server start
 - `src/core/artifact-dir/` - artifact metadata, skill catalog helpers, temp workspace helpers, and ignore rules
 - `src/core/session/` - SDK-backed sessions, run registry, compaction helpers, and context reframing
 - `src/core/terminal/` - PTY process management and attachment registry
+- `src/test-skill.ts` - standalone CLI for running the server agent prompt/tools with appended Chrome docs and exporting a Markdown transcript
 - `src/contracts/` - TypeBox request and response contracts for route handlers
 - `src/http/` - contract adapters and schema validation helpers
 - `tests/unit/` - route, core, and HTTP helper coverage
