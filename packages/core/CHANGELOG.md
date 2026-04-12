@@ -6,6 +6,8 @@ The format is based on Keep a Changelog and this package follows SemVer once its
 
 ## [Unreleased]
 
+## [0.0.6] - 2026-04-12
+
 ### Added
 
 - Added a dedicated image-generation runtime with `generateImage()`, image model catalogs, and a separate image provider registry.
