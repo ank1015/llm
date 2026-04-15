@@ -35,3 +35,6 @@ packages/*/*.tgz
 packages/agents/.sessions/
 packages/agents/temp/
 .agents
+
+# Assembled release payloads
+packages/app/vendor/
