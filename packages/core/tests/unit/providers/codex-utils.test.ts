@@ -6,10 +6,17 @@ import {
   buildCodexMessages,
   buildParams,
   createClient,
+  getCodexUserAgent,
   rewriteCodexErrorBody,
 } from '../../../src/providers/codex/utils.js';
 
-import type { CodexProviderOptions, Context, Model, Tool, UserMessage } from '../../../src/types/index.js';
+import type {
+  CodexProviderOptions,
+  Context,
+  Model,
+  Tool,
+  UserMessage,
+} from '../../../src/types/index.js';
 
 describe('Codex Utils', () => {
   const mockModel: Model<'codex'> = {
@@ -38,6 +45,15 @@ describe('Codex Utils', () => {
       expect(client.baseURL).toBe('https://chatgpt.com/backend-api/codex');
     });
 
+    it('should attach the codex user-agent header', () => {
+      const client = createClient(mockModel, defaultOptions) as unknown as {
+        _options: { defaultHeaders: Record<string, string> };
+      };
+
+      expect(client._options.defaultHeaders['user-agent']).toBe(getCodexUserAgent());
+      expect(client._options.defaultHeaders.originator).toBe('codex_cli_rs');
+    });
+
     it('should throw when apiKey is missing', () => {
       expect(() =>
         createClient(mockModel, {
@@ -54,6 +70,49 @@ describe('Codex Utils', () => {
           'chatgpt-account-id': '',
         })
       ).toThrow('Codex chatgpt-account-id is required.');
+    });
+  });
+
+  describe('getCodexUserAgent', () => {
+    it('should format macOS user-agent metadata from Darwin release', () => {
+      expect(
+        getCodexUserAgent({
+          architecture: 'arm64',
+          platform: 'darwin',
+          release: '25.3.0',
+        })
+      ).toBe('codex_cli_rs/0.98.0 (Mac OS 26.3.0; arm64)');
+    });
+
+    it('should format Windows user-agent metadata without Mac-specific values', () => {
+      expect(
+        getCodexUserAgent({
+          architecture: 'x64',
+          platform: 'win32',
+          release: '10.0.22631',
+        })
+      ).toBe('codex_cli_rs/0.98.0 (Windows 10.0.22631; x86_64)');
+    });
+
+    it('should format Linux user-agent metadata', () => {
+      expect(
+        getCodexUserAgent({
+          architecture: 'arm64',
+          platform: 'linux',
+          release: '6.8.0',
+        })
+      ).toBe('codex_cli_rs/0.98.0 (Linux 6.8.0; arm64)');
+    });
+
+    it('should sanitize invalid header characters', () => {
+      expect(
+        getCodexUserAgent({
+          architecture: 'arm64',
+          originator: 'codex\ncli',
+          platform: 'darwin',
+          release: '25.3.0',
+        })
+      ).toBe('codex_cli/0.98.0 (Mac OS 26.3.0; arm64)');
     });
   });
 

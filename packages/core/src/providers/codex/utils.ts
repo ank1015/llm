@@ -1,3 +1,5 @@
+import { arch, platform, release } from 'node:os';
+
 import OpenAI from 'openai';
 
 import { sanitizeSurrogates } from '../../utils/sanitize-unicode.js';
@@ -16,13 +18,108 @@ import type {
 } from 'openai/resources/responses/responses.js';
 
 const CODEX_ORIGINATOR = 'codex_cli_rs';
-const CODEX_USER_AGENT = 'codex_cli_rs/0.98.0 (Mac OS 26.3.0; arm64)';
+const CODEX_BUILD_VERSION = '0.98.0';
 const DEFAULT_CODEX_INSTRUCTIONS = 'You are a helpful assistant';
 
 interface CodexBackendErrorBody {
   detail?: unknown;
   error?: Record<string, unknown>;
   message?: unknown;
+}
+
+type CodexUserAgentInput = {
+  architecture?: string;
+  buildVersion?: string;
+  originator?: string;
+  platform?: string;
+  release?: string;
+};
+
+function normalizeCodexOsType(platformValue: string): string {
+  switch (platformValue) {
+    case 'darwin':
+      return 'Mac OS';
+    case 'win32':
+      return 'Windows';
+    case 'linux':
+      return 'Linux';
+    case 'freebsd':
+      return 'FreeBSD';
+    case 'openbsd':
+      return 'OpenBSD';
+    case 'aix':
+      return 'AIX';
+    case 'sunos':
+      return 'SunOS';
+    default:
+      return platformValue || 'Unknown';
+  }
+}
+
+function normalizeCodexArchitecture(architecture: string): string {
+  switch (architecture) {
+    case 'x64':
+      return 'x86_64';
+    case 'ia32':
+      return 'x86';
+    default:
+      return architecture || 'unknown';
+  }
+}
+
+function getMacOsVersionFromDarwinRelease(darwinRelease: string): string {
+  const [majorValue, ...rest] = darwinRelease.split('.');
+  const major = Number(majorValue);
+
+  if (!Number.isInteger(major)) {
+    return darwinRelease || 'unknown';
+  }
+
+  if (major >= 25) {
+    return [String(major + 1), ...rest].join('.');
+  }
+
+  if (major >= 20) {
+    return [String(major - 9), ...rest].join('.');
+  }
+
+  if (major >= 5) {
+    return ['10', String(major - 4), ...rest].join('.');
+  }
+
+  return darwinRelease || 'unknown';
+}
+
+function normalizeCodexOsVersion(platformValue: string, releaseValue: string): string {
+  if (platformValue === 'darwin') {
+    return getMacOsVersionFromDarwinRelease(releaseValue);
+  }
+
+  return releaseValue || 'unknown';
+}
+
+function sanitizeCodexUserAgent(userAgent: string, fallback: string): string {
+  const sanitized = [...userAgent]
+    .map((character) => {
+      const code = character.charCodeAt(0);
+      return code >= 0x20 && code <= 0x7e ? character : '_';
+    })
+    .join('');
+
+  return sanitized.trim() || fallback;
+}
+
+export function getCodexUserAgent(input: CodexUserAgentInput = {}): string {
+  const originator = input.originator ?? CODEX_ORIGINATOR;
+  const buildVersion = input.buildVersion ?? CODEX_BUILD_VERSION;
+  const platformValue = input.platform ?? platform();
+  const releaseValue = input.release ?? release();
+  const architecture = normalizeCodexArchitecture(input.architecture ?? arch());
+  const osType = normalizeCodexOsType(platformValue);
+  const osVersion = normalizeCodexOsVersion(platformValue, releaseValue);
+  const userAgent = `${originator}/${buildVersion} (${osType} ${osVersion}; ${architecture})`;
+
+  return sanitizeCodexUserAgent(userAgent, `${originator}/${buildVersion}`);
 }
 
 /**
@@ -111,7 +208,7 @@ export function createClient(model: Model<'codex'>, options: CodexProviderOption
       'chatgpt-account-id': options['chatgpt-account-id'],
       originator: CODEX_ORIGINATOR,
       'x-oai-web-search-eligible': 'true',
-      'user-agent': CODEX_USER_AGENT,
+      'user-agent': getCodexUserAgent(),
     },
     fetch: codexFetch,
   });

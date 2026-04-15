@@ -9,7 +9,7 @@ Path: `packages/core`
 - No hard OS-specific runtime code found.
 - Should work on macOS, Windows, and Linux.
 - No runtime use of filesystem, shell commands, child processes, or native binaries.
-- Notable detail: Codex provider sends a hardcoded user-agent containing `Mac OS 26.3.0; arm64`, but this is only an HTTP header and does not make the package macOS-only.
+- Codex provider user-agent metadata is derived from the current OS platform, release, and architecture instead of hardcoding macOS/arm64.
 
 ### Device Requirements
 
@@ -37,6 +37,7 @@ No direct core dependency appears to require OS-specific native setup.
 
 - Mostly portable TypeScript/Web API-style code.
 - Not fully browser-audited.
+- Codex user-agent construction reads Node's `node:os` metadata.
 - OpenAI image edits use `Buffer`, so that path is Node-specific unless bundled/polyfilled.
 
 ### Checked
