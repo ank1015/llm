@@ -1,5 +1,15 @@
 import { existsSync } from 'node:fs';
-import { access, lstat, mkdir, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
+import {
+  access,
+  cp,
+  lstat,
+  mkdir,
+  readFile,
+  realpath,
+  rm,
+  symlink,
+  writeFile,
+} from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -125,8 +135,8 @@ async function ensureTempNodeModules(layout: TempWorkspaceLayout): Promise<void>
   await mkdir(layout.scopeDir, { recursive: true });
   await mkdir(layout.binDir, { recursive: true });
 
-  await ensureSymlink(join(layout.scopeDir, 'llm-agents'), agentsPackage.packageRoot, 'dir');
-  await ensureSymlink(join(layout.nodeModulesDir, 'tsx'), tsxPackage.packageRoot, 'dir');
+  await ensureLinkedPackage(join(layout.scopeDir, 'llm-agents'), agentsPackage.packageRoot, 'dir');
+  await ensureLinkedPackage(join(layout.nodeModulesDir, 'tsx'), tsxPackage.packageRoot, 'dir');
 
   for (const binaryName of ['tsx', 'tsx.cmd', 'tsx.ps1']) {
     const source = join(tsxPackage.nodeModulesDir, '.bin', binaryName);
@@ -134,7 +144,7 @@ async function ensureTempNodeModules(layout: TempWorkspaceLayout): Promise<void>
       continue;
     }
 
-    await ensureSymlink(join(layout.binDir, binaryName), source, 'file');
+    await ensureLinkedPackage(join(layout.binDir, binaryName), source, 'file');
   }
 }
 
@@ -223,7 +233,7 @@ function findNearestNodeModulesDir(startDir: string): string | null {
   }
 }
 
-async function ensureSymlink(
+async function ensureLinkedPackage(
   linkPath: string,
   targetPath: string,
   type: 'dir' | 'file'
@@ -241,11 +251,20 @@ async function ensureSymlink(
     await rm(linkPath, { recursive: true, force: true });
   }
 
-  await symlink(
-    targetPath,
-    linkPath,
-    process.platform === 'win32' && type === 'dir' ? 'junction' : type
-  );
+  try {
+    await symlink(
+      targetPath,
+      linkPath,
+      process.platform === 'win32' && type === 'dir' ? 'junction' : type
+    );
+  } catch {
+    await rm(linkPath, { recursive: true, force: true });
+    await cp(targetPath, linkPath, {
+      dereference: true,
+      force: true,
+      recursive: type === 'dir',
+    });
+  }
 }
 
 function normalizeObjectRecord(value: unknown): Record<string, string> {

@@ -69,8 +69,9 @@ Path: `apps/web`
 - Node.js `>=20.0.0`
 - pnpm `9.15.0` for monorepo development
 - Modern browser
-- Running `@ank1015/llm-server` backend
-- Server URL defaults to `http://localhost:8001`
+- Running `@ank1015/llm-server` backend or packaged `npx @ank1015/llm` launcher
+- Production browser default is the current origin, for example `http://127.0.0.1:3210` in the launcher.
+- Test/server-side fallback is `http://localhost:8001`.
 - `NEXT_PUBLIC_LLM_SERVER_BASE_URL` can point the UI at another server
 - WebSocket support for terminal sessions
 
@@ -188,10 +189,13 @@ Path: `packages/server`
 
 - Node-only backend package.
 - Should run on macOS, Windows, and Linux, but depends on several OS-level tools and native packages.
-- Uses filesystem, HTTP server, WebSocket, shell/process, PTY, Git, temp files, symlinks, and archive extraction.
-- Default network bind:
+- Uses filesystem, HTTP server, WebSocket, shell/process, PTY, Git, temp files, package links/copies, and archive extraction.
+- Standalone server default network bind:
   - `HOST=127.0.0.1`
   - `PORT=8001`
+- Packaged `npx @ank1015/llm` default public origin:
+  - `http://127.0.0.1:3210`
+  - server runs on a private internal port behind the launcher
 - Default storage:
   - project workspaces: `~/projects`
   - metadata: `~/.llm/projects`
@@ -210,7 +214,10 @@ Path: `packages/server`
   - macOS/Linux: `$SHELL`, `/bin/bash`, `bash`, or `sh`
   - Windows: `ComSpec`, PowerShell, or `cmd.exe`
 - Python 3 is optional fallback for PTY support on non-Windows when `node-pty` fails with `posix_spawn`.
-- Claude credential reload expects the `claude` CLI on PATH and writes a temporary bash wrapper.
+- Claude credential reload expects the `claude` CLI on PATH.
+- Claude credential reload now uses `which` on Unix-like hosts, `where.exe` on Windows, and writes a temporary `.cmd` wrapper on Windows or POSIX `sh` wrapper elsewhere.
+- Artifact temp workspaces prefer symlinks/junctions for package wiring and fall back to copying if links are blocked by host policy.
+- The package `dev` script now uses a Node runner instead of Unix-only `sh`/`trap` process control.
 
 ### Runtime Dependencies
 
@@ -245,19 +252,25 @@ Passed:
 pnpm --filter @ank1015/llm-server build
 pnpm --filter @ank1015/llm-server typecheck
 pnpm --filter @ank1015/llm-server test:unit
+pnpm --filter @ank1015/llm-server test:integration
+node --check packages/server/scripts/dev.mjs
 ```
 
 Unit result:
 
 - 22 test files passed
-- 87 tests passed
+- 89 tests passed
 - No type errors
 
 Integration result:
 
-- 5 of 6 integration files passed.
-- 1 integration test failed in `tests/integration/routes/resources.app.test.ts`.
-- Failure appears to be stale expected registry data: `/api/skills` now returns multiple skills, while the test expected only the `pdf` object.
+- 6 integration files passed
+- 10 tests passed
+- No type errors
+
+Lint result:
+
+- `pnpm --filter @ank1015/llm-server lint` still fails on pre-existing import-order/style issues outside the OS hardening changes.
 
 Live tests were not run because they require live provider credentials.
 

@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
+  createClaudeCodeExecutableWrapperScript,
   extractClaudeCodeCredentials,
   loadCodexCredentials,
   reloadCredentials,
@@ -23,6 +24,45 @@ afterEach(async () => {
 });
 
 describe('credential-utils', () => {
+  describe('createClaudeCodeExecutableWrapperScript', () => {
+    it('creates a POSIX sh wrapper on Unix-like platforms', () => {
+      expect(
+        createClaudeCodeExecutableWrapperScript({
+          claudePath: "/opt/Claude CLI/bin/claude's",
+          platform: 'darwin',
+          port: 32123,
+        })
+      ).toBe(
+        [
+          '#!/usr/bin/env sh',
+          "export ANTHROPIC_BASE_URL='http://127.0.0.1:32123'",
+          'unset CLAUDECODE',
+          "exec '/opt/Claude CLI/bin/claude'\\''s' \"$@\"",
+          '',
+        ].join('\n')
+      );
+    });
+
+    it('creates a cmd wrapper on Windows', () => {
+      expect(
+        createClaudeCodeExecutableWrapperScript({
+          claudePath: 'C:\\Program Files\\Claude\\claude.cmd',
+          platform: 'win32',
+          port: 32123,
+        })
+      ).toBe(
+        [
+          '@echo off',
+          'set "ANTHROPIC_BASE_URL=http://127.0.0.1:32123"',
+          'set "CLAUDECODE="',
+          'call "C:\\Program Files\\Claude\\claude.cmd" %*',
+          'exit /b %errorlevel%',
+          '',
+        ].join('\r\n')
+      );
+    });
+  });
+
   describe('loadCodexCredentials', () => {
     it('loads codex credentials from auth.json', async () => {
       const homeDir = await mkdtemp(join(tmpdir(), 'codex-home-'));

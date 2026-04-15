@@ -24,7 +24,7 @@
   },
   "scripts": {
     "build": "node ../../scripts/remove-paths.mjs dist coverage --tsbuildinfo && tsc",
-    "dev": "sh -c 'tsc && tsc --watch --preserveWatchOutput & TSC_PID=$!; trap \"kill $TSC_PID\" EXIT; node --watch dist/server.js'",
+    "dev": "node scripts/dev.mjs",
     "start": "node dist/server.js",
     "test-skill": "pnpm run build && node dist/test-skill.js",
     "test": "pnpm run test:unit && pnpm run test:integration",

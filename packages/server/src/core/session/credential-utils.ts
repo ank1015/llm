@@ -1,4 +1,4 @@
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { chmodSync, existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import * as https from 'node:https';
@@ -52,7 +52,95 @@ function toError(error: unknown): Error {
 }
 
 function findClaudeExecutable(): string {
-  return execSync('which claude', { encoding: 'utf8' }).trim();
+  const executablePath = findExecutableOnPath('claude');
+  if (!executablePath) {
+    throw new Error('Claude CLI not found on PATH');
+  }
+
+  return executablePath;
+}
+
+function findExecutableOnPath(command: string): string | null {
+  const lookupTool = process.platform === 'win32' ? 'where.exe' : 'which';
+
+  try {
+    const output = execFileSync(lookupTool, [command], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+      timeout: 5000,
+    });
+
+    const firstMatch = output
+      .split(/\r?\n/u)
+      .map((line) => line.trim())
+      .find((line) => line.length > 0 && existsSync(line));
+
+    return firstMatch ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function quoteSh(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+function quoteCmdPath(value: string): string {
+  return value.replace(/"/g, '""').replace(/%/g, '%%');
+}
+
+export function createClaudeCodeExecutableWrapperScript(input: {
+  claudePath: string;
+  platform?: NodeJS.Platform;
+  port: number;
+}): string {
+  const platform = input.platform ?? process.platform;
+
+  if (platform === 'win32') {
+    return [
+      '@echo off',
+      `set "ANTHROPIC_BASE_URL=http://127.0.0.1:${input.port}"`,
+      'set "CLAUDECODE="',
+      `call "${quoteCmdPath(input.claudePath)}" %*`,
+      'exit /b %errorlevel%',
+      '',
+    ].join('\r\n');
+  }
+
+  return [
+    '#!/usr/bin/env sh',
+    `export ANTHROPIC_BASE_URL=${quoteSh(`http://127.0.0.1:${input.port}`)}`,
+    'unset CLAUDECODE',
+    `exec ${quoteSh(input.claudePath)} "$@"`,
+    '',
+  ].join('\n');
+}
+
+function writeClaudeCodeExecutableWrapper(input: {
+  claudePath: string;
+  port: number;
+  tempDir?: string | undefined;
+}): string {
+  const extension = process.platform === 'win32' ? '.cmd' : '.sh';
+  const wrapperPath = join(
+    input.tempDir ?? tmpdir(),
+    `claude-cred-extract-${input.port}${extension}`
+  );
+
+  writeFileSync(
+    wrapperPath,
+    createClaudeCodeExecutableWrapperScript({
+      claudePath: input.claudePath,
+      port: input.port,
+    }),
+    'utf8'
+  );
+
+  if (process.platform !== 'win32') {
+    chmodSync(wrapperPath, 0o755);
+  }
+
+  return wrapperPath;
 }
 
 async function loadClaudeCodeQueryRunner(
@@ -253,17 +341,11 @@ export async function extractClaudeCodeCredentials(
         const claudePath = (options.findClaudeExecutable ?? findClaudeExecutable)();
         const queryRunner = await loadClaudeCodeQueryRunner(options.queryRunner);
 
-        wrapperPath = join(options.tempDir ?? tmpdir(), `claude-cred-extract-${port}.sh`);
-        writeFileSync(
-          wrapperPath,
-          [
-            '#!/bin/bash',
-            `export ANTHROPIC_BASE_URL="http://127.0.0.1:${port}"`,
-            'unset CLAUDECODE',
-            `exec "${claudePath}" "$@"`,
-          ].join('\n')
-        );
-        chmodSync(wrapperPath, 0o755);
+        wrapperPath = writeClaudeCodeExecutableWrapper({
+          claudePath,
+          port,
+          tempDir: options.tempDir,
+        });
 
         try {
           for await (const _ of queryRunner({

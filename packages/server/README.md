@@ -1,12 +1,12 @@
 # @ank1015/llm-server
 
-Private workspace package for the monorepo's Hono backend, project storage model, session orchestration, terminal transport, and installable-skill APIs.
+Published Node package for the monorepo's Hono backend, project storage model, session orchestration, terminal transport, and installable-skill APIs.
 
 ## Status
 
-This package is workspace-only and is not intended to be published to npm.
+This package is published as `@ank1015/llm-server` and is also consumed by the `npx @ank1015/llm` launcher.
 
-It is the main backend for the repo's app clients and local session workflows.
+It is the main backend for the repo's app clients and local session workflows. When run through `npx @ank1015/llm`, the public app and API share the launcher's port (`3210` by default), while the Hono server process runs on a private internal port selected by the launcher.
 
 ## Commands
 
@@ -18,6 +18,7 @@ pnpm --filter @ank1015/llm-server test
 pnpm --filter @ank1015/llm-server test:unit
 pnpm --filter @ank1015/llm-server test:integration
 pnpm --filter @ank1015/llm-server test:live
+pnpm --filter @ank1015/llm-server dev
 pnpm --filter @ank1015/llm-server start
 pnpm --filter @ank1015/llm-server test-skill -- --prompt "Open the target page"
 ```
@@ -31,12 +32,20 @@ pnpm --filter @ank1015/llm-server test-skill -- --prompt "Open the target page"
 
 ## Runtime Defaults
 
+Standalone `pnpm --filter @ank1015/llm-server start` / `node dist/server.js` defaults:
+
 - `HOST` defaults to `127.0.0.1`
 - `PORT` defaults to `8001`
 - `projectsRoot` defaults to `~/projects`
 - `dataRoot` defaults to `~/.llm/projects`
 
 Repo-local callers can override filesystem paths through the internal config module before starting the app or tests.
+
+Packaged `npx @ank1015/llm` defaults:
+
+- public web and API origin: `http://127.0.0.1:3210`
+- override with `llm --host <host> --port <port>`
+- API requests should use same-origin `/api` routes from the web app instead of assuming `8001`
 
 ## Module Map
 
@@ -61,6 +70,7 @@ Repo-local callers can override filesystem paths through the internal config mod
 
 ## Notes
 
-- This package is intentionally private even though it has a clean package manifest and exported entrypoints for workspace consumers.
-- The current package-level lint command still has outstanding source warnings and errors; the docs here describe the package as it exists today without changing runtime behavior.
+- The package is Node-only and requires local filesystem and subprocess access.
+- Terminal sessions use `node-pty`; the package includes a Python 3 PTY fallback on Unix-like hosts for specific `posix_spawn` failures.
+- Claude credential reload creates a temporary executable wrapper: `.cmd` on Windows, POSIX `sh` elsewhere.
 - `test-skill` accepts `--prompt`, optional `--cwd`, and optional `--output`, then writes a conversation-style Markdown transcript after the run finishes.
