@@ -32,7 +32,18 @@ Create a release tarball preview with:
 
 ```bash
 cd packages/sdk
-npm pack --dry-run
+pnpm publish --dry-run --no-git-checks
+```
+
+This exercises the real `pnpm` publish path, prints the tarball contents, and keeps the workspace dependency rewrite that `prepublishOnly` enforces for releases.
+
+If you need to inspect the rewritten packed manifest directly, create a tarball with `pnpm` and read the packaged `package.json`:
+
+```bash
+mkdir -p /tmp/llm-sdk-pack
+cd packages/sdk
+pnpm pack --pack-destination /tmp/llm-sdk-pack
+tar -xOf /tmp/llm-sdk-pack/*.tgz package/package.json
 ```
 
 `prepack` runs `release:check`, so tarball creation also validates the package before packaging.
@@ -44,7 +55,7 @@ Before publishing `@ank1015/llm-sdk`, verify:
 1. `README.md`, `CHANGELOG.md`, `LICENSE`, and `docs/` reflect the current public API.
 2. `release:check` passes locally.
 3. `test:integration` was run for the provider coverage you intend to claim in the release notes.
-4. `npm pack --dry-run` includes the expected package artifacts and rewrites workspace dependencies to published semver ranges.
+4. A `pnpm publish --dry-run --no-git-checks` preview includes the expected package artifacts, and a `pnpm pack` tarball shows workspace dependencies rewritten to published semver ranges.
 5. A fresh temp-project install can import the package root and the documented subpath exports you expect users to rely on.
 6. The package version and changelog entry match the intended release.
 7. Publish is performed with `pnpm`, which is enforced by `prepublishOnly`.

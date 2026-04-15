@@ -10,6 +10,13 @@ The format is based on Keep a Changelog and this package follows SemVer once its
 
 - Added package docs for the new `image()` SDK entrypoint, including path-first output behavior, SDK image aliases, and model-specific settings guidance.
 
+## [0.0.5] - 2026-04-13
+
+### Changed
+
+- Documented the `pnpm`-based packaging workflow that previews the real publish path and preserves workspace dependency rewrites in the packed manifest.
+- Excluded generated `coverage/` artifacts from Vitest coverage collection so repeated `release:check`, `pack`, and `publish` runs stay stable.
+
 ## [0.0.4] - 2026-04-02
 
 ### Added

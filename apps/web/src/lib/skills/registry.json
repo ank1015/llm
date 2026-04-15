@@ -10,6 +10,11 @@
     "description": "Use this skill whenever the user wants to create, read, edit, or manipulate Word documents (.docx files). Triggers include: any mention of 'Word doc', 'word document', '.docx', or requests to produce professional documents with formatting like tables of contents, headings, page numbers, or letterheads. Also use when extracting or reorganizing content from .docx files, inserting or replacing images in documents, performing find-and-replace in Word files, working with tracked changes or comments, or converting content into a polished Word document. If the user asks for a 'report', 'memo', 'letter', 'template', or similar deliverable as a Word or .docx file, use this skill. Do NOT use for PDFs, spreadsheets, Google Docs, or general coding tasks unrelated to document generation."
   },
   {
+    "name": "image-gen",
+    "link": "https://github.com/ank1015/llm/tree/main/packages/sdk/skills/image-gen",
+    "description": "Use when you want to create or edit images with `image()` from `@ank1015/llm-sdk`. Covers model choice across `nano-banana`, `nano-banana-pro`, and `gpt-image`, path-first output handling, central-keystore-first key selection, and provider-specific settings guidance."
+  },
+  {
     "name": "llm",
     "link": "https://github.com/ank1015/llm/tree/main/packages/sdk/skills/llm-sdk",
     "description": "Use when you want to call LLMs with one-off `llm()` calls or stateful `agent()` loops through `@ank1015/llm-sdk`. Covers curated model IDs, message and response helpers, TypeBox-based tool definitions, central-keystore-first key selection, provider preference rules, and default session handling."
