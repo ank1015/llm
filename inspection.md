@@ -71,7 +71,7 @@ Path: `apps/web`
 - Modern browser
 - Running `@ank1015/llm-server` backend or packaged `npx @ank1015/llm` launcher
 - Production browser default is the current origin, for example `http://127.0.0.1:3210` in the launcher.
-- Test/server-side fallback is `http://localhost:8001`.
+- Development/test/server-side fallback is `http://localhost:8001`.
 - `NEXT_PUBLIC_LLM_SERVER_BASE_URL` can point the UI at another server
 - WebSocket support for terminal sessions
 

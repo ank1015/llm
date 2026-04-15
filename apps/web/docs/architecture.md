@@ -17,7 +17,7 @@
 
 ## Server Dependency
 
-The app expects the local backend to speak the `@ank1015/llm-server/contracts` DTO layer. In production browsers it defaults to the current origin so the packaged app can serve web and API from one port; tests and server-side fallback use `http://localhost:8001` unless `NEXT_PUBLIC_LLM_SERVER_BASE_URL` is set.
+The app expects the local backend to speak the `@ank1015/llm-server/contracts` DTO layer. In production browsers it defaults to the current origin so the packaged app can serve web and API from one port; development, tests, and server-side fallback use `http://localhost:8001` unless `NEXT_PUBLIC_LLM_SERVER_BASE_URL` is set.
 
 ## Testing Scope
 

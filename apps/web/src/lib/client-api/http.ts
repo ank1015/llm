@@ -1,7 +1,7 @@
 const LOCAL_SERVER_BASE = 'http://localhost:8001';
 
 function getDefaultServerBaseUrl(): string {
-  if (process.env.NODE_ENV === 'test' || typeof window === 'undefined') {
+  if (process.env.NODE_ENV !== 'production' || typeof window === 'undefined') {
     return LOCAL_SERVER_BASE;
   }
 
@@ -60,7 +60,14 @@ export async function apiRequestJson<TResponse>(
     headers,
   });
 
-  const body = (await response.json().catch(() => ({}))) as unknown;
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    throw new Error(
+      response.ok ? `Expected JSON response from ${url}` : `Request failed: ${response.status}`
+    );
+  }
 
   if (!response.ok) {
     throw new Error(getErrorMessage(body) ?? `Request failed: ${response.status}`);
