@@ -1,6 +1,6 @@
 :root {
-  color: #1f2933;
-  background: #f6f3ed;
+  color: #111111;
+  background: #ffffff;
   font-family:
     Inter,
     ui-sans-serif,
@@ -18,9 +18,7 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background:
-    linear-gradient(135deg, rgb(246 243 237 / 92%), rgb(231 238 232 / 90%)),
-    radial-gradient(circle at 80% 10%, rgb(40 116 166 / 18%), transparent 30%);
+  background: #ffffff;
 }
 
 button,
@@ -30,19 +28,38 @@ a {
 
 .shell {
   width: min(100%, 920px);
+  min-height: 100vh;
   margin: 0 auto;
   padding: 48px 28px;
 }
 
-.intro {
-  margin-bottom: 28px;
+.welcome {
+  display: grid;
+  min-height: calc(100vh - 96px);
+  place-content: center;
+  justify-items: center;
+  gap: 28px;
+  text-align: center;
+}
+
+.setup {
+  display: none;
+  padding-top: 24px;
+}
+
+.shell[data-screen='setup'] .welcome {
+  display: none;
+}
+
+.shell[data-screen='setup'] .setup {
+  display: block;
 }
 
 .eyebrow {
   margin: 0 0 8px;
-  color: #4d7661;
+  color: #555555;
   font-size: 0.78rem;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: 0;
   text-transform: uppercase;
 }
@@ -56,9 +73,10 @@ p {
 
 h1 {
   max-width: 720px;
-  margin-bottom: 14px;
-  font-size: clamp(2.5rem, 8vw, 5.4rem);
-  line-height: 0.92;
+  margin-bottom: 0;
+  font-size: clamp(2.25rem, 6vw, 4.5rem);
+  font-weight: 700;
+  line-height: 1;
 }
 
 h2 {
@@ -71,21 +89,12 @@ h3 {
   font-size: 1rem;
 }
 
-.summary {
-  max-width: 680px;
-  margin-bottom: 0;
-  color: #52616f;
-  font-size: 1.05rem;
-  line-height: 1.7;
-}
-
 .panel {
   margin-top: 18px;
   padding: 22px;
-  border: 1px solid rgb(31 41 51 / 12%);
+  border: 1px solid #e7e7e7;
   border-radius: 8px;
-  background: rgb(255 255 255 / 78%);
-  box-shadow: 0 18px 50px rgb(31 41 51 / 10%);
+  background: #ffffff;
 }
 
 .panelHeader,
@@ -109,7 +118,7 @@ h3 {
   gap: 18px;
   min-height: 74px;
   padding: 16px;
-  border: 1px solid rgb(31 41 51 / 10%);
+  border: 1px solid #eeeeee;
   border-radius: 8px;
   background: #ffffff;
 }
@@ -117,7 +126,7 @@ h3 {
 .requirement p,
 .helper {
   margin-bottom: 0;
-  color: #667789;
+  color: #666666;
   line-height: 1.5;
 }
 
@@ -128,17 +137,21 @@ button,
   justify-content: center;
   min-width: 112px;
   min-height: 42px;
-  padding: 0 16px;
+  padding: 0 18px;
   border: 0;
   border-radius: 8px;
   color: #ffffff;
-  font-weight: 800;
+  font-weight: 700;
   text-decoration: none;
   cursor: pointer;
 }
 
 button {
-  background: #1f2933;
+  background: #000000;
+}
+
+#start {
+  min-width: 150px;
 }
 
 button:disabled {
@@ -147,35 +160,36 @@ button:disabled {
 }
 
 .badge.ready {
-  background: #2f7d55;
+  background: #111111;
 }
 
 .badge.missing {
-  background: #a64236;
+  background: #666666;
 }
 
 .status {
   min-height: 28px;
   margin: 18px 0 0;
-  color: #52616f;
+  color: #555555;
   font-weight: 700;
 }
 
 .status[data-tone='success'] {
-  color: #2f7d55;
+  color: #111111;
 }
 
-.status[data-tone='warning'] {
-  color: #9a6700;
-}
-
+.status[data-tone='warning'],
 .status[data-tone='error'] {
-  color: #a64236;
+  color: #555555;
 }
 
 @media (max-width: 720px) {
   .shell {
     padding: 32px 18px;
+  }
+
+  .welcome {
+    min-height: calc(100vh - 64px);
   }
 
   .panelHeader,

@@ -1,4 +1,5 @@
 import { execFile, spawn } from 'node:child_process';
+import { platform } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 
@@ -11,37 +12,26 @@ const execFileAsync = promisify(execFile);
 const dependencyChecks: Array<{
   readonly name: DependencyName;
   readonly label: string;
-  readonly command: string;
-  readonly args: readonly string[];
+  readonly commands: readonly string[];
   readonly installUrl: string;
 }> = [
   {
     name: 'git',
     label: 'Git',
-    command: 'git',
-    args: ['--version'],
+    commands: ['git'],
     installUrl: 'https://git-scm.com/downloads',
   },
   {
     name: 'node',
     label: 'Node.js',
-    command: 'node',
-    args: ['--version'],
+    commands: ['node'],
     installUrl: 'https://nodejs.org/en/download',
   },
   {
-    name: 'npm',
-    label: 'npm',
-    command: 'npm',
-    args: ['--version'],
-    installUrl: 'https://docs.npmjs.com/downloading-and-installing-node-js-and-npm',
-  },
-  {
-    name: 'npx',
-    label: 'npx',
-    command: 'npx',
-    args: ['--version'],
-    installUrl: 'https://docs.npmjs.com/cli/v10/commands/npx',
+    name: 'python',
+    label: 'Python',
+    commands: ['python3', 'python'],
+    installUrl: 'https://www.python.org/downloads/',
   },
 ];
 
@@ -56,7 +46,7 @@ const createWindow = (): void => {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
-      preload: join(app.getAppPath(), 'dist/preload/preload.js'),
+      preload: join(app.getAppPath(), 'dist/preload/preload.cjs'),
     },
   });
 
@@ -66,34 +56,74 @@ const createWindow = (): void => {
 const checkDependency = async (
   check: (typeof dependencyChecks)[number]
 ): Promise<DependencyCheck> => {
+  for (const command of check.commands) {
+    const result = await checkCommand(command);
+
+    if (result.installed) {
+      return {
+        name: check.name,
+        label: check.label,
+        command,
+        installed: true,
+        installUrl: check.installUrl,
+        ...(result.version ? { version: result.version } : {}),
+        ...(result.executablePath ? { executablePath: result.executablePath } : {}),
+      };
+    }
+  }
+
+  return {
+    name: check.name,
+    label: check.label,
+    command: check.commands.join(' / '),
+    installed: false,
+    installUrl: check.installUrl,
+  };
+};
+
+const checkCommand = async (
+  command: string
+): Promise<{
+  readonly installed: boolean;
+  readonly version?: string;
+  readonly executablePath?: string;
+}> => {
   try {
-    const { stdout, stderr } = await execFileAsync(check.command, [...check.args], {
+    const { stdout, stderr } = await execFileAsync(getShell(), getShellArgs(command), {
       timeout: 10_000,
     });
-    const version = (stdout || stderr).trim().split('\n')[0];
+    const lines = (stdout || stderr)
+      .trim()
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+    const executablePath = lines[0];
+    const version = lines[1];
 
-    const result: DependencyCheck = {
-      name: check.name,
-      label: check.label,
-      command: check.command,
-      installed: true,
-      installUrl: check.installUrl,
-    };
-
-    if (version) {
-      return { ...result, version };
-    }
-
-    return result;
-  } catch {
     return {
-      name: check.name,
-      label: check.label,
-      command: check.command,
-      installed: false,
-      installUrl: check.installUrl,
+      installed: true,
+      ...(executablePath ? { executablePath } : {}),
+      ...(version ? { version } : {}),
     };
+  } catch {
+    return { installed: false };
   }
+};
+
+const getShell = (): string => {
+  if (platform() === 'win32') {
+    return 'cmd.exe';
+  }
+
+  return process.env.SHELL || '/bin/zsh';
+};
+
+const getShellArgs = (command: string): string[] => {
+  if (platform() === 'win32') {
+    return ['/d', '/s', '/c', `where ${command} && ${command} --version`];
+  }
+
+  return ['-lc', `command -v ${command} && ${command} --version`];
 };
 
 const registerIpcHandlers = (): void => {

@@ -1,4 +1,4 @@
-export type DependencyName = 'git' | 'node' | 'npm' | 'npx';
+export type DependencyName = 'git' | 'node' | 'python';
 
 export type DependencyCheck = {
   readonly name: DependencyName;
@@ -6,6 +6,7 @@ export type DependencyCheck = {
   readonly command: string;
   readonly installed: boolean;
   readonly version?: string;
+  readonly executablePath?: string;
   readonly installUrl: string;
 };
 

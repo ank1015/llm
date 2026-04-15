@@ -4,6 +4,8 @@ const requirements = document.querySelector('#requirements');
 const refreshButton = document.querySelector('#refresh');
 const launchButton = document.querySelector('#launch');
 const statusElement = document.querySelector('#status');
+const shell = document.querySelector('.shell');
+const startButton = document.querySelector('#start');
 
 const setStatus = (message, tone = 'neutral') => {
   statusElement.textContent = message;
@@ -22,7 +24,12 @@ const renderChecks = (checks) => {
 
       const details = document.createElement('p');
       details.textContent = check.installed
-        ? `${check.command} detected${check.version ? `: ${check.version}` : ''}`
+        ? [
+            `${check.command} detected${check.version ? `: ${check.version}` : ''}`,
+            check.executablePath ? `Path: ${check.executablePath}` : '',
+          ]
+            .filter(Boolean)
+            .join(' | ')
         : `${check.command} was not found on PATH`;
 
       copy.append(title, details);
@@ -47,6 +54,10 @@ const refreshChecks = async () => {
   setStatus('Checking local requirements...');
 
   try {
+    if (!window.setupApp) {
+      throw new Error('Setup bridge is unavailable. Restart the app after rebuilding.');
+    }
+
     const checks = await window.setupApp.checkDependencies();
     renderChecks(checks);
 
@@ -72,6 +83,10 @@ const launchMainApp = async () => {
   setStatus('Launching main app...');
 
   try {
+    if (!window.setupApp) {
+      throw new Error('Setup bridge is unavailable. Restart the app after rebuilding.');
+    }
+
     const result = await window.setupApp.launchMainApp();
     setStatus(result.message, result.ok ? 'success' : 'error');
   } catch (error) {
@@ -90,4 +105,9 @@ launchButton.addEventListener('click', () => {
   void launchMainApp();
 });
 
-void refreshChecks();
+startButton.addEventListener('click', () => {
+  shell.dataset.screen = 'setup';
+  requirements.replaceChildren();
+  launchButton.disabled = true;
+  setStatus('Click Check dependencies to scan this device.');
+});

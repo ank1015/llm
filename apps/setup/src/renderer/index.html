@@ -7,38 +7,36 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <main class="shell">
-      <section class="intro">
-        <p class="eyebrow">Local setup</p>
-        <h1>LLM Setup</h1>
-        <p class="summary">
-          Check the tools needed to run the local LLM workspace, install anything missing, and
-          launch the main app when the machine is ready.
-        </p>
+    <main class="shell" data-screen="welcome">
+      <section class="welcome" aria-labelledby="welcome-title">
+        <h1 id="welcome-title">Welcome to LLM Setup</h1>
+        <button id="start" type="button">Start</button>
       </section>
 
-      <section class="panel" aria-labelledby="requirements-title">
-        <div class="panelHeader">
-          <div>
-            <p class="eyebrow">Step 1</p>
-            <h2 id="requirements-title">Requirements</h2>
+      <section class="setup" aria-label="Setup steps">
+        <section class="panel" aria-labelledby="requirements-title">
+          <div class="panelHeader">
+            <div>
+              <p class="eyebrow">Step 1</p>
+              <h2 id="requirements-title">Requirements</h2>
+            </div>
+            <button id="refresh" type="button">Check dependencies</button>
           </div>
-          <button id="refresh" type="button">Refresh</button>
-        </div>
 
-        <div id="requirements" class="requirements" aria-live="polite"></div>
+          <div id="requirements" class="requirements" aria-live="polite"></div>
+        </section>
+
+        <section class="panel launchPanel" aria-labelledby="launch-title">
+          <div>
+            <p class="eyebrow">Step 2</p>
+            <h2 id="launch-title">Launch</h2>
+            <p class="helper">Runs the main app through the configured npx command.</p>
+          </div>
+          <button id="launch" type="button" disabled>Launch main app</button>
+        </section>
+
+        <p id="status" class="status" role="status"></p>
       </section>
-
-      <section class="panel launchPanel" aria-labelledby="launch-title">
-        <div>
-          <p class="eyebrow">Step 2</p>
-          <h2 id="launch-title">Launch</h2>
-          <p class="helper">Runs the main app through the configured npx command.</p>
-        </div>
-        <button id="launch" type="button">Launch main app</button>
-      </section>
-
-      <p id="status" class="status" role="status"></p>
     </main>
 
     <script src="./renderer.js"></script>
