@@ -123,6 +123,28 @@ export default [
     },
   },
 
+  // App release scripts and CLI intentionally run in Node.
+  {
+    files: ['packages/app/scripts/**/*.mjs'],
+    languageOptions: {
+      globals: {
+        console: 'readonly',
+        fetch: 'readonly',
+        process: 'readonly',
+      },
+    },
+    rules: {
+      'no-console': 'off',
+    },
+  },
+
+  {
+    files: ['packages/app/src/cli.ts'],
+    rules: {
+      'no-console': 'off',
+    },
+  },
+
   // Expo Router route filenames use framework-specific conventions.
   {
     files: ['**/src/app/**/_layout.tsx', '**/src/app/**/+*.tsx', '**/src/app/**/[[]*[]].tsx'],

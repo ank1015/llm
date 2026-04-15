@@ -120,11 +120,36 @@ async function replaceRemainingTopLevelSymlinks() {
   }
 }
 
+async function replaceSymlinksInDirectory(directory) {
+  if (!existsSync(directory)) {
+    return;
+  }
+
+  const entries = await readdir(directory, { withFileTypes: true });
+
+  for (const entry of entries) {
+    const target = join(directory, entry.name);
+    const targetStat = await lstat(target);
+
+    if (targetStat.isSymbolicLink()) {
+      const source = await realpath(target);
+      await unlink(target);
+      await cp(source, target, { recursive: true });
+      continue;
+    }
+
+    if (targetStat.isDirectory()) {
+      await replaceSymlinksInDirectory(target);
+    }
+  }
+}
+
 await rm(webVendorRoot, { recursive: true, force: true });
 await mkdir(standaloneAppRoot, { recursive: true });
 await cp(standaloneSource, standaloneTarget, { recursive: true });
 await hydrateTopLevelPnpmPackages();
 await replaceRemainingTopLevelSymlinks();
+await replaceSymlinksInDirectory(resolve(standaloneAppRoot, '.next/node_modules'));
 await cp(staticSource, resolve(standaloneAppRoot, '.next/static'), {
   recursive: true,
 });
