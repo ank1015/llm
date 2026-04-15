@@ -83,6 +83,23 @@ describe('find tool', () => {
 
     expect(result.content).toEqual([{ type: 'text', content: 'a.ts\nnested/b.ts' }]);
   });
+
+  it('keeps relative custom-operation results unchanged', async () => {
+    const tool = createFindTool('/repo', {
+      operations: {
+        exists: () => true,
+        glob: () => ['src/a.ts', 'src/nested/b.ts'],
+      },
+    });
+
+    const result = await tool.execute({
+      toolCallId: 'find-2',
+      params: { path: '.', pattern: '**/*.ts' },
+      context: { messages: [] },
+    });
+
+    expect(result.content).toEqual([{ type: 'text', content: 'src/a.ts\nsrc/nested/b.ts' }]);
+  });
 });
 
 describe('ls tool', () => {

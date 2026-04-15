@@ -1,6 +1,6 @@
 # @ank1015/llm-agents
 
-Private workspace package for the monorepo's filesystem tools, system prompts, and installable-skill registry helpers.
+Published Node-only package for filesystem tools, system prompts, and installable-skill registry helpers.
 
 ## Commands
 
@@ -26,7 +26,7 @@ pnpm --filter @ank1015/llm-agents test:coverage
 
 ## Conventions
 
-- Keep this package workspace-only. Do not reintroduce publish or CLI-only workflows without a clear caller in the repo.
+- Keep this package runtime-focused. Do not add CLI-only workflows without a clear caller in the repo.
 - Treat `skills/registry.json` as remote metadata, not as a bundled local skill payload.
 - When changing prompt wording or registry behavior, update the relevant unit tests in the same change.
 - Prefer deterministic tests for tools by injecting custom operations instead of relying on host binaries when possible.

@@ -121,7 +121,9 @@ Path: `packages/agents`
 - Uses filesystem, path, OS, process, shell, and child process APIs.
 - Has Windows-specific shell handling:
   - looks for Git Bash in `Program Files`
+  - also checks per-user Git installs under `LOCALAPPDATA`
   - falls back to `bash.exe` on `PATH`
+  - honors `shellPath` in `~/.pi/agent/settings.json`
   - uses `taskkill` to kill process trees
 - Has Unix/macOS handling:
   - prefers `/bin/bash`
@@ -137,9 +139,11 @@ Path: `packages/agents`
 - A shell for the bash tool:
   - macOS/Linux: `/bin/bash`, `bash`, or `sh`
   - Windows: Git Bash or another `bash.exe`
+  - custom shell path can be configured with `shellPath` in `~/.pi/agent/settings.json`
 - `fd` and `rg` for file search tools.
   - The package can auto-download them from GitHub for macOS/Linux/Windows.
-  - Extraction requires `tar`.
+  - `.tar.gz` extraction requires `tar`.
+  - Windows `.zip` extraction tries `tar` first, then PowerShell `Expand-Archive`.
 - Network access if auto-downloading `fd`/`rg`.
 
 ### Runtime Dependencies

@@ -1,10 +1,31 @@
 import { spawn, spawnSync } from 'child_process';
-import { existsSync } from 'node:fs';
-import { delimiter } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { delimiter, join } from 'node:path';
 
 import { getBinDir, getSettingsPath } from './config.js';
 
 let cachedShellConfig: { shell: string; args: string[] } | null = null;
+
+function readConfiguredShellPath(): string | null {
+  const settingsPath = getSettingsPath();
+
+  if (!existsSync(settingsPath)) {
+    return null;
+  }
+
+  try {
+    const settings = JSON.parse(readFileSync(settingsPath, 'utf-8')) as { shellPath?: unknown };
+    const shellPath = typeof settings.shellPath === 'string' ? settings.shellPath.trim() : '';
+
+    return shellPath.length > 0 ? shellPath : null;
+  } catch {
+    return null;
+  }
+}
+
+function createShellConfig(shell: string): { shell: string; args: string[] } {
+  return { shell, args: ['-c'] };
+}
 
 /**
  * Find bash executable on PATH (cross-platform)
@@ -53,21 +74,35 @@ export function getShellConfig(): { shell: string; args: string[] } {
     return cachedShellConfig;
   }
 
+  const configuredShellPath = readConfiguredShellPath();
+  if (configuredShellPath) {
+    if (!existsSync(configuredShellPath)) {
+      throw new Error(`Configured shellPath does not exist: ${configuredShellPath}`);
+    }
+
+    cachedShellConfig = createShellConfig(configuredShellPath);
+    return cachedShellConfig;
+  }
+
   if (process.platform === 'win32') {
     // 2. Try Git Bash in known locations
     const paths: string[] = [];
     const programFiles = process.env.ProgramFiles;
     if (programFiles) {
-      paths.push(`${programFiles}\\Git\\bin\\bash.exe`);
+      paths.push(join(programFiles, 'Git', 'bin', 'bash.exe'));
     }
     const programFilesX86 = process.env['ProgramFiles(x86)'];
     if (programFilesX86) {
-      paths.push(`${programFilesX86}\\Git\\bin\\bash.exe`);
+      paths.push(join(programFilesX86, 'Git', 'bin', 'bash.exe'));
+    }
+    const localAppData = process.env.LOCALAPPDATA;
+    if (localAppData) {
+      paths.push(join(localAppData, 'Programs', 'Git', 'bin', 'bash.exe'));
     }
 
     for (const path of paths) {
       if (existsSync(path)) {
-        cachedShellConfig = { shell: path, args: ['-c'] };
+        cachedShellConfig = createShellConfig(path);
         return cachedShellConfig;
       }
     }
@@ -75,7 +110,7 @@ export function getShellConfig(): { shell: string; args: string[] } {
     // 3. Fallback: search bash.exe on PATH (Cygwin, MSYS2, WSL, etc.)
     const bashOnPath = findBashOnPath();
     if (bashOnPath) {
-      cachedShellConfig = { shell: bashOnPath, args: ['-c'] };
+      cachedShellConfig = createShellConfig(bashOnPath);
       return cachedShellConfig;
     }
 
@@ -90,17 +125,17 @@ export function getShellConfig(): { shell: string; args: string[] } {
 
   // Unix: try /bin/bash, then bash on PATH, then fallback to sh
   if (existsSync('/bin/bash')) {
-    cachedShellConfig = { shell: '/bin/bash', args: ['-c'] };
+    cachedShellConfig = createShellConfig('/bin/bash');
     return cachedShellConfig;
   }
 
   const bashOnPath = findBashOnPath();
   if (bashOnPath) {
-    cachedShellConfig = { shell: bashOnPath, args: ['-c'] };
+    cachedShellConfig = createShellConfig(bashOnPath);
     return cachedShellConfig;
   }
 
-  cachedShellConfig = { shell: 'sh', args: ['-c'] };
+  cachedShellConfig = createShellConfig('sh');
   return cachedShellConfig;
 }
 
