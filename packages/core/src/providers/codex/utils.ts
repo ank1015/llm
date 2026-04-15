@@ -199,6 +199,13 @@ export function createClient(model: Model<'codex'>, options: CodexProviderOption
     throw new Error('Codex chatgpt-account-id is required.');
   }
 
+  const conversationHeaders = options.conversationId
+    ? {
+        'x-client-request-id': options.conversationId,
+        session_id: options.conversationId,
+      }
+    : {};
+
   return new OpenAI({
     apiKey: options.apiKey,
     baseURL: model.baseUrl,
@@ -206,6 +213,7 @@ export function createClient(model: Model<'codex'>, options: CodexProviderOption
     defaultHeaders: {
       ...(model.headers || {}),
       'chatgpt-account-id': options['chatgpt-account-id'],
+      ...conversationHeaders,
       originator: CODEX_ORIGINATOR,
       'x-oai-web-search-eligible': 'true',
       'user-agent': getCodexUserAgent(),
@@ -231,6 +239,7 @@ export function buildParams(
     apiKey,
     signal,
     'chatgpt-account-id': chatgptAccountId,
+    conversationId,
     temperature,
     top_p,
     truncation,
@@ -258,6 +267,10 @@ export function buildParams(
     store: false,
     stream: false,
   };
+
+  if (conversationId) {
+    params.prompt_cache_key = conversationId;
+  }
 
   const tools: OpenAITool[] = [];
 

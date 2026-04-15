@@ -54,6 +54,18 @@ describe('Codex Utils', () => {
       expect(client._options.defaultHeaders.originator).toBe('codex_cli_rs');
     });
 
+    it('should attach conversation headers when conversationId is provided', () => {
+      const client = createClient(mockModel, {
+        ...defaultOptions,
+        conversationId: 'conversation-123',
+      }) as unknown as {
+        _options: { defaultHeaders: Record<string, string> };
+      };
+
+      expect(client._options.defaultHeaders['x-client-request-id']).toBe('conversation-123');
+      expect(client._options.defaultHeaders.session_id).toBe('conversation-123');
+    });
+
     it('should throw when apiKey is missing', () => {
       expect(() =>
         createClient(mockModel, {
@@ -201,6 +213,28 @@ describe('Codex Utils', () => {
           content: [{ type: 'input_text', text: 'hello' }],
         },
       ]);
+    });
+
+    it('should map conversationId to prompt_cache_key', () => {
+      const context: Context = { messages: [] };
+      const result = buildParams(mockModel, context, {
+        ...defaultOptions,
+        conversationId: 'conversation-456',
+      });
+
+      expect(result.prompt_cache_key).toBe('conversation-456');
+      expect(result).not.toHaveProperty('conversationId');
+    });
+
+    it('should let conversationId override prompt_cache_key', () => {
+      const context: Context = { messages: [] };
+      const result = buildParams(mockModel, context, {
+        ...defaultOptions,
+        conversationId: 'conversation-789',
+        prompt_cache_key: 'manual-cache-key',
+      });
+
+      expect(result.prompt_cache_key).toBe('conversation-789');
     });
 
     it('should remove credential and unsupported fields from params', () => {
