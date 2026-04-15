@@ -6,7 +6,7 @@ Private Next.js client for browsing projects, opening artifacts, streaming sessi
 
 This app is workspace-only and is not intended to be published to npm.
 
-It talks to the server backend over HTTP and WebSocket APIs, defaulting to `http://localhost:8001`.
+It talks to the server backend over HTTP and WebSocket APIs, defaulting to the current browser origin in production and `http://localhost:8001` during tests/server-side fallback.
 
 ## Commands
 
@@ -34,7 +34,8 @@ pnpm --dir apps/web test
 ## Environment
 
 - `NEXT_PUBLIC_LLM_SERVER_BASE_URL` overrides the default backend URL
-- default server URL: `http://localhost:8001`
+- production browser default: current origin, for example `http://127.0.0.1:3210`
+- test/server fallback: `http://localhost:8001`
 - terminal sockets are derived from the same base URL
 
 ## What It Contains

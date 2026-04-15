@@ -1,20 +1,28 @@
-const DEFAULT_SERVER_BASE = "http://localhost:8001";
+const LOCAL_SERVER_BASE = 'http://localhost:8001';
+
+function getDefaultServerBaseUrl(): string {
+  if (process.env.NODE_ENV === 'test' || typeof window === 'undefined') {
+    return LOCAL_SERVER_BASE;
+  }
+
+  return window.location.origin;
+}
 
 export function resolveServerBaseUrl(
-  rawBase = process.env.NEXT_PUBLIC_LLM_SERVER_BASE_URL,
+  rawBase = process.env.NEXT_PUBLIC_LLM_SERVER_BASE_URL
 ): string {
   const trimmed = rawBase?.trim();
   if (!trimmed) {
-    return DEFAULT_SERVER_BASE;
+    return getDefaultServerBaseUrl();
   }
 
-  return trimmed.replace(/\/+$/, "");
+  return trimmed.replace(/\/+$/, '');
 }
 
 export const SERVER_BASE = resolveServerBaseUrl();
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
+  return typeof value === 'object' && value !== null;
 }
 
 function getErrorMessage(body: unknown): string | undefined {
@@ -22,12 +30,12 @@ function getErrorMessage(body: unknown): string | undefined {
     return undefined;
   }
 
-  if (typeof body.error === "string") {
+  if (typeof body.error === 'string') {
     return body.error;
   }
 
   const error = body.error;
-  if (isRecord(error) && typeof error.message === "string") {
+  if (isRecord(error) && typeof error.message === 'string') {
     return error.message;
   }
 
@@ -40,11 +48,11 @@ function toHeaders(headers?: HeadersInit): Headers {
 
 export async function apiRequestJson<TResponse>(
   url: string,
-  init?: RequestInit,
+  init?: RequestInit
 ): Promise<TResponse> {
   const headers = toHeaders(init?.headers);
-  if (!headers.has("Accept")) {
-    headers.set("Accept", "application/json");
+  if (!headers.has('Accept')) {
+    headers.set('Accept', 'application/json');
   }
 
   const response = await fetch(url, {
@@ -63,6 +71,6 @@ export async function apiRequestJson<TResponse>(
 
 export function toWebSocketUrl(url: string): string {
   const socketUrl = new URL(url);
-  socketUrl.protocol = socketUrl.protocol === "https:" ? "wss:" : "ws:";
+  socketUrl.protocol = socketUrl.protocol === 'https:' ? 'wss:' : 'ws:';
   return socketUrl.toString();
 }
