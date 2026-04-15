@@ -20,7 +20,9 @@ pnpm clean            # Remove workspace build artifacts and root node_modules
 
 # Development
 pnpm dev              # Run workspace dev tasks through Turbo
+pnpm dev:setup-app    # Build and run the Electron setup app
 pnpm dev:web-app      # Start the Next.js web client
+pnpm start:setup-app  # Start the built Electron setup app
 pnpm start:web-app    # Start the built web client
 ```
 
@@ -29,6 +31,7 @@ pnpm start:web-app    # Start the built web client
 ```text
 apps/
   web/                # @ank1015/llm-web-app - Next.js client for the server
+  setup/              # @ank1015/llm-setup-app - Electron setup app and binary packaging
 
 packages/
   core/               # @ank1015/llm-core - Stateless provider runtime and model catalog
@@ -49,6 +52,8 @@ packages/
    Private Hono backend for project storage, artifact APIs, sessions, skills, checkpoints, and terminals.
 5. `@ank1015/llm-web-app`
    Private Next.js client for browsing projects and artifacts, streaming sessions, and terminal interaction.
+6. `@ank1015/llm-setup-app`
+   Private Electron setup app for prerequisite checks, binary distribution, and launching the main app through `npx`.
 
 ## Conventions
 
@@ -69,6 +74,7 @@ packages/
 - `packages/sdk/src/index.ts` - SDK public entry
 - `packages/server/src/index.ts` - Server app/server entry
 - `apps/web/src/app/page.tsx` - Web app home route
+- `apps/setup/src/main/main.ts` - Electron setup app main process
 
 ## Package Guide
 
@@ -77,6 +83,7 @@ packages/
 - [packages/agents/AGENTS.md](packages/agents/AGENTS.md) - Agent tools, prompts, and registry helpers
 - [packages/server/AGENTS.md](packages/server/AGENTS.md) - Backend routes, storage, sessions, and terminals
 - [apps/web/AGENTS.md](apps/web/AGENTS.md) - Next.js web client for projects, artifacts, sessions, and terminals
+- [apps/setup/AGENTS.md](apps/setup/AGENTS.md) - Electron setup app and binary packaging
 
 ## Boundaries
 

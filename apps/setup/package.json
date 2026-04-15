@@ -1,0 +1,60 @@
+{
+  "name": "@ank1015/llm-setup-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Private Electron setup app for installing local LLM runtime prerequisites and launching the main app",
+  "type": "module",
+  "main": "./dist/main/main.js",
+  "scripts": {
+    "dev": "pnpm run build && electron .",
+    "build": "node ../../scripts/remove-paths.mjs dist release --tsbuildinfo && tsc && node scripts/copy-renderer.mjs",
+    "start": "electron .",
+    "package": "pnpm run build && electron-builder --dir",
+    "dist": "pnpm run build && electron-builder",
+    "test": "echo \"No tests configured for setup app yet\"",
+    "test:unit": "echo \"No unit tests configured for setup app yet\"",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src scripts",
+    "clean": "node ../../scripts/remove-paths.mjs dist release --tsbuildinfo"
+  },
+  "dependencies": {
+    "@ank1015/llm-agents": "workspace:^",
+    "@ank1015/llm-sdk": "workspace:^"
+  },
+  "devDependencies": {
+    "@types/node": "^24.6.0",
+    "electron": "^39.2.7",
+    "electron-builder": "^26.0.12",
+    "typescript": "^5.7.0"
+  },
+  "build": {
+    "appId": "com.ank1015.llm.setup",
+    "productName": "LLM Setup",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Development"
+    }
+  }
+}
