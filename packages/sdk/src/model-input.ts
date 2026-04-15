@@ -100,6 +100,7 @@ export type ProviderOptionsForModelId<TModelId extends string> = TModelId extend
 export interface ResolveModelInputInput<TModelId extends string = string> {
   modelId: TModelId;
   reasoningEffort?: ReasoningEffort;
+  conversationId?: string;
   overrideProviderSetting?: Partial<ProviderOptionsForModelId<TModelId>>;
   keysFilePath?: string;
 }
@@ -221,6 +222,7 @@ export async function resolveModelInput<TModelId extends string>(
     return resolveCodexModelInput(
       input.modelId,
       input.reasoningEffort,
+      input.conversationId,
       input.overrideProviderSetting as Partial<CodexProviderOptions> | undefined,
       keysFilePath
     );
@@ -343,6 +345,7 @@ async function resolveOpenAIModelInput(
 async function resolveCodexModelInput(
   modelId: CodexModelId,
   reasoningEffort: ReasoningEffort | undefined,
+  conversationId: string | undefined,
   overrideProviderSetting: Partial<CodexProviderOptions> | undefined,
   keysFilePath: string
 ): Promise<ResolveModelInputResult> {
@@ -377,6 +380,7 @@ async function resolveCodexModelInput(
   const baseProviderOptions: CodexProviderOptions = {
     ...credentialsResult.credentials,
     ...buildOpenAICompatibleReasoning(reasoningEffort),
+    ...(conversationId !== undefined ? { conversationId } : {}),
   };
   const providerOptions = mergeProviderOptions(baseProviderOptions, overrideProviderSetting);
 

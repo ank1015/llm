@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { agentEngine, createEventAdapter, defaultModelInvoker } from '@ank1015/llm-core';
 
+import { toDeterministicUuidV7 } from './conversation-id.js';
 import { resolveModelInput } from './model-input.js';
 import {
   createSessionPath,
@@ -363,6 +364,7 @@ async function executeAgent<TModelId extends CuratedModelId>(
     const resolved = await resolveModelInput({
       modelId: input.modelId,
       ...(input.reasoningEffort !== undefined ? { reasoningEffort: input.reasoningEffort } : {}),
+      conversationId: toDeterministicUuidV7(sessionId),
       ...(input.overrideProviderSetting !== undefined
         ? { overrideProviderSetting: input.overrideProviderSetting }
         : {}),

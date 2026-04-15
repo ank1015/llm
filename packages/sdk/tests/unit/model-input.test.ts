@@ -150,6 +150,78 @@ describe('model input', () => {
     });
   });
 
+  it('maps conversationId into Codex provider options', async () => {
+    const keysFilePath = await createTempKeysFile();
+    await setProviderCredentials(keysFilePath, 'codex', {
+      apiKey: 'codex-key',
+      'chatgpt-account-id': 'account-123',
+    });
+
+    const result = await resolveModelInput({
+      modelId: 'codex/gpt-5.4-mini',
+      conversationId: '018f1f2e-7c99-7cc1-9f5d-2a2a9f3c7b11',
+      keysFilePath,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      throw new Error('Expected successful resolution.');
+    }
+
+    expect(result.providerOptions.conversationId).toBe('018f1f2e-7c99-7cc1-9f5d-2a2a9f3c7b11');
+    expect(result.provider.providerOptions.conversationId).toBe(
+      '018f1f2e-7c99-7cc1-9f5d-2a2a9f3c7b11'
+    );
+  });
+
+  it('ignores conversationId for non-Codex provider options', async () => {
+    const keysFilePath = await createTempKeysFile();
+    await setProviderCredentials(keysFilePath, 'openai', {
+      apiKey: 'openai-key',
+    });
+
+    const result = await resolveModelInput({
+      modelId: 'openai/gpt-5.4-mini',
+      conversationId: '018f1f2e-7c99-7cc1-9f5d-2a2a9f3c7b11',
+      keysFilePath,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      throw new Error('Expected successful resolution.');
+    }
+
+    expect(result.providerOptions).not.toHaveProperty('conversationId');
+    expect(result.provider.providerOptions).not.toHaveProperty('conversationId');
+  });
+
+  it('lets overrideProviderSetting conversationId win over resolver conversationId', async () => {
+    const keysFilePath = await createTempKeysFile();
+    await setProviderCredentials(keysFilePath, 'codex', {
+      apiKey: 'codex-key',
+      'chatgpt-account-id': 'account-123',
+    });
+
+    const result = await resolveModelInput({
+      modelId: 'codex/gpt-5.4-mini',
+      conversationId: '018f1f2e-7c99-7cc1-9f5d-2a2a9f3c7b11',
+      keysFilePath,
+      overrideProviderSetting: {
+        conversationId: '018f1f2e-7c99-7cc1-9f5d-2a2a9f3c7b22',
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      throw new Error('Expected successful resolution.');
+    }
+
+    expect(result.providerOptions.conversationId).toBe('018f1f2e-7c99-7cc1-9f5d-2a2a9f3c7b22');
+    expect(result.provider.providerOptions.conversationId).toBe(
+      '018f1f2e-7c99-7cc1-9f5d-2a2a9f3c7b22'
+    );
+  });
+
   it('lets overrideProviderSetting win over defaults', async () => {
     const keysFilePath = await createTempKeysFile();
     await setProviderCredentials(keysFilePath, 'openai', {

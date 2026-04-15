@@ -6,6 +6,7 @@ import { createEventAdapter } from '@ank1015/llm-core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { resetSdkConfig, setSdkConfig } from '../../src/config.js';
+import { toDeterministicUuidV7 } from '../../src/conversation-id.js';
 import { AgentInputError, AgentRunConsumptionError, agent } from '../../src/index.js';
 import { resolveModelInput } from '../../src/model-input.js';
 import { appendSessionMessage, getSessionHead, loadSessionMessages } from '../../src/session.js';
@@ -149,6 +150,13 @@ describe('agent', () => {
     if (!result.ok) {
       throw new Error('Expected success result');
     }
+
+    expect(mockedResolveModelInput).toHaveBeenCalledWith(
+      expect.objectContaining({
+        modelId: 'openai/gpt-5.4-mini',
+        conversationId: toDeterministicUuidV7(result.sessionId),
+      })
+    );
 
     const loaded = await loadSessionMessages({ path: result.sessionPath });
     expect(loaded?.messages).toEqual([
