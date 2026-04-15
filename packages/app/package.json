@@ -1,0 +1,52 @@
+{
+  "name": "@ank1015/llm",
+  "version": "0.0.3",
+  "description": "Local LLM runtime app launcher for the Hono server and Next.js web client",
+  "type": "module",
+  "bin": {
+    "llm": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "vendor",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "node ../../scripts/remove-paths.mjs dist vendor --tsbuildinfo && tsc && node scripts/assemble.mjs",
+    "smoke": "node scripts/smoke.mjs",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src scripts",
+    "clean": "node ../../scripts/remove-paths.mjs dist vendor --tsbuildinfo",
+    "prepublishOnly": "node ../../scripts/ensure-pnpm-publish.mjs"
+  },
+  "keywords": [
+    "llm",
+    "agents",
+    "hono",
+    "nextjs",
+    "cli"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ank1015/llm.git",
+    "directory": "packages/app"
+  },
+  "homepage": "https://github.com/ank1015/llm/tree/main/packages/app",
+  "bugs": {
+    "url": "https://github.com/ank1015/llm/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@ank1015/llm-server": "workspace:^"
+  },
+  "devDependencies": {
+    "@types/node": "^25.2.3"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

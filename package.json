@@ -1,5 +1,5 @@
 {
-  "name": "@ank1015/llm",
+  "name": "@ank1015/llm-workspace",
   "version": "0.0.1",
   "private": true,
   "description": "LLM SDK monorepo",
@@ -7,6 +7,12 @@
   "scripts": {
     "build": "turbo run build",
     "build:packages": "turbo run build --filter=@ank1015/llm-core --filter=@ank1015/llm-sdk --filter=@ank1015/llm-agents --filter=@ank1015/llm-server",
+    "release:app:build": "pnpm --filter @ank1015/llm-server build && pnpm --filter @ank1015/llm-web-app build && pnpm --filter @ank1015/llm build",
+    "release:app:smoke": "pnpm --filter @ank1015/llm smoke",
+    "release:app:pack": "pnpm release:app:build && pnpm release:app:smoke && pnpm --dir packages/app pack",
+    "release:app:publish": "pnpm release:app:build && pnpm release:app:smoke && pnpm --dir packages/app publish",
+    "release:runtime:publish": "pnpm --dir packages/core publish && pnpm --dir packages/sdk publish && pnpm --dir packages/agents publish && pnpm --dir packages/server publish",
+    "release:publish": "pnpm release:app:build && pnpm release:app:smoke && pnpm release:runtime:publish && pnpm --dir packages/app publish",
     "dev": "turbo run dev",
     "dev:setup-app": "pnpm --filter @ank1015/llm-setup-app dev",
     "dev:web-app": "pnpm --filter @ank1015/llm-web-app dev",

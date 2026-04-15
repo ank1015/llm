@@ -234,6 +234,16 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@25.3.2)(jsdom@29.0.1)(lightningcss@1.32.0)(terser@5.46.0)
 
+  packages/app:
+    dependencies:
+      '@ank1015/llm-server':
+        specifier: workspace:^
+        version: link:../server
+    devDependencies:
+      '@types/node':
+        specifier: ^25.2.3
+        version: 25.3.2
+
   packages/core:
     dependencies:
       '@anthropic-ai/sdk':
