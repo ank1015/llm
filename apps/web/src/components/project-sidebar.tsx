@@ -7,7 +7,6 @@ import {
   File01Icon,
   FolderAddIcon,
   Folder01Icon,
-  Key01Icon,
   MoreHorizontalIcon,
   PanelLeftCloseIcon,
   PanelLeftOpenIcon,
@@ -18,7 +17,7 @@ import {
 import { HugeiconsIcon } from '@hugeicons/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams, usePathname, useRouter } from 'next/navigation';
-import { useEffect , useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
 
@@ -48,7 +47,6 @@ import { useArtifactFilesStore } from '@/stores/artifact-files-store';
 import { useChatStore } from '@/stores/chat-store';
 import { useSidebarStore } from '@/stores/sidebar-store';
 import { useUiStore } from '@/stores/ui-store';
-
 
 const MENU_WIDTH = 176;
 const MENU_HEIGHT = 92;
@@ -174,9 +172,7 @@ function RecentThreadsSection({
 function SettingsSidebarSection({ projectId, pathname }: { projectId: string; pathname: string }) {
   const router = useRouter();
   const generalHref = `/${projectId}/settings/general`;
-  const modelsHref = `/${projectId}/settings/models`;
   const isGeneralActive = pathname === generalHref;
-  const isModelsActive = pathname === modelsHref;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -204,25 +200,6 @@ function SettingsSidebarSection({ projectId, pathname }: { projectId: string; pa
               className="shrink-0 text-black/52 dark:text-white/52"
             />
             <span className="min-w-0 flex-1 truncate">General</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push(modelsHref)}
-            className={[
-              'group flex h-10 items-center gap-2 whitespace-nowrap rounded-lg pl-2 pr-1 text-left text-[14px] font-medium transition-colors',
-              isModelsActive
-                ? 'bg-accent text-black dark:text-white'
-                : 'text-black/80 hover:bg-accent dark:text-white/82',
-            ].join(' ')}
-          >
-            <HugeiconsIcon
-              icon={Key01Icon}
-              size={18}
-              color="currentColor"
-              strokeWidth={1.8}
-              className="shrink-0 text-black/52 dark:text-white/52"
-            />
-            <span className="min-w-0 flex-1 truncate">Models</span>
           </button>
         </div>
       </div>
