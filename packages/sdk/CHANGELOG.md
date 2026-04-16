@@ -6,6 +6,14 @@ The format is based on Keep a Changelog and this package follows SemVer once its
 
 ## [Unreleased]
 
+## [0.0.7] - 2026-04-16
+
+### Added
+
+- Added Codex conversation tracking for `agent()` sessions so persisted sdk sessions can continue the matching Codex conversation across turns.
+
+## [0.0.6] - 2026-04-15
+
 ### Added
 
 - Added package docs for the new `image()` SDK entrypoint, including path-first output behavior, SDK image aliases, and model-specific settings guidance.
