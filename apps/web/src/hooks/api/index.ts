@@ -44,13 +44,6 @@ export {
   useSessionsQuery,
   useRenameSessionMutation,
 } from './sessions';
-export {
-  useClearKeyMutation,
-  useKeyDetailsQuery,
-  useKeysQuery,
-  useReloadKeyMutation,
-  useSetKeyMutation,
-} from './keys';
 export { useModelsQuery } from './models';
 export {
   useCreateTerminalMutation,

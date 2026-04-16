@@ -21,8 +21,6 @@ export type {
   StreamRetryRequest,
   TurnSettings,
 } from './conversation';
-export { clearKey, getKeyDetails, listKeys, reloadKey, setKey } from './keys';
-export type { KeyCredentialsInput } from './keys';
 export { listModels } from './models';
 export {
   createArtifactCheckpoint,
@@ -113,15 +111,9 @@ export type {
   CuratedModelIdContract,
   DeleteArtifactSkillResponse,
   DeleteArtifactPathResponse,
-  DeleteKeyResponse,
   InstallArtifactSkillRequest,
-  KeyCredentialFieldDto,
   DeleteSessionResponse,
   DeleteTerminalResponse,
-  KeyProviderContract,
-  KeyProviderDetailsResponse,
-  KeyProviderStatusDto,
-  KeysListResponse,
   LiveRunSummaryDto,
   ModelOptionDto,
   ModelProviderDto,
@@ -133,7 +125,6 @@ export type {
   ProjectOverviewDto,
   RegisteredSkillDto,
   ReasoningEffortContract,
-  ReloadKeyResponse,
   RenameArtifactDirRequest,
   RenameArtifactPathRequest,
   RenameArtifactPathResponse,
@@ -147,8 +138,6 @@ export type {
   SessionSummaryDto,
   SessionTreeResponse,
   SessionTurnSettingsRequest,
-  SetKeyRequest,
-  SetKeyResponse,
   StreamAgentEventData,
   StreamConflictResponse,
   StreamDoneEventData,
