@@ -1,6 +1,6 @@
 {
   "name": "@ank1015/llm",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "description": "Local LLM runtime app launcher for the Hono server and Next.js web client",
   "type": "module",
   "bin": {
