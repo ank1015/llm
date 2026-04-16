@@ -38,25 +38,6 @@ Then run:
 pnpm --filter @ank1015/llm-server test:live
 ```
 
-## Optional server API setup
-
-If the standalone local server is already running on its default port, you can also populate the same keystore through the keys route:
-
-```bash
-curl -X PUT http://127.0.0.1:8001/api/keys/codex \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "credentials": {
-      "apiKey": "replace-with-your-codex-api-key",
-      "chatgpt-account-id": "replace-with-your-chatgpt-account-id"
-    }
-  }'
-```
-
-That route writes into the SDK central keystore used by the live session route tests.
-
-When using the packaged `npx @ank1015/llm` app, send the same request to the launcher's public origin, `http://127.0.0.1:3210/api/keys/codex` by default.
-
 ## Related docs
 
 - `README.md` for the package overview and command list
