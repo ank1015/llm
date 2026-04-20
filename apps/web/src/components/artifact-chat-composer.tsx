@@ -9,7 +9,7 @@ import {
 } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import type { ProjectFileIndexEntryDto } from '@/lib/client-api';
@@ -41,14 +41,15 @@ import { useArtifactFilesStore } from '@/stores/artifact-files-store';
 import { useChatSettingsStore } from '@/stores/chat-settings-store';
 import { useChatStore } from '@/stores/chat-store';
 import { useComposerStore } from '@/stores/composer-store';
+import { useProjectPreferencesStore } from '@/stores/project-preferences-store';
 import { useSessionsStore } from '@/stores/sessions-store';
 import { useSidebarStore } from '@/stores/sidebar-store';
-
 
 const PDF_MIME_TYPE = 'application/pdf';
 const ATTACHMENT_ACCEPT = `image/*,${PDF_MIME_TYPE}`;
 const EMPTY_ATTACHMENTS: Attachment[] = [];
 const LOG_PREFIX = '[artifact-chat]';
+const SIMPLE_COMPOSER_SINGLE_LINE_HEIGHT_PX = 40;
 
 function isAbortError(error: unknown): boolean {
   if (!error) {
@@ -171,6 +172,7 @@ export function ArtifactChatComposer({
   const [mentionError, setMentionError] = useState<string | null>(null);
   const [highlightedMentionIndex, setHighlightedMentionIndex] = useState(0);
   const [isDragActive, setIsDragActive] = useState(false);
+  const [isSimpleComposerMultiline, setIsSimpleComposerMultiline] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragDepthRef = useRef(0);
@@ -196,6 +198,9 @@ export function ArtifactChatComposer({
 
   const selectedModelId = useChatSettingsStore((state) => state.modelId);
   const selectedReasoning = useChatSettingsStore((state) => state.reasoningEffort);
+  const isAdvancedModeEnabled = useProjectPreferencesStore((state) =>
+    state.isAdvancedModeEnabled(projectId)
+  );
 
   const createSession = useSessionsStore((state) => state.createSession);
   const searchProjectFiles = useArtifactFilesStore((state) => state.searchProjectFiles);
@@ -220,6 +225,59 @@ export function ArtifactChatComposer({
     : 'Ask about this artifact or start a thread…';
   const canSubmit = draft.trim().length > 0 || attachments.length > 0;
   const isMentionOpen = activeMention !== null;
+  const simpleComposerAlignmentClassName = isSimpleComposerMultiline ? 'self-end' : 'self-center';
+
+  const attachmentButton = (
+    <button
+      type="button"
+      onClick={() => {
+        if (attachmentsAreLocked) {
+          toast.error('Attachments are fixed while editing this message.', {
+            id: 'artifact-edit-attachment-locked',
+          });
+          return;
+        }
+
+        fileInputRef.current?.click();
+      }}
+      disabled={attachmentsAreLocked}
+      className={cn(
+        'inline-flex size-7 shrink-0 items-center justify-center rounded-md text-black/38 transition-colors hover:bg-accent hover:text-black/64 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/12 disabled:cursor-default disabled:opacity-35 dark:text-white/36 dark:hover:text-white/64 dark:focus-visible:ring-white/12',
+        !isAdvancedModeEnabled ? simpleComposerAlignmentClassName : null
+      )}
+      aria-label="Add attachment"
+      title={
+        attachmentsAreLocked ? 'Attachments are fixed while editing this message' : 'Add attachment'
+      }
+    >
+      <HugeiconsIcon icon={PlusSignIcon} size={18} color="currentColor" strokeWidth={1.9} />
+    </button>
+  );
+
+  const sendButton = (
+    <button
+      type="button"
+      onClick={() => {
+        void handleSubmit();
+      }}
+      disabled={!isStreaming && !canSubmit}
+      className={cn(
+        'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/12 disabled:cursor-not-allowed dark:focus-visible:ring-white/12',
+        isStreaming || canSubmit
+          ? 'bg-[#FF6363] text-white hover:bg-[#f25454]'
+          : 'bg-accent text-black/28 dark:text-white/26',
+        !isAdvancedModeEnabled ? simpleComposerAlignmentClassName : null
+      )}
+      aria-label={isStreaming ? 'Stop generation' : 'Send prompt'}
+      title={isStreaming ? 'Stop generation' : 'Send prompt'}
+    >
+      {isStreaming ? (
+        <span className="h-3 w-3 rounded-[2px] bg-current" />
+      ) : (
+        <HugeiconsIcon icon={ArrowUp02Icon} size={16} color="currentColor" strokeWidth={1.9} />
+      )}
+    </button>
+  );
 
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -230,6 +288,23 @@ export function ArtifactChatComposer({
 
     syncMentionFromTextarea(textarea);
   }, [draft]);
+
+  useLayoutEffect(() => {
+    if (isAdvancedModeEnabled) {
+      setIsSimpleComposerMultiline(false);
+      return;
+    }
+
+    const textarea = textareaRef.current;
+    if (!textarea) {
+      setIsSimpleComposerMultiline(false);
+      return;
+    }
+
+    const inlineHeight = Number.parseFloat(textarea.style.height);
+    const resolvedHeight = Number.isFinite(inlineHeight) ? inlineHeight : textarea.scrollHeight;
+    setIsSimpleComposerMultiline(resolvedHeight > SIMPLE_COMPOSER_SINGLE_LINE_HEIGHT_PX + 0.5);
+  }, [draft, isAdvancedModeEnabled]);
 
   useEffect(() => {
     if (!activeMention) {
@@ -926,72 +1001,59 @@ export function ArtifactChatComposer({
         </div>
       ) : null}
 
-      <PromptInputTextarea
-        data-chat-composer-textarea
-        ref={textareaRef}
-        placeholder={isEditing ? 'Edit your message…' : placeholderText}
-        className="px-1 py-2 text-[15px] leading-[1.8] placeholder:text-black/30 dark:placeholder:text-white/24"
-        maxLength={200000}
-        onChange={handleTextareaInteraction}
-        onSelect={handleTextareaInteraction}
-        onClick={handleTextareaInteraction}
-        onFocus={handleTextareaInteraction}
-        onKeyUp={handleTextareaInteraction}
-        onKeyDown={handleTextareaKeyDown}
-      />
+      {isAdvancedModeEnabled ? (
+        <>
+          <PromptInputTextarea
+            data-chat-composer-textarea
+            ref={textareaRef}
+            placeholder={isEditing ? 'Edit your message…' : placeholderText}
+            className="px-1 py-2 text-[15px] leading-[1.8] placeholder:text-black/30 dark:placeholder:text-white/24"
+            maxLength={200000}
+            onChange={handleTextareaInteraction}
+            onSelect={handleTextareaInteraction}
+            onClick={handleTextareaInteraction}
+            onFocus={handleTextareaInteraction}
+            onKeyUp={handleTextareaInteraction}
+            onKeyDown={handleTextareaKeyDown}
+          />
 
-      <PromptInputActions className="justify-between gap-2 px-1 pt-4">
-        <div className="flex min-w-0 items-center gap-0.5">
-          <button
-            type="button"
-            onClick={() => {
-              if (attachmentsAreLocked) {
-                toast.error('Attachments are fixed while editing this message.', {
-                  id: 'artifact-edit-attachment-locked',
-                });
-                return;
-              }
+          <PromptInputActions className="justify-between gap-2 px-1 pt-4">
+            <div className="flex min-w-0 items-center gap-0.5">
+              {attachmentButton}
+              <PromptModelPicker />
+              <PromptReasoningPicker />
+            </div>
 
-              fileInputRef.current?.click();
-            }}
-            disabled={attachmentsAreLocked}
-            className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-black/38 transition-colors hover:bg-accent hover:text-black/64 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/12 disabled:cursor-default disabled:opacity-35 dark:text-white/36 dark:hover:text-white/64 dark:focus-visible:ring-white/12"
-            aria-label="Add attachment"
-            title={
-              attachmentsAreLocked
-                ? 'Attachments are fixed while editing this message'
-                : 'Add attachment'
-            }
-          >
-            <HugeiconsIcon icon={PlusSignIcon} size={18} color="currentColor" strokeWidth={1.9} />
-          </button>
-
-          <PromptModelPicker />
-          <PromptReasoningPicker />
-        </div>
-
-        <button
-          type="button"
-          onClick={() => {
-            void handleSubmit();
-          }}
-          disabled={!isStreaming && !canSubmit}
-          className={[
-            'inline-flex h-8 w-8 items-center justify-center rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/12 disabled:cursor-not-allowed dark:focus-visible:ring-white/12',
-            isStreaming || canSubmit
-              ? 'bg-[#FF6363] text-white hover:bg-[#f25454]'
-              : 'bg-accent text-black/28 dark:text-white/26',
-          ].join(' ')}
-          aria-label={isStreaming ? 'Stop generation' : 'Send prompt'}
-          title={isStreaming ? 'Stop generation' : 'Send prompt'}
-        >
-          {isStreaming ? (
-            <span className="h-3 w-3 rounded-[2px] bg-current" />
-          ) : (
-            <HugeiconsIcon icon={ArrowUp02Icon} size={16} color="currentColor" strokeWidth={1.9} />
+            {sendButton}
+          </PromptInputActions>
+        </>
+      ) : (
+        <div
+          data-testid="prompt-composer-simple-row"
+          className={cn(
+            'flex min-w-0 gap-1.5 px-1 py-0.5',
+            isSimpleComposerMultiline ? 'items-end' : 'items-center'
           )}
-        </button>
-      </PromptInputActions>
+        >
+          {attachmentButton}
+
+          <PromptInputTextarea
+            data-chat-composer-textarea
+            ref={textareaRef}
+            placeholder={isEditing ? 'Edit your message…' : placeholderText}
+            className="min-h-[40px] flex-1 px-0 py-2 text-[15px] leading-6 placeholder:text-black/30 dark:placeholder:text-white/24"
+            maxLength={200000}
+            onChange={handleTextareaInteraction}
+            onSelect={handleTextareaInteraction}
+            onClick={handleTextareaInteraction}
+            onFocus={handleTextareaInteraction}
+            onKeyUp={handleTextareaInteraction}
+            onKeyDown={handleTextareaKeyDown}
+          />
+
+          {sendButton}
+        </div>
+      )}
 
       {isDragActive ? (
         <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-3xl border border-dashed border-black/18 bg-white/72 text-sm text-black/72 backdrop-blur-sm dark:border-white/22 dark:bg-black/28 dark:text-white/78">

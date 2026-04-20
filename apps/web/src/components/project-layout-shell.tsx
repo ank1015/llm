@@ -22,8 +22,8 @@ import {
 } from '@/components/settings-button';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useArtifactFilesStore } from '@/stores/artifact-files-store';
+import { useProjectPreferencesStore } from '@/stores/project-preferences-store';
 import { useTerminalStore } from '@/stores/terminals-store';
-
 
 const DEFAULT_DRAWER_RATIO = 0.5;
 const MIN_DRAWER_WIDTH = 320;
@@ -80,6 +80,9 @@ export function ProjectLayoutShell({
     artifactKey ? (state.dockByArtifact[artifactKey]?.open ?? false) : false
   );
   const toggleTerminalDock = useTerminalStore((state) => state.toggleDock);
+  const isAdvancedModeEnabled = useProjectPreferencesStore((state) =>
+    state.isAdvancedModeEnabled(projectId)
+  );
   const drawerVisible = Boolean(artifactId && previewMode);
   const artifactContext = useMemo<ArtifactContext | null>(
     () =>
@@ -94,6 +97,9 @@ export function ProjectLayoutShell({
   const isSettingsRoute =
     pathname === `/${projectId}/settings` || pathname.startsWith(`/${projectId}/settings/`);
   const terminalAvailable = Boolean(artifactId && !isSettingsRoute);
+  const advancedTerminalAvailable = terminalAvailable && isAdvancedModeEnabled;
+  const showAdvancedArtifactHeaderControls =
+    artifactContext !== null && !isSettingsRoute && isAdvancedModeEnabled;
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -180,13 +186,13 @@ export function ProjectLayoutShell({
               <ProjectHeaderBreadcrumb />
             )}
             <div className="ml-auto flex shrink-0 items-center gap-1">
-              {artifactContext && !isSettingsRoute ? (
+              {showAdvancedArtifactHeaderControls && artifactContext ? (
                 <ArtifactCheckpointControls
                   artifactContext={artifactContext}
                   compact={drawerVisible}
                 />
               ) : null}
-              {terminalAvailable ? (
+              {advancedTerminalAvailable ? (
                 <button
                   type="button"
                   onClick={() => {
@@ -233,7 +239,7 @@ export function ProjectLayoutShell({
             />
           ) : null}
 
-          {terminalAvailable && artifactContext ? (
+          {advancedTerminalAvailable && artifactContext ? (
             <ProjectTerminalPanel artifactContext={artifactContext} />
           ) : null}
         </div>

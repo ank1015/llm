@@ -1,7 +1,10 @@
+import { QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ProjectSidebar } from '@/components/project-sidebar';
+import { getBrowserQueryClient } from '@/lib/query-client';
+import { useProjectPreferencesStore } from '@/stores/project-preferences-store';
 
 const navigationState = vi.hoisted(() => ({
   pathname: '/project-1',
@@ -35,6 +38,43 @@ const projectState = vi.hoisted(() => ({
   },
 }));
 
+const explorerState = vi.hoisted(() => ({
+  entriesByPath: {
+    '': [
+      {
+        name: '.git',
+        path: '.git',
+        type: 'directory' as const,
+        size: null,
+        updatedAt: '2026-04-01T00:00:00.000Z',
+      },
+      {
+        name: 'src',
+        path: 'src',
+        type: 'directory' as const,
+        size: null,
+        updatedAt: '2026-04-01T00:00:00.000Z',
+      },
+      {
+        name: 'README.md',
+        path: 'README.md',
+        type: 'file' as const,
+        size: 128,
+        updatedAt: '2026-04-01T00:00:00.000Z',
+      },
+    ],
+  } as Record<
+    string,
+    Array<{
+      name: string;
+      path: string;
+      type: 'file' | 'directory';
+      size: number | null;
+      updatedAt: string;
+    }>
+  >,
+}));
+
 const uiState = vi.hoisted(() => ({
   isSidebarCollapsed: false,
   toggleSidebarCollapsed: vi.fn(),
@@ -60,8 +100,11 @@ vi.mock('@/hooks/api/projects', () => ({
     data: projectState.artifacts,
     isPending: false,
   }),
-  useArtifactExplorerQuery: () => ({
-    data: [],
+  useArtifactExplorerQuery: (_ctx: unknown, path: string) => ({
+    data: {
+      path,
+      entries: explorerState.entriesByPath[path] ?? [],
+    },
     isPending: false,
     isError: false,
   }),
@@ -97,6 +140,7 @@ vi.mock('@/stores/ui-store', () => ({
 
 describe('ProjectSidebar', () => {
   beforeEach(() => {
+    getBrowserQueryClient().clear();
     navigationState.pathname = '/project-1';
     navigationState.params = {
       projectId: 'project-1',
@@ -105,10 +149,19 @@ describe('ProjectSidebar', () => {
     uiState.toggleSidebarCollapsed.mockClear();
     projectState.renameArtifact.mutateAsync.mockClear();
     projectState.deleteArtifact.mutateAsync.mockClear();
+    useProjectPreferencesStore.getState().reset();
   });
 
+  function renderSidebar() {
+    return render(
+      <QueryClientProvider client={getBrowserQueryClient()}>
+        <ProjectSidebar />
+      </QueryClientProvider>
+    );
+  }
+
   it('keeps the user on the project page when opening the artifact rename dialog', () => {
-    render(<ProjectSidebar />);
+    renderSidebar();
 
     fireEvent.click(screen.getByRole('button', { name: /more options for artifact one/i }));
     fireEvent.click(screen.getByRole('menuitem', { name: /rename/i }));
@@ -119,7 +172,7 @@ describe('ProjectSidebar', () => {
   });
 
   it('closes the dialog backdrop without navigating into the artifact', () => {
-    render(<ProjectSidebar />);
+    renderSidebar();
 
     fireEvent.click(screen.getByRole('button', { name: /more options for artifact one/i }));
     fireEvent.click(screen.getByRole('menuitem', { name: /rename/i }));
@@ -129,5 +182,33 @@ describe('ProjectSidebar', () => {
 
     expect(navigationState.push).not.toHaveBeenCalled();
     expect(screen.queryByRole('dialog', { name: /rename artifact/i })).not.toBeInTheDocument();
+  });
+
+  it('hides dot-prefixed folders in the file tree when advanced mode is off', () => {
+    navigationState.pathname = '/project-1/artifact-1';
+    navigationState.params = {
+      projectId: 'project-1',
+      artifactId: 'artifact-1',
+    };
+
+    renderSidebar();
+
+    expect(screen.queryByText('.git')).not.toBeInTheDocument();
+    expect(screen.getByText('src')).toBeInTheDocument();
+    expect(screen.getByText('README.md')).toBeInTheDocument();
+  });
+
+  it('shows dot-prefixed folders in the file tree when advanced mode is on', () => {
+    navigationState.pathname = '/project-1/artifact-1';
+    navigationState.params = {
+      projectId: 'project-1',
+      artifactId: 'artifact-1',
+    };
+    useProjectPreferencesStore.getState().setProjectAdvancedMode('project-1', true);
+
+    renderSidebar();
+
+    expect(screen.getByText('.git')).toBeInTheDocument();
+    expect(screen.getByText('src')).toBeInTheDocument();
   });
 });

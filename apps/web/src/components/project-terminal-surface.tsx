@@ -1,26 +1,23 @@
-"use client";
+'use client';
 
-import {
-  Add01Icon,
-  ComputerTerminal01Icon,
-  Delete03Icon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { FitAddon } from "@xterm/addon-fit";
-import { Terminal as XTerm } from "@xterm/xterm";
-import { useEffect, useRef } from "react";
+import { Add01Icon, ComputerTerminal01Icon, Delete03Icon } from '@hugeicons/core-free-icons';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { FitAddon } from '@xterm/addon-fit';
+import { Terminal as XTerm } from '@xterm/xterm';
+import { useEffect, useRef } from 'react';
 
-import { cn } from "@/lib/utils";
+import type { ArtifactContext } from '@/lib/client-api';
+import type { TerminalDockState } from '@/stores/terminals-store';
+
+import { cn } from '@/lib/utils';
 import {
   getTerminalArtifactKey,
   getTerminalRecordKey,
   getTerminalReplayFrames,
   useTerminalStore,
-} from "@/stores/terminals-store";
-import { useUiStore } from "@/stores/ui-store";
+} from '@/stores/terminals-store';
+import { useUiStore } from '@/stores/ui-store';
 
-import type { ArtifactContext } from "@/lib/client-api";
-import type { TerminalDockState } from "@/stores/terminals-store";
 
 const MIN_TERMINAL_FIT_WIDTH_PX = 120;
 const MIN_TERMINAL_FIT_HEIGHT_PX = 80;
@@ -40,46 +37,46 @@ const EMPTY_DOCK_STATE: TerminalDockState = {
 function applyTerminalTheme(terminal: XTerm): void {
   const styles = getComputedStyle(document.documentElement);
   const foreground =
-    styles.getPropertyValue("--foreground").trim() ||
-    (document.documentElement.classList.contains("dark") ? "#F3F4F6" : "#111111");
-  const background = styles.getPropertyValue("--terminal-surface-bg").trim() || undefined;
-  const isDark = document.documentElement.classList.contains("dark");
+    styles.getPropertyValue('--foreground').trim() ||
+    (document.documentElement.classList.contains('dark') ? '#F3F4F6' : '#111111');
+  const background = styles.getPropertyValue('--terminal-surface-bg').trim() || undefined;
+  const isDark = document.documentElement.classList.contains('dark');
   const palette = isDark
     ? {
-        black: "#14161B",
-        red: "#FF7A6B",
-        green: "#8FE067",
-        yellow: "#E9C46A",
-        blue: "#7AB7FF",
-        magenta: "#C894FF",
-        cyan: "#5EDBFF",
-        white: "#F3F4F6",
-        brightBlack: "#6C7280",
-        brightRed: "#FF9387",
-        brightGreen: "#A5EE84",
-        brightYellow: "#F2D487",
-        brightBlue: "#98CAFF",
-        brightMagenta: "#D8AEFF",
-        brightCyan: "#84E7FF",
-        brightWhite: "#FFFFFF",
+        black: '#14161B',
+        red: '#FF7A6B',
+        green: '#8FE067',
+        yellow: '#E9C46A',
+        blue: '#7AB7FF',
+        magenta: '#C894FF',
+        cyan: '#5EDBFF',
+        white: '#F3F4F6',
+        brightBlack: '#6C7280',
+        brightRed: '#FF9387',
+        brightGreen: '#A5EE84',
+        brightYellow: '#F2D487',
+        brightBlue: '#98CAFF',
+        brightMagenta: '#D8AEFF',
+        brightCyan: '#84E7FF',
+        brightWhite: '#FFFFFF',
       }
     : {
-        black: "#111111",
-        red: "#C85A52",
-        green: "#5F9D46",
-        yellow: "#A67C2D",
-        blue: "#4B7CC5",
-        magenta: "#9360C9",
-        cyan: "#2A92B0",
-        white: "#D5D8DE",
-        brightBlack: "#666C75",
-        brightRed: "#DD6B61",
-        brightGreen: "#71AF55",
-        brightYellow: "#B98D3E",
-        brightBlue: "#5C90DB",
-        brightMagenta: "#A674DB",
-        brightCyan: "#35A7C6",
-        brightWhite: "#F4F5F7",
+        black: '#111111',
+        red: '#C85A52',
+        green: '#5F9D46',
+        yellow: '#A67C2D',
+        blue: '#4B7CC5',
+        magenta: '#9360C9',
+        cyan: '#2A92B0',
+        white: '#D5D8DE',
+        brightBlack: '#666C75',
+        brightRed: '#DD6B61',
+        brightGreen: '#71AF55',
+        brightYellow: '#B98D3E',
+        brightBlue: '#5C90DB',
+        brightMagenta: '#A674DB',
+        brightCyan: '#35A7C6',
+        brightWhite: '#F4F5F7',
       };
 
   terminal.options.theme = {
@@ -87,7 +84,7 @@ function applyTerminalTheme(terminal: XTerm): void {
     foreground,
     cursor: foreground,
     cursorAccent: background,
-    selectionBackground: styles.getPropertyValue("--home-hover").trim() || undefined,
+    selectionBackground: styles.getPropertyValue('--home-hover').trim() || undefined,
     black: palette.black,
     red: palette.red,
     green: palette.green,
@@ -104,32 +101,28 @@ function applyTerminalTheme(terminal: XTerm): void {
     brightMagenta: palette.brightMagenta,
     brightCyan: palette.brightCyan,
     brightWhite: palette.brightWhite,
-    scrollbarSliderBackground: isDark ? "rgba(245, 245, 245, 0.18)" : "rgba(17, 17, 17, 0.18)",
-    scrollbarSliderHoverBackground: isDark
-      ? "rgba(245, 245, 245, 0.3)"
-      : "rgba(17, 17, 17, 0.28)",
-    scrollbarSliderActiveBackground: isDark
-      ? "rgba(245, 245, 245, 0.4)"
-      : "rgba(17, 17, 17, 0.36)",
+    scrollbarSliderBackground: isDark ? 'rgba(245, 245, 245, 0.18)' : 'rgba(17, 17, 17, 0.18)',
+    scrollbarSliderHoverBackground: isDark ? 'rgba(245, 245, 245, 0.3)' : 'rgba(17, 17, 17, 0.28)',
+    scrollbarSliderActiveBackground: isDark ? 'rgba(245, 245, 245, 0.4)' : 'rgba(17, 17, 17, 0.36)',
   };
 }
 
 function getTerminalFontFamily(): string {
   const styles = getComputedStyle(document.documentElement);
-  const mono = styles.getPropertyValue("--font-geist-mono").trim();
+  const mono = styles.getPropertyValue('--font-geist-mono').trim();
 
   return [
     '"SFMono-Regular"',
-    "ui-monospace",
-    "Menlo",
-    "Monaco",
-    "Consolas",
+    'ui-monospace',
+    'Menlo',
+    'Monaco',
+    'Consolas',
     mono,
     '"Liberation Mono"',
-    "monospace",
+    'monospace',
   ]
     .filter(Boolean)
-    .join(", ");
+    .join(', ');
 }
 
 function applyTerminalTypography(terminal: XTerm): void {
@@ -141,6 +134,46 @@ function applyTerminalTypography(terminal: XTerm): void {
   terminal.options.lineHeight = 1.2;
 }
 
+function isMacPlatform(): boolean {
+  if (typeof navigator === 'undefined') {
+    return false;
+  }
+
+  return /Mac|iPhone|iPad|iPod/i.test(navigator.platform);
+}
+
+async function copyTerminalSelection(terminal: XTerm): Promise<void> {
+  const selection = terminal.getSelection();
+  if (!selection) {
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(selection);
+  } catch {
+    // Clipboard access is best-effort.
+  }
+}
+
+async function pasteIntoTerminal(
+  terminal: XTerm,
+  sendInput: (ctx: ArtifactContext, terminalId: string, data: string) => void,
+  artifactContext: ArtifactContext,
+  terminalId: string
+): Promise<void> {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (!text) {
+      return;
+    }
+
+    terminal.paste(text);
+    sendInput(artifactContext, terminalId, text);
+  } catch {
+    // Clipboard access is best-effort.
+  }
+}
+
 export function ProjectTerminalSurface({
   artifactContext,
   terminalId,
@@ -148,17 +181,12 @@ export function ProjectTerminalSurface({
   artifactContext: ArtifactContext;
   terminalId: string;
 }) {
-  const artifactKey = getTerminalArtifactKey(
-    artifactContext.projectId,
-    artifactContext.artifactId,
-  );
-  const dock = useTerminalStore((state) =>
-    state.dockByArtifact[artifactKey] ?? EMPTY_DOCK_STATE,
-  );
+  const artifactKey = getTerminalArtifactKey(artifactContext.projectId, artifactContext.artifactId);
+  const dock = useTerminalStore((state) => state.dockByArtifact[artifactKey] ?? EMPTY_DOCK_STATE);
   const terminalsById = useTerminalStore((state) => state.terminalsById);
   const terminalRecordKey = getTerminalRecordKey(artifactContext, terminalId);
   const terminalRecord = useTerminalStore(
-    (state) => state.terminalsById[terminalRecordKey] ?? null,
+    (state) => state.terminalsById[terminalRecordKey] ?? null
   );
   const createTerminal = useTerminalStore((state) => state.createTerminal);
   const deleteTerminal = useTerminalStore((state) => state.deleteTerminal);
@@ -194,6 +222,39 @@ export function ProjectTerminalSurface({
     applyTerminalTypography(xterm);
     applyTerminalTheme(xterm);
 
+    const isMac = isMacPlatform();
+    xterm.attachCustomKeyEventHandler((event: KeyboardEvent) => {
+      const key = event.key.toLowerCase();
+      const copyShortcut =
+        key === 'c' && !event.altKey && !event.shiftKey && (isMac ? event.metaKey : event.ctrlKey);
+      const pasteShortcut =
+        key === 'v' && !event.altKey && !event.shiftKey && (isMac ? event.metaKey : event.ctrlKey);
+      const alternateCopyShortcut =
+        !isMac && key === 'c' && event.ctrlKey && event.shiftKey && !event.altKey;
+      const alternatePasteShortcut =
+        !isMac &&
+        ((key === 'v' && event.ctrlKey && event.shiftKey && !event.altKey) ||
+          (key === 'insert' && event.shiftKey && !event.ctrlKey && !event.altKey));
+
+      if (copyShortcut || alternateCopyShortcut) {
+        if (!xterm.hasSelection()) {
+          return true;
+        }
+
+        event.preventDefault();
+        void copyTerminalSelection(xterm);
+        return false;
+      }
+
+      if (pasteShortcut || alternatePasteShortcut) {
+        event.preventDefault();
+        void pasteIntoTerminal(xterm, sendInput, artifactContext, terminalId);
+        return false;
+      }
+
+      return true;
+    });
+
     terminalRef.current = xterm;
     fitAddonRef.current = fitAddon;
     lastRenderedSeqRef.current = 0;
@@ -205,10 +266,7 @@ export function ProjectTerminalSurface({
       }
 
       const rect = container.getBoundingClientRect();
-      if (
-        rect.width < MIN_TERMINAL_FIT_WIDTH_PX ||
-        rect.height < MIN_TERMINAL_FIT_HEIGHT_PX
-      ) {
+      if (rect.width < MIN_TERMINAL_FIT_WIDTH_PX || rect.height < MIN_TERMINAL_FIT_HEIGHT_PX) {
         return;
       }
 
@@ -290,7 +348,7 @@ export function ProjectTerminalSurface({
       }
 
       lastRenderedSeqRef.current = frame.seq;
-      if (frame.type === "output") {
+      if (frame.type === 'output') {
         xterm.write(frame.data);
       }
     }
@@ -308,7 +366,7 @@ export function ProjectTerminalSurface({
   }, [theme]);
 
   useEffect(() => {
-    if (terminalRecord?.connectionState === "connected") {
+    if (terminalRecord?.connectionState === 'connected') {
       terminalRef.current?.focus();
     }
   }, [terminalRecord?.connectionState]);
@@ -334,12 +392,7 @@ export function ProjectTerminalSurface({
           aria-label="New terminal"
           title="New terminal"
         >
-          <HugeiconsIcon
-            icon={Add01Icon}
-            size={15}
-            color="currentColor"
-            strokeWidth={1.8}
-          />
+          <HugeiconsIcon icon={Add01Icon} size={15} color="currentColor" strokeWidth={1.8} />
         </button>
 
         <button
@@ -352,12 +405,7 @@ export function ProjectTerminalSurface({
           aria-label="Kill current terminal"
           title="Kill current terminal"
         >
-          <HugeiconsIcon
-            icon={Delete03Icon}
-            size={15}
-            color="currentColor"
-            strokeWidth={1.8}
-          />
+          <HugeiconsIcon icon={Delete03Icon} size={15} color="currentColor" strokeWidth={1.8} />
         </button>
       </div>
 
@@ -365,7 +413,7 @@ export function ProjectTerminalSurface({
         <div
           ref={containerRef}
           className="artifact-terminal-surface h-full min-h-0 min-w-0 flex-1 overflow-hidden"
-          style={{ paddingRight: showSessionsRail ? "2.25rem" : undefined }}
+          style={{ paddingRight: showSessionsRail ? '2.25rem' : undefined }}
         />
       </div>
 
@@ -385,17 +433,15 @@ export function ProjectTerminalSurface({
                     type="button"
                     title={terminal.title}
                     aria-label={`Switch to Terminal ${index + 1}`}
-                    aria-current={isActive ? "page" : undefined}
+                    aria-current={isActive ? 'page' : undefined}
                     onClick={() => {
-                      void selectTerminal(artifactContext, terminal.id).catch(
-                        () => undefined,
-                      );
+                      void selectTerminal(artifactContext, terminal.id).catch(() => undefined);
                     }}
                     className={cn(
-                      "relative inline-flex size-7 items-center justify-center rounded-md transition-colors",
+                      'relative inline-flex size-7 items-center justify-center rounded-md transition-colors',
                       isActive
-                        ? "bg-black/[0.05] text-black dark:bg-white/[0.06] dark:text-white"
-                        : "text-black/42 hover:bg-black/[0.03] hover:text-black dark:text-white/42 dark:hover:bg-white/[0.04] dark:hover:text-white",
+                        ? 'bg-black/[0.05] text-black dark:bg-white/[0.06] dark:text-white'
+                        : 'text-black/42 hover:bg-black/[0.03] hover:text-black dark:text-white/42 dark:hover:bg-white/[0.04] dark:hover:text-white'
                     )}
                   >
                     <HugeiconsIcon
@@ -406,10 +452,8 @@ export function ProjectTerminalSurface({
                     />
                     <span
                       className={cn(
-                        "absolute bottom-1 right-1 size-1 rounded-full",
-                        isActive
-                          ? "bg-black/66 dark:bg-white/70"
-                          : "bg-black/16 dark:bg-white/18",
+                        'absolute bottom-1 right-1 size-1 rounded-full',
+                        isActive ? 'bg-black/66 dark:bg-white/70' : 'bg-black/16 dark:bg-white/18'
                       )}
                     />
                   </button>
@@ -426,10 +470,10 @@ export function ProjectTerminalSurface({
         </div>
       ) : null}
 
-      {terminalRecord.status === "exited" ? (
+      {terminalRecord.status === 'exited' ? (
         <div className="absolute inset-x-0 bottom-0 z-20 border-t border-black/6 bg-[var(--terminal-surface-bg)] px-3 py-1.5 text-xs text-black/48 dark:border-white/8 dark:text-white/50">
           Process exited
-          {terminalRecord.exitCode !== null ? ` with code ${terminalRecord.exitCode}` : ""}.
+          {terminalRecord.exitCode !== null ? ` with code ${terminalRecord.exitCode}` : ''}.
         </div>
       ) : null}
     </div>

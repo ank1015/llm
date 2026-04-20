@@ -45,6 +45,7 @@ import {
 import { queryKeys } from '@/lib/query-keys';
 import { useArtifactFilesStore } from '@/stores/artifact-files-store';
 import { useChatStore } from '@/stores/chat-store';
+import { useProjectPreferencesStore } from '@/stores/project-preferences-store';
 import { useSidebarStore } from '@/stores/sidebar-store';
 import { useUiStore } from '@/stores/ui-store';
 
@@ -249,6 +250,7 @@ function FileTreeRows({
   ctx,
   path,
   depth,
+  showDotDirectories,
   expandedDirectories,
   onToggleDirectory,
   selectedFilePath,
@@ -257,6 +259,7 @@ function FileTreeRows({
   ctx: ArtifactContext;
   path: string;
   depth: number;
+  showDotDirectories: boolean;
   expandedDirectories: Record<string, boolean>;
   onToggleDirectory: (path: string) => void;
   selectedFilePath: string | null;
@@ -292,15 +295,24 @@ function FileTreeRows({
     return null;
   }
 
+  const visibleEntries = listing.entries.filter(
+    (entry) => entry.type !== 'directory' || showDotDirectories || !entry.name.startsWith('.')
+  );
+
+  if (visibleEntries.length === 0 && safePath.length === 0) {
+    return null;
+  }
+
   return (
     <>
-      {listing.entries.map((entry) =>
+      {visibleEntries.map((entry) =>
         entry.type === 'directory' ? (
           <FileTreeDirectoryRow
             key={entry.path}
             ctx={ctx}
             entry={entry}
             depth={depth}
+            showDotDirectories={showDotDirectories}
             expandedDirectories={expandedDirectories}
             onToggleDirectory={onToggleDirectory}
             selectedFilePath={selectedFilePath}
@@ -324,6 +336,7 @@ function FileTreeDirectoryRow({
   ctx,
   entry,
   depth,
+  showDotDirectories,
   expandedDirectories,
   onToggleDirectory,
   selectedFilePath,
@@ -332,6 +345,7 @@ function FileTreeDirectoryRow({
   ctx: ArtifactContext;
   entry: ArtifactExplorerEntry;
   depth: number;
+  showDotDirectories: boolean;
   expandedDirectories: Record<string, boolean>;
   onToggleDirectory: (path: string) => void;
   selectedFilePath: string | null;
@@ -373,6 +387,7 @@ function FileTreeDirectoryRow({
           ctx={ctx}
           path={entry.path}
           depth={depth + 1}
+          showDotDirectories={showDotDirectories}
           expandedDirectories={expandedDirectories}
           onToggleDirectory={onToggleDirectory}
           selectedFilePath={selectedFilePath}
@@ -425,6 +440,9 @@ function FilesSection({ projectId, artifactId }: { projectId: string; artifactId
     projectId,
     artifactId,
   };
+  const showDotDirectories = useProjectPreferencesStore((state) =>
+    state.isAdvancedModeEnabled(projectId)
+  );
   const artifactKey = getArtifactKey(artifactContext);
   const [isOpen, setIsOpen] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -522,6 +540,7 @@ function FilesSection({ projectId, artifactId }: { projectId: string; artifactId
             ctx={artifactContext}
             path=""
             depth={0}
+            showDotDirectories={showDotDirectories}
             expandedDirectories={expandedDirectories}
             onToggleDirectory={toggleDirectory}
             selectedFilePath={selectedFilePath}

@@ -1,4 +1,10 @@
-export default function ProjectGeneralSettingsPage() {
+import { ProjectAdvancedModeSetting } from '@/components/project-advanced-mode-setting';
+
+export default async function ProjectGeneralSettingsPage({
+  params,
+}: PageProps<'/[projectId]/settings/general'>) {
+  const { projectId } = await params;
+
   return (
     <main className="bg-home-page text-foreground flex h-full min-h-0 w-full min-w-0 overflow-y-auto px-6 py-10">
       <div className="mx-auto flex w-full max-w-4xl flex-col">
@@ -7,6 +13,8 @@ export default function ProjectGeneralSettingsPage() {
             General
           </h1>
         </div>
+
+        <ProjectAdvancedModeSetting projectId={projectId} />
       </div>
     </main>
   );

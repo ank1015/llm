@@ -1,12 +1,12 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ProjectTerminalSurface } from "@/components/project-terminal-surface";
+import { ProjectTerminalSurface } from '@/components/project-terminal-surface';
 
 type MockTerminalRecord = {
   id: string;
   title: string;
-  status: "running" | "exited";
+  status: 'running' | 'exited';
   projectId: string;
   artifactId: string;
   cols: number;
@@ -18,7 +18,7 @@ type MockTerminalRecord = {
   exitedAt: string | null;
   cwdAtLaunch: string;
   shell: string;
-  connectionState: "disconnected" | "connecting" | "connected" | "reconnecting";
+  connectionState: 'disconnected' | 'connecting' | 'connected' | 'reconnecting';
   socketError: string | null;
   lastSeq: number;
   bufferVersion: number;
@@ -38,8 +38,8 @@ type MockDockState = {
 };
 
 const artifactContext = {
-  projectId: "project-1",
-  artifactId: "artifact-1",
+  projectId: 'project-1',
+  artifactId: 'artifact-1',
 } as const;
 
 const artifactKey = `${artifactContext.projectId}::${artifactContext.artifactId}`;
@@ -48,19 +48,19 @@ function createTerminalRecord(id: string, title: string): MockTerminalRecord {
   return {
     id,
     title,
-    status: "running",
-    projectId: "project-1",
-    artifactId: "artifact-1",
+    status: 'running',
+    projectId: 'project-1',
+    artifactId: 'artifact-1',
     cols: 80,
     rows: 24,
-    createdAt: "2026-03-27T00:00:00.000Z",
-    lastActiveAt: "2026-03-27T00:00:00.000Z",
+    createdAt: '2026-03-27T00:00:00.000Z',
+    lastActiveAt: '2026-03-27T00:00:00.000Z',
     exitCode: null,
     signal: null,
     exitedAt: null,
     cwdAtLaunch: `/tmp/${id}`,
-    shell: "/bin/zsh",
-    connectionState: "connected",
+    shell: '/bin/zsh',
+    connectionState: 'connected',
     socketError: null,
     lastSeq: 1,
     bufferVersion: 1,
@@ -84,21 +84,21 @@ function createDockState(terminalIds: string[], activeTerminalId: string | null)
 
 const terminalState = vi.hoisted(() => ({
   terminalsById: {
-    "project-1::artifact-1::terminal-1": createTerminalRecord("terminal-1", "Terminal 1"),
+    'project-1::artifact-1::terminal-1': createTerminalRecord('terminal-1', 'Terminal 1'),
   } as Record<string, MockTerminalRecord>,
   dockByArtifact: {
-    "project-1::artifact-1": createDockState(["terminal-1"], "terminal-1"),
+    'project-1::artifact-1': createDockState(['terminal-1'], 'terminal-1'),
   } as Record<string, MockDockState>,
-  createTerminal: vi.fn(() => Promise.resolve("terminal-2")),
+  createTerminal: vi.fn(() => Promise.resolve('terminal-2')),
   deleteTerminal: vi.fn(() => Promise.resolve()),
   selectTerminal: vi.fn(() => Promise.resolve()),
   sendInput: vi.fn(),
   resizeTerminal: vi.fn(),
   replayFrames: [
     {
-      type: "output" as const,
+      type: 'output' as const,
       seq: 1,
-      data: "hello\n",
+      data: 'hello\n',
     },
   ],
 }));
@@ -110,12 +110,17 @@ const terminalMockState = vi.hoisted(() => {
     dispose: ReturnType<typeof vi.fn>;
     loadAddon: ReturnType<typeof vi.fn>;
     open: ReturnType<typeof vi.fn>;
+    paste: ReturnType<typeof vi.fn>;
     attachCustomWheelEventHandler: ReturnType<typeof vi.fn>;
+    attachCustomKeyEventHandler: ReturnType<typeof vi.fn>;
+    hasSelection: ReturnType<typeof vi.fn>;
+    getSelection: ReturnType<typeof vi.fn>;
     onData: ReturnType<typeof vi.fn>;
     cols: number;
     rows: number;
     options: Record<string, unknown>;
     dataListener?: (data: string) => void;
+    keyHandler?: (event: KeyboardEvent) => boolean;
   }> = [];
 
   class MockTerminal {
@@ -127,7 +132,13 @@ const terminalMockState = vi.hoisted(() => {
     dispose = vi.fn();
     loadAddon = vi.fn();
     open = vi.fn();
+    paste = vi.fn();
     attachCustomWheelEventHandler = vi.fn();
+    attachCustomKeyEventHandler = vi.fn((listener: (event: KeyboardEvent) => boolean) => {
+      this.keyHandler = listener;
+    });
+    hasSelection = vi.fn(() => false);
+    getSelection = vi.fn(() => '');
     onData = vi.fn((listener: (data: string) => void) => {
       this.dataListener = listener;
       return {
@@ -135,6 +146,7 @@ const terminalMockState = vi.hoisted(() => {
       };
     });
     dataListener?: (data: string) => void;
+    keyHandler?: (event: KeyboardEvent) => boolean;
 
     constructor() {
       instances.push(this);
@@ -152,15 +164,15 @@ const terminalMockState = vi.hoisted(() => {
   };
 });
 
-vi.mock("@xterm/xterm", () => ({
+vi.mock('@xterm/xterm', () => ({
   Terminal: terminalMockState.MockTerminal,
 }));
 
-vi.mock("@xterm/addon-fit", () => ({
+vi.mock('@xterm/addon-fit', () => ({
   FitAddon: terminalMockState.MockFitAddon,
 }));
 
-vi.mock("@/stores/terminals-store", () => ({
+vi.mock('@/stores/terminals-store', () => ({
   getTerminalArtifactKey: (projectId: string, artifactId: string) => `${projectId}::${artifactId}`,
   getTerminalRecordKey: (ctx: { projectId: string; artifactId: string }, terminalId: string) =>
     `${ctx.projectId}::${ctx.artifactId}::${terminalId}`,
@@ -168,18 +180,18 @@ vi.mock("@/stores/terminals-store", () => ({
   useTerminalStore: (selector: (state: typeof terminalState) => unknown) => selector(terminalState),
 }));
 
-vi.mock("@/stores/ui-store", () => ({
-  useUiStore: (selector: (state: { theme: "light" | "dark" }) => unknown) =>
-    selector({ theme: "light" }),
+vi.mock('@/stores/ui-store', () => ({
+  useUiStore: (selector: (state: { theme: 'light' | 'dark' }) => unknown) =>
+    selector({ theme: 'light' }),
 }));
 
-describe("ProjectTerminalSurface", () => {
+describe('ProjectTerminalSurface', () => {
   beforeEach(() => {
     terminalState.terminalsById = {
-      [`${artifactKey}::terminal-1`]: createTerminalRecord("terminal-1", "Terminal 1"),
+      [`${artifactKey}::terminal-1`]: createTerminalRecord('terminal-1', 'Terminal 1'),
     };
     terminalState.dockByArtifact = {
-      [artifactKey]: createDockState(["terminal-1"], "terminal-1"),
+      [artifactKey]: createDockState(['terminal-1'], 'terminal-1'),
     };
     terminalState.createTerminal.mockClear();
     terminalState.deleteTerminal.mockClear();
@@ -187,7 +199,14 @@ describe("ProjectTerminalSurface", () => {
     terminalState.sendInput.mockClear();
     terminalState.resizeTerminal.mockClear();
     terminalMockState.instances.length = 0;
-    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
+    vi.stubGlobal('navigator', {
+      platform: 'Win32',
+      clipboard: {
+        writeText: vi.fn(() => Promise.resolve()),
+        readText: vi.fn(() => Promise.resolve('')),
+      },
+    });
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
       bottom: 320,
       height: 320,
       left: 0,
@@ -198,84 +217,147 @@ describe("ProjectTerminalSurface", () => {
       x: 0,
       y: 0,
     });
-    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
       callback(0);
       return 1;
     });
-    vi.stubGlobal("cancelAnimationFrame", vi.fn());
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it("replays output and forwards input and resize events", () => {
-    render(
-      <ProjectTerminalSurface artifactContext={artifactContext} terminalId="terminal-1" />,
-    );
+  it('replays output and forwards input and resize events', () => {
+    render(<ProjectTerminalSurface artifactContext={artifactContext} terminalId="terminal-1" />);
 
     const instance = terminalMockState.instances[0];
     expect(instance).toBeDefined();
     expect(instance?.attachCustomWheelEventHandler).not.toHaveBeenCalled();
-    expect(instance?.write).toHaveBeenCalledWith("hello\n");
+    expect(instance?.attachCustomKeyEventHandler).toHaveBeenCalledTimes(1);
+    expect(instance?.write).toHaveBeenCalledWith('hello\n');
     expect(terminalState.resizeTerminal).toHaveBeenCalledWith(
       artifactContext,
-      "terminal-1",
+      'terminal-1',
       80,
-      24,
+      24
     );
-    expect(screen.queryByLabelText("Terminal sessions")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "New terminal" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Kill current terminal" })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Terminal sessions')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'New terminal' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Kill current terminal' })).toBeInTheDocument();
 
-    instance?.dataListener?.("pwd\n");
-    expect(terminalState.sendInput).toHaveBeenCalledWith(artifactContext, "terminal-1", "pwd\n");
+    instance?.dataListener?.('pwd\n');
+    expect(terminalState.sendInput).toHaveBeenCalledWith(artifactContext, 'terminal-1', 'pwd\n');
   });
 
-  it("shows the sessions rail automatically and routes terminal actions through the store", () => {
+  it('copies selected text on Windows Ctrl+C and pastes clipboard text on Ctrl+V', async () => {
+    render(<ProjectTerminalSurface artifactContext={artifactContext} terminalId="terminal-1" />);
+
+    const instance = terminalMockState.instances[0];
+    const writeTextMock = vi.mocked(navigator.clipboard.writeText);
+    const readTextMock = vi.mocked(navigator.clipboard.readText);
+
+    instance?.hasSelection.mockReturnValue(true);
+    instance?.getSelection.mockReturnValue('copied text');
+
+    const copyEvent = {
+      key: 'c',
+      ctrlKey: true,
+      metaKey: false,
+      altKey: false,
+      shiftKey: false,
+      preventDefault: vi.fn(),
+    } as unknown as KeyboardEvent;
+
+    expect(instance?.keyHandler?.(copyEvent)).toBe(false);
+    await Promise.resolve();
+    expect(copyEvent.preventDefault).toHaveBeenCalledTimes(1);
+    expect(writeTextMock).toHaveBeenCalledWith('copied text');
+    expect(terminalState.sendInput).not.toHaveBeenCalled();
+
+    readTextMock.mockResolvedValueOnce('pasted text');
+
+    const pasteEvent = {
+      key: 'v',
+      ctrlKey: true,
+      metaKey: false,
+      altKey: false,
+      shiftKey: false,
+      preventDefault: vi.fn(),
+    } as unknown as KeyboardEvent;
+
+    expect(instance?.keyHandler?.(pasteEvent)).toBe(false);
+    await Promise.resolve();
+    expect(pasteEvent.preventDefault).toHaveBeenCalledTimes(1);
+    expect(readTextMock).toHaveBeenCalledTimes(1);
+    expect(instance?.paste).toHaveBeenCalledWith('pasted text');
+    expect(terminalState.sendInput).toHaveBeenCalledWith(
+      artifactContext,
+      'terminal-1',
+      'pasted text'
+    );
+  });
+
+  it('preserves terminal Ctrl+C behavior when nothing is selected', () => {
+    render(<ProjectTerminalSurface artifactContext={artifactContext} terminalId="terminal-1" />);
+
+    const instance = terminalMockState.instances[0];
+    instance?.hasSelection.mockReturnValue(false);
+
+    const copyEvent = {
+      key: 'c',
+      ctrlKey: true,
+      metaKey: false,
+      altKey: false,
+      shiftKey: false,
+      preventDefault: vi.fn(),
+    } as unknown as KeyboardEvent;
+
+    expect(instance?.keyHandler?.(copyEvent)).toBe(true);
+    expect(copyEvent.preventDefault).not.toHaveBeenCalled();
+    expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+  });
+
+  it('shows the sessions rail automatically and routes terminal actions through the store', () => {
     terminalState.terminalsById[`${artifactKey}::terminal-2`] = createTerminalRecord(
-      "terminal-2",
-      "Terminal 2",
+      'terminal-2',
+      'Terminal 2'
     );
     terminalState.dockByArtifact[artifactKey] = createDockState(
-      ["terminal-1", "terminal-2"],
-      "terminal-1",
+      ['terminal-1', 'terminal-2'],
+      'terminal-1'
     );
 
-    render(
-      <ProjectTerminalSurface artifactContext={artifactContext} terminalId="terminal-1" />,
-    );
+    render(<ProjectTerminalSurface artifactContext={artifactContext} terminalId="terminal-1" />);
 
-    expect(screen.getByLabelText("Terminal sessions")).toBeInTheDocument();
+    expect(screen.getByLabelText('Terminal sessions')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "New terminal" }));
+    fireEvent.click(screen.getByRole('button', { name: 'New terminal' }));
     expect(terminalState.createTerminal).toHaveBeenCalledWith(artifactContext);
 
-    fireEvent.click(screen.getByRole("button", { name: "Kill current terminal" }));
-    expect(terminalState.deleteTerminal).toHaveBeenCalledWith(artifactContext, "terminal-1");
+    fireEvent.click(screen.getByRole('button', { name: 'Kill current terminal' }));
+    expect(terminalState.deleteTerminal).toHaveBeenCalledWith(artifactContext, 'terminal-1');
 
-    fireEvent.click(screen.getByRole("button", { name: "Switch to Terminal 2" }));
-    expect(terminalState.selectTerminal).toHaveBeenCalledWith(artifactContext, "terminal-2");
+    fireEvent.click(screen.getByRole('button', { name: 'Switch to Terminal 2' }));
+    expect(terminalState.selectTerminal).toHaveBeenCalledWith(artifactContext, 'terminal-2');
   });
 
-  it("shows socket and exit state banners", () => {
+  it('shows socket and exit state banners', () => {
     terminalState.terminalsById[`${artifactKey}::terminal-1`] = {
       ...terminalState.terminalsById[`${artifactKey}::terminal-1`],
-      status: "exited",
+      status: 'exited',
       exitCode: 2,
-      socketError: "Socket dropped",
+      socketError: 'Socket dropped',
     };
 
-    render(
-      <ProjectTerminalSurface artifactContext={artifactContext} terminalId="terminal-1" />,
-    );
+    render(<ProjectTerminalSurface artifactContext={artifactContext} terminalId="terminal-1" />);
 
-    expect(screen.getByText("Socket dropped")).toBeInTheDocument();
-    expect(screen.getByText("Process exited with code 2.")).toBeInTheDocument();
+    expect(screen.getByText('Socket dropped')).toBeInTheDocument();
+    expect(screen.getByText('Process exited with code 2.')).toBeInTheDocument();
   });
 
-  it("skips fitting while the terminal surface is transiently collapsed", () => {
-    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
+  it('skips fitting while the terminal surface is transiently collapsed', () => {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
       bottom: 40,
       height: 40,
       left: 0,
@@ -287,9 +369,7 @@ describe("ProjectTerminalSurface", () => {
       y: 0,
     });
 
-    render(
-      <ProjectTerminalSurface artifactContext={artifactContext} terminalId="terminal-1" />,
-    );
+    render(<ProjectTerminalSurface artifactContext={artifactContext} terminalId="terminal-1" />);
 
     expect(terminalState.resizeTerminal).not.toHaveBeenCalled();
   });

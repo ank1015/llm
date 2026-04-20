@@ -17,7 +17,7 @@ import { WorkingTrace } from '@/components/working-trace';
 import { getAssistantTurnMetrics } from '@/lib/messages/assistant-turn-metrics';
 import { buildWorkingTraceModel } from '@/lib/messages/working-trace';
 import { useChatStore } from '@/stores/chat-store';
-
+import { useProjectPreferencesStore } from '@/stores/project-preferences-store';
 
 type AssistantStreamingMessage = Omit<BaseAssistantMessage<Api>, 'message'>;
 type CotRenderableMessage = Message | AssistantStreamingMessage;
@@ -29,6 +29,7 @@ type AssistantMessagesProps = {
   isStreamingTurn: boolean;
   streamingAssistant: AssistantStreamingMessage | null;
   api: Api | null;
+  projectId: string;
   sessionKey: string | null;
   userTimestamp: number | null;
   onExportChat: () => string | null;
@@ -55,6 +56,7 @@ function AssistantMessageActions({
   exported,
   displayText,
   isStreamingTurn,
+  showTurnMetrics,
   onCopy,
   onExport,
   metrics,
@@ -63,6 +65,7 @@ function AssistantMessageActions({
   exported: boolean;
   displayText: string | null;
   isStreamingTurn: boolean;
+  showTurnMetrics: boolean;
   onCopy: () => void;
   onExport: () => void;
   metrics: ReturnType<typeof getAssistantTurnMetrics>;
@@ -101,7 +104,7 @@ function AssistantMessageActions({
           strokeWidth={1.8}
         />
       </button>
-      <AssistantTurnMetricsInline metrics={metrics} />
+      {showTurnMetrics ? <AssistantTurnMetricsInline metrics={metrics} /> : null}
     </div>
   );
 }
@@ -112,10 +115,14 @@ export function AssistantMessages({
   isStreamingTurn,
   streamingAssistant,
   api,
+  projectId,
   sessionKey,
   userTimestamp,
   onExportChat,
 }: AssistantMessagesProps) {
+  const isAdvancedModeEnabled = useProjectPreferencesStore((state) =>
+    state.isAdvancedModeEnabled(projectId)
+  );
   const liveAgentEvents = useChatStore((state) => {
     if (!sessionKey || !isStreamingTurn) {
       return EMPTY_AGENT_EVENTS;
@@ -213,6 +220,7 @@ export function AssistantMessages({
         exported={exported}
         displayText={displayText}
         isStreamingTurn={isStreamingTurn}
+        showTurnMetrics={isAdvancedModeEnabled}
         onCopy={handleCopy}
         onExport={handleExport}
         metrics={turnMetrics}
