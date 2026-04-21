@@ -1,0 +1,88 @@
+{
+  "name": "@ank1015/llm-gateway",
+  "version": "0.0.1",
+  "description": "Node-only Hono gateway for provider-backed chat streaming, image generation, and request logging",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "llm-gateway-admin": "./dist/bin/gateway-admin.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./contracts": {
+      "types": "./dist/contracts/index.d.ts",
+      "import": "./dist/contracts/index.js",
+      "default": "./dist/contracts/index.js"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.js",
+      "default": "./dist/server.js"
+    }
+  },
+  "files": [
+    "dist",
+    "docs",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "node ../../scripts/remove-paths.mjs dist coverage --tsbuildinfo && tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/server.js",
+    "test": "pnpm run test:unit && pnpm run test:integration",
+    "test:watch": "vitest",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src tests vitest.config.ts",
+    "release:check": "pnpm run build && pnpm run typecheck && pnpm run lint && pnpm run test",
+    "clean": "node ../../scripts/remove-paths.mjs dist coverage --tsbuildinfo",
+    "prepack": "pnpm run release:check",
+    "prepublishOnly": "node ../../scripts/ensure-pnpm-publish.mjs"
+  },
+  "keywords": [
+    "llm",
+    "gateway",
+    "hono",
+    "proxy",
+    "streaming",
+    "sqlite",
+    "typescript",
+    "node"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ank1015/llm.git",
+    "directory": "packages/gateway"
+  },
+  "homepage": "https://github.com/ank1015/llm/tree/main/packages/gateway",
+  "bugs": {
+    "url": "https://github.com/ank1015/llm/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@ank1015/llm-core": "workspace:^",
+    "@hono/node-server": "^1.14.1",
+    "@sinclair/typebox": "^0.34.48",
+    "better-sqlite3": "^11.10.0",
+    "hono": "^4.7.6",
+    "jose": "^5.10.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^25.2.3",
+    "@vitest/coverage-v8": "^2.1.0",
+    "vitest": "^2.1.0"
+  }
+}

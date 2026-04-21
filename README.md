@@ -26,8 +26,8 @@ Shortcut:
 pnpm release:app:publish
 ```
 
-Publish the runtime packages when `packages/core`, `packages/sdk`, `packages/agents`, or
-`packages/server` changed:
+Publish the runtime packages when `packages/core`, `packages/sdk`, `packages/gateway`,
+`packages/agents`, or `packages/server` changed:
 
 ```bash
 pnpm release:runtime:publish
