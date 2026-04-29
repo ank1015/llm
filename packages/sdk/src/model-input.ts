@@ -6,6 +6,7 @@ import { resolveProviderCredentials } from './keys.js';
 import type { ResolveProviderCredentialsError } from './keys.js';
 import type {
   AnthropicProviderOptions,
+  AzureOpenAIProviderOptions,
   ClaudeCodeProviderOptions,
   CodexProviderOptions,
   GoogleProviderOptions,
@@ -19,6 +20,7 @@ export const ReasoningEfforts = ['low', 'medium', 'high', 'xhigh'] as const;
 export type ReasoningEffort = (typeof ReasoningEfforts)[number];
 
 const CLAUDE_CODE_API = 'claude-code' as const;
+const AZURE_OPENAI_API = 'azure-openai' as const;
 
 const OPENAI_MODEL_CATALOG = {
   'openai/gpt-5.4': 'gpt-5.4',
@@ -73,6 +75,7 @@ export const CuratedModelIds = [
 
 export interface SupportedProviderOptionsByApi {
   openai: OpenAIProviderOptions;
+  [AZURE_OPENAI_API]: AzureOpenAIProviderOptions;
   codex: CodexProviderOptions;
   anthropic: AnthropicProviderOptions;
   [CLAUDE_CODE_API]: ClaudeCodeProviderOptions;
@@ -86,7 +89,7 @@ export type SupportedProviderOptions =
   SupportedProviderOptionsByApi[keyof SupportedProviderOptionsByApi];
 
 export type ProviderOptionsForModelId<TModelId extends string> = TModelId extends OpenAIModelId
-  ? OpenAIProviderOptions
+  ? AzureOpenAIProviderOptions
   : TModelId extends CodexModelId
     ? CodexProviderOptions
     : TModelId extends AnthropicModelId
@@ -116,11 +119,17 @@ export interface CoreModelNotFoundError {
   code: 'core_model_not_found';
   message: string;
   modelId: CuratedModelId;
-  api: 'openai' | 'codex' | 'anthropic' | typeof CLAUDE_CODE_API | 'google';
+  api:
+    | 'openai'
+    | typeof AZURE_OPENAI_API
+    | 'codex'
+    | 'anthropic'
+    | typeof CLAUDE_CODE_API
+    | 'google';
   providerModelId: string;
 }
 
-type OpenAICredentialsError = ResolveProviderCredentialsError<'openai'>;
+type AzureOpenAICredentialsError = ResolveProviderCredentialsError<typeof AZURE_OPENAI_API>;
 type CodexCredentialsError = ResolveProviderCredentialsError<'codex'>;
 type AnthropicCredentialsError = ResolveProviderCredentialsError<'anthropic'>;
 type ClaudeCodeCredentialsError = ResolveProviderCredentialsError<typeof CLAUDE_CODE_API>;
@@ -129,7 +138,7 @@ type GoogleCredentialsError = ResolveProviderCredentialsError<'google'>;
 export type ResolveModelInputError =
   | UnsupportedModelIdError
   | CoreModelNotFoundError
-  | OpenAICredentialsError
+  | AzureOpenAICredentialsError
   | CodexCredentialsError
   | AnthropicCredentialsError
   | ClaudeCodeCredentialsError
@@ -137,12 +146,12 @@ export type ResolveModelInputError =
 
 export interface ResolvedOpenAIModelInput {
   ok: true;
-  api: 'openai';
+  api: typeof AZURE_OPENAI_API;
   modelId: OpenAIModelId;
   keysFilePath: string;
-  model: Model<'openai'>;
-  providerOptions: OpenAIProviderOptions;
-  provider: Provider<'openai'>;
+  model: Model<typeof AZURE_OPENAI_API>;
+  providerOptions: AzureOpenAIProviderOptions;
+  provider: Provider<typeof AZURE_OPENAI_API>;
 }
 
 export interface ResolvedCodexModelInput {
@@ -213,7 +222,7 @@ export async function resolveModelInput<TModelId extends string>(
     return resolveOpenAIModelInput(
       input.modelId,
       input.reasoningEffort,
-      input.overrideProviderSetting as Partial<OpenAIProviderOptions> | undefined,
+      input.overrideProviderSetting as Partial<AzureOpenAIProviderOptions> | undefined,
       keysFilePath
     );
   }
@@ -291,11 +300,11 @@ function isGoogleModelId(value: string): value is GoogleModelId {
 async function resolveOpenAIModelInput(
   modelId: OpenAIModelId,
   reasoningEffort: ReasoningEffort | undefined,
-  overrideProviderSetting: Partial<OpenAIProviderOptions> | undefined,
+  overrideProviderSetting: Partial<AzureOpenAIProviderOptions> | undefined,
   keysFilePath: string
 ): Promise<ResolveModelInputResult> {
   const providerModelId = OPENAI_MODEL_CATALOG[modelId];
-  const model = getModel('openai', providerModelId);
+  const model = getModel(AZURE_OPENAI_API, providerModelId);
 
   if (!model) {
     return {
@@ -304,15 +313,15 @@ async function resolveOpenAIModelInput(
       keysFilePath,
       error: {
         code: 'core_model_not_found',
-        message: `Core model "${providerModelId}" was not found for ${modelId}`,
+        message: `Core Azure OpenAI model "${providerModelId}" was not found for ${modelId}`,
         modelId,
-        api: 'openai',
+        api: AZURE_OPENAI_API,
         providerModelId,
       },
     };
   }
 
-  const credentialsResult = await resolveProviderCredentials(keysFilePath, 'openai');
+  const credentialsResult = await resolveProviderCredentials(keysFilePath, AZURE_OPENAI_API);
   if (!credentialsResult.ok) {
     return {
       ok: false,
@@ -322,15 +331,19 @@ async function resolveOpenAIModelInput(
     };
   }
 
-  const baseProviderOptions: OpenAIProviderOptions = {
-    ...credentialsResult.credentials,
+  const endpoint = parseAzureOpenAIDeploymentUrl(credentialsResult.credentials.azureDeploymentUrl);
+  const baseProviderOptions: AzureOpenAIProviderOptions = {
+    apiKey: credentialsResult.credentials.apiKey,
+    azureBaseURL: endpoint.azureBaseURL,
+    ...(endpoint.azureApiVersion ? { azureApiVersion: endpoint.azureApiVersion } : {}),
+    azureDeploymentName: providerModelId,
     ...buildOpenAICompatibleReasoning(reasoningEffort),
   };
   const providerOptions = mergeProviderOptions(baseProviderOptions, overrideProviderSetting);
 
   return {
     ok: true,
-    api: 'openai',
+    api: AZURE_OPENAI_API,
     modelId,
     keysFilePath,
     model,
@@ -562,7 +575,7 @@ async function resolveGoogleModelInput(
 
 function buildOpenAICompatibleReasoning(
   reasoningEffort: ReasoningEffort | undefined
-): Pick<OpenAIProviderOptions, 'reasoning'> | {} {
+): Pick<AzureOpenAIProviderOptions, 'reasoning'> | {} {
   if (!reasoningEffort) {
     return {};
   }
@@ -572,6 +585,26 @@ function buildOpenAICompatibleReasoning(
       effort: reasoningEffort,
       summary: 'auto',
     },
+  };
+}
+
+function parseAzureOpenAIDeploymentUrl(deploymentUrl: string): {
+  azureBaseURL: string;
+  azureApiVersion?: string;
+} {
+  const url = new URL(deploymentUrl);
+  const apiVersion = url.searchParams.get('api-version')?.trim() || undefined;
+  let pathname = url.pathname.replace(/\/+$/u, '');
+  if (pathname.endsWith('/responses')) {
+    pathname = pathname.slice(0, -'/responses'.length);
+  }
+  if (!pathname || !pathname.includes('/openai')) {
+    throw new Error('Azure OpenAI deployment URL must include an /openai path.');
+  }
+
+  return {
+    azureBaseURL: `${url.origin}${pathname}`,
+    ...(apiVersion ? { azureApiVersion: apiVersion } : {}),
   };
 }
 

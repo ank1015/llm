@@ -79,6 +79,20 @@ CODEX_CHATGPT_ACCOUNT_ID=acc=123
         ],
       });
     });
+
+    it('returns Azure OpenAI credential field mappings', () => {
+      expect(getProviderCredentialSpec('azure-openai')).toEqual({
+        provider: 'azure-openai',
+        fields: [
+          { option: 'apiKey', env: 'AZURE_OPENAI_API_KEY', aliases: [] },
+          {
+            option: 'azureDeploymentUrl',
+            env: 'AZURE_OPENAI_DEPLOYMENT_URL',
+            aliases: ['AZURE_OPENAI_TARGET_URI', 'AZURE_OPENAI_BASE_URL'],
+          },
+        ],
+      });
+    });
   });
 
   describe('resolveProviderCredentialsFromValues', () => {
@@ -92,6 +106,24 @@ CODEX_CHATGPT_ACCOUNT_ID=acc=123
         provider: 'anthropic',
         credentials: {
           apiKey: 'sk-ant-test',
+        },
+      });
+    });
+
+    it('resolves Azure OpenAI API key and deployment URL', () => {
+      const result = resolveProviderCredentialsFromValues('azure-openai', {
+        AZURE_OPENAI_API_KEY: 'azure-key',
+        AZURE_OPENAI_TARGET_URI:
+          'https://resource.cognitiveservices.azure.com/openai/responses?api-version=2025-04-01-preview',
+      });
+
+      expect(result).toEqual({
+        ok: true,
+        provider: 'azure-openai',
+        credentials: {
+          apiKey: 'azure-key',
+          azureDeploymentUrl:
+            'https://resource.cognitiveservices.azure.com/openai/responses?api-version=2025-04-01-preview',
         },
       });
     });

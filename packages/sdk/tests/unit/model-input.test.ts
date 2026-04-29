@@ -59,10 +59,12 @@ describe('model input', () => {
     expect(isCuratedModelId('google/gemini-2.5-flash')).toBe(false);
   });
 
-  it('resolves openai model, credentials, and standardized reasoning', async () => {
+  it('resolves default GPT models through Azure OpenAI with standardized reasoning', async () => {
     const keysFilePath = await createTempKeysFile();
-    await setProviderCredentials(keysFilePath, 'openai', {
-      apiKey: 'openai-key',
+    await setProviderCredentials(keysFilePath, 'azure-openai', {
+      apiKey: 'azure-key',
+      azureDeploymentUrl:
+        'https://resource.cognitiveservices.azure.com/openai/responses?api-version=2025-04-01-preview',
     });
 
     const result = await resolveModelInput({
@@ -73,15 +75,18 @@ describe('model input', () => {
 
     expect(result).toEqual({
       ok: true,
-      api: 'openai',
+      api: 'azure-openai',
       modelId: 'openai/gpt-5.4-mini',
       keysFilePath,
       model: expect.objectContaining({
-        api: 'openai',
+        api: 'azure-openai',
         id: 'gpt-5.4-mini',
       }),
       providerOptions: {
-        apiKey: 'openai-key',
+        apiKey: 'azure-key',
+        azureBaseURL: 'https://resource.cognitiveservices.azure.com/openai',
+        azureApiVersion: '2025-04-01-preview',
+        azureDeploymentName: 'gpt-5.4-mini',
         reasoning: {
           effort: 'high',
           summary: 'auto',
@@ -89,11 +94,14 @@ describe('model input', () => {
       },
       provider: {
         model: expect.objectContaining({
-          api: 'openai',
+          api: 'azure-openai',
           id: 'gpt-5.4-mini',
         }),
         providerOptions: {
-          apiKey: 'openai-key',
+          apiKey: 'azure-key',
+          azureBaseURL: 'https://resource.cognitiveservices.azure.com/openai',
+          azureApiVersion: '2025-04-01-preview',
+          azureDeploymentName: 'gpt-5.4-mini',
           reasoning: {
             effort: 'high',
             summary: 'auto',
@@ -176,8 +184,10 @@ describe('model input', () => {
 
   it('ignores conversationId for non-Codex provider options', async () => {
     const keysFilePath = await createTempKeysFile();
-    await setProviderCredentials(keysFilePath, 'openai', {
-      apiKey: 'openai-key',
+    await setProviderCredentials(keysFilePath, 'azure-openai', {
+      apiKey: 'azure-key',
+      azureDeploymentUrl:
+        'https://resource.cognitiveservices.azure.com/openai/responses?api-version=2025-04-01-preview',
     });
 
     const result = await resolveModelInput({
@@ -224,8 +234,10 @@ describe('model input', () => {
 
   it('lets overrideProviderSetting win over defaults', async () => {
     const keysFilePath = await createTempKeysFile();
-    await setProviderCredentials(keysFilePath, 'openai', {
-      apiKey: 'openai-key',
+    await setProviderCredentials(keysFilePath, 'azure-openai', {
+      apiKey: 'azure-key',
+      azureDeploymentUrl:
+        'https://resource.cognitiveservices.azure.com/openai/responses?api-version=2025-04-01-preview',
     });
 
     const result = await resolveModelInput({
@@ -242,15 +254,18 @@ describe('model input', () => {
 
     expect(result).toEqual({
       ok: true,
-      api: 'openai',
+      api: 'azure-openai',
       modelId: 'openai/gpt-5.4',
       keysFilePath,
       model: expect.objectContaining({
-        api: 'openai',
+        api: 'azure-openai',
         id: 'gpt-5.4',
       }),
       providerOptions: {
-        apiKey: 'openai-key',
+        apiKey: 'azure-key',
+        azureBaseURL: 'https://resource.cognitiveservices.azure.com/openai',
+        azureApiVersion: '2025-04-01-preview',
+        azureDeploymentName: 'gpt-5.4',
         reasoning: {
           effort: 'low',
           summary: 'detailed',
@@ -259,11 +274,14 @@ describe('model input', () => {
       },
       provider: {
         model: expect.objectContaining({
-          api: 'openai',
+          api: 'azure-openai',
           id: 'gpt-5.4',
         }),
         providerOptions: {
-          apiKey: 'openai-key',
+          apiKey: 'azure-key',
+          azureBaseURL: 'https://resource.cognitiveservices.azure.com/openai',
+          azureApiVersion: '2025-04-01-preview',
+          azureDeploymentName: 'gpt-5.4',
           reasoning: {
             effort: 'low',
             summary: 'detailed',
@@ -618,8 +636,10 @@ describe('model input', () => {
   it('uses the SDK default keysFilePath when none is provided', async () => {
     const keysFilePath = await createTempKeysFile();
     setSdkConfig({ keysFilePath });
-    await setProviderCredentials(keysFilePath, 'openai', {
-      apiKey: 'openai-key',
+    await setProviderCredentials(keysFilePath, 'azure-openai', {
+      apiKey: 'azure-key',
+      azureDeploymentUrl:
+        'https://resource.cognitiveservices.azure.com/openai/responses?api-version=2025-04-01-preview',
     });
 
     const result = await resolveModelInput({

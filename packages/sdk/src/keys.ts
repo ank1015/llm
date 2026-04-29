@@ -5,6 +5,7 @@ import { getSdkConfig } from './config.js';
 
 export const KnownKeyProviders = [
   'openai',
+  'azure-openai',
   'codex',
   'google',
   'deepseek',
@@ -25,6 +26,10 @@ interface ApiKeyCredentials {
 
 export interface ProviderCredentialsMap {
   openai: ApiKeyCredentials;
+  'azure-openai': {
+    apiKey: string;
+    azureDeploymentUrl: string;
+  };
   codex: {
     apiKey: string;
     'chatgpt-account-id': string;
@@ -105,6 +110,14 @@ const providerCredentialSpecs: {
   [TProvider in KeyProvider]: readonly CredentialFieldSpec<ProviderCredentialOption<TProvider>>[];
 } = {
   openai: [{ option: 'apiKey', env: 'OPENAI_API_KEY', aliases: [] }],
+  'azure-openai': [
+    { option: 'apiKey', env: 'AZURE_OPENAI_API_KEY', aliases: [] },
+    {
+      option: 'azureDeploymentUrl',
+      env: 'AZURE_OPENAI_DEPLOYMENT_URL',
+      aliases: ['AZURE_OPENAI_TARGET_URI', 'AZURE_OPENAI_BASE_URL'],
+    },
+  ],
   codex: [
     { option: 'apiKey', env: 'CODEX_API_KEY', aliases: [] },
     {
