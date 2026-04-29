@@ -20,8 +20,10 @@ pnpm clean            # Remove workspace build artifacts and root node_modules
 
 # Development
 pnpm dev              # Run workspace dev tasks through Turbo
+pnpm dev:desktop-app  # Build and run the Electron desktop app
 pnpm dev:setup-app    # Build and run the Electron setup app
 pnpm dev:web-app      # Start the Next.js web client
+pnpm start:desktop-app # Start the built Electron desktop app
 pnpm start:setup-app  # Start the built Electron setup app
 pnpm start:web-app    # Start the built web client
 ```
@@ -31,6 +33,7 @@ pnpm start:web-app    # Start the built web client
 ```text
 apps/
   web/                # @ank1015/llm-web-app - Next.js client for the server
+  desktop/            # @ank1015/llm-desktop-app - Electron app for embedded server and frontend
   setup/              # @ank1015/llm-setup-app - Electron setup app and binary packaging
 
 packages/
@@ -57,6 +60,8 @@ packages/
    Private Next.js client for browsing projects and artifacts, streaming sessions, and terminal interaction.
 7. `@ank1015/llm-setup-app`
    Private Electron setup app for prerequisite checks, binary distribution, and launching the main app through `npx`.
+8. `@ank1015/llm-desktop-app`
+   Private Electron desktop app shell for the embedded server and frontend runtime.
 
 ## Conventions
 
@@ -78,6 +83,8 @@ packages/
 - `packages/gateway/src/index.ts` - Gateway public entry
 - `packages/server/src/index.ts` - Server app/server entry
 - `apps/web/src/app/page.tsx` - Web app home route
+- `apps/desktop/src/main/main.ts` - Desktop Electron main process
+- `apps/desktop/src/main/server/embedded-server.ts` - Desktop embedded server lifecycle boundary
 - `apps/setup/src/main/main.ts` - Electron setup app main process
 
 ## Package Guide
@@ -88,6 +95,7 @@ packages/
 - [packages/agents/AGENTS.md](packages/agents/AGENTS.md) - Agent tools, prompts, and registry helpers
 - [packages/server/AGENTS.md](packages/server/AGENTS.md) - Backend routes, storage, sessions, and terminals
 - [apps/web/AGENTS.md](apps/web/AGENTS.md) - Next.js web client for projects, artifacts, sessions, and terminals
+- [apps/desktop/AGENTS.md](apps/desktop/AGENTS.md) - Electron desktop app shell for embedded server and frontend runtime
 - [apps/setup/AGENTS.md](apps/setup/AGENTS.md) - Electron setup app and binary packaging
 
 ## Boundaries
