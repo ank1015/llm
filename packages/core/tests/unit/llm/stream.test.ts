@@ -41,6 +41,7 @@ function createMockEventStream(): AssistantMessageEventStream<any> {
 const mockStreamAnthropic = vi.fn();
 const mockStreamClaudeCode = vi.fn();
 const mockStreamOpenAI = vi.fn();
+const mockStreamAzureOpenAI = vi.fn();
 const mockStreamGoogle = vi.fn();
 const mockStreamDeepSeek = vi.fn();
 const mockStreamZai = vi.fn();
@@ -52,6 +53,10 @@ registerProvider('claude-code', {
   getMockNativeMessage: () => ({}),
 });
 registerProvider('openai', { stream: mockStreamOpenAI, getMockNativeMessage: () => ({}) });
+registerProvider('azure-openai', {
+  stream: mockStreamAzureOpenAI,
+  getMockNativeMessage: () => ({}),
+});
 registerProvider('google', { stream: mockStreamGoogle, getMockNativeMessage: () => ({}) });
 registerProvider('deepseek', { stream: mockStreamDeepSeek, getMockNativeMessage: () => ({}) });
 registerProvider('zai', { stream: mockStreamZai, getMockNativeMessage: () => ({}) });
@@ -88,6 +93,23 @@ describe('stream', () => {
       const result = stream(model, context, options, 'req-1');
 
       expect(mockStreamOpenAI).toHaveBeenCalledWith(model, context, options, 'req-1');
+      expect(result).toBe(mockStream);
+    });
+
+    it('should dispatch to Azure OpenAI provider', () => {
+      const model = createMockModel('azure-openai');
+      const context = createMockContext();
+      const options = {
+        apiKey: 'test-key',
+        azureBaseURL: 'https://example-resource.openai.azure.com/openai/v1',
+      };
+      const mockStream = createMockEventStream();
+
+      mockStreamAzureOpenAI.mockReturnValue(mockStream);
+
+      const result = stream(model, context, options, 'req-1');
+
+      expect(mockStreamAzureOpenAI).toHaveBeenCalledWith(model, context, options, 'req-1');
       expect(result).toBe(mockStream);
     });
 
