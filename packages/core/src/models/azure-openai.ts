@@ -1,0 +1,92 @@
+import type { Model } from '../types/index.js';
+
+const azureOpenAIBaseUrl = '';
+const azureOpenAIApi = 'azure-openai';
+
+export const azureOpenAIModels = {
+  'gpt-5.4': {
+    id: 'gpt-5.4',
+    name: 'GPT-5.4',
+    api: azureOpenAIApi,
+    baseUrl: azureOpenAIBaseUrl,
+    reasoning: true,
+    input: ['text', 'image', 'file'],
+    cost: {
+      input: 2.5,
+      output: 15,
+      cacheRead: 0.25,
+      cacheWrite: 0,
+    },
+    contextWindow: 272000,
+    maxTokens: 128000,
+    tools: ['function_calling'],
+  } satisfies Model<typeof azureOpenAIApi>,
+  'gpt-5.3-codex': {
+    id: 'gpt-5.3-codex',
+    name: 'GPT-5.3 Codex',
+    api: azureOpenAIApi,
+    baseUrl: azureOpenAIBaseUrl,
+    reasoning: true,
+    input: ['text', 'image', 'file'],
+    cost: {
+      input: 1.75,
+      output: 14,
+      cacheRead: 0.175,
+      cacheWrite: 0,
+    },
+    contextWindow: 400000,
+    maxTokens: 128000,
+    tools: ['function_calling'],
+  } satisfies Model<typeof azureOpenAIApi>,
+  'gpt-5.4-pro': {
+    id: 'gpt-5.4-pro',
+    name: 'GPT-5.4 Pro',
+    api: azureOpenAIApi,
+    baseUrl: azureOpenAIBaseUrl,
+    reasoning: true,
+    input: ['text', 'image', 'file'],
+    cost: {
+      input: 30,
+      output: 180,
+      cacheRead: 30,
+      cacheWrite: 0,
+    },
+    contextWindow: 400000,
+    maxTokens: 128000,
+    tools: ['function_calling'],
+  } satisfies Model<typeof azureOpenAIApi>,
+  'gpt-5.4-mini': {
+    id: 'gpt-5.4-mini',
+    name: 'GPT-5.4 Mini',
+    api: azureOpenAIApi,
+    baseUrl: azureOpenAIBaseUrl,
+    reasoning: true,
+    input: ['text', 'image', 'file'],
+    cost: {
+      input: 0.75,
+      output: 4.5,
+      cacheRead: 0.075,
+      cacheWrite: 0,
+    },
+    contextWindow: 400000,
+    maxTokens: 128000,
+    tools: ['function_calling'],
+  } satisfies Model<typeof azureOpenAIApi>,
+  'gpt-5.4-nano': {
+    id: 'gpt-5.4-nano',
+    name: 'GPT-5.4 Nano',
+    api: azureOpenAIApi,
+    baseUrl: azureOpenAIBaseUrl,
+    reasoning: true,
+    input: ['text', 'image', 'file'],
+    cost: {
+      input: 0.2,
+      output: 1.25,
+      cacheRead: 0.02,
+      cacheWrite: 0,
+    },
+    contextWindow: 400000,
+    maxTokens: 128000,
+    tools: ['function_calling'],
+  } satisfies Model<typeof azureOpenAIApi>,
+};

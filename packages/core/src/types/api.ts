@@ -10,6 +10,7 @@
  */
 export const KnownApis = [
   'openai',
+  'azure-openai',
   'codex',
   'google',
   'deepseek',

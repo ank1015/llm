@@ -9,6 +9,7 @@ import type { Api } from '../api.js';
 // Import native response types for the map
 // Import provider options for the map
 import type { AnthropicNativeResponse, AnthropicProviderOptions } from './anthropic.js';
+import type { AzureOpenAINativeResponse, AzureOpenAIProviderOptions } from './azure-openai.js';
 import type { CerebrasNativeResponse, CerebrasProviderOptions } from './cerebras.js';
 import type { ClaudeCodeNativeResponse, ClaudeCodeProviderOptions } from './claude-code.js';
 import type { CodexNativeResponse, CodexProviderOptions } from './codex.js';
@@ -22,6 +23,7 @@ import type { ZaiNativeResponse, ZaiProviderOptions } from './zai.js';
 
 // Re-export all provider types
 export type { AnthropicNativeResponse, AnthropicProviderOptions } from './anthropic.js';
+export type { AzureOpenAINativeResponse, AzureOpenAIProviderOptions } from './azure-openai.js';
 export type {
   CerebrasNativeResponse,
   CerebrasProviderOptions,
@@ -45,6 +47,7 @@ export type { ZaiNativeResponse, ZaiProviderOptions, ZaiThinkingConfig } from '.
  */
 export interface ApiNativeResponseMap {
   openai: OpenAINativeResponse;
+  'azure-openai': AzureOpenAINativeResponse;
   google: GoogleNativeResponse;
   deepseek: DeepSeekNativeResponse;
   anthropic: AnthropicNativeResponse;
@@ -67,6 +70,7 @@ export type NativeResponseForApi<TApi extends Api> = ApiNativeResponseMap[TApi];
  */
 export interface ApiOptionsMap {
   openai: OpenAIProviderOptions;
+  'azure-openai': AzureOpenAIProviderOptions;
   google: GoogleProviderOptions;
   deepseek: DeepSeekProviderOptions;
   anthropic: AnthropicProviderOptions;

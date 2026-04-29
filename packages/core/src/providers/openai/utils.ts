@@ -3,6 +3,7 @@ import OpenAI from 'openai';
 import { sanitizeSurrogates } from '../../utils/sanitize-unicode.js';
 
 import type {
+  Api,
   BaseAssistantMessage,
   Context,
   ImageContent,
@@ -22,6 +23,12 @@ import type {
   ResponseInputMessageContentList,
   ResponseOutputMessage,
 } from 'openai/resources/responses/responses.js';
+
+type OpenAIResponsesApi = Extract<Api, 'openai' | 'azure-openai'>;
+
+function isOpenAIResponsesApi(api: Api): api is OpenAIResponsesApi {
+  return api === 'openai' || api === 'azure-openai';
+}
 
 export function createClient(model: Model<'openai'>, apiKey: string) {
   if (!apiKey) {
@@ -108,7 +115,10 @@ function buildFileDataUrl(data: string, mimeType: string): string {
   return `data:${mimeType};base64,${data}`;
 }
 
-export function buildOpenAIMessages(model: Model<'openai'>, context: Context): ResponseInput {
+export function buildOpenAIMessages<TApi extends OpenAIResponsesApi>(
+  model: Model<TApi>,
+  context: Context
+): ResponseInput {
   const openAIMessages: ResponseInput = [];
   if (context.systemPrompt) {
     openAIMessages.push({
@@ -195,8 +205,8 @@ export function buildOpenAIMessages(model: Model<'openai'>, context: Context): R
 
     // normalize for Assistant message
     if (message.role === 'assistant') {
-      if (message.model.api === 'openai') {
-        const baseMessage = message as BaseAssistantMessage<'openai'>;
+      if (isOpenAIResponsesApi(message.model.api)) {
+        const baseMessage = message as BaseAssistantMessage<OpenAIResponsesApi>;
         for (const outputPart of baseMessage.message.output) {
           if (
             outputPart.type === 'function_call' ||
