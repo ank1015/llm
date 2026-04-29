@@ -33,16 +33,46 @@
   </head>
   <body>
     <main class="shell" aria-labelledby="app-title">
+      <header class="leftHeader">
+        <button id="sign-out" class="signOutButton" type="button" hidden>Sign out</button>
+      </header>
+
       <header class="appHeader">
         <button id="theme-toggle" class="themeToggle" type="button" title="Toggle theme">
           <span class="srOnly">Toggle theme</span>
         </button>
       </header>
 
-      <section class="screen">
-        <p class="eyebrow">Desktop</p>
-        <h1 id="app-title">LLM Desktop</h1>
-        <p id="runtime" class="runtime" role="status">Starting</p>
+      <section id="login-screen" class="screen loginScreen">
+        <div class="welcomeCopy">
+          <h1 id="app-title">Welcome</h1>
+          <p>This app is still in development.</p>
+        </div>
+
+        <form id="login-form" class="loginForm">
+          <label>
+            <span>Username</span>
+            <input id="username" name="username" type="text" autocomplete="username" required />
+          </label>
+
+          <label>
+            <span>Password</span>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              autocomplete="current-password"
+              required
+            />
+          </label>
+
+          <button id="login-button" type="submit">Login</button>
+          <p id="login-status" class="status" role="status"></p>
+        </form>
+      </section>
+
+      <section id="next-screen" class="screen nextScreen" hidden>
+        <h1>Next</h1>
       </section>
     </main>
 

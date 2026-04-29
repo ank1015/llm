@@ -2,6 +2,7 @@ import { join } from 'node:path';
 
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
 
+import { getGatewaySession, loginGateway, signOutGateway } from './gateway-credentials.js';
 import { createEmbeddedServerController } from './server/embedded-server.js';
 
 import type { RuntimeInfo } from '../shared/desktop-api.js';
@@ -35,6 +36,16 @@ const registerIpcHandlers = (): void => {
       server: embeddedServer.getState(),
     })
   );
+
+  ipcMain.handle('desktop:get-gateway-session', () => getGatewaySession());
+
+  ipcMain.handle(
+    'desktop:login-gateway',
+    (_event, credentials: { readonly username?: string; readonly password?: string }) =>
+      loginGateway(credentials.username ?? '', credentials.password ?? '')
+  );
+
+  ipcMain.handle('desktop:sign-out-gateway', () => signOutGateway());
 };
 
 registerIpcHandlers();
