@@ -18,7 +18,8 @@
     "clean": "node ../../scripts/remove-paths.mjs dist release --tsbuildinfo"
   },
   "dependencies": {
-    "@ank1015/llm-server": "workspace:^"
+    "@ank1015/llm-server": "workspace:^",
+    "@hugeicons/core-free-icons": "^4.0.0"
   },
   "devDependencies": {
     "@types/node": "^24.6.0",

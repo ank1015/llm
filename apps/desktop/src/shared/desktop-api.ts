@@ -8,3 +8,5 @@ export type RuntimeInfo = {
     readonly url: string | null;
   };
 };
+
+export type Theme = 'light' | 'dark';
