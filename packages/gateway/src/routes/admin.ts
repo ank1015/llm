@@ -11,6 +11,7 @@ import {
 import { jsonError } from '../http/response.js';
 import { readJsonBody, validateSchema } from '../http/validation.js';
 import { adminAuthMiddleware } from '../middleware/admin-auth.js';
+import { parseAzureOpenAIDeploymentUrl } from '../proxy/llm.js';
 import { isGatewayApi } from '../vault/provider-key-vault.js';
 
 import type { GatewayEnv } from '../context.js';
@@ -21,7 +22,7 @@ export function createAdminRoutes(): Hono<GatewayEnv> {
   routes.use('/admin/*', adminAuthMiddleware());
 
   routes.post('/admin/senders', async (c) => {
-    const rawBody = await readJsonBody(c);
+    const rawBody = await readJsonBody(c, c.get('services').config.maxRequestBodyBytes);
     const validation = validateSchema(c, CreateSenderBodySchema, rawBody, 'name is required.');
     if (!validation.ok) {
       return validation.response;
@@ -69,7 +70,7 @@ export function createAdminRoutes(): Hono<GatewayEnv> {
       return c.json({ error: `Unsupported gateway provider "${api}".` }, 400);
     }
 
-    const rawBody = await readJsonBody(c);
+    const rawBody = await readJsonBody(c, c.get('services').config.maxRequestBodyBytes);
     const validation = validateSchema(
       c,
       StoreProviderKeyBodySchema,
@@ -78,6 +79,27 @@ export function createAdminRoutes(): Hono<GatewayEnv> {
     );
     if (!validation.ok) {
       return validation.response;
+    }
+
+    if (api === 'azure-openai') {
+      if (!validation.value.azureDeploymentUrl) {
+        return c.json({ error: 'azureDeploymentUrl is required for azure-openai.' }, 400);
+      }
+
+      try {
+        parseAzureOpenAIDeploymentUrl(validation.value.azureDeploymentUrl);
+      } catch {
+        return c.json({ error: 'azureDeploymentUrl must be a valid Azure OpenAI URL.' }, 400);
+      }
+
+      c.get('services').vault.setProviderCredentials(api, {
+        apiKey: validation.value.apiKey,
+        azureDeploymentUrl: validation.value.azureDeploymentUrl,
+        ...(validation.value.azureDeploymentName
+          ? { azureDeploymentName: validation.value.azureDeploymentName }
+          : {}),
+      });
+      return c.json({ ok: true, api });
     }
 
     c.get('services').vault.setApiKey(api, validation.value.apiKey);

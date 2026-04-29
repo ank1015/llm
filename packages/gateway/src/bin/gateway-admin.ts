@@ -5,6 +5,8 @@ import { getGatewayConfig } from '../config.js';
 import { createGatewayDatabase } from '../db/index.js';
 import { createProviderKeyVault, isGatewayApi } from '../vault/provider-key-vault.js';
 
+// Small command router; each branch exits immediately after handling its command.
+// eslint-disable-next-line sonarjs/cognitive-complexity
 async function main(): Promise<void> {
   const [command, ...args] = process.argv.slice(2);
   const config = getGatewayConfig();
@@ -33,16 +35,32 @@ async function main(): Promise<void> {
         return;
       }
       case 'set-provider-key': {
-        const [api, apiKey] = args;
+        const [api, apiKey, azureDeploymentUrl, azureDeploymentName] = args;
         if (!api || !apiKey) {
-          throw new Error('Usage: llm-gateway-admin set-provider-key <api> <apiKey>');
+          throw new Error(
+            'Usage: llm-gateway-admin set-provider-key <api> <apiKey> [azureDeploymentUrl] [azureDeploymentName]'
+          );
         }
 
         if (!isGatewayApi(api)) {
           throw new Error(`Unsupported gateway provider "${api}".`);
         }
 
-        vault.setApiKey(api, apiKey);
+        if (api === 'azure-openai') {
+          if (!azureDeploymentUrl) {
+            throw new Error(
+              'Usage: llm-gateway-admin set-provider-key azure-openai <apiKey> <azureDeploymentUrl> [azureDeploymentName]'
+            );
+          }
+
+          vault.setProviderCredentials(api, {
+            apiKey,
+            azureDeploymentUrl,
+            ...(azureDeploymentName ? { azureDeploymentName } : {}),
+          });
+        } else {
+          vault.setApiKey(api, apiKey);
+        }
         process.stdout.write(`${JSON.stringify({ ok: true, api }, null, 2)}\n`);
         return;
       }

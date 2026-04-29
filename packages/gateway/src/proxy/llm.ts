@@ -6,6 +6,7 @@ import { GatewayProxyError } from './error.js';
 
 import type { GatewayEnv } from '../context.js';
 import type { LlmStreamRequest } from '../contracts/index.js';
+import type { GatewayApi, GatewayProviderCredentials } from '../vault/provider-key-vault.js';
 import type {
   Api,
   BaseAssistantEvent,
@@ -46,10 +47,10 @@ export async function createLlmStreamProxyResponse(
     );
   }
 
-  const apiKey = services.vault.getApiKey(body.api);
-  if (!apiKey) {
+  const providerCredentials = services.vault.getProviderCredentials(body.api);
+  if (!providerCredentials) {
     throw new GatewayProxyError(
-      `No provider key is configured for "${body.api}".`,
+      `No provider credentials are configured for "${body.api}".`,
       'provider_key_missing',
       503
     );
@@ -84,7 +85,7 @@ export async function createLlmStreamProxyResponse(
 
   const providerOptions = {
     ...(sanitizeProviderOptions(body.providerOptions) ?? {}),
-    apiKey,
+    ...buildStoredProviderOptions(body.api, providerCredentials),
     signal: signalController.signal,
   };
 
@@ -269,6 +270,68 @@ function createSyntheticErrorEvent(
     type: 'error',
     reason: 'error',
     message,
+  };
+}
+
+function buildStoredProviderOptions(
+  api: GatewayApi,
+  credentials: GatewayProviderCredentials
+): Record<string, unknown> {
+  if (api !== 'azure-openai') {
+    return { apiKey: credentials.apiKey };
+  }
+
+  if (!('azureDeploymentUrl' in credentials) || !credentials.azureDeploymentUrl) {
+    throw new GatewayProxyError(
+      'Azure OpenAI deployment URL is not configured.',
+      'provider_config_missing',
+      503
+    );
+  }
+
+  const endpoint = parseAzureOpenAIDeploymentUrl(credentials.azureDeploymentUrl);
+  return {
+    apiKey: credentials.apiKey,
+    azureBaseURL: endpoint.azureBaseURL,
+    ...(endpoint.azureApiVersion ? { azureApiVersion: endpoint.azureApiVersion } : {}),
+    ...(credentials.azureDeploymentName
+      ? { azureDeploymentName: credentials.azureDeploymentName }
+      : {}),
+  };
+}
+
+export function parseAzureOpenAIDeploymentUrl(deploymentUrl: string): {
+  azureBaseURL: string;
+  azureApiVersion?: string;
+} {
+  let url: URL;
+  try {
+    url = new URL(deploymentUrl);
+  } catch {
+    throw new GatewayProxyError(
+      'Azure OpenAI deployment URL must be a valid URL.',
+      'invalid_provider_config',
+      400
+    );
+  }
+
+  const apiVersion = url.searchParams.get('api-version')?.trim() || undefined;
+  let pathname = url.pathname.replace(/\/+$/u, '');
+  if (pathname.endsWith('/responses')) {
+    pathname = pathname.slice(0, -'/responses'.length);
+  }
+
+  if (!pathname || !pathname.includes('/openai')) {
+    throw new GatewayProxyError(
+      'Azure OpenAI deployment URL must include an /openai path.',
+      'invalid_provider_config',
+      400
+    );
+  }
+
+  return {
+    azureBaseURL: `${url.origin}${pathname}`,
+    ...(apiVersion ? { azureApiVersion: apiVersion } : {}),
   };
 }
 

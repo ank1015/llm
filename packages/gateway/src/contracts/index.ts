@@ -57,6 +57,8 @@ export const CreateUserBodySchema = Type.Object({
 
 export const StoreProviderKeyBodySchema = Type.Object({
   apiKey: Type.String({ minLength: 1 }),
+  azureDeploymentUrl: Type.Optional(Type.String({ minLength: 1 })),
+  azureDeploymentName: Type.Optional(Type.String({ minLength: 1 })),
 });
 
 export const AdminRequestsQuerySchema = Type.Object({
