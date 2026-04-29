@@ -48,6 +48,12 @@ export async function runImageProxy(
     );
   }
 
+  validateImagePayloadLimits(
+    body,
+    services.config.maxImages,
+    services.config.imagePayloadLimitBytes
+  );
+
   services.requestLog.startRequest({
     requestId,
     clientRequestId: body.requestId,
@@ -109,6 +115,39 @@ export async function runImageProxy(
   } finally {
     c.req.raw.signal.removeEventListener('abort', handleAbort);
   }
+}
+
+function validateImagePayloadLimits(
+  body: ImageGenerateRequest,
+  maxImages: number,
+  payloadLimitBytes: number
+): void {
+  const imageCount = (body.images?.length ?? 0) + (body.mask ? 1 : 0);
+  if (imageCount > maxImages) {
+    throw new GatewayProxyError(
+      `Image request can include at most ${maxImages} image payloads.`,
+      'too_many_images',
+      413
+    );
+  }
+
+  const payloadBytes =
+    (body.images ?? []).reduce((total, image) => total + estimateBase64Bytes(image.data), 0) +
+    (body.mask ? estimateBase64Bytes(body.mask.data) : 0);
+
+  if (payloadBytes > payloadLimitBytes) {
+    throw new GatewayProxyError(
+      `Image payloads must total ${payloadLimitBytes} bytes or less.`,
+      'image_payload_too_large',
+      413
+    );
+  }
+}
+
+function estimateBase64Bytes(value: string): number {
+  const normalized = value.replace(/\s/gu, '');
+  const padding = normalized.endsWith('==') ? 2 : normalized.endsWith('=') ? 1 : 0;
+  return Math.max(0, Math.floor((normalized.length * 3) / 4) - padding);
 }
 
 function getErrorMessage(error: unknown): string {

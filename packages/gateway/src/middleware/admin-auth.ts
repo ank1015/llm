@@ -1,3 +1,5 @@
+import { consumeRateLimit, rateLimitJsonResponse } from './rate-limit.js';
+
 import type { GatewayEnv } from '../context.js';
 import type { MiddlewareHandler } from 'hono';
 
@@ -7,6 +9,11 @@ export function adminAuthMiddleware(): MiddlewareHandler<GatewayEnv> {
     const adminToken = c.get('services').config.adminToken;
 
     if (!token || token !== adminToken) {
+      const rateLimit = consumeRateLimit(c, 'unauthenticated');
+      if (!rateLimit.allowed) {
+        return rateLimitJsonResponse(c, rateLimit);
+      }
+
       return c.json({ error: 'Admin bearer token is required.' }, 401);
     }
 

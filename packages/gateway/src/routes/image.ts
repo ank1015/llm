@@ -15,7 +15,7 @@ export function createImageRoutes(): Hono<GatewayEnv> {
   routes.use('/v1/image/*', authMiddleware());
 
   routes.post('/v1/image/generate', async (c) => {
-    const rawBody = await readJsonBody(c);
+    const rawBody = await readJsonBody(c, c.get('services').config.maxRequestBodyBytes);
     const validation = validateSchema(
       c,
       ImageGenerateRequestSchema,

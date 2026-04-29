@@ -3,6 +3,8 @@ import { cors } from 'hono/cors';
 
 import { GatewayAuthError } from './auth/tokens.js';
 import { jsonError } from './http/response.js';
+import { securityHeadersMiddleware } from './http/security.js';
+import { RequestBodyError } from './http/validation.js';
 import { requestIdMiddleware } from './middleware/request-id.js';
 import { GatewayProxyError } from './proxy/error.js';
 import { createAdminRoutes } from './routes/admin.js';
@@ -39,6 +41,7 @@ export function createGatewayAppWithServices(configInput: Partial<GatewayConfigI
       allowHeaders: ['Authorization', 'Content-Type'],
     })
   );
+  app.use('*', securityHeadersMiddleware());
   app.use('*', async (c, next) => {
     c.set('services', services);
     await next();
@@ -59,6 +62,10 @@ export function createGatewayAppWithServices(configInput: Partial<GatewayConfigI
     }
 
     if (error instanceof GatewayProxyError || error instanceof GatewayAuthError) {
+      return jsonError(c, { error: error.message, code: error.code }, error.status);
+    }
+
+    if (error instanceof RequestBodyError) {
       return jsonError(c, { error: error.message, code: error.code }, error.status);
     }
 

@@ -15,7 +15,7 @@ export function createLlmRoutes(): Hono<GatewayEnv> {
   routes.use('/v1/llm/*', authMiddleware());
 
   routes.post('/v1/llm/stream', async (c) => {
-    const rawBody = await readJsonBody(c);
+    const rawBody = await readJsonBody(c, c.get('services').config.maxRequestBodyBytes);
     const validation = validateSchema(
       c,
       LlmStreamRequestSchema,

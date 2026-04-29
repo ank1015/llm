@@ -38,7 +38,7 @@ export interface ProviderKeyRecord {
 export interface RequestRecord {
   id: string;
   clientRequestId: string | null;
-  senderId: string;
+  senderId: string | null;
   kind: RequestKind;
   api: string;
   modelId: string;
@@ -70,6 +70,54 @@ export interface UsageSummary {
   costUsd: number;
 }
 
+export type UsageBreakdownDimension = 'api' | 'apiModel' | 'senderId';
+
+export interface UsageBreakdownRow {
+  key: string;
+  api: string | null;
+  modelId: string | null;
+  senderId: string | null;
+  requestCount: number;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  costUsd: number;
+  errorCount: number;
+  lastStartedAt: number | null;
+}
+
+export type TimelineBucket = 'day' | 'hour';
+
+export interface TimelineRow {
+  bucket: number;
+  ok: number;
+  error: number;
+  aborted: number;
+  running: number;
+  totalTokens: number;
+  costUsd: number;
+}
+
+export class GatewayDatabaseError extends Error {
+  readonly code: 'request_running';
+
+  constructor(code: 'request_running', message: string) {
+    super(message);
+    this.code = code;
+    this.name = 'GatewayDatabaseError';
+  }
+}
+
+export class DeleteRequestError extends Error {
+  readonly code: 'not_found' | 'running';
+
+  constructor(code: 'not_found' | 'running', message: string) {
+    super(message);
+    this.name = 'DeleteRequestError';
+    this.code = code;
+  }
+}
+
 export interface GatewayDatabase {
   close(): void;
   completeRequest(input: {
@@ -90,13 +138,43 @@ export interface GatewayDatabase {
     passwordHash?: string;
     username?: string;
   }): SenderRecord;
+  deleteProviderKey(api: string): boolean;
+  /**
+   * Hard-deletes a request row and its events. Throws DeleteRequestError with
+   * code "running" when the request has not completed yet, and "not_found" when
+   * the id does not exist.
+   */
+  deleteRequest(id: string): void;
+  /**
+   * Hard-deletes a sender. Any request rows that referenced the sender are
+   * anonymized (sender_id set to NULL). Associated refresh tokens are removed.
+   * Returns true if a sender row was deleted.
+   */
+  deleteSender(id: string): boolean;
   getProviderKey(api: string): ProviderKeyRecord | undefined;
   getRequestById(id: string): { events: RequestEventRecord[]; request: RequestRecord } | undefined;
   getSenderById(id: string): SenderRecord | undefined;
   getSenderByUsername(username: string): SenderRecord | undefined;
+  getRefreshTokenById(id: string): RefreshTokenRecord | undefined;
   getUsageSummary(filters?: { from?: number; senderId?: string; to?: number }): UsageSummary;
   getRefreshTokenByHash(tokenHash: string): RefreshTokenRecord | undefined;
+  getRequestsTimeline(filters?: {
+    bucket?: TimelineBucket;
+    from?: number;
+    senderId?: string;
+    to?: number;
+  }): TimelineRow[];
+  getUsageBreakdown(input: {
+    by: UsageBreakdownDimension;
+    from?: number;
+    limit?: number;
+    senderId?: string;
+    to?: number;
+  }): UsageBreakdownRow[];
   insertRefreshToken(input: RefreshTokenRecord): void;
+  listRefreshTokensBySender(senderId: string): RefreshTokenRecord[];
+  revokeRefreshTokensBySender(senderId: string, revokedAt?: number): number;
+  setSenderDisabled(senderId: string, disabledAt: number | null): boolean;
   insertRequest(input: {
     id: string;
     clientRequestId?: string | undefined;
@@ -152,7 +230,7 @@ CREATE TABLE IF NOT EXISTS provider_keys (
 CREATE TABLE IF NOT EXISTS requests (
   id TEXT PRIMARY KEY,
   client_request_id TEXT,
-  sender_id TEXT NOT NULL REFERENCES senders(id),
+  sender_id TEXT REFERENCES senders(id) ON DELETE SET NULL,
   kind TEXT NOT NULL CHECK (kind IN ('llm', 'image')),
   api TEXT NOT NULL,
   model_id TEXT NOT NULL,
@@ -194,6 +272,7 @@ export function createGatewayDatabase(config: GatewayConfig): GatewayDatabase {
   database.pragma('foreign_keys = ON');
   database.exec(INIT_SQL);
   ensureSenderCredentialColumns(database);
+  ensureRequestsSenderNullable(database);
 
   const createSenderStatement = database.prepare(`
     INSERT INTO senders (id, name, username, password_hash, created_at, disabled_at)
@@ -247,10 +326,43 @@ export function createGatewayDatabase(config: GatewayConfig): GatewayDatabase {
     FROM refresh_tokens
     WHERE token_hash = ?
   `);
+  const getRefreshTokenByIdStatement = database.prepare(`
+    SELECT
+      id,
+      sender_id AS senderId,
+      token_hash AS tokenHash,
+      issued_at AS issuedAt,
+      expires_at AS expiresAt,
+      revoked_at AS revokedAt
+    FROM refresh_tokens
+    WHERE id = ?
+  `);
   const revokeRefreshTokenByIdStatement = database.prepare(`
     UPDATE refresh_tokens
     SET revoked_at = ?
     WHERE id = ? AND revoked_at IS NULL
+  `);
+  const listRefreshTokensBySenderStatement = database.prepare(`
+    SELECT
+      id,
+      sender_id AS senderId,
+      token_hash AS tokenHash,
+      issued_at AS issuedAt,
+      expires_at AS expiresAt,
+      revoked_at AS revokedAt
+    FROM refresh_tokens
+    WHERE sender_id = ?
+    ORDER BY issued_at DESC
+  `);
+  const revokeRefreshTokensBySenderStatement = database.prepare(`
+    UPDATE refresh_tokens
+    SET revoked_at = @revokedAt
+    WHERE sender_id = @senderId AND revoked_at IS NULL
+  `);
+  const setSenderDisabledStatement = database.prepare(`
+    UPDATE senders
+    SET disabled_at = ?
+    WHERE id = ?
   `);
   const upsertProviderKeyStatement = database.prepare(`
     INSERT INTO provider_keys (api, ciphertext, iv, tag, updated_at)
@@ -371,6 +483,18 @@ export function createGatewayDatabase(config: GatewayConfig): GatewayDatabase {
     WHERE request_id = ?
     ORDER BY seq ASC
   `);
+  const deleteRequestStatement = database.prepare(`DELETE FROM requests WHERE id = ?`);
+  const getRequestStatusStatement = database.prepare(`SELECT status FROM requests WHERE id = ?`);
+  const deleteRefreshTokensBySenderStatement = database.prepare(
+    `DELETE FROM refresh_tokens WHERE sender_id = ?`
+  );
+  const deleteSenderStatement = database.prepare(`DELETE FROM senders WHERE id = ?`);
+  const deleteProviderKeyStatement = database.prepare(`DELETE FROM provider_keys WHERE api = ?`);
+
+  const deleteSenderTransaction = database.transaction((senderId: string) => {
+    deleteRefreshTokensBySenderStatement.run(senderId);
+    return deleteSenderStatement.run(senderId).changes > 0;
+  });
 
   return {
     close() {
@@ -406,6 +530,27 @@ export function createGatewayDatabase(config: GatewayConfig): GatewayDatabase {
 
       return getSenderByIdStatement.get(id) as SenderRecord;
     },
+    deleteProviderKey(api) {
+      return deleteProviderKeyStatement.run(api).changes > 0;
+    },
+    deleteRequest(id) {
+      const existing = getRequestStatusStatement.get(id) as { status: RequestStatus } | undefined;
+      if (!existing) {
+        throw new DeleteRequestError('not_found', `Request "${id}" was not found.`);
+      }
+
+      if (existing.status === 'running') {
+        throw new DeleteRequestError(
+          'running',
+          'Cannot delete a running request. Wait for it to finish or abort it first.'
+        );
+      }
+
+      deleteRequestStatement.run(id);
+    },
+    deleteSender(id) {
+      return deleteSenderTransaction(id);
+    },
     getProviderKey(api) {
       return getProviderKeyStatement.get(api) as ProviderKeyRecord | undefined;
     },
@@ -427,6 +572,9 @@ export function createGatewayDatabase(config: GatewayConfig): GatewayDatabase {
     getSenderByUsername(username) {
       return getSenderByUsernameStatement.get(username) as SenderRecord | undefined;
     },
+    getRefreshTokenById(id) {
+      return getRefreshTokenByIdStatement.get(id) as RefreshTokenRecord | undefined;
+    },
     getUsageSummary(filters = {}) {
       const { clause, params } = buildRequestFilters(filters);
       const statement = database.prepare(`
@@ -445,8 +593,95 @@ export function createGatewayDatabase(config: GatewayConfig): GatewayDatabase {
     getRefreshTokenByHash(tokenHash) {
       return getRefreshTokenByHashStatement.get(tokenHash) as RefreshTokenRecord | undefined;
     },
+    getRequestsTimeline(filters = {}) {
+      const bucket: TimelineBucket = filters.bucket ?? 'hour';
+      const bucketMs = bucket === 'hour' ? 3_600_000 : 86_400_000;
+      const { clause, params } = buildRequestFilters(filters);
+      const statement = database.prepare(`
+        SELECT
+          (started_at / ${bucketMs}) * ${bucketMs} AS bucket,
+          SUM(CASE WHEN status = 'ok' THEN 1 ELSE 0 END) AS ok,
+          SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) AS error,
+          SUM(CASE WHEN status = 'aborted' THEN 1 ELSE 0 END) AS aborted,
+          SUM(CASE WHEN status = 'running' THEN 1 ELSE 0 END) AS running,
+          COALESCE(SUM(total_tokens), 0) AS totalTokens,
+          COALESCE(SUM(cost_usd), 0) AS costUsd
+        FROM requests
+        ${clause}
+        GROUP BY bucket
+        ORDER BY bucket ASC
+      `);
+
+      return statement.all(...params) as TimelineRow[];
+    },
+    getUsageBreakdown(input) {
+      const { by } = input;
+      const { clause, params } = buildRequestFilters({
+        ...(input.from !== undefined ? { from: input.from } : {}),
+        ...(input.to !== undefined ? { to: input.to } : {}),
+        ...(input.senderId ? { senderId: input.senderId } : {}),
+      });
+      const groupExpr =
+        by === 'api' ? 'api' : by === 'senderId' ? 'sender_id' : "api || '/' || model_id";
+      const statement = database.prepare(`
+        SELECT
+          ${groupExpr} AS key,
+          api AS api,
+          model_id AS modelId,
+          sender_id AS senderId,
+          COUNT(*) AS requestCount,
+          COALESCE(SUM(input_tokens), 0) AS inputTokens,
+          COALESCE(SUM(output_tokens), 0) AS outputTokens,
+          COALESCE(SUM(total_tokens), 0) AS totalTokens,
+          COALESCE(SUM(cost_usd), 0) AS costUsd,
+          SUM(CASE WHEN status IN ('error', 'aborted') THEN 1 ELSE 0 END) AS errorCount,
+          MAX(started_at) AS lastStartedAt
+        FROM requests
+        ${clause}
+        GROUP BY ${groupExpr}
+        ORDER BY requestCount DESC
+        LIMIT ?
+      `);
+      const limit = Math.max(1, Math.min(input.limit ?? 50, 200));
+      const rows = statement.all(...params, limit) as Array<{
+        key: string;
+        api: string;
+        modelId: string;
+        senderId: string;
+        requestCount: number;
+        inputTokens: number;
+        outputTokens: number;
+        totalTokens: number;
+        costUsd: number;
+        errorCount: number;
+        lastStartedAt: number | null;
+      }>;
+
+      return rows.map((row) => ({
+        key: row.key,
+        api: by === 'senderId' ? null : row.api,
+        modelId: by === 'apiModel' ? row.modelId : null,
+        senderId: by === 'senderId' ? row.senderId : null,
+        requestCount: row.requestCount,
+        inputTokens: row.inputTokens,
+        outputTokens: row.outputTokens,
+        totalTokens: row.totalTokens,
+        costUsd: row.costUsd,
+        errorCount: row.errorCount,
+        lastStartedAt: row.lastStartedAt,
+      }));
+    },
     insertRefreshToken(input) {
       insertRefreshTokenStatement.run(input);
+    },
+    listRefreshTokensBySender(senderId) {
+      return listRefreshTokensBySenderStatement.all(senderId) as RefreshTokenRecord[];
+    },
+    revokeRefreshTokensBySender(senderId, revokedAt = Date.now()) {
+      return revokeRefreshTokensBySenderStatement.run({ senderId, revokedAt }).changes;
+    },
+    setSenderDisabled(senderId, disabledAt) {
+      return setSenderDisabledStatement.run(disabledAt, senderId).changes > 0;
     },
     insertRequest(input) {
       insertRequestStatement.run({
@@ -506,6 +741,79 @@ export function createGatewayDatabase(config: GatewayConfig): GatewayDatabase {
       upsertProviderKeyStatement.run(input);
     },
   };
+}
+
+function ensureRequestsSenderNullable(database: Database.Database): void {
+  const columns = database.pragma('table_info(requests)') as Array<{
+    name: string;
+    notnull: number;
+  }>;
+  const senderColumn = columns.find((column) => column.name === 'sender_id');
+  if (!senderColumn) {
+    return;
+  }
+
+  const fks = database.pragma('foreign_key_list(requests)') as Array<{
+    table: string;
+    from: string;
+    on_delete: string;
+  }>;
+  const senderFk = fks.find((fk) => fk.from === 'sender_id' && fk.table === 'senders');
+  const needsMigration = senderColumn.notnull === 1 || senderFk?.on_delete !== 'SET NULL';
+  if (!needsMigration) {
+    return;
+  }
+
+  const migrate = database.transaction(() => {
+    database.exec(`
+      CREATE TABLE requests_new (
+        id TEXT PRIMARY KEY,
+        client_request_id TEXT,
+        sender_id TEXT REFERENCES senders(id) ON DELETE SET NULL,
+        kind TEXT NOT NULL CHECK (kind IN ('llm', 'image')),
+        api TEXT NOT NULL,
+        model_id TEXT NOT NULL,
+        started_at INTEGER NOT NULL,
+        ended_at INTEGER,
+        status TEXT NOT NULL CHECK (status IN ('running', 'ok', 'error', 'aborted')),
+        input_tokens INTEGER,
+        output_tokens INTEGER,
+        total_tokens INTEGER,
+        cost_usd REAL,
+        error_code TEXT,
+        error_message TEXT,
+        input_json TEXT,
+        output_json TEXT
+      );
+    `);
+    database.exec(`
+      INSERT INTO requests_new (
+        id, client_request_id, sender_id, kind, api, model_id, started_at,
+        ended_at, status, input_tokens, output_tokens, total_tokens, cost_usd,
+        error_code, error_message, input_json, output_json
+      )
+      SELECT
+        id, client_request_id, sender_id, kind, api, model_id, started_at,
+        ended_at, status, input_tokens, output_tokens, total_tokens, cost_usd,
+        error_code, error_message, input_json, output_json
+      FROM requests;
+    `);
+    database.exec('DROP TABLE requests;');
+    database.exec('ALTER TABLE requests_new RENAME TO requests;');
+    database.exec(
+      'CREATE INDEX IF NOT EXISTS idx_requests_sender_id_started_at ON requests(sender_id, started_at DESC);'
+    );
+    database.exec(
+      'CREATE INDEX IF NOT EXISTS idx_requests_started_at ON requests(started_at DESC);'
+    );
+  });
+
+  database.pragma('foreign_keys = OFF');
+  try {
+    migrate();
+  } finally {
+    database.pragma('foreign_keys = ON');
+  }
 }
 
 function ensureSenderCredentialColumns(database: Database.Database): void {

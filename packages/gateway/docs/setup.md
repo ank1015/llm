@@ -17,6 +17,22 @@ Optional environment variables:
 - `GATEWAY_REFRESH_TTL_SECONDS` - default `2592000`
 - `GATEWAY_CORS_ORIGINS` - comma-separated, default `*`
 - `GATEWAY_LOG_MODE` - `off`, `summary`, or `full`; default `full`
+- `GATEWAY_RATE_LIMIT_ENABLED` - `true` or `false`; default `true`
+- `GATEWAY_RATE_LIMIT_WINDOW_SECONDS` - unauthenticated non-login window; default `60`
+- `GATEWAY_RATE_LIMIT_MAX` - unauthenticated non-login requests per window; default `60`
+- `GATEWAY_LOGIN_RATE_LIMIT_WINDOW_SECONDS` - login window; default `600`
+- `GATEWAY_LOGIN_RATE_LIMIT_MAX` - login attempts per window; default `10`
+- `GATEWAY_TRUST_PROXY` - trust `X-Forwarded-*` headers from your reverse proxy; default `false`
+- `GATEWAY_COOKIE_SECURE` - `auto`, `true`, or `false`; default `auto`
+
+For production, set `GATEWAY_CORS_ORIGINS` to the exact browser origin that will call
+the gateway. Do not leave it as `*` for a public deployment.
+
+If the gateway is served over plain HTTP, browser cookies cannot use the `Secure`
+attribute. For AWS/Azure MVPs, prefer keeping the gateway on a private interface
+or behind an HTTPS reverse proxy. When using an HTTPS reverse proxy, set
+`GATEWAY_TRUST_PROXY=true` so `GATEWAY_COOKIE_SECURE=auto` can honor
+`X-Forwarded-Proto: https`.
 
 Boot the server with:
 

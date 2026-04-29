@@ -4,10 +4,11 @@ import { join } from 'node:path';
 
 import { createGatewayAppWithServices } from '../../src/app.js';
 
+import type { GatewayConfigInput } from '../../src/config.js';
 import type { GatewayServices } from '../../src/context.js';
 import type { Hono } from 'hono';
 
-export async function createGatewayTestApp(): Promise<{
+export async function createGatewayTestApp(overrides: Partial<GatewayConfigInput> = {}): Promise<{
   adminHeaders: Record<string, string>;
   app: Hono;
   cleanup: () => Promise<void>;
@@ -29,6 +30,7 @@ export async function createGatewayTestApp(): Promise<{
     refreshTtlSeconds: 300,
     corsOrigins: ['*'],
     logMode: 'full',
+    ...overrides,
   });
 
   return {

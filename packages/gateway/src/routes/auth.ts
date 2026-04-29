@@ -4,14 +4,15 @@ import { GatewayAuthError } from '../auth/tokens.js';
 import { RefreshTokenBodySchema, UserLoginBodySchema } from '../contracts/index.js';
 import { jsonError } from '../http/response.js';
 import { readJsonBody, validateSchema } from '../http/validation.js';
+import { rateLimitMiddleware } from '../middleware/rate-limit.js';
 
 import type { GatewayEnv } from '../context.js';
 
 export function createAuthRoutes(): Hono<GatewayEnv> {
   const routes = new Hono<GatewayEnv>();
 
-  routes.post('/v1/auth/login', async (c) => {
-    const rawBody = await readJsonBody(c);
+  routes.post('/v1/auth/login', rateLimitMiddleware('login'), async (c) => {
+    const rawBody = await readJsonBody(c, c.get('services').config.maxRequestBodyBytes);
     const validation = validateSchema(
       c,
       UserLoginBodySchema,
@@ -36,8 +37,8 @@ export function createAuthRoutes(): Hono<GatewayEnv> {
     }
   });
 
-  routes.post('/v1/auth/refresh', async (c) => {
-    const rawBody = await readJsonBody(c);
+  routes.post('/v1/auth/refresh', rateLimitMiddleware('unauthenticated'), async (c) => {
+    const rawBody = await readJsonBody(c, c.get('services').config.maxRequestBodyBytes);
     const validation = validateSchema(
       c,
       RefreshTokenBodySchema,
@@ -60,8 +61,8 @@ export function createAuthRoutes(): Hono<GatewayEnv> {
     }
   });
 
-  routes.post('/v1/auth/revoke', async (c) => {
-    const rawBody = await readJsonBody(c);
+  routes.post('/v1/auth/revoke', rateLimitMiddleware('unauthenticated'), async (c) => {
+    const rawBody = await readJsonBody(c, c.get('services').config.maxRequestBodyBytes);
     const validation = validateSchema(
       c,
       RefreshTokenBodySchema,

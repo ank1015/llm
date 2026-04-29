@@ -1,8 +1,10 @@
 import { resolve } from 'node:path';
 
 export const GatewayLogModes = ['off', 'summary', 'full'] as const;
+export const GatewayCookieSecureModes = ['auto', 'false', 'true'] as const;
 
 export type GatewayLogMode = (typeof GatewayLogModes)[number];
+export type GatewayCookieSecure = 'auto' | boolean;
 
 export interface GatewayConfig {
   host: string;
@@ -17,6 +19,18 @@ export interface GatewayConfig {
   refreshTtlSeconds: number;
   corsOrigins: string[];
   logMode: GatewayLogMode;
+  rateLimitEnabled: boolean;
+  rateLimitWindowSeconds: number;
+  rateLimitMax: number;
+  loginRateLimitWindowSeconds: number;
+  loginRateLimitMax: number;
+  authenticatedRateLimitWindowSeconds: number;
+  authenticatedRateLimitMax: number;
+  maxRequestBodyBytes: number;
+  imagePayloadLimitBytes: number;
+  maxImages: number;
+  trustProxy: boolean;
+  cookieSecure: GatewayCookieSecure;
 }
 
 export interface GatewayConfigInput {
@@ -32,6 +46,18 @@ export interface GatewayConfigInput {
   refreshTtlSeconds?: number | string;
   corsOrigins?: string[] | string;
   logMode?: GatewayLogMode;
+  rateLimitEnabled?: boolean | string;
+  rateLimitWindowSeconds?: number | string;
+  rateLimitMax?: number | string;
+  loginRateLimitWindowSeconds?: number | string;
+  loginRateLimitMax?: number | string;
+  authenticatedRateLimitWindowSeconds?: number | string;
+  authenticatedRateLimitMax?: number | string;
+  maxRequestBodyBytes?: number | string;
+  imagePayloadLimitBytes?: number | string;
+  maxImages?: number | string;
+  trustProxy?: boolean | string;
+  cookieSecure?: GatewayCookieSecure | string;
 }
 
 export function getGatewayConfig(overrides: Partial<GatewayConfigInput> = {}): GatewayConfig {
@@ -76,6 +102,76 @@ export function getGatewayConfig(overrides: Partial<GatewayConfigInput> = {}): G
   );
   const corsOrigins = readOrigins(overrides.corsOrigins, process.env['GATEWAY_CORS_ORIGINS']);
   const logMode = readLogMode(overrides.logMode, process.env['GATEWAY_LOG_MODE']);
+  const rateLimitEnabled = readBoolean(
+    overrides.rateLimitEnabled,
+    process.env['GATEWAY_RATE_LIMIT_ENABLED'],
+    true,
+    'GATEWAY_RATE_LIMIT_ENABLED'
+  );
+  const rateLimitWindowSeconds = readInteger(
+    overrides.rateLimitWindowSeconds,
+    process.env['GATEWAY_RATE_LIMIT_WINDOW_SECONDS'],
+    60,
+    'GATEWAY_RATE_LIMIT_WINDOW_SECONDS'
+  );
+  const rateLimitMax = readInteger(
+    overrides.rateLimitMax,
+    process.env['GATEWAY_RATE_LIMIT_MAX'],
+    60,
+    'GATEWAY_RATE_LIMIT_MAX'
+  );
+  const loginRateLimitWindowSeconds = readInteger(
+    overrides.loginRateLimitWindowSeconds,
+    process.env['GATEWAY_LOGIN_RATE_LIMIT_WINDOW_SECONDS'],
+    600,
+    'GATEWAY_LOGIN_RATE_LIMIT_WINDOW_SECONDS'
+  );
+  const loginRateLimitMax = readInteger(
+    overrides.loginRateLimitMax,
+    process.env['GATEWAY_LOGIN_RATE_LIMIT_MAX'],
+    10,
+    'GATEWAY_LOGIN_RATE_LIMIT_MAX'
+  );
+  const authenticatedRateLimitWindowSeconds = readInteger(
+    overrides.authenticatedRateLimitWindowSeconds,
+    process.env['GATEWAY_AUTHENTICATED_RATE_LIMIT_WINDOW_SECONDS'],
+    3_600,
+    'GATEWAY_AUTHENTICATED_RATE_LIMIT_WINDOW_SECONDS'
+  );
+  const authenticatedRateLimitMax = readInteger(
+    overrides.authenticatedRateLimitMax,
+    process.env['GATEWAY_AUTHENTICATED_RATE_LIMIT_MAX'],
+    120,
+    'GATEWAY_AUTHENTICATED_RATE_LIMIT_MAX'
+  );
+  const maxRequestBodyBytes = readInteger(
+    overrides.maxRequestBodyBytes,
+    process.env['GATEWAY_MAX_REQUEST_BODY_BYTES'],
+    16 * 1024 * 1024,
+    'GATEWAY_MAX_REQUEST_BODY_BYTES'
+  );
+  const imagePayloadLimitBytes = readInteger(
+    overrides.imagePayloadLimitBytes,
+    process.env['GATEWAY_IMAGE_PAYLOAD_LIMIT_BYTES'],
+    12 * 1024 * 1024,
+    'GATEWAY_IMAGE_PAYLOAD_LIMIT_BYTES'
+  );
+  const maxImages = readInteger(
+    overrides.maxImages,
+    process.env['GATEWAY_MAX_IMAGES'],
+    4,
+    'GATEWAY_MAX_IMAGES'
+  );
+  const trustProxy = readBoolean(
+    overrides.trustProxy,
+    process.env['GATEWAY_TRUST_PROXY'],
+    false,
+    'GATEWAY_TRUST_PROXY'
+  );
+  const cookieSecure = readCookieSecure(
+    overrides.cookieSecure,
+    process.env['GATEWAY_COOKIE_SECURE']
+  );
 
   return {
     host,
@@ -90,6 +186,18 @@ export function getGatewayConfig(overrides: Partial<GatewayConfigInput> = {}): G
     refreshTtlSeconds,
     corsOrigins,
     logMode,
+    rateLimitEnabled,
+    rateLimitWindowSeconds,
+    rateLimitMax,
+    loginRateLimitWindowSeconds,
+    loginRateLimitMax,
+    authenticatedRateLimitWindowSeconds,
+    authenticatedRateLimitMax,
+    maxRequestBodyBytes,
+    imagePayloadLimitBytes,
+    maxImages,
+    trustProxy,
+    cookieSecure,
   };
 }
 
@@ -189,6 +297,55 @@ function readLogMode(
   }
 
   throw new Error(`GATEWAY_LOG_MODE must be one of: ${GatewayLogModes.join(', ')}`);
+}
+
+function readBoolean(
+  overrideValue: boolean | string | undefined,
+  envValue: string | undefined,
+  fallback: boolean,
+  name: string
+): boolean {
+  const resolved = overrideValue ?? envValue;
+  if (resolved === undefined) {
+    return fallback;
+  }
+
+  if (typeof resolved === 'boolean') {
+    return resolved;
+  }
+
+  const value = resolved.trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(value)) {
+    return true;
+  }
+  if (['0', 'false', 'no', 'off'].includes(value)) {
+    return false;
+  }
+
+  throw new Error(`${name} must be true or false.`);
+}
+
+function readCookieSecure(
+  overrideValue: GatewayCookieSecure | string | undefined,
+  envValue: string | undefined
+): GatewayCookieSecure {
+  const resolved = overrideValue ?? envValue ?? 'auto';
+  if (typeof resolved === 'boolean') {
+    return resolved;
+  }
+
+  const value = resolved.trim().toLowerCase();
+  if (value === 'auto') {
+    return 'auto';
+  }
+  if (['1', 'true', 'yes', 'on'].includes(value)) {
+    return true;
+  }
+  if (['0', 'false', 'no', 'off'].includes(value)) {
+    return false;
+  }
+
+  throw new Error('GATEWAY_COOKIE_SECURE must be auto, true, or false.');
 }
 
 function readEncryptionKey(

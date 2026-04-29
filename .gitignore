@@ -31,6 +31,12 @@ coverage/
 npm-debug.log*
 pnpm-debug.log*
 packages/*/*.tgz
+packages/gateway/*.db
+packages/gateway/*.db-shm
+packages/gateway/*.db-wal
+packages/gateway/*.sqlite
+packages/gateway/*.sqlite-shm
+packages/gateway/*.sqlite-wal
 
 packages/agents/.sessions/
 packages/agents/temp/
@@ -38,3 +44,7 @@ packages/agents/temp/
 
 # Assembled release payloads
 packages/app/vendor/
+
+# Local deployment secrets
+gateway-deployment.txt
+gateway-deployment-key.pem

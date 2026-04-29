@@ -42,3 +42,12 @@ GET /admin/dashboard
 ```
 
 After a successful admin login, the gateway sets an HttpOnly dashboard session cookie scoped to `/admin`. The dashboard can create users and store provider keys without exposing provider keys back to the browser.
+
+Dashboard cookies use `Secure` when `GATEWAY_COOKIE_SECURE=true`, or when
+`GATEWAY_COOKIE_SECURE=auto` and the request is HTTPS. If the gateway is behind
+an HTTPS reverse proxy, set `GATEWAY_TRUST_PROXY=true` so the gateway can use
+`X-Forwarded-Proto: https` to enable secure cookies.
+
+Public login, refresh, revoke, invalid admin bearer-token, and unauthenticated
+LLM/image requests are rate limited to slow repeated unknown callers. Successful
+authenticated LLM/image usage is not rate limited by the gateway MVP limiter.
