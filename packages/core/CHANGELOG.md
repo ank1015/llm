@@ -6,6 +6,10 @@ The format is based on Keep a Changelog and this package follows SemVer once its
 
 ## [Unreleased]
 
+### Added
+
+- Added a built-in Azure OpenAI chat provider using the OpenAI Responses API normalization with Azure endpoint, API version, and deployment configuration.
+
 ## [0.0.8] - 2026-04-16
 
 ### Added

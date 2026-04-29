@@ -4,25 +4,27 @@
 
 ## Built-In Providers
 
-| Provider    | `getModel()` API key | Typical integration-test env                                        |
-| ----------- | -------------------- | ------------------------------------------------------------------- |
-| OpenAI      | `openai`             | `OPENAI_API_KEY`                                                    |
-| Codex       | `codex`              | `~/.codex/auth.json` or explicit `apiKey` plus `chatgpt-account-id` |
-| Google      | `google`             | `GEMINI_API_KEY`                                                    |
-| DeepSeek    | `deepseek`           | `DEEPSEEK_API_KEY`                                                  |
-| Anthropic   | `anthropic`          | `ANTHROPIC_API_KEY`                                                 |
-| Claude Code | `claude-code`        | explicit `oauthToken`, `betaFlag`, `billingHeader`                  |
-| Z.AI        | `zai`                | `ZAI_API_KEY`                                                       |
-| Kimi        | `kimi`               | `KIMI_API_KEY`                                                      |
-| MiniMax     | `minimax`            | `MINIMAX_API_KEY`                                                   |
-| Cerebras    | `cerebras`           | `CEREBRAS_API_KEY`                                                  |
-| OpenRouter  | `openrouter`         | `OPENROUTER_API_KEY`                                                |
+| Provider     | `getModel()` API key | Typical integration-test env                                        |
+| ------------ | -------------------- | ------------------------------------------------------------------- |
+| OpenAI       | `openai`             | `OPENAI_API_KEY`                                                    |
+| Azure OpenAI | `azure-openai`       | `AZURE_OPENAI_API_KEY`, Azure base URL/resource, deployment name    |
+| Codex        | `codex`              | `~/.codex/auth.json` or explicit `apiKey` plus `chatgpt-account-id` |
+| Google       | `google`             | `GEMINI_API_KEY`                                                    |
+| DeepSeek     | `deepseek`           | `DEEPSEEK_API_KEY`                                                  |
+| Anthropic    | `anthropic`          | `ANTHROPIC_API_KEY`                                                 |
+| Claude Code  | `claude-code`        | explicit `oauthToken`, `betaFlag`, `billingHeader`                  |
+| Z.AI         | `zai`                | `ZAI_API_KEY`                                                       |
+| Kimi         | `kimi`               | `KIMI_API_KEY`                                                      |
+| MiniMax      | `minimax`            | `MINIMAX_API_KEY`                                                   |
+| Cerebras     | `cerebras`           | `CEREBRAS_API_KEY`                                                  |
+| OpenRouter   | `openrouter`         | `OPENROUTER_API_KEY`                                                |
 
 ## Provider Options
 
 All built-in providers expose typed option aliases through the package root, for example:
 
 - `OpenAIProviderOptions`
+- `AzureOpenAIProviderOptions`
 - `GoogleProviderOptions`
 - `AnthropicProviderOptions`
 - `CodexProviderOptions`
