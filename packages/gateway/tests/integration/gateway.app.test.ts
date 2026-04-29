@@ -48,7 +48,9 @@ describe('gateway app integration', () => {
     mockState.getModel.mockImplementation((api: string, modelId: string) =>
       api === 'openai' && modelId === 'gpt-5.4-mini'
         ? createModel('openai', 'gpt-5.4-mini')
-        : undefined
+        : api === 'azure-openai' && modelId === 'gpt-5.4-nano'
+          ? createModel('azure-openai', 'gpt-5.4-nano')
+          : undefined
     );
     mockState.getImageModel.mockImplementation((api: string, modelId: string) =>
       api === 'openai' && modelId === 'gpt-image-1.5'
@@ -91,6 +93,93 @@ describe('gateway app integration', () => {
     expect(authResponse.status).toBe(401);
   });
 
+  it('rate limits repeated bad user logins', async () => {
+    let response: Response | undefined;
+    for (let i = 0; i < 11; i += 1) {
+      response = await jsonRequest(fixture.app, '/v1/auth/login', 'POST', {
+        username: 'missing',
+        password: 'wrong-password',
+      });
+    }
+
+    expect(response?.status).toBe(429);
+    expect(response?.headers.get('retry-after')).toBeTruthy();
+  });
+
+  it('rate limits repeated unauthenticated proxy requests without limiting valid users', async () => {
+    let unauthenticatedResponse: Response | undefined;
+    for (let i = 0; i < 61; i += 1) {
+      unauthenticatedResponse = await jsonRequest(fixture.app, '/v1/llm/stream', 'POST', {
+        api: 'openai',
+        modelId: 'gpt-5.4-mini',
+        messages: [],
+      });
+    }
+
+    expect(unauthenticatedResponse?.status).toBe(429);
+
+    const tokens = await issueSenderTokens(fixture.app, fixture.adminHeaders);
+    await jsonRequest(
+      fixture.app,
+      '/admin/providers/openai/key',
+      'PUT',
+      { apiKey: 'server-openai-key' },
+      fixture.adminHeaders
+    );
+
+    const imageResult = createImageResult();
+    mockState.generateImage.mockResolvedValue(imageResult);
+
+    const authenticatedResponse = await jsonRequest(
+      fixture.app,
+      '/v1/image/generate',
+      'POST',
+      {
+        api: 'openai',
+        modelId: 'gpt-image-1.5',
+        prompt: 'Draw a kite',
+      },
+      {
+        Authorization: `Bearer ${tokens.accessToken}`,
+      }
+    );
+
+    expect(authenticatedResponse.status).toBe(200);
+  });
+
+  it('sets secure admin cookies only when configured or behind trusted https proxy', async () => {
+    const defaultLogin = await formRequest(fixture.app, '/admin/login', {
+      username: 'admin',
+      password: 'admin-password',
+    });
+    expect(defaultLogin.headers.get('set-cookie')).not.toMatch(/;\s*Secure/iu);
+
+    await fixture.cleanup();
+    fixture = await createGatewayTestApp({ cookieSecure: true });
+
+    const forcedSecureLogin = await formRequest(fixture.app, '/admin/login', {
+      username: 'admin',
+      password: 'admin-password',
+    });
+    expect(forcedSecureLogin.headers.get('set-cookie')).toMatch(/;\s*Secure/iu);
+
+    await fixture.cleanup();
+    fixture = await createGatewayTestApp({ cookieSecure: 'auto', trustProxy: true });
+
+    const proxySecureLogin = await formRequest(
+      fixture.app,
+      '/admin/login',
+      {
+        username: 'admin',
+        password: 'admin-password',
+      },
+      {
+        'X-Forwarded-Proto': 'https',
+      }
+    );
+    expect(proxySecureLogin.headers.get('set-cookie')).toMatch(/;\s*Secure/iu);
+  });
+
   it('lets an admin log in, create a user, and lets that user log in for tokens', async () => {
     const loginResponse = await formRequest(fixture.app, '/admin/login', {
       username: 'admin',
@@ -108,6 +197,15 @@ describe('gateway app integration', () => {
     });
     expect(dashboardResponse.status).toBe(200);
     expect(await dashboardResponse.text()).toContain('Admin dashboard');
+
+    const providersResponse = await fixture.app.request('/admin/dashboard/providers', {
+      headers: {
+        Cookie: cookie ?? '',
+      },
+    });
+    const providersHtml = await providersResponse.text();
+    expect(providersHtml).toContain('azure-openai');
+    expect(providersHtml).toContain('azureDeploymentUrl');
 
     const createUserResponse = await formRequest(
       fixture.app,
@@ -246,6 +344,71 @@ describe('gateway app integration', () => {
     expect(detailBody.request.status).toBe('ok');
     expect(detailBody.events).toHaveLength(3);
     expect(detailBody.request.input.providerOptions.apiKey).toBe('[REDACTED]');
+  });
+
+  it('proxies Azure OpenAI with stored deployment URL settings', async () => {
+    const tokens = await issueSenderTokens(fixture.app, fixture.adminHeaders);
+    await jsonRequest(
+      fixture.app,
+      '/admin/providers/azure-openai/key',
+      'PUT',
+      {
+        apiKey: 'server-azure-key',
+        azureDeploymentUrl:
+          'https://resource.cognitiveservices.azure.com/openai/responses?api-version=2025-04-01-preview',
+        azureDeploymentName: 'prod-gpt-54-nano',
+      },
+      fixture.adminHeaders
+    );
+
+    const finalMessage = createAssistantMessage('azure-openai', 'gpt-5.4-nano');
+    const events: BaseAssistantEvent<'azure-openai'>[] = [
+      { type: 'start', message: finalMessage },
+      { type: 'done', reason: 'stop', message: finalMessage },
+    ];
+
+    mockState.stream.mockImplementation((_model, _context, options) => {
+      expect(options).toMatchObject({
+        apiKey: 'server-azure-key',
+        azureBaseURL: 'https://resource.cognitiveservices.azure.com/openai',
+        azureApiVersion: '2025-04-01-preview',
+        azureDeploymentName: 'prod-gpt-54-nano',
+        reasoning: {
+          effort: 'medium',
+        },
+      });
+      expect(options).not.toHaveProperty('headers');
+
+      return createStream(events, finalMessage);
+    });
+
+    const response = await jsonRequest(
+      fixture.app,
+      '/v1/llm/stream',
+      'POST',
+      {
+        api: 'azure-openai',
+        modelId: 'gpt-5.4-nano',
+        messages: [],
+        providerOptions: {
+          apiKey: 'malicious-client-key',
+          azureBaseURL: 'https://wrong.example.com/openai',
+          azureApiVersion: 'wrong-version',
+          headers: {
+            Authorization: 'Bearer should-not-pass',
+          },
+          reasoning: {
+            effort: 'medium',
+          },
+        },
+      },
+      {
+        Authorization: `Bearer ${tokens.accessToken}`,
+      }
+    );
+
+    expect(response.status).toBe(200);
+    expect(await readSseDataFrames(response)).toEqual(events);
   });
 
   it('proxies image generation and stores sanitized payloads', async () => {
@@ -520,13 +683,16 @@ function formRequest(
   });
 }
 
-function createAssistantMessage(): BaseAssistantMessage<'openai'> {
+function createAssistantMessage<TApi extends 'openai' | 'azure-openai'>(
+  api = 'openai' as TApi,
+  modelId = 'gpt-5.4-mini'
+): BaseAssistantMessage<TApi> {
   return {
     role: 'assistant',
-    api: 'openai',
+    api,
     id: 'assistant-1',
-    model: createModel('openai', 'gpt-5.4-mini'),
-    message: {} as BaseAssistantMessage<'openai'>['message'],
+    model: createModel(api, modelId),
+    message: {} as BaseAssistantMessage<TApi>['message'],
     timestamp: 1,
     duration: 1,
     stopReason: 'stop',
@@ -613,7 +779,7 @@ function createGeneratedImage(data: string): ImageContent {
   };
 }
 
-function createModel<TApi extends 'openai'>(api: TApi, id: string): Model<TApi> {
+function createModel<TApi extends 'openai' | 'azure-openai'>(api: TApi, id: string): Model<TApi> {
   return {
     api,
     id,
@@ -631,7 +797,7 @@ function createModel<TApi extends 'openai'>(api: TApi, id: string): Model<TApi> 
   };
 }
 
-function createStream<TApi extends 'openai'>(
+function createStream<TApi extends 'openai' | 'azure-openai'>(
   events: BaseAssistantEvent<TApi>[],
   finalMessage: BaseAssistantMessage<TApi>
 ) {
