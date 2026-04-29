@@ -4,6 +4,7 @@ import { app, BrowserWindow, ipcMain, shell } from 'electron';
 
 import { getGatewaySession, loginGateway, signOutGateway } from './gateway-credentials.js';
 import { createEmbeddedServerController } from './server/embedded-server.js';
+import { checkSetupRequirements } from './setup-checks.js';
 
 import type { RuntimeInfo } from '../shared/desktop-api.js';
 
@@ -46,6 +47,8 @@ const registerIpcHandlers = (): void => {
   );
 
   ipcMain.handle('desktop:sign-out-gateway', () => signOutGateway());
+
+  ipcMain.handle('desktop:check-setup-requirements', () => checkSetupRequirements());
 };
 
 registerIpcHandlers();

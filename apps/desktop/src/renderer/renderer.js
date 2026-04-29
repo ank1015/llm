@@ -7,6 +7,8 @@ const loginScreen = document.querySelector('#login-screen');
 const loginStatus = document.querySelector('#login-status');
 const nextScreen = document.querySelector('#next-screen');
 const passwordInput = document.querySelector('#password');
+const setupChecksElement = document.querySelector('#setup-checks');
+const setupStatus = document.querySelector('#setup-status');
 const signOutButton = document.querySelector('#sign-out');
 const themeToggle = document.querySelector('#theme-toggle');
 const usernameInput = document.querySelector('#username');
@@ -94,6 +96,7 @@ const showNext = () => {
     loginScreen.hidden = true;
     nextScreen.hidden = false;
     signOutButton.hidden = false;
+    void runSetupChecks();
   }
 };
 
@@ -167,6 +170,67 @@ const signOut = async () => {
   await window.desktopApp.signOutGateway();
   showLogin();
   setLoginStatus('', 'muted');
+};
+
+const renderSetupChecks = (checks) => {
+  if (!setupChecksElement) {
+    return;
+  }
+
+  setupChecksElement.replaceChildren(
+    ...checks.map((check) => {
+      const row = document.createElement('article');
+      row.className = check.installed ? 'setupCheck ready' : 'setupCheck missing';
+
+      const copy = document.createElement('div');
+      const title = document.createElement('h3');
+      title.textContent = check.label;
+
+      const details = document.createElement('p');
+      details.textContent = check.installed
+        ? [
+            `${check.command} detected${check.version ? `: ${check.version}` : ''}`,
+            check.executablePath ? check.executablePath : '',
+          ]
+            .filter(Boolean)
+            .join(' | ')
+        : `${check.command} missing`;
+
+      const badge = document.createElement('span');
+      badge.className = 'setupBadge';
+      badge.textContent = check.installed ? 'Ready' : 'Missing';
+
+      copy.append(title, details);
+      row.append(copy, badge);
+
+      return row;
+    })
+  );
+};
+
+const runSetupChecks = async () => {
+  if (!setupStatus || !setupChecksElement || !window.desktopApp) {
+    return;
+  }
+
+  setupStatus.textContent = 'Checking';
+  setupStatus.dataset.tone = 'muted';
+  setupChecksElement.replaceChildren();
+
+  try {
+    const checks = await window.desktopApp.checkSetupRequirements();
+    const missing = checks.filter((check) => !check.installed);
+
+    renderSetupChecks(checks);
+    setupStatus.textContent =
+      missing.length === 0
+        ? 'All ready'
+        : `Missing ${missing.map((check) => check.label).join(', ')}`;
+    setupStatus.dataset.tone = missing.length === 0 ? 'success' : 'warning';
+  } catch {
+    setupStatus.textContent = 'Unable to check';
+    setupStatus.dataset.tone = 'error';
+  }
 };
 
 applyTheme(getStoredTheme());

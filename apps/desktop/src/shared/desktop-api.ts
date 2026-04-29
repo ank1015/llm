@@ -40,3 +40,14 @@ export type GatewayLoginResult =
       readonly message: string;
       readonly session: GatewaySession;
     };
+
+export type SetupCheckName = 'node' | 'npx' | 'python' | 'git' | 'chrome-controller';
+
+export type SetupCheck = {
+  readonly name: SetupCheckName;
+  readonly label: string;
+  readonly command: string;
+  readonly installed: boolean;
+  readonly version?: string;
+  readonly executablePath?: string;
+};

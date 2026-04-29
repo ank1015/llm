@@ -266,9 +266,137 @@ h1 {
 }
 
 .nextScreen {
-  place-content: center;
-  min-height: calc(100vh - 80px);
-  padding-top: 0;
+  width: min(100%, 560px);
+  gap: 28px;
+  padding-top: min(14vh, 110px);
+}
+
+.setupSummary {
+  display: grid;
+  width: 100%;
+  gap: 12px;
+  text-align: left;
+}
+
+.setupSummaryHeader,
+.setupCheck {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.setupSummary h2,
+.setupCheck h3,
+.setupCheck p {
+  margin: 0;
+}
+
+.setupSummary h2 {
+  font-size: 0.92rem;
+  font-weight: 650;
+}
+
+.setupStatus,
+.setupBadge {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+
+.setupStatus {
+  padding: 0 8px;
+  color: var(--muted-foreground);
+  background: var(--accent);
+}
+
+.setupStatus[data-tone='success'] {
+  color: #067647;
+  background: #ecfdf3;
+}
+
+.setupStatus[data-tone='warning'] {
+  color: #93370d;
+  background: #fffaeb;
+}
+
+.setupStatus[data-tone='error'] {
+  color: #b42318;
+  background: #fef3f2;
+}
+
+.dark .setupStatus[data-tone='success'] {
+  color: #75e0a7;
+  background: rgba(6, 118, 71, 0.22);
+}
+
+.dark .setupStatus[data-tone='warning'] {
+  color: #fec84b;
+  background: rgba(147, 55, 13, 0.24);
+}
+
+.dark .setupStatus[data-tone='error'] {
+  color: #ffb4ab;
+  background: rgba(180, 35, 24, 0.22);
+}
+
+.setupChecks {
+  display: grid;
+  gap: 8px;
+}
+
+.setupCheck {
+  min-height: 58px;
+  padding: 10px 12px;
+  border: 1px solid var(--home-border);
+  border-radius: 8px;
+  background: var(--home-panel);
+}
+
+.setupCheck h3 {
+  font-size: 0.88rem;
+  font-weight: 620;
+}
+
+.setupCheck p {
+  max-width: 380px;
+  overflow: hidden;
+  color: var(--muted-foreground);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.setupBadge {
+  min-width: 58px;
+  padding: 0 8px;
+  color: var(--muted-foreground);
+  background: var(--accent);
+}
+
+.setupCheck.ready .setupBadge {
+  color: #067647;
+  background: #ecfdf3;
+}
+
+.setupCheck.missing .setupBadge {
+  color: #b42318;
+  background: #fef3f2;
+}
+
+.dark .setupCheck.ready .setupBadge {
+  color: #75e0a7;
+  background: rgba(6, 118, 71, 0.22);
+}
+
+.dark .setupCheck.missing .setupBadge {
+  color: #ffb4ab;
+  background: rgba(180, 35, 24, 0.22);
 }
 
 @media (max-width: 640px) {
