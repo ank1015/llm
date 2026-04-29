@@ -9,6 +9,7 @@ The format is based on Keep a Changelog and this package follows SemVer once its
 ### Added
 
 - Added a built-in Azure OpenAI chat provider using the OpenAI Responses API normalization with Azure endpoint, API version, and deployment configuration.
+- Added a built-in AWS Bedrock chat provider using ConverseStream for Anthropic Claude models.
 
 ## [0.0.8] - 2026-04-16
 

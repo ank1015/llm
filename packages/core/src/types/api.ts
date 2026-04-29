@@ -11,6 +11,7 @@
 export const KnownApis = [
   'openai',
   'azure-openai',
+  'aws-bedrock',
   'codex',
   'google',
   'deepseek',

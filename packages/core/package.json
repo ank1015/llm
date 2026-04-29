@@ -63,6 +63,8 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.1038.0",
+    "@aws-sdk/credential-providers": "^3.1038.0",
     "@google/genai": "^1.44.0",
     "@sinclair/typebox": "^0.34.48",
     "ajv": "^8.17.1",

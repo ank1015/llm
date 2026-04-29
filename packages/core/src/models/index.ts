@@ -1,4 +1,5 @@
 import { anthropicModels } from './anthropic.js';
+import { awsBedrockModels } from './aws-bedrock.js';
 import { azureOpenAIModels } from './azure-openai.js';
 import { cerebrasModels } from './cerebras.js';
 import { claudeCodeModels } from './claude-code.js';
@@ -14,6 +15,7 @@ import { zaiModels } from './zai.js';
 export const MODELS = {
   openai: openaiModels,
   'azure-openai': azureOpenAIModels,
+  'aws-bedrock': awsBedrockModels,
   codex: codexModels,
   google: googleModels,
   deepseek: deepseekModels,

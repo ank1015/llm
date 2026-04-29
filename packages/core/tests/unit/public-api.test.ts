@@ -15,6 +15,15 @@ describe('core public api', () => {
     });
   });
 
+  it('exports AWS Bedrock as a built-in provider with models', () => {
+    expect(getProviders()).toContain('aws-bedrock');
+    expect(getModels('aws-bedrock').length).toBeGreaterThan(0);
+    expect(getModel('aws-bedrock', 'anthropic.claude-sonnet-4-6')).toMatchObject({
+      id: 'anthropic.claude-sonnet-4-6',
+      api: 'aws-bedrock',
+    });
+  });
+
   it('exports registerProvider so advanced callers can extend the registry', () => {
     const customStream = vi.fn(() => new EventStream() as any);
 
