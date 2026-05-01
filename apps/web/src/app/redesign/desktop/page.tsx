@@ -5,11 +5,14 @@ import { HugeiconsIcon } from '@hugeicons/react';
 import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import type { DesktopEntryDto, DesktopFileDto } from '@/lib/client-api';
+
+import { ArtifactCodeViewer } from '@/components/artifact-code-viewer';
 import { ThemeToggle } from '@/components/theme-toggle';
-import { useDesktopListingQuery } from '@/hooks/api';
+import { useDesktopFileQuery, useDesktopListingQuery } from '@/hooks/api';
+import { getDesktopRawFileUrl } from '@/lib/client-api';
 import { cn } from '@/lib/utils';
 
-import type { DesktopEntryDto } from '@/lib/client-api';
 
 const FOLDER_ICON_SRC = '/macos/Folder.png';
 const FILE_ICON_SRC = '/macos/File.png';
@@ -18,9 +21,152 @@ const HISTORY_LIMIT = 64;
 const DEFAULT_LEFT_PANE_RATIO = 0.6;
 const MIN_PANE_RATIO = 0.25;
 const MAX_PANE_RATIO = 0.75;
+const VIEWER_MAX_BYTES = 1024 * 1024;
+const MAX_TABLE_ROWS = 300;
+const MAX_TABLE_COLUMNS = 32;
 
 type DoubleClickHandler = (entry: DesktopEntryDto) => void;
 type FinderViewMode = 'tiles' | 'list';
+type ViewerKind = 'code' | 'csv' | 'image' | 'pdf' | 'audio' | 'video' | 'text' | 'binary';
+
+const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico']);
+const PDF_EXTENSIONS = new Set(['pdf']);
+const AUDIO_EXTENSIONS = new Set(['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac']);
+const VIDEO_EXTENSIONS = new Set(['mp4', 'webm', 'mov', 'mkv']);
+const CSV_EXTENSIONS = new Set(['csv', 'tsv']);
+const CODE_EXTENSIONS = new Set([
+  'ts',
+  'tsx',
+  'js',
+  'jsx',
+  'json',
+  'py',
+  'go',
+  'rs',
+  'java',
+  'kt',
+  'rb',
+  'php',
+  'swift',
+  'c',
+  'h',
+  'cpp',
+  'hpp',
+  'cs',
+  'sh',
+  'bash',
+  'zsh',
+  'yaml',
+  'yml',
+  'toml',
+  'xml',
+  'html',
+  'css',
+  'scss',
+  'sql',
+  'graphql',
+  'proto',
+  'ini',
+  'env',
+  'md',
+  'markdown',
+  'mdx',
+  'txt',
+]);
+const CODE_BASENAMES = new Set([
+  '.editorconfig',
+  '.gitattributes',
+  '.gitignore',
+  '.npmrc',
+  '.prettierignore',
+  '.prettierrc',
+]);
+
+function getPathBasename(path: string): string {
+  const normalized = path.replace(/\\/g, '/');
+  const segments = normalized.split('/');
+  return segments[segments.length - 1] ?? path;
+}
+
+function getPathExtension(path: string): string {
+  const basename = getPathBasename(path);
+  const dotIndex = basename.lastIndexOf('.');
+  if (dotIndex === -1 || dotIndex === basename.length - 1) {
+    return '';
+  }
+
+  return basename.slice(dotIndex + 1).toLowerCase();
+}
+
+function isCodeLikePath(path: string): boolean {
+  const basename = getPathBasename(path).toLowerCase();
+  const extension = getPathExtension(path);
+
+  if (CODE_EXTENSIONS.has(extension)) {
+    return true;
+  }
+  if (CODE_BASENAMES.has(basename)) {
+    return true;
+  }
+  return basename === '.env' || basename.startsWith('.env.');
+}
+
+function getViewerKind(path: string, file: Pick<DesktopFileDto, 'isBinary'> | null): ViewerKind {
+  const extension = getPathExtension(path);
+  if (IMAGE_EXTENSIONS.has(extension)) return 'image';
+  if (PDF_EXTENSIONS.has(extension)) return 'pdf';
+  if (AUDIO_EXTENSIONS.has(extension)) return 'audio';
+  if (VIDEO_EXTENSIONS.has(extension)) return 'video';
+  if (CSV_EXTENSIONS.has(extension)) return 'csv';
+  if (file?.isBinary) return 'binary';
+  if (isCodeLikePath(path)) return 'code';
+  return 'text';
+}
+
+function parseDelimitedLine(line: string, delimiter: string): string[] {
+  const cells: string[] = [];
+  let value = '';
+  let inQuotes = false;
+
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    const next = line[index + 1];
+
+    if (char === '"') {
+      if (inQuotes && next === '"') {
+        value += '"';
+        index += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+
+    if (char === delimiter && !inQuotes) {
+      cells.push(value);
+      value = '';
+      continue;
+    }
+
+    value += char;
+  }
+
+  cells.push(value);
+  return cells;
+}
+
+function parseDelimitedTable(content: string, delimiter: string) {
+  const lines = content.replace(/\r\n/g, '\n').split('\n');
+  const rows = lines.slice(0, MAX_TABLE_ROWS).map((line) => {
+    const parsed = parseDelimitedLine(line, delimiter);
+    return parsed.slice(0, MAX_TABLE_COLUMNS);
+  });
+
+  return {
+    rows,
+    truncatedRows: lines.length > MAX_TABLE_ROWS,
+  };
+}
 
 export default function MacFinderRedesignPage() {
   const [history, setHistory] = useState<string[]>([]);
@@ -29,6 +175,9 @@ export default function MacFinderRedesignPage() {
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<FinderViewMode>('tiles');
   const [searchQuery, setSearchQuery] = useState('');
+  const [leftPaneRatio, setLeftPaneRatio] = useState(DEFAULT_LEFT_PANE_RATIO);
+  const [fileTabs, setFileTabs] = useState<DesktopEntryDto[]>([]);
+  const [activeFilePath, setActiveFilePath] = useState<string | null>(null);
 
   const listingQuery = useDesktopListingQuery({
     ...(pathOverride !== undefined ? { path: pathOverride } : {}),
@@ -58,14 +207,40 @@ export default function MacFinderRedesignPage() {
     [currentPath, historyIndex]
   );
 
+  const handleLeftPaneRatioChange = useCallback((nextRatio: number) => {
+    setLeftPaneRatio(nextRatio);
+  }, []);
+
+  const openFileTab = useCallback((entry: DesktopEntryDto) => {
+    setFileTabs((prev) => (prev.some((tab) => tab.path === entry.path) ? prev : [...prev, entry]));
+    setActiveFilePath(entry.path);
+  }, []);
+
+  const closeFileTab = useCallback(
+    (path: string) => {
+      const nextTabs = fileTabs.filter((tab) => tab.path !== path);
+      setFileTabs(nextTabs);
+      setActiveFilePath((currentPath) => {
+        if (currentPath !== path) {
+          return currentPath;
+        }
+
+        return nextTabs[nextTabs.length - 1]?.path ?? null;
+      });
+    },
+    [fileTabs]
+  );
+
   const handleEntryDoubleClick: DoubleClickHandler = useCallback(
     (entry) => {
-      if (entry.type !== 'directory') {
+      if (entry.type === 'directory') {
+        navigateTo(entry.path);
         return;
       }
-      navigateTo(entry.path);
+
+      openFileTab(entry);
     },
-    [navigateTo]
+    [navigateTo, openFileTab]
   );
 
   const onBack = useCallback(() => {
@@ -75,6 +250,7 @@ export default function MacFinderRedesignPage() {
     const nextIndex = historyIndex - 1;
     setHistoryIndex(nextIndex);
     setSelectedPath(null);
+    setActiveFilePath(null);
     setPathOverride(history[nextIndex]);
   }, [history, historyIndex]);
 
@@ -85,6 +261,7 @@ export default function MacFinderRedesignPage() {
     const nextIndex = historyIndex + 1;
     setHistoryIndex(nextIndex);
     setSelectedPath(null);
+    setActiveFilePath(null);
     setPathOverride(history[nextIndex]);
   }, [history, historyIndex]);
 
@@ -100,15 +277,22 @@ export default function MacFinderRedesignPage() {
   const onBackgroundClick = useCallback(() => {
     setSelectedPath(null);
   }, []);
+  const activeFileTab =
+    activeFilePath === null ? null : (fileTabs.find((tab) => tab.path === activeFilePath) ?? null);
 
   return (
-    <main className="flex h-[100dvh] w-full flex-col overflow-hidden bg-white text-[#1f1f1f] dark:bg-[#202021] dark:text-white">
+    <main className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-white text-[#1f1f1f] dark:bg-[#202021] dark:text-white">
       <FinderToolbar
         canGoBack={canGoBack}
         canGoForward={canGoForward}
         onBack={onBack}
         onForward={onForward}
         title={listing?.name ?? 'Desktop'}
+        fileTabs={fileTabs}
+        activeFilePath={activeFilePath}
+        onSelectDirectory={() => setActiveFilePath(null)}
+        onSelectFileTab={setActiveFilePath}
+        onCloseFileTab={closeFileTab}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         searchQuery={searchQuery}
@@ -116,25 +300,39 @@ export default function MacFinderRedesignPage() {
         isFetching={listingQuery.isFetching}
       />
 
-      <DesktopSplitPane>
-        <FinderBody
-          error={listingQuery.error}
-          isLoading={listingQuery.isLoading}
-          entries={visibleEntries}
-          viewMode={viewMode}
-          selectedPath={selectedPath}
-          onSelect={(entry) => setSelectedPath(entry.path)}
-          onActivate={handleEntryDoubleClick}
-          onBackgroundClick={onBackgroundClick}
-        />
+      <DesktopSplitPane
+        leftPaneRatio={leftPaneRatio}
+        onLeftPaneRatioChange={handleLeftPaneRatioChange}
+      >
+        {activeFileTab ? (
+          <DesktopFileViewerContent entry={activeFileTab} />
+        ) : (
+          <FinderBody
+            error={listingQuery.error}
+            isLoading={listingQuery.isLoading}
+            entries={visibleEntries}
+            viewMode={viewMode}
+            selectedPath={selectedPath}
+            onSelect={(entry) => setSelectedPath(entry.path)}
+            onActivate={handleEntryDoubleClick}
+            onBackgroundClick={onBackgroundClick}
+          />
+        )}
       </DesktopSplitPane>
     </main>
   );
 }
 
-function DesktopSplitPane({ children }: { children: React.ReactNode }) {
+function DesktopSplitPane({
+  children,
+  leftPaneRatio,
+  onLeftPaneRatioChange,
+}: {
+  children: React.ReactNode;
+  leftPaneRatio: number;
+  onLeftPaneRatioChange: (ratio: number) => void;
+}) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const [leftPaneRatio, setLeftPaneRatio] = useState(DEFAULT_LEFT_PANE_RATIO);
   const [isResizing, setIsResizing] = useState(false);
 
   useEffect(() => {
@@ -150,7 +348,7 @@ function DesktopSplitPane({ children }: { children: React.ReactNode }) {
 
       const rect = container.getBoundingClientRect();
       const nextRatio = (event.clientX - rect.left) / rect.width;
-      setLeftPaneRatio(Math.min(MAX_PANE_RATIO, Math.max(MIN_PANE_RATIO, nextRatio)));
+      onLeftPaneRatioChange(Math.min(MAX_PANE_RATIO, Math.max(MIN_PANE_RATIO, nextRatio)));
     }
 
     function handleMouseUp() {
@@ -168,7 +366,7 @@ function DesktopSplitPane({ children }: { children: React.ReactNode }) {
       document.body.style.userSelect = '';
       document.body.style.cursor = '';
     };
-  }, [isResizing]);
+  }, [isResizing, onLeftPaneRatioChange]);
 
   return (
     <div ref={containerRef} className="flex min-h-0 flex-1 overflow-hidden">
@@ -196,7 +394,135 @@ function DesktopSplitPane({ children }: { children: React.ReactNode }) {
         <div className="absolute h-10 w-1 rounded-full bg-black/18 dark:bg-white/22" />
       </div>
 
-      <aside className="min-w-0 flex-1 bg-white dark:bg-[#202021]" aria-label="Desktop preview panel" />
+      <aside
+        className="min-w-0 flex-1 bg-white dark:bg-[#202021]"
+        aria-label="Desktop preview panel"
+      />
+    </div>
+  );
+}
+
+function DesktopFileViewerContent({ entry }: { entry: DesktopEntryDto }) {
+  const fileQuery = useDesktopFileQuery({ path: entry.path, maxBytes: VIEWER_MAX_BYTES });
+  const file = fileQuery.data ?? null;
+  const viewerKind = getViewerKind(entry.path, file);
+  const rawFileUrl = getDesktopRawFileUrl({ path: entry.path });
+  const tableData =
+    viewerKind === 'csv' && file
+      ? parseDelimitedTable(file.content, getPathExtension(entry.path) === 'tsv' ? '\t' : ',')
+      : null;
+
+  if (fileQuery.isLoading) {
+    return (
+      <div className="flex min-h-0 flex-1 items-center justify-center px-6">
+        <p className="text-sm text-black/46 dark:text-white/46">Loading preview...</p>
+      </div>
+    );
+  }
+
+  if (fileQuery.error instanceof Error) {
+    return (
+      <div className="flex min-h-0 flex-1 items-center justify-center px-6">
+        <p className="max-w-sm text-center text-sm text-[#c13e3e] dark:text-[#ff8a8a]">
+          {fileQuery.error.message}
+        </p>
+      </div>
+    );
+  }
+
+  if (!file) {
+    return (
+      <div className="flex min-h-0 flex-1 items-center justify-center px-6">
+        <p className="text-sm text-black/46 dark:text-white/46">Could not load this file.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative min-h-0 flex-1 overflow-hidden bg-white dark:bg-[#151516]">
+      {viewerKind === 'image' ? (
+        <div className="flex h-full items-center justify-center p-5">
+          <img
+            src={rawFileUrl}
+            alt={entry.name}
+            className="max-h-full max-w-full rounded-2xl object-contain"
+          />
+        </div>
+      ) : viewerKind === 'pdf' ? (
+        <iframe title={entry.name} src={rawFileUrl} className="h-full w-full" />
+      ) : viewerKind === 'audio' ? (
+        <div className="flex h-full items-center justify-center p-6">
+          <audio controls src={rawFileUrl} className="w-full max-w-xl" />
+        </div>
+      ) : viewerKind === 'video' ? (
+        <div className="flex h-full items-center justify-center p-5">
+          <video controls src={rawFileUrl} className="max-h-full max-w-full rounded-2xl" />
+        </div>
+      ) : viewerKind === 'code' ? (
+        <ArtifactCodeViewer
+          path={entry.path}
+          content={file.content}
+          editable={false}
+          onChange={() => undefined}
+          wordWrapEnabled={false}
+        />
+      ) : viewerKind === 'csv' && tableData && tableData.rows.length > 0 ? (
+        <div className="h-full overflow-auto">
+          <table className="min-w-full border-separate border-spacing-0">
+            <thead className="sticky top-0 z-10 bg-[#F8F8F8] dark:bg-[#202021]">
+              <tr>
+                {tableData.rows[0].map((cell, index) => (
+                  <th
+                    key={`header-${index}`}
+                    className="border-b border-black/8 px-3 py-2 text-left text-xs font-medium text-black dark:border-white/10 dark:text-white"
+                  >
+                    {cell || `Column ${index + 1}`}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {tableData.rows.slice(1).map((row, rowIndex) => (
+                <tr
+                  key={`row-${rowIndex}`}
+                  className="odd:bg-black/[0.025] dark:odd:bg-white/[0.045]"
+                >
+                  {row.map((cell, cellIndex) => (
+                    <td
+                      key={`cell-${rowIndex}-${cellIndex}`}
+                      className="border-b border-black/6 px-3 py-2 align-top font-mono text-xs text-black/82 dark:border-white/8 dark:text-white/82"
+                    >
+                      {cell}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {tableData.truncatedRows ? (
+            <p className="px-4 py-3 text-xs text-black/46 dark:text-white/46">
+              Showing the first {MAX_TABLE_ROWS} rows.
+            </p>
+          ) : null}
+        </div>
+      ) : viewerKind === 'binary' ? (
+        <div className="flex h-full items-center justify-center px-6">
+          <p className="max-w-sm text-center text-sm text-black/46 dark:text-white/46">
+            This file is binary and cannot be previewed inline.
+          </p>
+        </div>
+      ) : (
+        <pre className="min-h-full overflow-auto whitespace-pre px-5 py-4 font-mono text-[13px] leading-6 text-black/84 dark:text-white/84">
+          {file.content}
+        </pre>
+      )}
+
+      {file.truncated ? (
+        <div className="absolute inset-x-0 bottom-0 border-t border-black/8 bg-[#F8F8F8]/95 px-4 py-2 text-xs text-black/50 dark:border-white/10 dark:bg-[#202021]/95 dark:text-white/52">
+          Preview truncated after {VIEWER_MAX_BYTES.toLocaleString()} bytes.
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -207,6 +533,11 @@ function FinderToolbar({
   onBack,
   onForward,
   title,
+  fileTabs,
+  activeFilePath,
+  onSelectDirectory,
+  onSelectFileTab,
+  onCloseFileTab,
   viewMode,
   onViewModeChange,
   searchQuery,
@@ -218,6 +549,11 @@ function FinderToolbar({
   onBack: () => void;
   onForward: () => void;
   title: string;
+  fileTabs: DesktopEntryDto[];
+  activeFilePath: string | null;
+  onSelectDirectory: () => void;
+  onSelectFileTab: (path: string) => void;
+  onCloseFileTab: (path: string) => void;
   viewMode: FinderViewMode;
   onViewModeChange: (mode: FinderViewMode) => void;
   searchQuery: string;
@@ -226,7 +562,7 @@ function FinderToolbar({
 }) {
   return (
     <div className="relative flex h-14 shrink-0 items-start bg-white px-2 pt-2 dark:bg-[#202021]">
-      <div className="relative z-10 flex w-full items-center gap-3">
+      <div className="relative z-10 flex w-full items-center gap-2">
         <div className="flex h-8 w-[66px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#F9F9F9] shadow-[0_4px_16px_rgba(0,0,0,0.08)] ring-1 ring-black/[0.035] dark:bg-[#1A1A1A] dark:ring-white/[0.06]">
           <ToolbarButton onClick={onBack} disabled={!canGoBack} ariaLabel="Back">
             <ChevronIcon direction="left" />
@@ -236,15 +572,38 @@ function FinderToolbar({
           </ToolbarButton>
         </div>
 
-        <h1 className="min-w-0 flex-1 truncate text-[14px] font-semibold tracking-[-0.01em] text-black/72 dark:text-white/76">
-          {title} <span className="font-semibold text-black/60 dark:text-white/55">— Local</span>
-        </h1>
+        <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+          <button
+            type="button"
+            onClick={onSelectDirectory}
+            title={`${title} — Local`}
+            className={cn(
+              'min-w-0 shrink-0 truncate rounded-md px-2 py-1 text-left text-[14px] font-semibold tracking-[-0.01em] transition',
+              activeFilePath === null
+                ? 'text-black/78 dark:text-white/82'
+                : 'text-black/50 hover:bg-black/[0.045] hover:text-black/70 dark:text-white/50 dark:hover:bg-white/[0.08] dark:hover:text-white/75'
+            )}
+          >
+            {title} <span className="font-semibold text-black/60 dark:text-white/55">— Local</span>
+          </button>
+          <div className="flex min-w-0 flex-1 items-end gap-1 overflow-hidden">
+            {fileTabs.map((tab) => (
+              <FinderTab
+                key={tab.path}
+                label={tab.name}
+                isActive={activeFilePath === tab.path}
+                onClick={() => onSelectFileTab(tab.path)}
+                onClose={() => onCloseFileTab(tab.path)}
+              />
+            ))}
+          </div>
+        </div>
 
         <ViewModeSwitch mode={viewMode} onChange={onViewModeChange} />
 
         <SearchField value={searchQuery} onChange={onSearchQueryChange} />
 
-        <div className="flex shrink-0 items-center">
+        <div className="-ml-1 flex w-3 shrink-0 items-center justify-center">
           {isFetching ? <Spinner /> : <span className="size-3" aria-hidden="true" />}
         </div>
 
@@ -281,6 +640,53 @@ function ToolbarButton({
     >
       {children}
     </button>
+  );
+}
+
+function FinderTab({
+  label,
+  isActive,
+  onClick,
+  onClose,
+}: {
+  label: string;
+  isActive: boolean;
+  onClick: () => void;
+  onClose?: () => void;
+}) {
+  return (
+    <div
+      title={label}
+      className={cn(
+        'group flex h-8 min-w-0 max-w-[210px] shrink items-center gap-1 rounded-t-xl text-[12px] font-medium transition',
+        isActive
+          ? 'bg-black/[0.07] text-black/80 shadow-sm dark:bg-white/[0.12] dark:text-white/86'
+          : 'bg-black/[0.025] text-black/50 hover:bg-black/[0.055] hover:text-black/70 dark:bg-white/[0.045] dark:text-white/52 dark:hover:bg-white/[0.08] dark:hover:text-white/76'
+      )}
+    >
+      <button
+        type="button"
+        onClick={onClick}
+        className="min-w-0 flex-1 truncate px-3 py-2 text-left"
+      >
+        {label}
+      </button>
+      {onClose ? (
+        <button
+          type="button"
+          aria-label={`Close ${label}`}
+          onClick={onClose}
+          className={cn(
+            'mr-2 flex size-4 shrink-0 items-center justify-center rounded-full text-[12px] leading-none transition',
+            isActive
+              ? 'text-black/55 hover:bg-black/10 hover:text-black/80 dark:text-white/62 dark:hover:bg-white/14 dark:hover:text-white/90'
+              : 'text-black/38 hover:bg-black/8 hover:text-black/70 dark:text-white/40 dark:hover:bg-white/12 dark:hover:text-white/78'
+          )}
+        >
+          x
+        </button>
+      ) : null}
+    </div>
   );
 }
 
@@ -373,13 +779,7 @@ function ViewModeButton({
   );
 }
 
-function SearchField({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-}) {
+function SearchField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   return (
     <label className="relative h-8 w-[250px] shrink-0">
       <span className="sr-only">Search</span>
@@ -532,9 +932,7 @@ function FinderList({
           <div
             className={cn(
               'flex size-9 shrink-0 items-center justify-center rounded-lg transition',
-              entry.path === selectedPath
-                ? 'bg-[#E6E6E6] dark:bg-[#343434]'
-                : ''
+              entry.path === selectedPath ? 'bg-[#E6E6E6] dark:bg-[#343434]' : ''
             )}
           >
             <EntryIcon entry={entry} size={22} />
@@ -542,9 +940,7 @@ function FinderList({
           <span
             className={cn(
               'min-w-0 flex-1 truncate rounded-full py-0.5',
-              entry.path === selectedPath
-                ? 'bg-[#0064E1] px-2.5 text-white dark:bg-[#0059D1]'
-                : ''
+              entry.path === selectedPath ? 'bg-[#0064E1] px-2.5 text-white dark:bg-[#0059D1]' : ''
             )}
           >
             {entry.name}
@@ -636,7 +1032,7 @@ function EntryIcon({ entry, size = 52 }: { entry: DesktopEntryDto; size?: number
       height={size}
       draggable={false}
       className="select-none drop-shadow-sm"
-      style={{ width: entry.type === 'directory' ? 1.15*size : 0.75*size, height: size }}
+      style={{ width: entry.type === 'directory' ? 1.15 * size : 0.75 * size, height: size }}
     />
   );
 }

@@ -32,6 +32,15 @@ export const queryKeys = {
           showHidden: showHidden === true,
         },
       ] as const,
+    file: (input: { path: string; maxBytes?: number }) =>
+      [
+        'desktop',
+        'file',
+        {
+          path: input.path,
+          maxBytes: normalizeInteger(input.maxBytes),
+        },
+      ] as const,
   },
   gateway: {
     session: () => ['gateway', 'session'] as const,

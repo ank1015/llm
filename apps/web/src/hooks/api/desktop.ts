@@ -2,12 +2,17 @@
 
 import { useQuery } from '@tanstack/react-query';
 
-import { getDesktopListing } from '@/lib/client-api';
+import { getDesktopFile, getDesktopListing } from '@/lib/client-api';
 import { queryKeys } from '@/lib/query-keys';
 
 export type UseDesktopListingInput = {
   path?: string;
   showHidden?: boolean;
+};
+
+export type UseDesktopFileInput = {
+  path: string;
+  maxBytes?: number;
 };
 
 export function useDesktopListingQuery(input?: UseDesktopListingInput) {
@@ -18,5 +23,12 @@ export function useDesktopListingQuery(input?: UseDesktopListingInput) {
         ...(input?.path !== undefined ? { path: input.path } : {}),
         ...(input?.showHidden !== undefined ? { showHidden: input.showHidden } : {}),
       }),
+  });
+}
+
+export function useDesktopFileQuery(input: UseDesktopFileInput) {
+  return useQuery({
+    queryKey: queryKeys.desktop.file(input),
+    queryFn: () => getDesktopFile(input),
   });
 }
