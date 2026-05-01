@@ -3,6 +3,7 @@ import { cors } from 'hono/cors';
 
 import { artifactDirRoutes } from './routes/artifact-dirs.js';
 import { checkpointRoutes } from './routes/checkpoints.js';
+import { desktopRoutes } from './routes/desktop.js';
 import { gatewayRoutes } from './routes/gateway.js';
 import { modelRoutes } from './routes/models.js';
 import { projectRoutes } from './routes/projects.js';
@@ -35,6 +36,7 @@ export function createApp(): Hono {
   app.route('/api', setupRoutes);
   app.route('/api', artifactDirRoutes);
   app.route('/api', checkpointRoutes);
+  app.route('/api', desktopRoutes);
   app.route('/api', gatewayRoutes);
   app.route('/api', modelRoutes);
   app.route('/api', sessionRoutes);
