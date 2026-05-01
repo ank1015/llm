@@ -21,6 +21,18 @@ const terminalScope = (ctx: ArtifactContext, terminalId: string) =>
   [...artifactScope(ctx), 'terminals', terminalId] as const;
 
 export const queryKeys = {
+  desktop: {
+    root: ['desktop'] as const,
+    listing: (path?: string, showHidden?: boolean) =>
+      [
+        'desktop',
+        'listing',
+        {
+          path: normalizeString(path),
+          showHidden: showHidden === true,
+        },
+      ] as const,
+  },
   gateway: {
     session: () => ['gateway', 'session'] as const,
   },

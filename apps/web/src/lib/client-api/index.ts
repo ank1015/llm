@@ -21,6 +21,8 @@ export type {
   StreamRetryRequest,
   TurnSettings,
 } from './conversation';
+export { getDesktopListing } from './desktop';
+export type { DesktopListInput } from './desktop';
 export { getGatewaySession, loginGateway } from './gateway';
 export type { GatewayLoginInput } from './gateway';
 export { cancelSetupAgentRun, completeSetup, getSetupStatus, startSetupAgent, streamSetupAgentRun } from './setup';
@@ -118,6 +120,9 @@ export type {
   InstallArtifactSkillRequest,
   DeleteSessionResponse,
   DeleteTerminalResponse,
+  DesktopEntryDto,
+  DesktopEntryTypeDto,
+  DesktopListResult,
   GatewayLoginResult,
   GatewaySession,
   SetupCheck,
