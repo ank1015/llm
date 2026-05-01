@@ -3,9 +3,11 @@ import { cors } from 'hono/cors';
 
 import { artifactDirRoutes } from './routes/artifact-dirs.js';
 import { checkpointRoutes } from './routes/checkpoints.js';
+import { gatewayRoutes } from './routes/gateway.js';
 import { modelRoutes } from './routes/models.js';
 import { projectRoutes } from './routes/projects.js';
 import { sessionRoutes } from './routes/sessions.js';
+import { setupRoutes } from './routes/setup.js';
 import { skillRoutes } from './routes/skills.js';
 import { terminalRoutes } from './routes/terminals.js';
 
@@ -30,8 +32,10 @@ export function createApp(): Hono {
   });
 
   app.route('/api', projectRoutes);
+  app.route('/api', setupRoutes);
   app.route('/api', artifactDirRoutes);
   app.route('/api', checkpointRoutes);
+  app.route('/api', gatewayRoutes);
   app.route('/api', modelRoutes);
   app.route('/api', sessionRoutes);
   app.route('/api', skillRoutes);

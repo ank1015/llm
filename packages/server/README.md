@@ -40,6 +40,18 @@ Standalone `pnpm --filter @ank1015/llm-server start` / `node dist/server.js` def
 - `dataRoot` defaults to `~/.llm/projects`
 
 Repo-local callers can override filesystem paths through the internal config module before starting the app or tests.
+Desktop callers can configure the project workspace root while leaving metadata in `~/.llm/projects`:
+
+```ts
+import { createApp, createHttpServer, setConfig } from '@ank1015/llm-server';
+
+setConfig({
+  projectsRoot: '/Users/me/Projects',
+  dataRoot: '/Users/me/.llm/projects',
+});
+
+const server = createHttpServer(createApp());
+```
 
 Packaged `npx @ank1015/llm` defaults:
 
