@@ -1,10 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { BaseAssistantMessage } from "@ank1015/llm-sdk";
+import type { SessionTreeResponse } from '@/lib/client-api';
+import type { BaseAssistantMessage } from '@ank1015/llm-sdk';
 
-import type { SessionTreeResponse } from "@/lib/client-api";
-import { getBrowserQueryClient } from "@/lib/query-client";
-import { useChatStore } from "@/stores/chat-store";
+import { getBrowserQueryClient } from '@/lib/query-client';
+import { useChatStore } from '@/stores/chat-store';
 
 const {
   attachToSessionRunMock,
@@ -26,8 +26,8 @@ const {
   streamRetryConversationMock: vi.fn(),
 }));
 
-vi.mock("@/lib/client-api", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/client-api")>("@/lib/client-api");
+vi.mock('@/lib/client-api', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/client-api')>('@/lib/client-api');
 
   return {
     ...actual,
@@ -43,44 +43,44 @@ vi.mock("@/lib/client-api", async () => {
 });
 
 const ctx = {
-  projectId: "project-1",
-  artifactId: "artifact-1",
+  projectId: 'project-1',
+  artifactId: 'artifact-1',
 };
 
-const session = { sessionId: "session-1" };
+const session = { sessionId: 'session-1' };
 
 const persistedUserNode = {
-  type: "message" as const,
-  id: "node-user",
-  parentId: "session-root",
-  branch: "main",
-  timestamp: "2026-03-30T10:00:00.000Z",
+  type: 'message' as const,
+  id: 'node-user',
+  parentId: 'session-root',
+  branch: 'main',
+  timestamp: '2026-03-30T10:00:00.000Z',
   message: {
-    role: "user" as const,
-    id: "message-user",
+    role: 'user' as const,
+    id: 'message-user',
     timestamp: Date.now(),
-    content: [{ type: "text" as const, content: "Hello" }],
+    content: [{ type: 'text' as const, content: 'Hello' }],
   },
-  metadata: { modelId: "codex/gpt-5.4" },
-} as SessionTreeResponse["nodes"][number];
+  metadata: { modelId: 'azure-openai/gpt-5.4' },
+} as SessionTreeResponse['nodes'][number];
 
 const persistedAssistantNode = {
-  type: "message" as const,
-  id: "node-assistant",
-  parentId: "node-user",
-  branch: "main",
-  timestamp: "2026-03-30T10:00:01.000Z",
+  type: 'message' as const,
+  id: 'node-assistant',
+  parentId: 'node-user',
+  branch: 'main',
+  timestamp: '2026-03-30T10:00:01.000Z',
   message: {
-    role: "assistant" as const,
-    id: "message-assistant",
-    api: "codex" as const,
+    role: 'assistant' as const,
+    id: 'message-assistant',
+    api: 'azure-openai' as const,
     model: {
-      id: "gpt-5.4",
-      api: "codex" as const,
-      name: "GPT-5.4",
-      baseUrl: "https://example.com",
+      id: 'gpt-5.4',
+      api: 'azure-openai' as const,
+      name: 'GPT-5.4',
+      baseUrl: 'https://example.com',
       reasoning: true,
-      input: ["text"],
+      input: ['text'],
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
       contextWindow: 1,
       maxTokens: 1,
@@ -88,7 +88,7 @@ const persistedAssistantNode = {
     },
     timestamp: Date.now(),
     duration: 1,
-    stopReason: "stop" as const,
+    stopReason: 'stop' as const,
     content: [],
     usage: {
       input: 0,
@@ -98,12 +98,12 @@ const persistedAssistantNode = {
       totalTokens: 0,
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
     },
-    message: {} as BaseAssistantMessage<"codex">["message"],
+    message: {} as BaseAssistantMessage<'azure-openai'>['message'],
   },
-  metadata: { modelId: "codex/gpt-5.4" },
-} as SessionTreeResponse["nodes"][number];
+  metadata: { modelId: 'azure-openai/gpt-5.4' },
+} as SessionTreeResponse['nodes'][number];
 
-describe("chat store", () => {
+describe('chat store', () => {
   beforeEach(() => {
     attachToSessionRunMock.mockReset();
     cancelSessionRunMock.mockReset();
@@ -119,16 +119,16 @@ describe("chat store", () => {
 
     getSessionMock.mockResolvedValue({
       id: session.sessionId,
-      name: "Session",
-      modelId: "codex/gpt-5.4",
-      createdAt: "2026-03-30T09:59:00.000Z",
-      activeBranch: "main",
+      name: 'Session',
+      modelId: 'azure-openai/gpt-5.4',
+      createdAt: '2026-03-30T09:59:00.000Z',
+      activeBranch: 'main',
     });
     getSessionMessagesMock.mockResolvedValue([persistedUserNode, persistedAssistantNode]);
     getSessionTreeMock.mockResolvedValue({
       nodes: [persistedUserNode, persistedAssistantNode],
       persistedLeafNodeId: persistedAssistantNode.id,
-      activeBranch: "main",
+      activeBranch: 'main',
       liveRun: undefined,
     });
   });
@@ -138,23 +138,23 @@ describe("chat store", () => {
     useChatStore.getState().clearSessionState(session);
   });
 
-  it("starts a stream with modelId and reasoningEffort and reloads current session data", async () => {
+  it('starts a stream with modelId and reasoningEffort and reloads current session data', async () => {
     streamConversationMock.mockImplementation(async (_request, handlers) => {
-      handlers.onEvent?.("ready", {
+      handlers.onEvent?.('ready', {
         ok: true,
         sessionId: session.sessionId,
-        runId: "run-1",
-        status: "running",
+        runId: 'run-1',
+        status: 'running',
       });
-      handlers.onEvent?.("node_persisted", {
+      handlers.onEvent?.('node_persisted', {
         seq: 1,
         node: persistedUserNode,
       });
-      handlers.onEvent?.("done", {
+      handlers.onEvent?.('done', {
         ok: true,
         sessionId: session.sessionId,
-        runId: "run-1",
-        status: "completed",
+        runId: 'run-1',
+        status: 'completed',
         messageCount: 2,
       });
     });
@@ -164,23 +164,23 @@ describe("chat store", () => {
     await useChatStore.getState().startStream({
       ...ctx,
       sessionId: session.sessionId,
-      prompt: "Hello",
-      modelId: "codex/gpt-5.4",
-      reasoningEffort: "high",
+      prompt: 'Hello',
+      modelId: 'azure-openai/gpt-5.4',
+      reasoningEffort: 'high',
     });
 
     expect(streamConversationMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        modelId: "codex/gpt-5.4",
-        reasoningEffort: "high",
+        modelId: 'azure-openai/gpt-5.4',
+        reasoningEffort: 'high',
       }),
       expect.any(Object),
-      expect.any(AbortSignal),
+      expect.any(AbortSignal)
     );
     expect(useChatStore.getState().messagesBySession[session.sessionId]).toHaveLength(2);
   });
 
-  it("passes reasoningEffort through retry and edit stream requests", async () => {
+  it('passes reasoningEffort through retry and edit stream requests', async () => {
     useChatStore.setState((state) => ({
       ...state,
       activeSession: session,
@@ -209,45 +209,45 @@ describe("chat store", () => {
       ...ctx,
       sessionId: session.sessionId,
       nodeId: persistedUserNode.id,
-      modelId: "codex/gpt-5.4",
-      reasoningEffort: "medium",
+      modelId: 'azure-openai/gpt-5.4',
+      reasoningEffort: 'medium',
     });
 
     await useChatStore.getState().editFromNode({
       ...ctx,
       sessionId: session.sessionId,
       nodeId: persistedUserNode.id,
-      prompt: "Edited",
-      modelId: "codex/gpt-5.4",
-      reasoningEffort: "low",
+      prompt: 'Edited',
+      modelId: 'azure-openai/gpt-5.4',
+      reasoningEffort: 'low',
     });
 
     expect(streamRetryConversationMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        reasoningEffort: "medium",
+        reasoningEffort: 'medium',
       }),
       expect.any(Object),
-      expect.any(AbortSignal),
+      expect.any(AbortSignal)
     );
     expect(streamEditConversationMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        reasoningEffort: "low",
+        reasoningEffort: 'low',
       }),
       expect.any(Object),
-      expect.any(AbortSignal),
+      expect.any(AbortSignal)
     );
   });
 
-  it("cancels a running stream using the current run id", async () => {
+  it('cancels a running stream using the current run id', async () => {
     useChatStore.setState((state) => ({
       ...state,
       liveRunBySession: {
         ...state.liveRunBySession,
         [session.sessionId]: {
-          runId: "run-1",
-          mode: "prompt",
-          status: "running",
-          startedAt: "2026-03-30T10:00:00.000Z",
+          runId: 'run-1',
+          mode: 'prompt',
+          status: 'running',
+          startedAt: '2026-03-30T10:00:00.000Z',
         },
       },
     }));
@@ -261,7 +261,7 @@ describe("chat store", () => {
       sessionId: session.sessionId,
       projectId: ctx.projectId,
       artifactId: ctx.artifactId,
-      runId: "run-1",
+      runId: 'run-1',
     });
   });
 });

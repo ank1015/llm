@@ -1,13 +1,10 @@
-"use client";
+'use client';
 
-import { create } from "zustand";
-import { createJSONStorage, persist } from "zustand/middleware";
+import { create } from 'zustand';
+import { createJSONStorage, persist } from 'zustand/middleware';
 
-import {
-  type Api,
-  type CuratedModelId,
-  type ReasoningEffort,
-} from "@ank1015/llm-sdk";
+import type { Api, CuratedModelId, ReasoningEffort } from '@ank1015/llm-sdk';
+
 
 import {
   CURATED_MODEL_IDS,
@@ -15,7 +12,7 @@ import {
   PROVIDER_LABELS,
   formatChatModelLabel,
   getApiForModelId,
-} from "@/lib/model-catalog";
+} from '@/lib/model-catalog';
 
 type ChatModelOption = {
   api: Api;
@@ -53,15 +50,11 @@ type ChatSettingsStoreState = {
     enabled: boolean;
     modelIds: readonly CuratedModelId[];
   }) => ToggleResult;
-  setModelEnabled: (input: {
-    api: Api;
-    modelId: CuratedModelId;
-    enabled: boolean;
-  }) => ToggleResult;
+  setModelEnabled: (input: { api: Api; modelId: CuratedModelId; enabled: boolean }) => ToggleResult;
   reset: () => void;
 };
 
-const CHAT_SETTINGS_STORAGE_KEY = "web-chat-settings-store";
+const CHAT_SETTINGS_STORAGE_KEY = 'web-chat-settings-store';
 
 export const CHAT_MODEL_OPTIONS: readonly ChatModelOption[] = CURATED_MODEL_IDS.map((modelId) => {
   const api = getApiForModelId(modelId);
@@ -75,31 +68,34 @@ export const CHAT_MODEL_OPTIONS: readonly ChatModelOption[] = CURATED_MODEL_IDS.
 
 export const REASONING_OPTIONS: readonly ReasoningOption[] = REASONING_EFFORTS.map((value) => ({
   value,
-  label: value === "xhigh" ? "XHigh" : value[0].toUpperCase() + value.slice(1),
+  label: value === 'xhigh' ? 'XHigh' : value[0].toUpperCase() + value.slice(1),
 }));
 
 const DEFAULT_MODEL =
-  CHAT_MODEL_OPTIONS.find((option) => option.modelId === "codex/gpt-5.4") ?? CHAT_MODEL_OPTIONS[0];
-const DEFAULT_REASONING: ReasoningEffort = "xhigh";
+  CHAT_MODEL_OPTIONS.find((option) => option.modelId === 'azure-openai/gpt-5.4') ??
+  CHAT_MODEL_OPTIONS[0];
+const DEFAULT_REASONING: ReasoningEffort = 'xhigh';
 const MODEL_IDS_BY_PROVIDER = CHAT_MODEL_OPTIONS.reduce(
   (groups, option) => {
     const existing = groups[option.api] ?? [];
     groups[option.api] = [...existing, option.modelId];
     return groups;
   },
-  {} as Record<Api, CuratedModelId[]>,
+  {} as Record<Api, CuratedModelId[]>
 );
-const DEFAULT_PROVIDER_MODEL_IDS = MODEL_IDS_BY_PROVIDER[DEFAULT_MODEL.api] ?? [DEFAULT_MODEL.modelId];
+const DEFAULT_PROVIDER_MODEL_IDS = MODEL_IDS_BY_PROVIDER[DEFAULT_MODEL.api] ?? [
+  DEFAULT_MODEL.modelId,
+];
 
 function getModelOption(modelId: CuratedModelId): ChatModelOption {
   return CHAT_MODEL_OPTIONS.find((option) => option.modelId === modelId) ?? DEFAULT_MODEL;
 }
 
 function getActiveModelIds(
-  enabledModels: Partial<Record<CuratedModelId, boolean>>,
+  enabledModels: Partial<Record<CuratedModelId, boolean>>
 ): CuratedModelId[] {
   return CHAT_MODEL_OPTIONS.map((option) => option.modelId).filter(
-    (modelId) => enabledModels[modelId] === true,
+    (modelId) => enabledModels[modelId] === true
   );
 }
 
@@ -108,12 +104,12 @@ function getActiveModelIdsForProvider(input: {
   enabledModels: Partial<Record<CuratedModelId, boolean>>;
 }): CuratedModelId[] {
   return (MODEL_IDS_BY_PROVIDER[input.api] ?? []).filter(
-    (modelId) => input.enabledModels[modelId] === true,
+    (modelId) => input.enabledModels[modelId] === true
   );
 }
 
 function buildEnabledProvidersFromModels(
-  enabledModels: Partial<Record<CuratedModelId, boolean>>,
+  enabledModels: Partial<Record<CuratedModelId, boolean>>
 ): Partial<Record<Api, boolean>> {
   const enabledProviders: Partial<Record<Api, boolean>> = {};
 
@@ -147,7 +143,7 @@ function buildInitialState() {
     [DEFAULT_MODEL.api]: true,
   };
   const enabledModels = Object.fromEntries(
-    DEFAULT_PROVIDER_MODEL_IDS.map((modelId) => [modelId, true]),
+    DEFAULT_PROVIDER_MODEL_IDS.map((modelId) => [modelId, true])
   ) as Partial<Record<CuratedModelId, boolean>>;
 
   return {
@@ -163,10 +159,12 @@ function buildInitialState() {
 const initialState = buildInitialState();
 
 function normalizePersistedState(
-  state: Partial<Pick<
-    ChatSettingsStoreState,
-    "api" | "modelId" | "reasoningEffort" | "reasoning" | "enabledProviders" | "enabledModels"
-  >>,
+  state: Partial<
+    Pick<
+      ChatSettingsStoreState,
+      'api' | 'modelId' | 'reasoningEffort' | 'reasoning' | 'enabledProviders' | 'enabledModels'
+    >
+  >
 ) {
   const enabledModels = state.enabledModels ?? initialState.enabledModels;
   const enabledProviders = buildEnabledProvidersFromModels(enabledModels);
@@ -266,7 +264,7 @@ export const useChatSettingsStore = create<ChatSettingsStoreState>()(
         if (remainingActiveModels.length === 0) {
           return {
             ok: false,
-            reason: "At least one active model must remain enabled.",
+            reason: 'At least one active model must remain enabled.',
           };
         }
 
@@ -299,7 +297,7 @@ export const useChatSettingsStore = create<ChatSettingsStoreState>()(
         if (!enabled && remainingActiveModels.length === 0) {
           return {
             ok: false,
-            reason: "At least one active model must remain enabled.",
+            reason: 'At least one active model must remain enabled.',
           };
         }
 
@@ -312,7 +310,8 @@ export const useChatSettingsStore = create<ChatSettingsStoreState>()(
           enabledProviders: {
             ...current.enabledProviders,
             ...(enabled ? { [api]: true } : {}),
-            ...(!enabled && getActiveModelIdsForProvider({
+            ...(!enabled &&
+            getActiveModelIdsForProvider({
               api,
               enabledModels: nextEnabledModels,
             }).length === 0
@@ -345,24 +344,24 @@ export const useChatSettingsStore = create<ChatSettingsStoreState>()(
       }),
       migrate: (persistedState) => {
         const state =
-          persistedState && typeof persistedState === "object"
+          persistedState && typeof persistedState === 'object'
             ? (persistedState as Partial<
                 Pick<
                   ChatSettingsStoreState,
-                  | "api"
-                  | "modelId"
-                  | "reasoningEffort"
-                  | "reasoning"
-                  | "enabledProviders"
-                  | "enabledModels"
+                  | 'api'
+                  | 'modelId'
+                  | 'reasoningEffort'
+                  | 'reasoning'
+                  | 'enabledProviders'
+                  | 'enabledModels'
                 >
               >)
             : {};
 
         return normalizePersistedState(state);
       },
-    },
-  ),
+    }
+  )
 );
 
 export type { ChatModelOption, ReasoningOption, ToggleResult };

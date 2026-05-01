@@ -11,7 +11,6 @@ import type {
 
 import { formatThreadMarkdownExport } from '@/lib/messages/thread-export';
 
-
 function createUserNode(input: {
   nodeId: string;
   messageId: string;
@@ -31,7 +30,7 @@ function createUserNode(input: {
       content: [{ type: 'text', content: input.text }, ...(input.attachments ?? [])],
     },
     metadata: {
-      modelId: 'codex/gpt-5.4',
+      modelId: 'azure-openai/gpt-5.4',
     },
   };
 }
@@ -39,15 +38,15 @@ function createUserNode(input: {
 function createAssistantMessage(input: {
   id: string;
   content: BaseAssistantMessage<Api>['content'];
-}): BaseAssistantMessage<'codex'> {
+}): BaseAssistantMessage<'azure-openai'> {
   return {
     role: 'assistant',
     id: input.id,
-    api: 'codex',
-    message: {} as BaseAssistantMessage<'codex'>['message'],
+    api: 'azure-openai',
+    message: {} as BaseAssistantMessage<'azure-openai'>['message'],
     model: {
       id: 'gpt-5.4',
-      api: 'codex',
+      api: 'azure-openai',
       name: 'GPT-5.4',
       baseUrl: 'https://example.com',
       reasoning: true,
@@ -99,7 +98,7 @@ function createAssistantNode(input: {
       content: input.content,
     }),
     metadata: {
-      modelId: 'codex/gpt-5.4',
+      modelId: 'azure-openai/gpt-5.4',
     },
   };
 }
