@@ -6,10 +6,17 @@ import {
   buildCodexMessages,
   buildParams,
   createClient,
+  getCodexUserAgent,
   rewriteCodexErrorBody,
 } from '../../../src/providers/codex/utils.js';
 
-import type { CodexProviderOptions, Context, Model, Tool, UserMessage } from '../../../src/types/index.js';
+import type {
+  CodexProviderOptions,
+  Context,
+  Model,
+  Tool,
+  UserMessage,
+} from '../../../src/types/index.js';
 
 describe('Codex Utils', () => {
   const mockModel: Model<'codex'> = {
@@ -38,6 +45,27 @@ describe('Codex Utils', () => {
       expect(client.baseURL).toBe('https://chatgpt.com/backend-api/codex');
     });
 
+    it('should attach the codex user-agent header', () => {
+      const client = createClient(mockModel, defaultOptions) as unknown as {
+        _options: { defaultHeaders: Record<string, string> };
+      };
+
+      expect(client._options.defaultHeaders['user-agent']).toBe(getCodexUserAgent());
+      expect(client._options.defaultHeaders.originator).toBe('codex_cli_rs');
+    });
+
+    it('should attach conversation headers when conversationId is provided', () => {
+      const client = createClient(mockModel, {
+        ...defaultOptions,
+        conversationId: 'conversation-123',
+      }) as unknown as {
+        _options: { defaultHeaders: Record<string, string> };
+      };
+
+      expect(client._options.defaultHeaders['x-client-request-id']).toBe('conversation-123');
+      expect(client._options.defaultHeaders.session_id).toBe('conversation-123');
+    });
+
     it('should throw when apiKey is missing', () => {
       expect(() =>
         createClient(mockModel, {
@@ -54,6 +82,49 @@ describe('Codex Utils', () => {
           'chatgpt-account-id': '',
         })
       ).toThrow('Codex chatgpt-account-id is required.');
+    });
+  });
+
+  describe('getCodexUserAgent', () => {
+    it('should format macOS user-agent metadata from Darwin release', () => {
+      expect(
+        getCodexUserAgent({
+          architecture: 'arm64',
+          platform: 'darwin',
+          release: '25.3.0',
+        })
+      ).toBe('codex_cli_rs/0.98.0 (Mac OS 26.3.0; arm64)');
+    });
+
+    it('should format Windows user-agent metadata without Mac-specific values', () => {
+      expect(
+        getCodexUserAgent({
+          architecture: 'x64',
+          platform: 'win32',
+          release: '10.0.22631',
+        })
+      ).toBe('codex_cli_rs/0.98.0 (Windows 10.0.22631; x86_64)');
+    });
+
+    it('should format Linux user-agent metadata', () => {
+      expect(
+        getCodexUserAgent({
+          architecture: 'arm64',
+          platform: 'linux',
+          release: '6.8.0',
+        })
+      ).toBe('codex_cli_rs/0.98.0 (Linux 6.8.0; arm64)');
+    });
+
+    it('should sanitize invalid header characters', () => {
+      expect(
+        getCodexUserAgent({
+          architecture: 'arm64',
+          originator: 'codex\ncli',
+          platform: 'darwin',
+          release: '25.3.0',
+        })
+      ).toBe('codex_cli/0.98.0 (Mac OS 26.3.0; arm64)');
     });
   });
 
@@ -142,6 +213,28 @@ describe('Codex Utils', () => {
           content: [{ type: 'input_text', text: 'hello' }],
         },
       ]);
+    });
+
+    it('should map conversationId to prompt_cache_key', () => {
+      const context: Context = { messages: [] };
+      const result = buildParams(mockModel, context, {
+        ...defaultOptions,
+        conversationId: 'conversation-456',
+      });
+
+      expect(result.prompt_cache_key).toBe('conversation-456');
+      expect(result).not.toHaveProperty('conversationId');
+    });
+
+    it('should let conversationId override prompt_cache_key', () => {
+      const context: Context = { messages: [] };
+      const result = buildParams(mockModel, context, {
+        ...defaultOptions,
+        conversationId: 'conversation-789',
+        prompt_cache_key: 'manual-cache-key',
+      });
+
+      expect(result.prompt_cache_key).toBe('conversation-789');
     });
 
     it('should remove credential and unsupported fields from params', () => {

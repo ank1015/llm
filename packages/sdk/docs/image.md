@@ -22,7 +22,7 @@ console.log(result.paths); // always an array
 console.log(result.text); // provider text, if any
 ```
 
-`image()` resolves provider credentials from the SDK keys file, calls the core image runtime, saves the generated image files to disk, and returns the saved paths plus the normalized core result.
+`image()` uses the SDK gateway by default, saves the generated image files to disk, and returns the saved paths plus the normalized provider result.
 
 ---
 
@@ -114,6 +114,8 @@ Notes:
 - a mask requires at least one `imagePaths` entry
 
 ### `keysFilePath`
+
+By default the SDK uses gateway credentials from `~/.llm/gateway.json`. `keysFilePath` is only used when `setSdkConfig({ modelTransport: 'direct' })` opts into direct provider calls.
 
 By default the SDK reads credentials from `~/.llm-sdk/keys.env`. Pass a custom path here to override it.
 

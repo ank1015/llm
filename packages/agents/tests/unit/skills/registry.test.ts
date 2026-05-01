@@ -30,6 +30,17 @@ describe('skills registry', () => {
         },
       }),
       expect.objectContaining({
+        name: 'image-gen',
+        link: 'https://github.com/ank1015/llm/tree/main/packages/sdk/skills/image-gen',
+        description: expect.stringContaining('@ank1015/llm-sdk'),
+        source: {
+          owner: 'ank1015',
+          repo: 'llm',
+          ref: 'main',
+          subpath: 'packages/sdk/skills/image-gen',
+        },
+      }),
+      expect.objectContaining({
         name: 'llm',
         link: 'https://github.com/ank1015/llm/tree/main/packages/sdk/skills/llm-sdk',
         description: expect.stringContaining('@ank1015/llm-sdk'),
@@ -82,6 +93,9 @@ describe('skills registry', () => {
     );
     await expect(getRegisteredSkill('docx')).resolves.toEqual(
       expect.objectContaining({ name: 'docx' })
+    );
+    await expect(getRegisteredSkill('image-gen')).resolves.toEqual(
+      expect.objectContaining({ name: 'image-gen' })
     );
     await expect(getRegisteredSkill('llm')).resolves.toEqual(
       expect.objectContaining({ name: 'llm' })

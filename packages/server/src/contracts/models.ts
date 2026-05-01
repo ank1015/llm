@@ -1,9 +1,10 @@
-import { Static, Type } from '@sinclair/typebox';
+import { Type, type Static } from '@sinclair/typebox';
 
 import { CuratedModelIdSchema } from './session.js';
 
 export const ModelApiSchema = Type.Union([
   Type.Literal('openai'),
+  Type.Literal('azure-openai'),
   Type.Literal('codex'),
   Type.Literal('anthropic'),
   Type.Literal('claude-code'),

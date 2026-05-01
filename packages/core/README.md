@@ -25,6 +25,8 @@ pnpm add @ank1015/llm-core @sinclair/typebox
 ## Supported Providers
 
 - OpenAI
+- Azure OpenAI
+- AWS Bedrock
 - Codex
 - Google
 - DeepSeek

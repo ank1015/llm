@@ -6,7 +6,22 @@ The format is based on Keep a Changelog and this package follows SemVer once its
 
 ## [Unreleased]
 
-## [0.0.6] - 2026-04-12
+### Added
+
+- Added a built-in Azure OpenAI chat provider using the OpenAI Responses API normalization with Azure endpoint, API version, and deployment configuration.
+- Added a built-in AWS Bedrock chat provider using ConverseStream for Anthropic Claude models.
+
+## [0.0.8] - 2026-04-16
+
+### Added
+
+- Added a provider option for passing a Codex conversation ID through the core runtime so callers can continue existing Codex conversations explicitly.
+
+### Changed
+
+- Updated Codex user-agent metadata generation to derive the operating system version from the host platform more accurately.
+
+## [0.0.7] - 2026-04-15
 
 ### Added
 
@@ -29,6 +44,8 @@ The format is based on Keep a Changelog and this package follows SemVer once its
 - Added live Google Veo integration coverage for interpolation, reference-image generation, image-to-video, and video extension.
 - Added provider option guides for Anthropic, OpenAI, Google, Z.AI, OpenRouter, and Codex covering reasoning and prompt-caching behavior.
 - Added a live multi-provider handoff integration test that carries a tool-backed conversation from Z.AI through Google, Anthropic, OpenAI, and Codex.
+
+## [0.0.6] - 2026-04-12
 
 ## [0.0.5] - 2026-04-02
 

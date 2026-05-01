@@ -37,14 +37,13 @@ describe('model input', () => {
       'openai/gpt-5.4-pro',
       'openai/gpt-5.4-mini',
       'openai/gpt-5.4-nano',
-      'codex/gpt-5.4',
-      'codex/gpt-5.4-mini',
-      'codex/gpt-5.3-codex',
-      'codex/gpt-5.3-codex-spark',
+      'azure-openai/gpt-5.4',
+      'azure-openai/gpt-5.3-codex',
+      'azure-openai/gpt-5.4-pro',
+      'azure-openai/gpt-5.4-mini',
+      'azure-openai/gpt-5.4-nano',
       'anthropic/claude-opus-4-6',
       'anthropic/claude-sonnet-4-6',
-      'claude-code/claude-opus-4-6',
-      'claude-code/claude-sonnet-4-6',
       'google/gemini-3.1-pro-preview',
       'google/gemini-3-flash-preview',
       'google/gemini-3.1-flash-lite-preview',
@@ -53,13 +52,14 @@ describe('model input', () => {
 
   it('can detect curated model ids', () => {
     expect(isCuratedModelId('openai/gpt-5.4')).toBe(true);
+    expect(isCuratedModelId('azure-openai/gpt-5.4')).toBe(true);
     expect(isCuratedModelId('anthropic/claude-opus-4-6')).toBe(true);
-    expect(isCuratedModelId('claude-code/claude-sonnet-4-6')).toBe(true);
+    expect(isCuratedModelId('claude-code/claude-sonnet-4-6')).toBe(false);
     expect(isCuratedModelId('google/gemini-3.1-pro-preview')).toBe(true);
     expect(isCuratedModelId('google/gemini-2.5-flash')).toBe(false);
   });
 
-  it('resolves openai model, credentials, and standardized reasoning', async () => {
+  it('resolves openai-prefixed GPT models through OpenAI with standardized reasoning', async () => {
     const keysFilePath = await createTempKeysFile();
     await setProviderCredentials(keysFilePath, 'openai', {
       apiKey: 'openai-key',
@@ -103,51 +103,77 @@ describe('model input', () => {
     });
   });
 
-  it('resolves codex model and merges multi-field credentials', async () => {
+  it('resolves azure-openai-prefixed GPT models through Azure OpenAI', async () => {
     const keysFilePath = await createTempKeysFile();
-    await setProviderCredentials(keysFilePath, 'codex', {
-      apiKey: 'codex-key',
-      'chatgpt-account-id': 'account-123',
+    await setProviderCredentials(keysFilePath, 'azure-openai', {
+      apiKey: 'azure-key',
+      azureDeploymentUrl:
+        'https://resource.cognitiveservices.azure.com/openai/responses?api-version=2025-04-01-preview',
     });
 
     const result = await resolveModelInput({
-      modelId: 'codex/gpt-5.4',
-      reasoningEffort: 'medium',
+      modelId: 'azure-openai/gpt-5.4-mini',
+      reasoningEffort: 'high',
       keysFilePath,
     });
 
     expect(result).toEqual({
       ok: true,
-      api: 'codex',
-      modelId: 'codex/gpt-5.4',
+      api: 'azure-openai',
+      modelId: 'azure-openai/gpt-5.4-mini',
       keysFilePath,
       model: expect.objectContaining({
-        api: 'codex',
-        id: 'gpt-5.4',
+        api: 'azure-openai',
+        id: 'gpt-5.4-mini',
       }),
       providerOptions: {
-        apiKey: 'codex-key',
-        'chatgpt-account-id': 'account-123',
+        apiKey: 'azure-key',
+        azureBaseURL: 'https://resource.cognitiveservices.azure.com/openai',
+        azureApiVersion: '2025-04-01-preview',
+        azureDeploymentName: 'gpt-5.4-mini',
         reasoning: {
-          effort: 'medium',
+          effort: 'high',
           summary: 'auto',
         },
       },
       provider: {
         model: expect.objectContaining({
-          api: 'codex',
-          id: 'gpt-5.4',
+          api: 'azure-openai',
+          id: 'gpt-5.4-mini',
         }),
         providerOptions: {
-          apiKey: 'codex-key',
-          'chatgpt-account-id': 'account-123',
+          apiKey: 'azure-key',
+          azureBaseURL: 'https://resource.cognitiveservices.azure.com/openai',
+          azureApiVersion: '2025-04-01-preview',
+          azureDeploymentName: 'gpt-5.4-mini',
           reasoning: {
-            effort: 'medium',
+            effort: 'high',
             summary: 'auto',
           },
         },
       },
     });
+  });
+
+  it('ignores conversationId for supported provider options', async () => {
+    const keysFilePath = await createTempKeysFile();
+    await setProviderCredentials(keysFilePath, 'openai', {
+      apiKey: 'openai-key',
+    });
+
+    const result = await resolveModelInput({
+      modelId: 'openai/gpt-5.4-mini',
+      conversationId: '018f1f2e-7c99-7cc1-9f5d-2a2a9f3c7b11',
+      keysFilePath,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      throw new Error('Expected successful resolution.');
+    }
+
+    expect(result.providerOptions).not.toHaveProperty('conversationId');
+    expect(result.provider.providerOptions).not.toHaveProperty('conversationId');
   });
 
   it('lets overrideProviderSetting win over defaults', async () => {
@@ -357,66 +383,6 @@ describe('model input', () => {
     });
   });
 
-  it('resolves claude-code models with adaptive thinking and credential fields', async () => {
-    const keysFilePath = await createTempKeysFile();
-    await setProviderCredentials(keysFilePath, 'claude-code', {
-      oauthToken: 'oauth-token',
-      betaFlag: 'oauth-2025-04-20',
-      billingHeader: 'x-billing-account: acc-123',
-    });
-
-    const result = await resolveModelInput({
-      modelId: 'claude-code/claude-sonnet-4-6',
-      reasoningEffort: 'medium',
-      keysFilePath,
-    });
-
-    expect(result).toEqual({
-      ok: true,
-      api: 'claude-code',
-      modelId: 'claude-code/claude-sonnet-4-6',
-      keysFilePath,
-      model: expect.objectContaining({
-        api: 'claude-code',
-        id: 'claude-sonnet-4-6',
-      }),
-      providerOptions: {
-        oauthToken: 'oauth-token',
-        betaFlag: 'oauth-2025-04-20',
-        billingHeader: 'x-billing-account: acc-123',
-        thinking: {
-          type: 'adaptive',
-        },
-        cache_control: {
-          type: 'ephemeral',
-        },
-        output_config: {
-          effort: 'medium',
-        },
-      },
-      provider: {
-        model: expect.objectContaining({
-          api: 'claude-code',
-          id: 'claude-sonnet-4-6',
-        }),
-        providerOptions: {
-          oauthToken: 'oauth-token',
-          betaFlag: 'oauth-2025-04-20',
-          billingHeader: 'x-billing-account: acc-123',
-          thinking: {
-            type: 'adaptive',
-          },
-          cache_control: {
-            type: 'ephemeral',
-          },
-          output_config: {
-            effort: 'medium',
-          },
-        },
-      },
-    });
-  });
-
   it('maps low to minimal for google flash models', async () => {
     const keysFilePath = await createTempKeysFile();
     await setProviderCredentials(keysFilePath, 'google', {
@@ -587,7 +553,7 @@ describe('model input', () => {
     await writeFile(keysFilePath, '', 'utf8');
 
     const result = await resolveModelInput({
-      modelId: 'codex/gpt-5.4-mini',
+      modelId: 'anthropic/claude-sonnet-4-6',
       keysFilePath,
     });
 
@@ -601,7 +567,7 @@ describe('model input', () => {
       throw new Error('Expected missing_provider_credentials.');
     }
 
-    expect(result.error.provider).toBe('codex');
+    expect(result.error.provider).toBe('anthropic');
     expect(result.error.path).toBe(keysFilePath);
   });
 });

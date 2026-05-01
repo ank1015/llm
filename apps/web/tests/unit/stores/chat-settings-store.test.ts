@@ -1,72 +1,81 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from 'vitest';
 
-import { CuratedModelIds } from "@ank1015/llm-sdk";
+import { CURATED_MODEL_IDS } from '@/lib/model-catalog';
+import { CHAT_MODEL_OPTIONS, useChatSettingsStore } from '@/stores/chat-settings-store';
 
-import {
-  CHAT_MODEL_OPTIONS,
-  useChatSettingsStore,
-} from "@/stores/chat-settings-store";
-
-describe("chat settings store", () => {
+describe('chat settings store', () => {
   afterEach(() => {
     useChatSettingsStore.getState().reset();
     window.localStorage.clear();
   });
 
-  function getModelIdsForApi(api: (typeof CHAT_MODEL_OPTIONS)[number]["api"]) {
-    return CHAT_MODEL_OPTIONS.filter((option) => option.api === api).map((option) => option.modelId);
+  function getModelIdsForApi(api: (typeof CHAT_MODEL_OPTIONS)[number]['api']) {
+    return CHAT_MODEL_OPTIONS.filter((option) => option.api === api).map(
+      (option) => option.modelId
+    );
   }
 
-  it("builds model options from the current curated model catalog", () => {
-    expect(CHAT_MODEL_OPTIONS.map((option) => option.modelId)).toEqual(CuratedModelIds);
+  it('builds model options from the current curated model catalog', () => {
+    expect(CHAT_MODEL_OPTIONS.map((option) => option.modelId)).toEqual(CURATED_MODEL_IDS);
   });
 
-  it("stores reasoningEffort using current settings fields", () => {
-    useChatSettingsStore.getState().setReasoning("low");
+  it('stores reasoningEffort using current settings fields', () => {
+    useChatSettingsStore.getState().setReasoning('low');
 
     const state = useChatSettingsStore.getState();
-    expect(state.reasoningEffort).toBe("low");
-    expect(state.reasoning).toBe("low");
+    expect(state.reasoningEffort).toBe('low');
+    expect(state.reasoning).toBe('low');
   });
 
-  it("enables all models when a provider is enabled", () => {
-    const openaiModelIds = getModelIdsForApi("openai");
+  it('enables all models when a provider is enabled', () => {
+    const azureModelIds = getModelIdsForApi('azure-openai');
 
     const result = useChatSettingsStore.getState().setProviderEnabled({
-      api: "openai",
+      api: 'azure-openai',
       enabled: true,
-      modelIds: openaiModelIds,
+      modelIds: azureModelIds,
     });
 
     expect(result).toEqual({ ok: true });
 
     const state = useChatSettingsStore.getState();
-    expect(state.isProviderEnabled("openai")).toBe(true);
-    expect(openaiModelIds.every((modelId) => state.isModelEnabled(modelId))).toBe(true);
+    expect(state.isProviderEnabled('azure-openai')).toBe(true);
+    expect(azureModelIds.every((modelId) => state.isModelEnabled(modelId))).toBe(true);
   });
 
-  it("disables all models when a provider is disabled", () => {
-    const openaiModelIds = getModelIdsForApi("openai");
-    useChatSettingsStore.getState().setProviderEnabled({
-      api: "openai",
-      enabled: true,
-      modelIds: openaiModelIds,
-    });
+  it('prevents disabling the only active provider', () => {
+    const azureModelIds = getModelIdsForApi('azure-openai');
+    const [firstModelId, ...otherModelIds] = azureModelIds;
+    expect(firstModelId).toBeDefined();
+    if (!firstModelId) {
+      return;
+    }
+
+    for (const modelId of otherModelIds) {
+      useChatSettingsStore.getState().setModelEnabled({
+        api: 'azure-openai',
+        modelId,
+        enabled: false,
+      });
+    }
 
     const result = useChatSettingsStore.getState().setProviderEnabled({
-      api: "openai",
+      api: 'azure-openai',
       enabled: false,
-      modelIds: openaiModelIds,
+      modelIds: [firstModelId],
     });
 
-    expect(result).toEqual({ ok: true });
+    expect(result).toEqual({
+      ok: false,
+      reason: 'At least one active model must remain enabled.',
+    });
 
     const state = useChatSettingsStore.getState();
-    expect(state.isProviderEnabled("openai")).toBe(false);
-    expect(openaiModelIds.every((modelId) => !state.isModelEnabled(modelId))).toBe(true);
+    expect(state.isProviderEnabled('azure-openai')).toBe(true);
+    expect(state.isModelEnabled(firstModelId)).toBe(true);
   });
 
-  it("switches selection when the selected model is disabled", () => {
+  it('switches selection when the selected model is disabled', () => {
     const { api, modelId } = useChatSettingsStore.getState();
 
     const result = useChatSettingsStore.getState().setModelEnabled({
@@ -82,7 +91,7 @@ describe("chat settings store", () => {
     expect(state.isModelEnabled(state.modelId)).toBe(true);
   });
 
-  it("prevents disabling the last active model", () => {
+  it('prevents disabling the last active model', () => {
     const defaultApi = useChatSettingsStore.getState().api;
     const defaultModelIds = getModelIdsForApi(defaultApi);
     const [lastModelId, ...otherModelIds] = defaultModelIds;
@@ -93,7 +102,7 @@ describe("chat settings store", () => {
           api: defaultApi,
           modelId,
           enabled: false,
-        }),
+        })
       ).toEqual({ ok: true });
     }
 
@@ -105,43 +114,53 @@ describe("chat settings store", () => {
 
     expect(result).toEqual({
       ok: false,
-      reason: "At least one active model must remain enabled.",
+      reason: 'At least one active model must remain enabled.',
     });
     expect(useChatSettingsStore.getState().isModelEnabled(lastModelId)).toBe(true);
   });
 
-  it("marks a provider inactive when its last enabled model is turned off", () => {
-    const openaiModelIds = getModelIdsForApi("openai");
-    useChatSettingsStore.getState().setProviderEnabled({
-      api: "openai",
-      enabled: true,
-      modelIds: openaiModelIds,
-    });
+  it('marks a provider inactive when its last enabled model is turned off', () => {
+    const azureModelIds = getModelIdsForApi('azure-openai');
+    const [lastModelId, ...otherModelIds] = azureModelIds;
+    expect(lastModelId).toBeDefined();
+    if (!lastModelId) {
+      return;
+    }
 
-    for (const modelId of openaiModelIds) {
+    for (const modelId of otherModelIds) {
       expect(
         useChatSettingsStore.getState().setModelEnabled({
-          api: "openai",
+          api: 'azure-openai',
           modelId,
           enabled: false,
-        }),
+        })
       ).toEqual({ ok: true });
     }
 
-    expect(useChatSettingsStore.getState().isProviderEnabled("openai")).toBe(false);
+    expect(
+      useChatSettingsStore.getState().setModelEnabled({
+        api: 'azure-openai',
+        modelId: lastModelId,
+        enabled: false,
+      })
+    ).toEqual({
+      ok: false,
+      reason: 'At least one active model must remain enabled.',
+    });
+    expect(useChatSettingsStore.getState().isProviderEnabled('azure-openai')).toBe(true);
   });
 
-  it("persists enabled providers and models to browser storage", () => {
-    const openaiModelIds = getModelIdsForApi("openai");
+  it('persists enabled providers and models to browser storage', () => {
+    const azureModelIds = getModelIdsForApi('azure-openai');
     useChatSettingsStore.getState().setProviderEnabled({
-      api: "openai",
+      api: 'azure-openai',
       enabled: true,
-      modelIds: openaiModelIds,
+      modelIds: azureModelIds,
     });
 
-    const persisted = JSON.parse(window.localStorage.getItem("web-chat-settings-store") ?? "{}");
+    const persisted = JSON.parse(window.localStorage.getItem('web-chat-settings-store') ?? '{}');
 
-    expect(persisted.state.enabledProviders.openai).toBe(true);
-    expect(persisted.state.enabledModels[openaiModelIds[0]]).toBe(true);
+    expect(persisted.state.enabledProviders['azure-openai']).toBe(true);
+    expect(persisted.state.enabledModels[azureModelIds[0]]).toBe(true);
   });
 });

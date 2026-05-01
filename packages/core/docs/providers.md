@@ -4,25 +4,29 @@
 
 ## Built-In Providers
 
-| Provider    | `getModel()` API key | Typical integration-test env                                        |
-| ----------- | -------------------- | ------------------------------------------------------------------- |
-| OpenAI      | `openai`             | `OPENAI_API_KEY`                                                    |
-| Codex       | `codex`              | `~/.codex/auth.json` or explicit `apiKey` plus `chatgpt-account-id` |
-| Google      | `google`             | `GEMINI_API_KEY`                                                    |
-| DeepSeek    | `deepseek`           | `DEEPSEEK_API_KEY`                                                  |
-| Anthropic   | `anthropic`          | `ANTHROPIC_API_KEY`                                                 |
-| Claude Code | `claude-code`        | explicit `oauthToken`, `betaFlag`, `billingHeader`                  |
-| Z.AI        | `zai`                | `ZAI_API_KEY`                                                       |
-| Kimi        | `kimi`               | `KIMI_API_KEY`                                                      |
-| MiniMax     | `minimax`            | `MINIMAX_API_KEY`                                                   |
-| Cerebras    | `cerebras`           | `CEREBRAS_API_KEY`                                                  |
-| OpenRouter  | `openrouter`         | `OPENROUTER_API_KEY`                                                |
+| Provider     | `getModel()` API key | Typical integration-test env                                        |
+| ------------ | -------------------- | ------------------------------------------------------------------- |
+| OpenAI       | `openai`             | `OPENAI_API_KEY`                                                    |
+| Azure OpenAI | `azure-openai`       | `AZURE_OPENAI_API_KEY`, Azure base URL/resource, deployment name    |
+| AWS Bedrock  | `aws-bedrock`        | AWS credentials plus explicit Bedrock region                        |
+| Codex        | `codex`              | `~/.codex/auth.json` or explicit `apiKey` plus `chatgpt-account-id` |
+| Google       | `google`             | `GEMINI_API_KEY`                                                    |
+| DeepSeek     | `deepseek`           | `DEEPSEEK_API_KEY`                                                  |
+| Anthropic    | `anthropic`          | `ANTHROPIC_API_KEY`                                                 |
+| Claude Code  | `claude-code`        | explicit `oauthToken`, `betaFlag`, `billingHeader`                  |
+| Z.AI         | `zai`                | `ZAI_API_KEY`                                                       |
+| Kimi         | `kimi`               | `KIMI_API_KEY`                                                      |
+| MiniMax      | `minimax`            | `MINIMAX_API_KEY`                                                   |
+| Cerebras     | `cerebras`           | `CEREBRAS_API_KEY`                                                  |
+| OpenRouter   | `openrouter`         | `OPENROUTER_API_KEY`                                                |
 
 ## Provider Options
 
 All built-in providers expose typed option aliases through the package root, for example:
 
 - `OpenAIProviderOptions`
+- `AzureOpenAIProviderOptions`
+- `AwsBedrockProviderOptions`
 - `GoogleProviderOptions`
 - `AnthropicProviderOptions`
 - `CodexProviderOptions`
@@ -39,3 +43,4 @@ These types preserve the upstream SDK request shape while omitting fields manage
 - Several providers support reasoning or thinking output, which core normalizes into `thinking_*` events and `thinking` content blocks.
 - Codex integration tests read access tokens from `~/.codex/auth.json` and pass both `apiKey` and `chatgpt-account-id`.
 - Claude Code requires explicit OAuth-style request fields rather than a single API key.
+- AWS Bedrock core options require an explicit `region`; credentials, profile, endpoint, or bearer token are supplied per call rather than read by core.

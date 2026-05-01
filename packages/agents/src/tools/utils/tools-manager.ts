@@ -1,5 +1,14 @@
 import { spawnSync } from 'child_process';
-import { chmodSync, createWriteStream, existsSync, mkdirSync, renameSync, rmSync } from 'fs';
+import {
+  chmodSync,
+  copyFileSync,
+  createWriteStream,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  rmSync,
+  statSync,
+} from 'fs';
 import { arch, platform } from 'os';
 import { join } from 'path';
 import { Readable } from 'stream';
@@ -77,6 +86,84 @@ function commandExists(cmd: string): boolean {
   } catch {
     return false;
   }
+}
+
+function getSpawnErrorMessage(result: ReturnType<typeof spawnSync>): string {
+  return result.error?.message ?? result.stderr?.toString().trim() ?? 'unknown error';
+}
+
+function extractWithTar(archivePath: string, extractDir: string, isZip: boolean): void {
+  const args = isZip
+    ? ['xf', archivePath, '-C', extractDir]
+    : ['xzf', archivePath, '-C', extractDir];
+  const result = spawnSync('tar', args, { stdio: 'pipe' });
+
+  if (result.error || result.status !== 0) {
+    throw new Error(getSpawnErrorMessage(result));
+  }
+}
+
+function extractZipWithPowerShell(archivePath: string, extractDir: string): void {
+  const result = spawnSync(
+    'powershell.exe',
+    [
+      '-NoProfile',
+      '-NonInteractive',
+      '-ExecutionPolicy',
+      'Bypass',
+      '-Command',
+      'Expand-Archive -LiteralPath $args[0] -DestinationPath $args[1] -Force',
+      archivePath,
+      extractDir,
+    ],
+    { stdio: 'pipe' }
+  );
+
+  if (result.error || result.status !== 0) {
+    throw new Error(getSpawnErrorMessage(result));
+  }
+}
+
+function extractArchive(assetName: string, archivePath: string, extractDir: string): void {
+  if (assetName.endsWith('.tar.gz')) {
+    extractWithTar(archivePath, extractDir, false);
+    return;
+  }
+
+  if (!assetName.endsWith('.zip')) {
+    throw new Error(`Unsupported archive type: ${assetName}`);
+  }
+
+  try {
+    extractWithTar(archivePath, extractDir, true);
+  } catch (tarError) {
+    if (platform() !== 'win32') {
+      throw tarError;
+    }
+
+    extractZipWithPowerShell(archivePath, extractDir);
+  }
+}
+
+function findExtractedBinary(directory: string, binaryName: string): string | undefined {
+  for (const entry of readdirSync(directory)) {
+    const entryPath = join(directory, entry);
+    const stat = statSync(entryPath);
+
+    if (stat.isDirectory()) {
+      const nested = findExtractedBinary(entryPath, binaryName);
+      if (nested) {
+        return nested;
+      }
+      continue;
+    }
+
+    if (stat.isFile() && entry.toLowerCase() === binaryName.toLowerCase()) {
+      return entryPath;
+    }
+  }
+
+  return undefined;
 }
 
 // Get the path to a tool (system-wide or in our tools dir)
@@ -161,32 +248,20 @@ async function downloadTool(tool: 'fd' | 'rg'): Promise<string> {
   mkdirSync(extractDir, { recursive: true });
 
   try {
-    // Use tar for both .tar.gz and .zip extraction. Windows 10+ ships bsdtar
-    // which handles both formats, avoiding the need for `unzip` (not available
-    // on Windows by default).
-    const extractResult = assetName.endsWith('.tar.gz')
-      ? spawnSync('tar', ['xzf', archivePath, '-C', extractDir], { stdio: 'pipe' })
-      : assetName.endsWith('.zip')
-        ? spawnSync('tar', ['xf', archivePath, '-C', extractDir], { stdio: 'pipe' })
-        : null;
-
-    if (!extractResult || extractResult.error || extractResult.status !== 0) {
-      const errMsg =
-        extractResult?.error?.message ??
-        extractResult?.stderr?.toString().trim() ??
-        'unknown error';
-      throw new Error(`Failed to extract ${assetName}: ${errMsg}`);
+    try {
+      extractArchive(assetName, archivePath, extractDir);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to extract ${assetName}: ${message}`);
     }
 
-    // Find the binary in extracted files
-    const extractedDir = join(extractDir, assetName.replace(/\.(tar\.gz|zip)$/, ''));
-    const extractedBinary = join(extractedDir, config.binaryName + binaryExt);
+    const extractedBinary = findExtractedBinary(extractDir, config.binaryName + binaryExt);
 
-    if (existsSync(extractedBinary)) {
-      renameSync(extractedBinary, binaryPath);
-    } else {
-      throw new Error(`Binary not found in archive: ${extractedBinary}`);
+    if (!extractedBinary) {
+      throw new Error(`Binary not found in archive: ${config.binaryName + binaryExt}`);
     }
+
+    copyFileSync(extractedBinary, binaryPath);
 
     // Make executable (Unix only)
     if (plat !== 'win32') {

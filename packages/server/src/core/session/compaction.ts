@@ -17,7 +17,7 @@ import type {
   Message,
 } from '@ank1015/llm-sdk';
 
-const TURN_COMPACTION_MODEL_ID = 'codex/gpt-5.4' as const;
+const TURN_COMPACTION_MODEL_ID = 'azure-openai/gpt-5.4' as const;
 const TURN_COMPACTION_REASONING_EFFORT = 'medium' as const;
 const MIN_TOOL_TRACE_TOKENS_FOR_TURN_COMPACTION = 400;
 const SESSION_COMPACTION_LOG_PREFIX = '[session-compaction]';

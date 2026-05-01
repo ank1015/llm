@@ -18,7 +18,7 @@ pnpm --filter @ank1015/llm-server typecheck
 pnpm --filter @ank1015/llm-server test
 ```
 
-`lint` is also available, but the package currently has known lint debt that is separate from the docs and metadata cleanup.
+`lint` is also available, but the package currently has known import-order/style debt that is separate from runtime validation.
 
 ## Preferred local keystore setup
 
@@ -37,23 +37,6 @@ Then run:
 ```bash
 pnpm --filter @ank1015/llm-server test:live
 ```
-
-## Optional server API setup
-
-If the local server is already running, you can also populate the same keystore through the keys route:
-
-```bash
-curl -X PUT http://127.0.0.1:8001/api/keys/codex \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "credentials": {
-      "apiKey": "replace-with-your-codex-api-key",
-      "chatgpt-account-id": "replace-with-your-chatgpt-account-id"
-    }
-  }'
-```
-
-That route writes into the SDK central keystore used by the live session route tests.
 
 ## Related docs
 

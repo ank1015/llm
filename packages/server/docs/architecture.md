@@ -1,13 +1,13 @@
 # Server Architecture
 
-The server package is the monorepo's private backend layer. It exposes a Hono app, a Node HTTP server wrapper, and a set of filesystem-backed resource managers that coordinate projects, artifacts, sessions, skills, and terminals.
+The server package is the monorepo's backend layer. It exposes a Hono app, a Node HTTP server wrapper, and a set of filesystem-backed resource managers that coordinate projects, artifacts, sessions, skills, and terminals.
 
 ## Main Entry Points
 
 - `src/app.ts` creates the Hono application and mounts all `/api` route groups.
 - `src/http-server.ts` wraps the Hono app in a Node server and handles terminal WebSocket upgrades.
-- `src/server.ts` is the local runtime entrypoint used by `pnpm --filter @ank1015/llm-server start`.
-- `src/index.ts` exports `createApp()`, `createHttpServer()`, and the default app instance for workspace consumers.
+- `src/server.ts` is the standalone runtime entrypoint used by `pnpm --filter @ank1015/llm-server start`.
+- `src/index.ts` exports `createApp()`, `createHttpServer()`, and the default app instance for package consumers.
 
 ## Route Groups
 
@@ -41,4 +41,4 @@ Within the metadata root, project and artifact records are organized under the p
 
 - `@ank1015/llm-sdk` provides the underlying keys/session abstractions used by session routes
 - `@ank1015/llm-agents` provides prompt helpers, skill registry support, and agent-side workflows consumed by the server
-- `@ank1015/llm-app-contracts` is the shared DTO layer used by app clients talking to this backend
+- `@ank1015/llm` packages this server with the production web app and exposes both through one local origin

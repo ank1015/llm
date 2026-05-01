@@ -11,7 +11,6 @@ import { getBranchNavigatorState, type BranchNavigatorState } from '@/lib/messag
 import { formatThreadMarkdownExport } from '@/lib/messages/thread-export';
 import { useChatStore } from '@/stores/chat-store';
 
-
 const EMPTY_MESSAGES: MessageNode[] = [];
 const EMPTY_STREAMING_ASSISTANT: Omit<BaseAssistantMessage<Api>, 'message'> | null = null;
 
@@ -74,6 +73,7 @@ const MessageTurnRow = memo(function MessageTurnRow({
   isStreamingTurn,
   streamingAssistant,
   branchState,
+  projectId,
   systemPrompt,
 }: {
   turn: MessageTurn;
@@ -83,6 +83,7 @@ const MessageTurnRow = memo(function MessageTurnRow({
   isStreamingTurn: boolean;
   streamingAssistant: Omit<BaseAssistantMessage<Api>, 'message'> | null;
   branchState: BranchNavigatorState | null;
+  projectId: string;
   systemPrompt: string | null;
 }) {
   const handleExportChat = () => {
@@ -127,6 +128,7 @@ const MessageTurnRow = memo(function MessageTurnRow({
             ? turn.userNode.message.timestamp
             : null
         }
+        projectId={projectId}
         sessionKey={sessionKey}
         onExportChat={handleExportChat}
       />
@@ -135,9 +137,11 @@ const MessageTurnRow = memo(function MessageTurnRow({
 });
 
 export function ChatMessages({
+  projectId,
   sessionId,
   systemPrompt,
 }: {
+  projectId: string;
   sessionId: string;
   systemPrompt: string | null;
 }) {
@@ -188,6 +192,7 @@ export function ChatMessages({
           isStreamingTurn={isSessionStreaming && index === turns.length - 1}
           streamingAssistant={streamingAssistant}
           branchState={turn.userNode ? (branchStateByNodeId[turn.userNode.id] ?? null) : null}
+          projectId={projectId}
           systemPrompt={systemPrompt}
         />
       ))}

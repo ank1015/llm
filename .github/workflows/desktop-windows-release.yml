@@ -1,0 +1,114 @@
+name: Desktop Windows Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Optional GitHub release tag to create or update, for example desktop-v0.1.0'
+        required: false
+        type: string
+      draft:
+        description: 'Create the GitHub release as a draft when release_tag is set'
+        required: false
+        default: true
+        type: boolean
+  push:
+    tags:
+      - 'desktop-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    name: Build Windows installer
+    runs-on: windows-latest
+
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      ELECTRON_BUILDER_CACHE: ${{ github.workspace }}\.cache\electron-builder
+      ELECTRON_CACHE: ${{ github.workspace }}\.cache\electron
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Windows desktop app
+        run: pnpm --filter @ank1015/llm-desktop-app dist
+
+      - name: List release files
+        shell: pwsh
+        run: Get-ChildItem apps/desktop/release -Recurse | Select-Object FullName, Length
+
+      - name: Upload Windows installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: llm-desktop-windows
+          path: |
+            apps/desktop/release/*.exe
+            apps/desktop/release/*.blockmap
+            apps/desktop/release/latest*.yml
+          if-no-files-found: error
+
+      - name: Resolve release tag
+        id: release
+        shell: pwsh
+        run: |
+          $tag = "${{ github.event.inputs.release_tag }}"
+          if (-not $tag -and "${{ github.ref_type }}" -eq "tag") {
+            $tag = "${{ github.ref_name }}"
+          }
+          "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Create or update GitHub release
+        if: steps.release.outputs.tag != ''
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_DRAFT: ${{ github.event.inputs.draft }}
+        run: |
+          gh release view $env:RELEASE_TAG *> $null
+          if ($LASTEXITCODE -ne 0) {
+            $createArgs = @(
+              "release",
+              "create",
+              $env:RELEASE_TAG,
+              "--title",
+              $env:RELEASE_TAG,
+              "--notes",
+              "Windows desktop build for $env:RELEASE_TAG"
+            )
+
+            if ($env:RELEASE_DRAFT -eq "true") {
+              $createArgs += "--draft"
+            }
+
+            & gh @createArgs
+          }
+
+          $releaseFiles = Get-ChildItem apps/desktop/release -File | Where-Object {
+            $_.Name -like "*.exe" -or $_.Name -like "*.blockmap" -or $_.Name -like "latest*.yml"
+          }
+          if (-not $releaseFiles) {
+            throw "No Windows release files found."
+          }
+
+          $uploadArgs = @("release", "upload", $env:RELEASE_TAG)
+          $uploadArgs += $releaseFiles.FullName
+          $uploadArgs += "--clobber"
+          & gh @uploadArgs

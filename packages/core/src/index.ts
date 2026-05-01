@@ -1,4 +1,6 @@
 import './providers/anthropic/index.js';
+import './providers/aws-bedrock/index.js';
+import './providers/azure-openai/index.js';
 import './providers/cerebras/index.js';
 import './providers/claude-code/index.js';
 import './providers/codex/index.js';

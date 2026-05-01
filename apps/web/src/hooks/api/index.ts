@@ -1,5 +1,12 @@
 'use client';
 
+export { useGatewayLoginMutation, useGatewaySessionQuery } from './gateway';
+export {
+  useCancelSetupAgentMutation,
+  useCompleteSetupMutation,
+  useSetupStatusQuery,
+  useStartSetupAgentMutation,
+} from './setup';
 export {
   useArtifactCheckpointDiffQuery,
   useArtifactCheckpointsQuery,
@@ -44,13 +51,6 @@ export {
   useSessionsQuery,
   useRenameSessionMutation,
 } from './sessions';
-export {
-  useClearKeyMutation,
-  useKeyDetailsQuery,
-  useKeysQuery,
-  useReloadKeyMutation,
-  useSetKeyMutation,
-} from './keys';
 export { useModelsQuery } from './models';
 export {
   useCreateTerminalMutation,

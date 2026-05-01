@@ -39,15 +39,16 @@ describe('keys', () => {
 # comment
 OPENAI_API_KEY=sk-openai
 export GOOGLE_API_KEY="google key"
-CLAUDE_CODE_BILLING_HEADER='x-billing-account: acc-123'
-CODEX_CHATGPT_ACCOUNT_ID=acc=123
+OPENROUTER_API_KEY='or-key'
+AZURE_OPENAI_DEPLOYMENT_URL=https://example.test/openai/responses?api-version=2025-04-01-preview
 `);
 
       expect(values).toEqual({
         OPENAI_API_KEY: 'sk-openai',
         GOOGLE_API_KEY: 'google key',
-        CLAUDE_CODE_BILLING_HEADER: 'x-billing-account: acc-123',
-        CODEX_CHATGPT_ACCOUNT_ID: 'acc=123',
+        OPENROUTER_API_KEY: 'or-key',
+        AZURE_OPENAI_DEPLOYMENT_URL:
+          'https://example.test/openai/responses?api-version=2025-04-01-preview',
       });
     });
   });
@@ -56,25 +57,36 @@ CODEX_CHATGPT_ACCOUNT_ID=acc=123
     it('quotes values when needed', () => {
       const content = stringifyKeysFile({
         OPENAI_API_KEY: 'sk-openai',
-        CLAUDE_CODE_BILLING_HEADER: 'x-billing-account: acc 123',
+        OPENROUTER_API_KEY: 'or key',
       });
 
-      expect(content).toBe(
-        'OPENAI_API_KEY=sk-openai\nCLAUDE_CODE_BILLING_HEADER="x-billing-account: acc 123"\n'
-      );
+      expect(content).toBe('OPENAI_API_KEY=sk-openai\nOPENROUTER_API_KEY="or key"\n');
     });
   });
 
   describe('getProviderCredentialSpec', () => {
     it('returns provider field mappings', () => {
-      expect(getProviderCredentialSpec('codex')).toEqual({
-        provider: 'codex',
+      expect(getProviderCredentialSpec('anthropic')).toEqual({
+        provider: 'anthropic',
         fields: [
-          { option: 'apiKey', env: 'CODEX_API_KEY', aliases: [] },
           {
-            option: 'chatgpt-account-id',
-            env: 'CODEX_CHATGPT_ACCOUNT_ID',
-            aliases: ['CHATGPT_ACCOUNT_ID'],
+            option: 'apiKey',
+            env: 'ANTHROPIC_API_KEY',
+            aliases: ['ANTHROPIC_API_KEYS'],
+          },
+        ],
+      });
+    });
+
+    it('returns Azure OpenAI credential field mappings', () => {
+      expect(getProviderCredentialSpec('azure-openai')).toEqual({
+        provider: 'azure-openai',
+        fields: [
+          { option: 'apiKey', env: 'AZURE_OPENAI_API_KEY', aliases: [] },
+          {
+            option: 'azureDeploymentUrl',
+            env: 'AZURE_OPENAI_DEPLOYMENT_URL',
+            aliases: ['AZURE_OPENAI_TARGET_URI', 'AZURE_OPENAI_BASE_URL'],
           },
         ],
       });
@@ -96,9 +108,27 @@ CODEX_CHATGPT_ACCOUNT_ID=acc=123
       });
     });
 
+    it('resolves Azure OpenAI API key and deployment URL', () => {
+      const result = resolveProviderCredentialsFromValues('azure-openai', {
+        AZURE_OPENAI_API_KEY: 'azure-key',
+        AZURE_OPENAI_TARGET_URI:
+          'https://resource.cognitiveservices.azure.com/openai/responses?api-version=2025-04-01-preview',
+      });
+
+      expect(result).toEqual({
+        ok: true,
+        provider: 'azure-openai',
+        credentials: {
+          apiKey: 'azure-key',
+          azureDeploymentUrl:
+            'https://resource.cognitiveservices.azure.com/openai/responses?api-version=2025-04-01-preview',
+        },
+      });
+    });
+
     it('returns a typed missing-credentials error', () => {
-      const result = resolveProviderCredentialsFromValues('codex', {
-        CODEX_API_KEY: 'codex-key',
+      const result = resolveProviderCredentialsFromValues('azure-openai', {
+        AZURE_OPENAI_API_KEY: 'azure-key',
       });
 
       expect(result.ok).toBe(false);
@@ -107,12 +137,12 @@ CODEX_CHATGPT_ACCOUNT_ID=acc=123
       }
 
       expect(result.error.code).toBe('missing_provider_credentials');
-      expect(result.error.message).toContain('chatgpt-account-id');
+      expect(result.error.message).toContain('azureDeploymentUrl');
       expect(result.error.missing).toEqual([
         {
-          option: 'chatgpt-account-id',
-          env: 'CODEX_CHATGPT_ACCOUNT_ID',
-          aliases: ['CHATGPT_ACCOUNT_ID'],
+          option: 'azureDeploymentUrl',
+          env: 'AZURE_OPENAI_DEPLOYMENT_URL',
+          aliases: ['AZURE_OPENAI_TARGET_URI', 'AZURE_OPENAI_BASE_URL'],
         },
       ]);
     });
@@ -143,15 +173,12 @@ CODEX_CHATGPT_ACCOUNT_ID=acc=123
         filePath,
         [
           'OPENAI_API_KEY=sk-openai',
-          'CODEX_API_KEY=codex-key',
-          'CODEX_CHATGPT_ACCOUNT_ID=acc-123',
           'ANTHROPIC_API_KEYS=sk-ant-test',
-          'CLAUDE_CODE_OAUTH_TOKEN=oauth-token',
         ].join('\n'),
         'utf8'
       );
 
-      expect(await getAvailableKeyProviders(filePath)).toEqual(['openai', 'codex', 'anthropic']);
+      expect(await getAvailableKeyProviders(filePath)).toEqual(['openai', 'anthropic']);
     });
 
     it('uses the configured default keys path and returns an empty list when the file is missing', async () => {
@@ -172,27 +199,26 @@ CODEX_CHATGPT_ACCOUNT_ID=acc=123
     it('writes provider values and round-trips them through the file', async () => {
       const filePath = await createTempFile();
 
-      await setProviderCredentials(filePath, 'claude-code', {
-        oauthToken: 'oauth-token',
-        betaFlag: 'oauth-2025-04-20',
-        billingHeader: 'x-billing-account: acc 123',
+      await setProviderCredentials(filePath, 'azure-openai', {
+        apiKey: 'azure-key',
+        azureDeploymentUrl:
+          'https://resource.cognitiveservices.azure.com/openai/responses?api-version=2025-04-01-preview',
       });
 
       const content = await readFile(filePath, 'utf8');
       expect(content).toBe(
-        'CLAUDE_CODE_OAUTH_TOKEN=oauth-token\n' +
-          'CLAUDE_CODE_BETA_FLAG=oauth-2025-04-20\n' +
-          'CLAUDE_CODE_BILLING_HEADER="x-billing-account: acc 123"\n'
+        'AZURE_OPENAI_API_KEY=azure-key\n' +
+          'AZURE_OPENAI_DEPLOYMENT_URL="https://resource.cognitiveservices.azure.com/openai/responses?api-version=2025-04-01-preview"\n'
       );
 
-      const result = await resolveProviderCredentials(filePath, 'claude-code');
+      const result = await resolveProviderCredentials(filePath, 'azure-openai');
       expect(result).toEqual({
         ok: true,
-        provider: 'claude-code',
+        provider: 'azure-openai',
         credentials: {
-          oauthToken: 'oauth-token',
-          betaFlag: 'oauth-2025-04-20',
-          billingHeader: 'x-billing-account: acc 123',
+          apiKey: 'azure-key',
+          azureDeploymentUrl:
+            'https://resource.cognitiveservices.azure.com/openai/responses?api-version=2025-04-01-preview',
         },
       });
     });

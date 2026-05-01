@@ -2,7 +2,7 @@
 
 Use `image()` in the most boring way possible:
 
-- Prefer the central keystore first.
+- Prefer the default gateway first.
 - Prefer Google when both providers can do the job.
 - Prefer `nano-banana` for normal work.
 - Prefer `nano-banana-pro` when the asset matters more.
@@ -10,12 +10,10 @@ Use `image()` in the most boring way possible:
 
 ## Keys
 
-Check the central keystore first:
+Use the SDK gateway first:
 
 ```ts
-import { getAvailableKeyProviders } from '@ank1015/llm-sdk/keys';
-
-const availableProviders = await getAvailableKeyProviders();
+// Normal calls use ~/.llm/gateway.json automatically.
 ```
 
 If `google` or `openai` is already available there:
@@ -23,7 +21,7 @@ If `google` or `openai` is already available there:
 - call `image()` normally
 - do not pass `keysFilePath`
 
-Only create or pass a custom keys file when the needed provider is not available centrally.
+Only create or pass a custom keys file after opting into direct provider mode.
 
 ## Model Choice
 

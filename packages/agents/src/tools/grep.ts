@@ -83,6 +83,11 @@ interface RipgrepEvent {
   };
 }
 
+function isPathInside(basePath: string, candidatePath: string): boolean {
+  const relative = path.relative(basePath, candidatePath);
+  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+}
+
 export function createGrepTool(
   cwd: string,
   options?: GrepToolOptions
@@ -94,15 +99,7 @@ export function createGrepTool(
     description: `Search file contents for a pattern. Returns matching lines with file paths and line numbers. Respects .gitignore. Output is truncated to ${DEFAULT_LIMIT} matches or ${DEFAULT_MAX_BYTES / 1024}KB (whichever is hit first). Long lines are truncated to ${GREP_MAX_LINE_LENGTH} chars.`,
     parameters: grepSchema,
     execute: async ({ params, signal }) => {
-      const {
-        pattern,
-        path: searchDir,
-        glob,
-        ignoreCase,
-        literal,
-        context,
-        limit,
-      } = params;
+      const { pattern, path: searchDir, glob, ignoreCase, literal, context, limit } = params;
 
       return new Promise((resolve, reject) => {
         if (signal?.aborted) {
@@ -142,12 +139,15 @@ export function createGrepTool(
             const effectiveLimit = Math.max(1, limit ?? DEFAULT_LIMIT);
 
             const formatPath = (filePath: string): string => {
-              if (isDirectory) {
+              if (isDirectory && path.isAbsolute(filePath) && isPathInside(searchPath, filePath)) {
                 const relative = path.relative(searchPath, filePath);
-                if (relative && !relative.startsWith('..')) {
-                  return relative.replace(/\\/g, '/');
-                }
+                return relative.replace(/\\/g, '/');
               }
+
+              if (isDirectory && !path.isAbsolute(filePath)) {
+                return filePath.replace(/\\/g, '/');
+              }
+
               return path.basename(filePath);
             };
 

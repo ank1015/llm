@@ -77,9 +77,8 @@ Pick one of the supported model IDs:
 | Provider      | Model IDs                                                                                                    |
 | ------------- | ------------------------------------------------------------------------------------------------------------ |
 | `openai`      | `openai/gpt-5.4`, `openai/gpt-5.4-pro`, `openai/gpt-5.4-mini`, `openai/gpt-5.4-nano`, `openai/gpt-5.3-codex` |
-| `codex`       | `codex/gpt-5.4`, `codex/gpt-5.4-mini`, `codex/gpt-5.3-codex`, `codex/gpt-5.3-codex-spark`                    |
+| `azure-openai` | `azure-openai/gpt-5.4`, `azure-openai/gpt-5.4-pro`, `azure-openai/gpt-5.4-mini`, `azure-openai/gpt-5.4-nano`, `azure-openai/gpt-5.3-codex` |
 | `anthropic`   | `anthropic/claude-opus-4-6`, `anthropic/claude-sonnet-4-6`                                                   |
-| `claude-code` | `claude-code/claude-opus-4-6`, `claude-code/claude-sonnet-4-6`                                               |
 | `google`      | `google/gemini-3.1-pro-preview`, `google/gemini-3-flash-preview`, `google/gemini-3.1-flash-lite-preview`     |
 
 Import `CuratedModelId` if you need the TypeScript type.
@@ -124,8 +123,8 @@ type ReasoningEffort = 'low' | 'medium' | 'high' | 'xhigh';
 
 Notes:
 
-- `openai` and `codex`: if omitted, no standardized reasoning setting is added.
-- `anthropic` and `claude-code`: this SDK always enables adaptive thinking and `cache_control: { type: 'ephemeral' }` for the supported Claude 4.6 models. `reasoningEffort` sets the adaptive effort level. If omitted, adaptive thinking is still enabled and the provider default effort is used.
+- `openai`: if omitted, no standardized reasoning setting is added.
+- `anthropic`: this SDK always enables adaptive thinking and `cache_control: { type: 'ephemeral' }` for the supported Claude 4.6 models. `reasoningEffort` sets the adaptive effort level. If omitted, adaptive thinking is still enabled and the provider default effort is used.
 - `google`: if omitted, no explicit thinking level is added and the provider default applies.
 
 ### `overrideProviderSetting`
@@ -144,7 +143,7 @@ If you call `llm({...})` with a literal `modelId`, TypeScript will usually infer
 
 ### `keysFilePath`
 
-By default the SDK reads credentials from `~/.llm-sdk/keys.env`. Pass a custom path here to override it.
+By default the SDK uses gateway credentials from `~/.llm/gateway.json`. `keysFilePath` is only used when `setSdkConfig({ modelTransport: 'direct' })` opts into direct provider calls.
 
 ---
 

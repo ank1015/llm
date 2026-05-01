@@ -1,0 +1,67 @@
+{
+  "name": "@ank1015/llm-desktop-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Private Electron desktop app for the embedded LLM server and frontend shell",
+  "type": "module",
+  "main": "./dist/main/main.js",
+  "scripts": {
+    "dev": "pnpm run build && electron .",
+    "build": "pnpm --filter @ank1015/llm-server build && pnpm --filter @ank1015/llm-web-app build && node ../../scripts/remove-paths.mjs dist release vendor --tsbuildinfo && tsc && node scripts/copy-renderer.mjs && node scripts/assemble-web.mjs",
+    "start": "electron .",
+    "package": "pnpm run build && node scripts/stage-package.mjs && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --projectDir .package --dir --config.directories.output=../release",
+    "dist": "pnpm run build && node scripts/stage-package.mjs && electron-builder --projectDir .package --config.directories.output=../release",
+    "test": "echo \"No tests configured for desktop app yet\"",
+    "test:unit": "echo \"No unit tests configured for desktop app yet\"",
+    "typecheck": "pnpm --filter @ank1015/llm-server build && tsc --noEmit",
+    "lint": "eslint src scripts",
+    "clean": "node ../../scripts/remove-paths.mjs .package dist release vendor --tsbuildinfo"
+  },
+  "dependencies": {
+    "@ank1015/llm-server": "workspace:^",
+    "@hugeicons/core-free-icons": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.6.0",
+    "electron": "^39.2.7",
+    "electron-builder": "^26.0.12",
+    "typescript": "^5.7.0"
+  },
+  "build": {
+    "appId": "com.ank1015.llm.desktop",
+    "electronVersion": "39.8.7",
+    "productName": "LLM Desktop",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "vendor",
+        "to": "vendor"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Development"
+    }
+  }
+}

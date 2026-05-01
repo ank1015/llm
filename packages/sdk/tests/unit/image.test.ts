@@ -2,8 +2,9 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { resetSdkConfig, setSdkConfig } from '../../src/config.js';
 import { ImageInputError, image } from '../../src/image.js';
 import { resolveProviderCredentials } from '../../src/keys.js';
 
@@ -28,6 +29,7 @@ const tempDirectories: string[] = [];
 
 afterEach(async () => {
   vi.clearAllMocks();
+  resetSdkConfig();
   await Promise.all(
     tempDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true }))
   );
@@ -40,6 +42,10 @@ async function createTempDirectory(): Promise<string> {
 }
 
 describe('image', () => {
+  beforeEach(() => {
+    setSdkConfig({ modelTransport: 'direct' });
+  });
+
   it('maps gpt-image to the OpenAI core model and saves the generated file using the real mime-type extension', async () => {
     const directory = await createTempDirectory();
     const model = createImageModel('openai', 'gpt-image-1.5');

@@ -4,6 +4,7 @@ import {
   AiBrain03Icon,
   ChromeIcon,
   Doc02Icon,
+  ImageAdd02Icon,
   Pdf02Icon,
   Ppt02Icon,
   Xls02Icon,
@@ -23,6 +24,7 @@ const REGISTERED_SKILLS = skillRegistryData as RegisteredSkillRecord[];
 const EXPLICIT_SKILL_ICON_MAP: Record<string, IconSvgElement> = {
   'chrome-controller': ChromeIcon,
   docx: Doc02Icon,
+  'image-gen': ImageAdd02Icon,
   llm: AiBrain03Icon,
   pdf: Pdf02Icon,
   pptx: Ppt02Icon,

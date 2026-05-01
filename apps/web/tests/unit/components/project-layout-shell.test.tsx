@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ProjectLayoutShell } from '@/components/project-layout-shell';
+import { useProjectPreferencesStore } from '@/stores/project-preferences-store';
 
 const navigationState = vi.hoisted(() => ({
   pathname: '/project-1/artifact-1',
@@ -112,6 +113,8 @@ describe('ProjectLayoutShell', () => {
       open: false,
     };
     terminalState.toggleDock.mockClear();
+    useProjectPreferencesStore.getState().reset();
+    useProjectPreferencesStore.getState().setProjectAdvancedMode('project-1', true);
   });
 
   it('shows checkpoint controls on artifact routes', () => {
@@ -169,6 +172,21 @@ describe('ProjectLayoutShell', () => {
 
     expect(screen.queryByTestId('checkpoint-controls')).not.toBeInTheDocument();
     expect(screen.queryByTestId('artifact-command-menu')).not.toBeInTheDocument();
+  });
+
+  it('hides commit, diff, and terminal header controls when advanced mode is off', () => {
+    useProjectPreferencesStore.getState().setProjectAdvancedMode('project-1', false);
+
+    render(
+      <ProjectLayoutShell>
+        <div>Child content</div>
+      </ProjectLayoutShell>
+    );
+
+    expect(screen.queryByTestId('checkpoint-controls')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /toggle terminal/i })).not.toBeInTheDocument();
+    expect(screen.queryByTestId('terminal-panel')).not.toBeInTheDocument();
+    expect(screen.getByTestId('artifact-command-menu')).toBeInTheDocument();
   });
 
   it('toggles the terminal dock from the header button', () => {

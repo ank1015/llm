@@ -99,7 +99,11 @@ export function ArtifactSessionPanel() {
             style={{ paddingBottom: `${composerReserve + 80}px` }}
           >
             {hasRenderableContent ? (
-              <ChatMessages sessionId={sessionId} systemPrompt={session?.systemPrompt ?? null} />
+              <ChatMessages
+                projectId={projectId}
+                sessionId={sessionId}
+                systemPrompt={session?.systemPrompt ?? null}
+              />
             ) : isLoading ? (
               <div className="flex min-h-[50vh] items-center justify-center px-6 py-16">
                 <p className="text-sm leading-7 text-black/46 dark:text-white/44">

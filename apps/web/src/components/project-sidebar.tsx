@@ -7,7 +7,6 @@ import {
   File01Icon,
   FolderAddIcon,
   Folder01Icon,
-  Key01Icon,
   MoreHorizontalIcon,
   PanelLeftCloseIcon,
   PanelLeftOpenIcon,
@@ -18,7 +17,7 @@ import {
 import { HugeiconsIcon } from '@hugeicons/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams, usePathname, useRouter } from 'next/navigation';
-import { useEffect , useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
 
@@ -46,9 +45,9 @@ import {
 import { queryKeys } from '@/lib/query-keys';
 import { useArtifactFilesStore } from '@/stores/artifact-files-store';
 import { useChatStore } from '@/stores/chat-store';
+import { useProjectPreferencesStore } from '@/stores/project-preferences-store';
 import { useSidebarStore } from '@/stores/sidebar-store';
 import { useUiStore } from '@/stores/ui-store';
-
 
 const MENU_WIDTH = 176;
 const MENU_HEIGHT = 92;
@@ -174,9 +173,7 @@ function RecentThreadsSection({
 function SettingsSidebarSection({ projectId, pathname }: { projectId: string; pathname: string }) {
   const router = useRouter();
   const generalHref = `/${projectId}/settings/general`;
-  const modelsHref = `/${projectId}/settings/models`;
   const isGeneralActive = pathname === generalHref;
-  const isModelsActive = pathname === modelsHref;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -204,25 +201,6 @@ function SettingsSidebarSection({ projectId, pathname }: { projectId: string; pa
               className="shrink-0 text-black/52 dark:text-white/52"
             />
             <span className="min-w-0 flex-1 truncate">General</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push(modelsHref)}
-            className={[
-              'group flex h-10 items-center gap-2 whitespace-nowrap rounded-lg pl-2 pr-1 text-left text-[14px] font-medium transition-colors',
-              isModelsActive
-                ? 'bg-accent text-black dark:text-white'
-                : 'text-black/80 hover:bg-accent dark:text-white/82',
-            ].join(' ')}
-          >
-            <HugeiconsIcon
-              icon={Key01Icon}
-              size={18}
-              color="currentColor"
-              strokeWidth={1.8}
-              className="shrink-0 text-black/52 dark:text-white/52"
-            />
-            <span className="min-w-0 flex-1 truncate">Models</span>
           </button>
         </div>
       </div>
@@ -272,6 +250,7 @@ function FileTreeRows({
   ctx,
   path,
   depth,
+  showDotDirectories,
   expandedDirectories,
   onToggleDirectory,
   selectedFilePath,
@@ -280,6 +259,7 @@ function FileTreeRows({
   ctx: ArtifactContext;
   path: string;
   depth: number;
+  showDotDirectories: boolean;
   expandedDirectories: Record<string, boolean>;
   onToggleDirectory: (path: string) => void;
   selectedFilePath: string | null;
@@ -315,15 +295,24 @@ function FileTreeRows({
     return null;
   }
 
+  const visibleEntries = listing.entries.filter(
+    (entry) => entry.type !== 'directory' || showDotDirectories || !entry.name.startsWith('.')
+  );
+
+  if (visibleEntries.length === 0 && safePath.length === 0) {
+    return null;
+  }
+
   return (
     <>
-      {listing.entries.map((entry) =>
+      {visibleEntries.map((entry) =>
         entry.type === 'directory' ? (
           <FileTreeDirectoryRow
             key={entry.path}
             ctx={ctx}
             entry={entry}
             depth={depth}
+            showDotDirectories={showDotDirectories}
             expandedDirectories={expandedDirectories}
             onToggleDirectory={onToggleDirectory}
             selectedFilePath={selectedFilePath}
@@ -347,6 +336,7 @@ function FileTreeDirectoryRow({
   ctx,
   entry,
   depth,
+  showDotDirectories,
   expandedDirectories,
   onToggleDirectory,
   selectedFilePath,
@@ -355,6 +345,7 @@ function FileTreeDirectoryRow({
   ctx: ArtifactContext;
   entry: ArtifactExplorerEntry;
   depth: number;
+  showDotDirectories: boolean;
   expandedDirectories: Record<string, boolean>;
   onToggleDirectory: (path: string) => void;
   selectedFilePath: string | null;
@@ -396,6 +387,7 @@ function FileTreeDirectoryRow({
           ctx={ctx}
           path={entry.path}
           depth={depth + 1}
+          showDotDirectories={showDotDirectories}
           expandedDirectories={expandedDirectories}
           onToggleDirectory={onToggleDirectory}
           selectedFilePath={selectedFilePath}
@@ -448,6 +440,9 @@ function FilesSection({ projectId, artifactId }: { projectId: string; artifactId
     projectId,
     artifactId,
   };
+  const showDotDirectories = useProjectPreferencesStore((state) =>
+    state.isAdvancedModeEnabled(projectId)
+  );
   const artifactKey = getArtifactKey(artifactContext);
   const [isOpen, setIsOpen] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -545,6 +540,7 @@ function FilesSection({ projectId, artifactId }: { projectId: string; artifactId
             ctx={artifactContext}
             path=""
             depth={0}
+            showDotDirectories={showDotDirectories}
             expandedDirectories={expandedDirectories}
             onToggleDirectory={toggleDirectory}
             selectedFilePath={selectedFilePath}

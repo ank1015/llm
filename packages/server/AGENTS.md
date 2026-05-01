@@ -1,6 +1,6 @@
 # @ank1015/llm-server
 
-Private workspace package for the monorepo's Hono backend, session orchestration, artifact storage APIs, and terminal transport.
+Published Node package for the monorepo's Hono backend, session orchestration, artifact storage APIs, and terminal transport.
 
 ## Commands
 
@@ -12,6 +12,7 @@ pnpm --filter @ank1015/llm-server test
 pnpm --filter @ank1015/llm-server test:unit
 pnpm --filter @ank1015/llm-server test:integration
 pnpm --filter @ank1015/llm-server test:live
+pnpm --filter @ank1015/llm-server dev
 pnpm --filter @ank1015/llm-server start
 pnpm --filter @ank1015/llm-server test-skill -- --prompt "Open the target page"
 ```
@@ -33,9 +34,16 @@ pnpm --filter @ank1015/llm-server test-skill -- --prompt "Open the target page"
 - `tests/integration/` - mounted app and session integration coverage
 - `tests/live/` - opt-in live-provider session coverage
 
+## Runtime Notes
+
+- Standalone server startup uses `HOST=127.0.0.1` and `PORT=8001` by default.
+- The `npx @ank1015/llm` launcher exposes the public web/API origin on `127.0.0.1:3210` by default and runs this server on a private internal port.
+- This package is Node-only; it uses filesystem, subprocess, PTY, Git, and WebSocket server APIs.
+- Keep Windows and macOS paths portable by using Node `path` helpers and `execFile`/`spawn` argument arrays instead of shell-composed commands.
+
 ## Conventions
 
-- Keep this package workspace-only. Do not add npm-release workflows or public-package artifacts back unless the package direction changes.
+- Keep package metadata publish-safe because this package is released independently and consumed by the `@ank1015/llm` launcher.
 - When a route contract changes, update both `src/contracts/` and the route tests in the same change.
 - Keep `docs/` aligned with the actual server defaults, especially host, port, keystore, and filesystem paths.
 - Treat `tests/live/` as opt-in local verification; avoid making routine package validation depend on live credentials.

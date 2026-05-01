@@ -16,7 +16,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
-      exclude: ['**/*.test.ts', '**/*.d.ts', '**/index.ts', 'vitest.config.ts'],
+      exclude: ['**/*.test.ts', '**/*.d.ts', '**/index.ts', 'coverage/**', 'vitest.config.ts'],
     },
     typecheck: {
       enabled: true,

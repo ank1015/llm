@@ -1,10 +1,10 @@
 # @ank1015/llm-sdk
 
-Opinionated SDK over `@ank1015/llm-core` with curated model IDs, credential resolution, `llm()`/`agent()`/`image()` helpers, and JSONL session tooling.
+Opinionated SDK over `@ank1015/llm-core` with curated model IDs, gateway-backed `llm()`/`agent()`/`image()` helpers, direct-key opt-out, and JSONL session tooling.
 
 ## What You Get
 
-- `llm()` for one-off model calls with credential lookup and curated `modelId` strings
+- `llm()` for one-off model calls through the configured gateway and curated `modelId` strings
 - `agent()` for multi-turn runs with tool execution and persisted session history
 - `image()` for simple path-first image generation and editing with saved output files
 - Helpers like `userMessage()`, `toolResultMessage()`, `getText()`, `getThinking()`, and `getToolCalls()`
@@ -20,12 +20,16 @@ If your app defines tool schemas with `Type.Object(...)`, also add `@sinclair/ty
 
 ## Quick Start
 
-Write credentials to `~/.llm-sdk/keys.env`:
+By default the SDK uses gateway credentials from `~/.llm/gateway.json`:
 
-```env
-OPENAI_API_KEY=sk-...
-ANTHROPIC_API_KEY=sk-ant-...
-GOOGLE_API_KEY=...
+```json
+{
+  "gatewayBaseUrl": "https://gateway.example",
+  "accessToken": "...",
+  "refreshToken": "...",
+  "accessTokenExpiresAt": 1777542373000,
+  "refreshTokenExpiresAt": 1780133473000
+}
 ```
 
 Then make a simple call:
@@ -40,6 +44,8 @@ const message = await llm({
 
 console.log(getText(message));
 ```
+
+For chat models, the prefix selects the provider: `openai/...` routes through the OpenAI provider, while `azure-openai/...` routes through the Azure OpenAI provider.
 
 ## Agent Runs
 
@@ -88,6 +94,7 @@ import { loadSessionMessages } from '@ank1015/llm-sdk/session';
 Defaults:
 
 - keys file: `~/.llm-sdk/keys.env`
+- gateway credentials file: `~/.llm/gateway.json`
 - session directory: `~/.llm-sdk/sessions`
 
 See [docs/setup.md](./docs/setup.md) for the full setup, keys-file, and session-helper guide.

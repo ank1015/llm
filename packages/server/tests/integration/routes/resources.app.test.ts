@@ -149,12 +149,13 @@ describe('mounted app resource routes', () => {
 
     const availableResponse = await app.request('/api/skills');
     expect(availableResponse.status).toBe(200);
-    expect(await availableResponse.json()).toEqual([
+    const availableSkills = (await availableResponse.json()) as unknown[];
+    expect(availableSkills).toContainEqual(
       expect.objectContaining({
         name: 'pdf',
         link: 'https://github.com/anthropics/skills/tree/main/skills/pdf',
-      }),
-    ]);
+      })
+    );
 
     const installResponse = await jsonRequest(
       app,

@@ -1,11 +1,29 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { registerProvider, stream } from '../../src/index.js';
+import { getModel, getModels, getProviders, registerProvider, stream } from '../../src/index.js';
 import { EventStream } from '../../src/utils/event-stream.js';
 
 import type { Context, Model } from '../../src/types/index.js';
 
 describe('core public api', () => {
+  it('exports Azure OpenAI as a built-in provider with models', () => {
+    expect(getProviders()).toContain('azure-openai');
+    expect(getModels('azure-openai').length).toBeGreaterThan(0);
+    expect(getModel('azure-openai', 'gpt-5.4')).toMatchObject({
+      id: 'gpt-5.4',
+      api: 'azure-openai',
+    });
+  });
+
+  it('exports AWS Bedrock as a built-in provider with models', () => {
+    expect(getProviders()).toContain('aws-bedrock');
+    expect(getModels('aws-bedrock').length).toBeGreaterThan(0);
+    expect(getModel('aws-bedrock', 'anthropic.claude-sonnet-4-6')).toMatchObject({
+      id: 'anthropic.claude-sonnet-4-6',
+      api: 'aws-bedrock',
+    });
+  });
+
   it('exports registerProvider so advanced callers can extend the registry', () => {
     const customStream = vi.fn(() => new EventStream() as any);
 

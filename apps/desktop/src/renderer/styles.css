@@ -1,0 +1,70 @@
+:root {
+  --background: #ffffff;
+  --foreground: #111111;
+  --muted-foreground: #737373;
+  --font-geist-sans: 'Geist';
+
+  color: var(--foreground);
+  color-scheme: light;
+  background: var(--background);
+  font-family: var(--font-geist-sans), sans-serif;
+}
+
+.dark {
+  --background: #101010;
+  --foreground: #f5f5f5;
+  --muted-foreground: #a3a3a3;
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.shell {
+  display: grid;
+  min-height: 100vh;
+  padding: 24px;
+  place-items: center;
+}
+
+.fallbackScreen {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  text-align: center;
+}
+
+h1,
+.status {
+  margin: 0;
+}
+
+h1 {
+  font-size: 1rem;
+  font-weight: 650;
+  letter-spacing: 0;
+}
+
+.status {
+  max-width: 36rem;
+  color: var(--muted-foreground);
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.status[data-tone='error'] {
+  color: #b42318;
+}
+
+.dark .status[data-tone='error'] {
+  color: #ffb4ab;
+}

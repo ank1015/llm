@@ -1,5 +1,4 @@
 import type { ArtifactContext, ProjectFileIndexInput } from '@/lib/client-api';
-import type { KeyProviderContract } from '@ank1015/llm-server/contracts';
 
 function normalizeString(value?: string): string {
   return value?.trim() ?? '';
@@ -22,6 +21,12 @@ const terminalScope = (ctx: ArtifactContext, terminalId: string) =>
   [...artifactScope(ctx), 'terminals', terminalId] as const;
 
 export const queryKeys = {
+  gateway: {
+    session: () => ['gateway', 'session'] as const,
+  },
+  setup: {
+    status: () => ['setup', 'status'] as const,
+  },
   skills: {
     list: () => ['skills', 'list'] as const,
   },
@@ -74,10 +79,6 @@ export const queryKeys = {
       [...sessionScope(ctx, sessionId), 'messages'] as const,
     tree: (ctx: ArtifactContext, sessionId: string) =>
       [...sessionScope(ctx, sessionId), 'tree'] as const,
-  },
-  keys: {
-    list: () => ['keys', 'list'] as const,
-    detail: (provider: KeyProviderContract) => ['keys', 'detail', provider] as const,
   },
   terminals: {
     list: (ctx: ArtifactContext) => [...artifactScope(ctx), 'terminals', 'list'] as const,

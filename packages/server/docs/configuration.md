@@ -11,6 +11,8 @@ The server package is configured through a small mix of process environment vari
 
 If you do not set either variable, the local server binds only to localhost on port `8001`.
 
+The `npx @ank1015/llm` launcher is different: it exposes the public web app and API on `http://127.0.0.1:3210` by default, then starts this Hono server on a private internal port. Browser code in that packaged app should call same-origin `/api` routes instead of hard-coding `8001`.
+
 ## Filesystem Defaults
 
 `src/core/config.ts` defines two persistent roots:
@@ -24,7 +26,20 @@ These defaults keep checked-out project workspaces separate from server-managed 
 
 Repo-local callers can override the filesystem roots before using the core services by calling `setConfig()` from the internal config module during startup or test setup.
 
-This package does not currently publish a dedicated `./core` subpath; treat `src/core/config.ts` as internal workspace wiring rather than a public package entrypoint.
+The package root exports `setConfig()` and `getConfig()` for desktop/runtime launchers that need to choose a project workspace root before mounting the Hono app:
+
+```ts
+import { createApp, createHttpServer, setConfig } from '@ank1015/llm-server';
+
+setConfig({
+  projectsRoot: '/Users/me/Projects',
+  dataRoot: '/Users/me/.llm/projects',
+});
+
+const server = createHttpServer(createApp());
+```
+
+Call `setConfig()` before handling API requests. The desktop app should keep `dataRoot` in `~/.llm/projects` and only vary `projectsRoot`.
 
 ## Live Test Credentials
 

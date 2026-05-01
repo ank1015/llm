@@ -1,17 +1,17 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { PromptModelPicker } from "@/components/prompt-model-picker";
-import { useModelsQuery } from "@/hooks/api";
-import { useChatSettingsStore } from "@/stores/chat-settings-store";
+import { PromptModelPicker } from '@/components/prompt-model-picker';
+import { useModelsQuery } from '@/hooks/api';
+import { useChatSettingsStore } from '@/stores/chat-settings-store';
 
-vi.mock("@/hooks/api", () => ({
+vi.mock('@/hooks/api', () => ({
   useModelsQuery: vi.fn(),
 }));
 
 const useModelsQueryMock = vi.mocked(useModelsQuery);
 
-describe("PromptModelPicker", () => {
+describe('PromptModelPicker', () => {
   beforeEach(() => {
     useChatSettingsStore.getState().reset();
 
@@ -19,20 +19,20 @@ describe("PromptModelPicker", () => {
       data: {
         providers: [
           {
-            api: "openai",
-            label: "OpenAI",
-            models: [{ modelId: "openai/gpt-5.4", label: "GPT-5.4" }],
+            api: 'openai',
+            label: 'OpenAI',
+            models: [{ modelId: 'openai/gpt-5.4', label: 'GPT-5.4' }],
           },
           {
-            api: "codex",
-            label: "Codex",
-            models: [{ modelId: "codex/gpt-5.4", label: "GPT-5.4" }],
+            api: 'azure-openai',
+            label: 'Azure OpenAI',
+            models: [{ modelId: 'azure-openai/gpt-5.4', label: 'GPT-5.4' }],
           },
         ],
       },
     } as ReturnType<typeof useModelsQuery>);
 
-    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
       x: 120,
       y: 120,
       left: 120,
@@ -45,27 +45,23 @@ describe("PromptModelPicker", () => {
     } as DOMRect);
   });
 
-  it("shows only active providers in the picker menu", () => {
+  it('shows only the active Azure OpenAI provider in the picker menu', () => {
     render(<PromptModelPicker />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Select model" }));
+    fireEvent.click(screen.getByRole('button', { name: 'Select model' }));
 
-    expect(screen.getByRole("menuitem", { name: "Codex" })).toBeInTheDocument();
-    expect(screen.queryByRole("menuitem", { name: "OpenAI" })).not.toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Azure OpenAI' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'OpenAI' })).not.toBeInTheDocument();
   });
 
-  it("shows newly enabled providers in the picker menu", () => {
-    useChatSettingsStore.getState().setProviderEnabled({
-      api: "openai",
-      enabled: true,
-      modelIds: ["openai/gpt-5.4"],
-    });
+  it('uses the Azure OpenAI fallback catalog when server models are unavailable', () => {
+    useModelsQueryMock.mockReturnValue({ data: undefined } as ReturnType<typeof useModelsQuery>);
 
     render(<PromptModelPicker />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Select model" }));
+    fireEvent.click(screen.getByRole('button', { name: 'Select model' }));
 
-    expect(screen.getByRole("menuitem", { name: "Codex" })).toBeInTheDocument();
-    expect(screen.getByRole("menuitem", { name: "OpenAI" })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Azure OpenAI' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'OpenAI' })).not.toBeInTheDocument();
   });
 });

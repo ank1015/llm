@@ -1,6 +1,6 @@
 # @ank1015/llm
 
-TypeScript monorepo for the local LLM runtime, SDK, agents layer, server backend, and web client.
+TypeScript monorepo for the local LLM runtime, SDK, gateway, agents layer, server backend, and web client.
 
 ## Commands
 
@@ -20,7 +20,9 @@ pnpm clean            # Remove workspace build artifacts and root node_modules
 
 # Development
 pnpm dev              # Run workspace dev tasks through Turbo
+pnpm dev:desktop-app  # Build and run the Electron desktop app
 pnpm dev:web-app      # Start the Next.js web client
+pnpm start:desktop-app # Start the built Electron desktop app
 pnpm start:web-app    # Start the built web client
 ```
 
@@ -29,10 +31,12 @@ pnpm start:web-app    # Start the built web client
 ```text
 apps/
   web/                # @ank1015/llm-web-app - Next.js client for the server
+  desktop/            # @ank1015/llm-desktop-app - Electron app for embedded server and frontend
 
 packages/
   core/               # @ank1015/llm-core - Stateless provider runtime and model catalog
   sdk/                # @ank1015/llm-sdk - Credential-backed LLM and agent helpers
+  gateway/            # @ank1015/llm-gateway - Hono proxy for provider-backed streaming and image requests
   agents/             # @ank1015/llm-agents - Agent tools, prompts, and skill registry helpers
   server/             # @ank1015/llm-server - Hono backend for projects, artifacts, sessions, and terminals
 ```
@@ -43,12 +47,16 @@ packages/
    Stateless runtime built around curated models, provider registration, `llm()` dispatch, and the agent loop foundation.
 2. `@ank1015/llm-sdk`
    Opinionated layer over core for key resolution, session persistence, `llm()`, and `agent()` flows.
-3. `@ank1015/llm-agents`
+3. `@ank1015/llm-gateway`
+   Thin Hono gateway that stores provider credentials server-side, proxies core transport calls, and logs request usage.
+4. `@ank1015/llm-agents`
    General-purpose tool and prompt layer used by the server and agent-oriented workflows.
-4. `@ank1015/llm-server`
+5. `@ank1015/llm-server`
    Private Hono backend for project storage, artifact APIs, sessions, skills, checkpoints, and terminals.
-5. `@ank1015/llm-web-app`
+6. `@ank1015/llm-web-app`
    Private Next.js client for browsing projects and artifacts, streaming sessions, and terminal interaction.
+7. `@ank1015/llm-desktop-app`
+   Private Electron desktop app shell for the embedded server and frontend runtime.
 
 ## Conventions
 
@@ -67,16 +75,21 @@ packages/
 - `tsconfig.base.json` - Shared TypeScript defaults
 - `packages/core/src/index.ts` - Core runtime entry
 - `packages/sdk/src/index.ts` - SDK public entry
+- `packages/gateway/src/index.ts` - Gateway public entry
 - `packages/server/src/index.ts` - Server app/server entry
 - `apps/web/src/app/page.tsx` - Web app home route
+- `apps/desktop/src/main/main.ts` - Desktop Electron main process
+- `apps/desktop/src/main/server/embedded-server.ts` - Desktop embedded server lifecycle boundary
 
 ## Package Guide
 
 - [packages/core/AGENTS.md](packages/core/AGENTS.md) - Stateless runtime layer
 - [packages/sdk/AGENTS.md](packages/sdk/AGENTS.md) - SDK wrappers, keys, and sessions
+- [packages/gateway/AGENTS.md](packages/gateway/AGENTS.md) - Hono gateway for provider-backed proxying and request logs
 - [packages/agents/AGENTS.md](packages/agents/AGENTS.md) - Agent tools, prompts, and registry helpers
 - [packages/server/AGENTS.md](packages/server/AGENTS.md) - Backend routes, storage, sessions, and terminals
 - [apps/web/AGENTS.md](apps/web/AGENTS.md) - Next.js web client for projects, artifacts, sessions, and terminals
+- [apps/desktop/AGENTS.md](apps/desktop/AGENTS.md) - Electron desktop app shell for embedded server and frontend runtime
 
 ## Boundaries
 

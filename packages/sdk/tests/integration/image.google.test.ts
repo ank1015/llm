@@ -11,7 +11,7 @@ import {
   describeIfAvailable,
   getIntegrationEnv,
 } from '../../../core/tests/integration/helpers/live.js';
-import { getSdkConfig } from '../../src/config.js';
+import { getSdkConfig, resetSdkConfig, setSdkConfig } from '../../src/config.js';
 import { image } from '../../src/index.js';
 import { resolveProviderCredentials } from '../../src/keys.js';
 
@@ -28,6 +28,7 @@ describeIfGoogle('SDK image() Google integration', () => {
   let sourceImagePath = '';
 
   beforeAll(async () => {
+    setSdkConfig({ modelTransport: 'direct' });
     mkdirSync(artifactsDir, { recursive: true });
 
     tempDirectory = await mkdtemp(join(tmpdir(), 'llm-sdk-image-google-'));
@@ -37,6 +38,8 @@ describeIfGoogle('SDK image() Google integration', () => {
   });
 
   afterAll(async () => {
+    resetSdkConfig();
+
     if (tempDirectory) {
       await rm(tempDirectory, { recursive: true, force: true });
     }

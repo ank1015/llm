@@ -29,12 +29,13 @@ describeIfOpenAI('SDK agent() OpenAI integration', () => {
     tempDirectory = await mkdtemp(join(tmpdir(), 'llm-sdk-agent-openai-'));
     keysFilePath = join(tempDirectory, 'keys.env');
     sessionsBaseDir = join(tempDirectory, 'sessions');
+    setSdkConfig({ modelTransport: 'direct' });
 
     await setProviderCredentials(keysFilePath, 'openai', {
       apiKey: openAiApiKey!,
     });
 
-    setSdkConfig({ sessionsBaseDir });
+    setSdkConfig({ sessionsBaseDir, modelTransport: 'direct' });
   });
 
   afterAll(async () => {

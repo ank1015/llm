@@ -126,13 +126,13 @@ describe('persistCompletedTurnCompaction', () => {
   it('compacts a completed turn and stores a turn_compact sidecar node', async () => {
     mockLlm.mockResolvedValue(
       buildAssistantMessage({
-        modelId: 'codex/gpt-5.4',
+        modelId: 'azure-openai/gpt-5.4',
         responseText: 'Inspected src/app.ts, updated the logic, and ran the tests.',
       })
     );
 
     const toolCallingAssistant = buildAssistantMessage({
-      modelId: 'codex/gpt-5.4',
+      modelId: 'azure-openai/gpt-5.4',
       toolCalls: [
         {
           name: 'read',
@@ -142,7 +142,7 @@ describe('persistCompletedTurnCompaction', () => {
       ],
     });
     const finalAssistant = buildAssistantMessage({
-      modelId: 'codex/gpt-5.4',
+      modelId: 'azure-openai/gpt-5.4',
       responseText: 'Updated the logic and everything passes now.',
     });
     const turnMessages: Message[] = [
@@ -188,13 +188,13 @@ describe('persistCompletedTurnCompaction', () => {
   it('uses the last tool result as lastNodeId when no final assistant reply exists', async () => {
     mockLlm.mockResolvedValue(
       buildAssistantMessage({
-        modelId: 'codex/gpt-5.4',
+        modelId: 'azure-openai/gpt-5.4',
         responseText: 'Ran the command, hit an error, and the turn ended before a final reply.',
       })
     );
 
     const toolCallingAssistant = buildAssistantMessage({
-      modelId: 'codex/gpt-5.4',
+      modelId: 'azure-openai/gpt-5.4',
       toolCalls: [
         {
           name: 'bash',
@@ -274,7 +274,7 @@ describe('persistCompletedTurnCompaction', () => {
             content: [{ type: 'text', content: 'Please explain what changed.' }],
           },
           buildAssistantMessage({
-            modelId: 'codex/gpt-5.4',
+            modelId: 'azure-openai/gpt-5.4',
             responseText: 'I updated the file and the tests are passing.',
           }),
         ],
@@ -289,7 +289,7 @@ describe('persistCompletedTurnCompaction', () => {
 
   it('returns null when tool trace messages are below the compaction token threshold', async () => {
     const toolCallingAssistant = buildAssistantMessage({
-      modelId: 'codex/gpt-5.4',
+      modelId: 'azure-openai/gpt-5.4',
       toolCalls: [
         {
           name: 'read',
@@ -322,7 +322,7 @@ describe('persistCompletedTurnCompaction', () => {
             timestamp: Date.now(),
           },
           buildAssistantMessage({
-            modelId: 'codex/gpt-5.4',
+            modelId: 'azure-openai/gpt-5.4',
             responseText: 'I checked the file and it looks fine.',
           }),
         ],

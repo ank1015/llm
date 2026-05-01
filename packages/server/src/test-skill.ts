@@ -9,7 +9,7 @@ import { createServerAgentConfig } from './core/session/agent-config.js';
 
 import type { AgentResult, AssistantToolCall, Content, Message } from '@ank1015/llm-sdk';
 
-const DEFAULT_MODEL_ID = 'codex/gpt-5.4' as const;
+const DEFAULT_MODEL_ID = 'azure-openai/gpt-5.4' as const;
 const DEFAULT_REASONING_EFFORT = 'medium' as const;
 const DEFAULT_MAX_TURNS = Number.MAX_SAFE_INTEGER;
 export const TEST_SKILL_DOCS_DIR = fileURLToPath(new URL('../test-skill-docs/', import.meta.url));

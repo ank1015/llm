@@ -5,11 +5,10 @@ import { getSdkConfig } from './config.js';
 
 export const KnownKeyProviders = [
   'openai',
-  'codex',
+  'azure-openai',
   'google',
   'deepseek',
   'anthropic',
-  'claude-code',
   'zai',
   'kimi',
   'minimax',
@@ -25,18 +24,13 @@ interface ApiKeyCredentials {
 
 export interface ProviderCredentialsMap {
   openai: ApiKeyCredentials;
-  codex: {
+  'azure-openai': {
     apiKey: string;
-    'chatgpt-account-id': string;
+    azureDeploymentUrl: string;
   };
   google: ApiKeyCredentials;
   deepseek: ApiKeyCredentials;
   anthropic: ApiKeyCredentials;
-  'claude-code': {
-    oauthToken: string;
-    betaFlag: string;
-    billingHeader: string;
-  };
   zai: ApiKeyCredentials;
   kimi: ApiKeyCredentials;
   minimax: ApiKeyCredentials;
@@ -105,12 +99,12 @@ const providerCredentialSpecs: {
   [TProvider in KeyProvider]: readonly CredentialFieldSpec<ProviderCredentialOption<TProvider>>[];
 } = {
   openai: [{ option: 'apiKey', env: 'OPENAI_API_KEY', aliases: [] }],
-  codex: [
-    { option: 'apiKey', env: 'CODEX_API_KEY', aliases: [] },
+  'azure-openai': [
+    { option: 'apiKey', env: 'AZURE_OPENAI_API_KEY', aliases: [] },
     {
-      option: 'chatgpt-account-id',
-      env: 'CODEX_CHATGPT_ACCOUNT_ID',
-      aliases: ['CHATGPT_ACCOUNT_ID'],
+      option: 'azureDeploymentUrl',
+      env: 'AZURE_OPENAI_DEPLOYMENT_URL',
+      aliases: ['AZURE_OPENAI_TARGET_URI', 'AZURE_OPENAI_BASE_URL'],
     },
   ],
   google: [{ option: 'apiKey', env: 'GOOGLE_API_KEY', aliases: [] }],
@@ -120,23 +114,6 @@ const providerCredentialSpecs: {
       option: 'apiKey',
       env: 'ANTHROPIC_API_KEY',
       aliases: ['ANTHROPIC_API_KEYS'],
-    },
-  ],
-  'claude-code': [
-    {
-      option: 'oauthToken',
-      env: 'CLAUDE_CODE_OAUTH_TOKEN',
-      aliases: [],
-    },
-    {
-      option: 'betaFlag',
-      env: 'CLAUDE_CODE_BETA_FLAG',
-      aliases: [],
-    },
-    {
-      option: 'billingHeader',
-      env: 'CLAUDE_CODE_BILLING_HEADER',
-      aliases: [],
     },
   ],
   zai: [{ option: 'apiKey', env: 'ZAI_API_KEY', aliases: [] }],

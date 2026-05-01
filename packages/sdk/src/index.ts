@@ -1,6 +1,7 @@
 export { agent, AgentInputError, AgentRunConsumptionError } from './agent.js';
 export { image, ImageInputError, ImageModelIds, isImageModelId } from './image.js';
 export { llm, LlmInputError, LlmRunConsumptionError } from './llm.js';
+export { GatewayTransportError } from './gateway.js';
 export { toolResultMessage, userMessage } from './messages.js';
 export { getText, getThinking, getToolCalls } from './response.js';
 export { CuratedModelIds, ReasoningEfforts, isCuratedModelId } from './model-input.js';
@@ -25,6 +26,7 @@ export type {
   ResolveImageInputError,
   UnsupportedImageModelError,
 } from './image.js';
+export type { GatewayCredentials, GatewayErrorCode } from './gateway.js';
 export type { LlmInput, LlmRun } from './llm.js';
 export type { ToolResultMessageOptions, UserMessageOptions } from './messages.js';
 export type {

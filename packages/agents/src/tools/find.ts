@@ -62,6 +62,23 @@ function toError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
 }
 
+function isPathInside(basePath: string, candidatePath: string): boolean {
+  const relative = path.relative(basePath, candidatePath);
+  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+}
+
+function formatFoundPath(searchPath: string, candidatePath: string): string {
+  if (!path.isAbsolute(candidatePath)) {
+    return candidatePath.replace(/\\/g, '/');
+  }
+
+  if (isPathInside(searchPath, candidatePath)) {
+    return path.relative(searchPath, candidatePath).replace(/\\/g, '/');
+  }
+
+  return candidatePath;
+}
+
 export function createFindTool(
   cwd: string,
   options?: FindToolOptions
@@ -113,13 +130,7 @@ export function createFindTool(
                 return;
               }
 
-              // Relativize paths
-              const relativized = results.map((p) => {
-                if (p.startsWith(searchPath)) {
-                  return p.slice(searchPath.length + 1);
-                }
-                return path.relative(searchPath, p);
-              });
+              const relativized = results.map((p) => formatFoundPath(searchPath, p));
 
               const resultLimitReached = relativized.length >= effectiveLimit;
               const rawOutput = relativized.join('\n');
@@ -230,12 +241,7 @@ export function createFindTool(
               if (!line) continue;
 
               const hadTrailingSlash = line.endsWith('/') || line.endsWith('\\');
-              let relativePath = line;
-              if (line.startsWith(searchPath)) {
-                relativePath = line.slice(searchPath.length + 1);
-              } else {
-                relativePath = path.relative(searchPath, line);
-              }
+              let relativePath = formatFoundPath(searchPath, line);
 
               if (hadTrailingSlash && !relativePath.endsWith('/')) {
                 relativePath += '/';

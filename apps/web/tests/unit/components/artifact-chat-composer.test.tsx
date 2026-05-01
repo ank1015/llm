@@ -8,8 +8,8 @@ import { MENTION_SEARCH_DEBOUNCE_MS, MENTION_SEARCH_LIMIT } from '@/lib/messages
 import { useArtifactFilesStore } from '@/stores/artifact-files-store';
 import { useChatStore } from '@/stores/chat-store';
 import { useComposerStore } from '@/stores/composer-store';
+import { useProjectPreferencesStore } from '@/stores/project-preferences-store';
 import { useSessionsStore } from '@/stores/sessions-store';
-
 
 const CURRENT_ARTIFACT_ROOT: ProjectFileIndexEntryDto = {
   artifactId: 'artifact-1',
@@ -97,6 +97,10 @@ function resetComposerStore(): void {
   localStorage.clear();
 }
 
+function resetProjectPreferencesStore(): void {
+  useProjectPreferencesStore.getState().reset();
+}
+
 describe('ArtifactChatComposer', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -106,6 +110,7 @@ describe('ArtifactChatComposer', () => {
     resetChatStore();
     resetArtifactFilesStore();
     resetComposerStore();
+    resetProjectPreferencesStore();
     useSessionsStore.getState().reset();
   });
 
@@ -114,6 +119,51 @@ describe('ArtifactChatComposer', () => {
     vi.useRealTimers();
     resetArtifactFilesStore();
     resetComposerStore();
+    resetProjectPreferencesStore();
+  });
+
+  it('hides the model and reasoning selectors when advanced mode is off', () => {
+    render(<ArtifactChatComposer projectId="project-1" artifactId="artifact-1" />);
+
+    expect(screen.queryByTestId('prompt-model-picker')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('prompt-reasoning-picker')).not.toBeInTheDocument();
+    expect(screen.getByTestId('prompt-composer-simple-row')).toBeInTheDocument();
+    expect(screen.getByTestId('prompt-composer-simple-row')).toHaveClass('items-center');
+  });
+
+  it('bottom-aligns the simple composer controls when the textarea becomes multiline', async () => {
+    render(<ArtifactChatComposer projectId="project-1" artifactId="artifact-1" />);
+
+    const textarea = screen.getByPlaceholderText(
+      'Ask about this artifact or start a thread…'
+    ) as HTMLTextAreaElement;
+
+    Object.defineProperty(textarea, 'scrollHeight', {
+      configurable: true,
+      get: () => 72,
+    });
+
+    await act(async () => {
+      fireEvent.change(textarea, {
+        target: {
+          value: 'First line\nSecond line',
+        },
+      });
+    });
+
+    expect(screen.getByTestId('prompt-composer-simple-row')).toHaveClass('items-end');
+  });
+
+  it('shows the model and reasoning selectors when advanced mode is on', async () => {
+    await act(async () => {
+      useProjectPreferencesStore.getState().setProjectAdvancedMode('project-1', true);
+    });
+
+    render(<ArtifactChatComposer projectId="project-1" artifactId="artifact-1" />);
+
+    expect(screen.getByTestId('prompt-model-picker')).toBeInTheDocument();
+    expect(screen.getByTestId('prompt-reasoning-picker')).toBeInTheDocument();
+    expect(screen.queryByTestId('prompt-composer-simple-row')).not.toBeInTheDocument();
   });
 
   it('lets users select the current artifact root from @ mentions in local draft mode', async () => {
