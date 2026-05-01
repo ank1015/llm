@@ -43,6 +43,9 @@ packages/agents/temp/
 .agents
 
 # Assembled release payloads
+apps/desktop/.package/
+apps/desktop/release/
+apps/desktop/vendor/
 packages/app/vendor/
 
 # Local deployment secrets

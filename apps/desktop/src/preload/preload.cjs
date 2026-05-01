@@ -1,9 +1,8 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('desktopApp', {
-  checkSetupRequirements: async () => ipcRenderer.invoke('desktop:check-setup-requirements'),
-  getGatewaySession: async () => ipcRenderer.invoke('desktop:get-gateway-session'),
   getRuntimeInfo: async () => ipcRenderer.invoke('desktop:get-runtime-info'),
-  loginGateway: async (credentials) => ipcRenderer.invoke('desktop:login-gateway', credentials),
-  signOutGateway: async () => ipcRenderer.invoke('desktop:sign-out-gateway'),
+  onStartupError: (callback) => {
+    ipcRenderer.on('desktop:startup-error', (_event, message) => callback(message));
+  },
 });

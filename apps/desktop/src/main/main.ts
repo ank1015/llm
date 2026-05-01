@@ -2,15 +2,14 @@ import { join } from 'node:path';
 
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
 
-import { getGatewaySession, loginGateway, signOutGateway } from './gateway-credentials.js';
+import { getDesktopState } from './desktop-state.js';
 import { createEmbeddedServerController } from './server/embedded-server.js';
-import { checkSetupRequirements } from './setup-checks.js';
 
 import type { RuntimeInfo } from '../shared/desktop-api.js';
 
-const embeddedServer = createEmbeddedServerController();
+const embeddedServer = createEmbeddedServerController(app.getAppPath());
 
-const createWindow = (): void => {
+const createWindow = async (): Promise<void> => {
   const window = new BrowserWindow({
     width: 1180,
     height: 760,
@@ -25,7 +24,24 @@ const createWindow = (): void => {
     },
   });
 
-  void window.loadFile(join(app.getAppPath(), 'dist/renderer/index.html'));
+  try {
+    const desktopState = await getDesktopState();
+    const serverState = await embeddedServer.start({ projectsRoot: desktopState.projectsRoot });
+
+    if (!serverState.url) {
+      throw new Error('Embedded app did not return a URL.');
+    }
+
+    await window.loadURL(serverState.url);
+  } catch (error) {
+    await window.loadFile(join(app.getAppPath(), 'dist/renderer/index.html'));
+    window.webContents.once('did-finish-load', () => {
+      window.webContents.send(
+        'desktop:startup-error',
+        error instanceof Error ? error.message : 'Failed to start embedded app.'
+      );
+    });
+  }
 };
 
 const registerIpcHandlers = (): void => {
@@ -37,28 +53,16 @@ const registerIpcHandlers = (): void => {
       server: embeddedServer.getState(),
     })
   );
-
-  ipcMain.handle('desktop:get-gateway-session', () => getGatewaySession());
-
-  ipcMain.handle(
-    'desktop:login-gateway',
-    (_event, credentials: { readonly username?: string; readonly password?: string }) =>
-      loginGateway(credentials.username ?? '', credentials.password ?? '')
-  );
-
-  ipcMain.handle('desktop:sign-out-gateway', () => signOutGateway());
-
-  ipcMain.handle('desktop:check-setup-requirements', () => checkSetupRequirements());
 };
 
 registerIpcHandlers();
 
 app.whenReady().then(() => {
-  createWindow();
+  void createWindow();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
+      void createWindow();
     }
   });
 });
