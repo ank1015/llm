@@ -5,6 +5,7 @@ import type { ModelApi, ModelProviderDto, ModelsCatalogResponse } from '../contr
 
 const API_LABELS: Record<ModelApi, string> = {
   openai: 'OpenAI',
+  'azure-openai': 'Azure OpenAI',
   codex: 'Codex',
   anthropic: 'Claude',
   'claude-code': 'Claude Code',

@@ -110,7 +110,7 @@ describe('compactTurn', () => {
   it('renders a turn into markdown and returns the compaction summary text', async () => {
     mockLlm.mockResolvedValue(
       buildAssistantMessage({
-        modelId: 'codex/gpt-5.4',
+        modelId: 'azure-openai/gpt-5.4',
         responseText: 'Read /tmp/project/src/app.ts, updated logic, and ran tests.',
       })
     );
@@ -133,7 +133,7 @@ describe('compactTurn', () => {
         ],
       },
       buildAssistantMessage({
-        modelId: 'codex/gpt-5.4',
+        modelId: 'azure-openai/gpt-5.4',
         responseText: 'I will inspect the current implementation.',
         toolCalls: [
           {
@@ -153,7 +153,7 @@ describe('compactTurn', () => {
         timestamp: Date.now(),
       },
       buildAssistantMessage({
-        modelId: 'codex/gpt-5.4',
+        modelId: 'azure-openai/gpt-5.4',
         responseText: 'Updated the logic and verified the tests passed.',
       }),
     ];
@@ -164,7 +164,7 @@ describe('compactTurn', () => {
 
     expect(mockLlm).toHaveBeenCalledOnce();
     expect(mockLlm).toHaveBeenCalledWith({
-      modelId: 'codex/gpt-5.4',
+      modelId: 'azure-openai/gpt-5.4',
       messages: [
         {
           role: 'user',
@@ -193,7 +193,7 @@ describe('compactTurn', () => {
   it('mentions a missing final assistant reply when the turn ends before one is produced', async () => {
     mockLlm.mockResolvedValue(
       buildAssistantMessage({
-        modelId: 'codex/gpt-5.4',
+        modelId: 'azure-openai/gpt-5.4',
         responseText: 'The turn ended after tool execution without a final reply.',
       })
     );
@@ -205,7 +205,7 @@ describe('compactTurn', () => {
         content: [{ type: 'text', content: 'Run the build.' }],
       },
       buildAssistantMessage({
-        modelId: 'codex/gpt-5.4',
+        modelId: 'azure-openai/gpt-5.4',
         toolCalls: [
           {
             name: 'bash',
@@ -239,7 +239,7 @@ describe('compactTurn', () => {
           content: [{ type: 'text', content: 'First' }],
         },
         buildAssistantMessage({
-          modelId: 'codex/gpt-5.4',
+          modelId: 'azure-openai/gpt-5.4',
           toolCalls: [
             {
               name: 'read',
@@ -264,7 +264,7 @@ describe('compactUltra', () => {
   it('renders user messages, system-generated summaries, and assistant replies into ultra-compaction markdown', async () => {
     mockLlm.mockResolvedValue(
       buildAssistantMessage({
-        modelId: 'codex/gpt-5.4',
+        modelId: 'azure-openai/gpt-5.4',
         responseText: 'Earlier work updated the app logic and preserved the key constraints.',
       })
     );
@@ -287,7 +287,7 @@ describe('compactUltra', () => {
         ],
       },
       buildAssistantMessage({
-        modelId: 'codex/gpt-5.4',
+        modelId: 'azure-openai/gpt-5.4',
         thinkingText: 'ignore this',
         responseText: 'Updated the app logic and the tests pass now.',
         toolCalls: [
@@ -311,7 +311,7 @@ describe('compactUltra', () => {
 
     expect(mockLlm).toHaveBeenCalledOnce();
     expect(mockLlm).toHaveBeenCalledWith({
-      modelId: 'codex/gpt-5.4',
+      modelId: 'azure-openai/gpt-5.4',
       messages: [
         {
           role: 'user',
@@ -367,7 +367,7 @@ describe('compactOngoingTurn', () => {
   it('renders the in-progress turn trace into markdown and returns the compaction summary text', async () => {
     mockLlm.mockResolvedValue(
       buildAssistantMessage({
-        modelId: 'codex/gpt-5.4',
+        modelId: 'azure-openai/gpt-5.4',
         responseText: 'Read /tmp/project/src/app.ts and started updating the implementation.',
       })
     );
@@ -379,7 +379,7 @@ describe('compactOngoingTurn', () => {
         content: [{ type: 'text', content: 'Keep working on the app logic.' }],
       },
       buildAssistantMessage({
-        modelId: 'codex/gpt-5.4',
+        modelId: 'azure-openai/gpt-5.4',
         responseText: 'Inspecting the current file first.',
         toolCalls: [
           {
@@ -399,7 +399,7 @@ describe('compactOngoingTurn', () => {
         timestamp: Date.now(),
       },
       buildAssistantMessage({
-        modelId: 'codex/gpt-5.4',
+        modelId: 'azure-openai/gpt-5.4',
         responseText: 'Preparing the next edit.',
       }),
     ];
@@ -410,7 +410,7 @@ describe('compactOngoingTurn', () => {
 
     expect(mockLlm).toHaveBeenCalledOnce();
     expect(mockLlm).toHaveBeenCalledWith({
-      modelId: 'codex/gpt-5.4',
+      modelId: 'azure-openai/gpt-5.4',
       messages: [
         {
           role: 'user',
@@ -443,7 +443,7 @@ describe('compactOngoingTurn', () => {
           content: [{ type: 'text', content: 'Start working.' }],
         },
         buildAssistantMessage({
-          modelId: 'codex/gpt-5.4',
+          modelId: 'azure-openai/gpt-5.4',
           toolCalls: [
             {
               name: 'read',
