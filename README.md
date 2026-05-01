@@ -2,6 +2,10 @@
 
 A very opinionated LLM stack.
 
+## Docs
+
+- [Development and release](./docs/development-and-release.md)
+
 ## Apps
 
 - `apps/web` - Next.js web client for the local server.
