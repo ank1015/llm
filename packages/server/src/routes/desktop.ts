@@ -1,15 +1,17 @@
-import { lstat, readdir, stat } from 'node:fs/promises';
+import { lstat, readFile, readdir, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { basename, dirname, isAbsolute, join, resolve, sep } from 'node:path';
 
 import { Hono } from 'hono';
 
-import { DesktopListQuerySchema } from '../contracts/index.js';
+import { DesktopFileQuerySchema, DesktopListQuerySchema } from '../contracts/index.js';
 import { validateSchema } from '../http/validation.js';
 
 import type {
   DesktopEntryDto,
   DesktopEntryTypeDto,
+  DesktopFileDto,
+  DesktopFileQuery,
   DesktopListQuery,
   DesktopListResult,
 } from '../contracts/index.js';
@@ -21,7 +23,11 @@ const DESKTOP_ROOT = join(HOME_DIR, 'Desktop');
 const INVALID_QUERY_MESSAGE = 'Invalid query parameters';
 const PATH_NOT_FOUND_MESSAGE = 'Path not found';
 const PATH_NOT_DIRECTORY_MESSAGE = 'Path is not a directory';
+const PATH_NOT_FILE_MESSAGE = 'Path is not a file';
 const PATH_OUT_OF_BOUNDS_MESSAGE = 'Path is outside the allowed root';
+const PATH_QUERY_REQUIRED_MESSAGE = 'path is required';
+const FILE_READ_DEFAULT_MAX_BYTES = 512 * 1024;
+const FILE_READ_MAX_BYTES = 5 * 1024 * 1024;
 
 /** Confines navigation to the Desktop subtree (Desktop itself and any descendant). */
 function isWithinDesktop(target: string): boolean {
@@ -53,10 +59,91 @@ function isHiddenName(name: string): boolean {
   return name.startsWith('.');
 }
 
-function classifyEntryType(
-  isDirectory: boolean,
-  isFile: boolean
-): DesktopEntryTypeDto | null {
+function parseMaxBytes(rawValue: string | undefined): number | null {
+  if (rawValue === undefined) {
+    return FILE_READ_DEFAULT_MAX_BYTES;
+  }
+
+  const parsed = Number(rawValue);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return null;
+  }
+
+  return Math.min(FILE_READ_MAX_BYTES, Math.max(1024, Math.floor(parsed)));
+}
+
+function looksBinary(content: Buffer): boolean {
+  if (content.length === 0) {
+    return false;
+  }
+
+  const sample = content.subarray(0, Math.min(content.length, 2048));
+  let suspicious = 0;
+
+  for (const byte of sample) {
+    if (byte === 0) {
+      return true;
+    }
+
+    const isTabOrNewline = byte === 9 || byte === 10 || byte === 13;
+    const isControl = byte < 32 || byte === 127;
+
+    if (isControl && !isTabOrNewline) {
+      suspicious += 1;
+    }
+  }
+
+  return suspicious / sample.length > 0.3;
+}
+
+function inferContentType(path: string): string {
+  const extension = path.split('.').pop()?.toLowerCase() ?? '';
+
+  switch (extension) {
+    case 'png':
+      return 'image/png';
+    case 'jpg':
+    case 'jpeg':
+      return 'image/jpeg';
+    case 'gif':
+      return 'image/gif';
+    case 'webp':
+      return 'image/webp';
+    case 'svg':
+      return 'image/svg+xml';
+    case 'bmp':
+      return 'image/bmp';
+    case 'pdf':
+      return 'application/pdf';
+    case 'csv':
+      return 'text/csv; charset=utf-8';
+    case 'tsv':
+      return 'text/tab-separated-values; charset=utf-8';
+    case 'md':
+      return 'text/markdown; charset=utf-8';
+    case 'json':
+      return 'application/json; charset=utf-8';
+    case 'mp4':
+      return 'video/mp4';
+    case 'webm':
+      return 'video/webm';
+    case 'mov':
+      return 'video/quicktime';
+    case 'mp3':
+      return 'audio/mpeg';
+    case 'wav':
+      return 'audio/wav';
+    case 'ogg':
+      return 'audio/ogg';
+    case 'txt':
+    case 'log':
+      return 'text/plain; charset=utf-8';
+    default:
+      return 'application/octet-stream';
+  }
+}
+
+function classifyEntryType(isDirectory: boolean, isFile: boolean): DesktopEntryTypeDto | null {
   if (isDirectory) {
     return 'directory';
   }
@@ -170,4 +257,104 @@ desktopRoutes.get('/desktop/list', async (c) => {
   };
 
   return c.json<DesktopListResult>(result);
+});
+
+/** GET /api/desktop/file?path=... — Read a Desktop file preview payload. */
+desktopRoutes.get('/desktop/file', async (c) => {
+  const queryValidation = validateSchema(
+    c,
+    DesktopFileQuerySchema,
+    c.req.query(),
+    INVALID_QUERY_MESSAGE
+  );
+  if (!queryValidation.ok) {
+    return queryValidation.response;
+  }
+
+  const queryParams = queryValidation.value as DesktopFileQuery;
+  const targetPath = resolveRequestedPath(queryParams.path);
+  const maxBytes = parseMaxBytes(queryParams.maxBytes);
+
+  if (!queryParams.path?.trim()) {
+    return c.json({ error: PATH_QUERY_REQUIRED_MESSAGE }, 400);
+  }
+  if (maxBytes === null) {
+    return c.json({ error: 'maxBytes must be a positive number' }, 400);
+  }
+  if (!isWithinDesktop(targetPath)) {
+    return c.json({ error: PATH_OUT_OF_BOUNDS_MESSAGE }, 400);
+  }
+
+  let fileStats;
+  try {
+    fileStats = await stat(targetPath);
+  } catch {
+    return c.json({ error: PATH_NOT_FOUND_MESSAGE }, 404);
+  }
+
+  if (!fileStats.isFile()) {
+    return c.json({ error: PATH_NOT_FILE_MESSAGE }, 400);
+  }
+
+  const raw = await readFile(targetPath);
+  const isBinary = looksBinary(raw);
+  const truncated = !isBinary && raw.length > maxBytes;
+  const content = isBinary ? '' : (truncated ? raw.subarray(0, maxBytes) : raw).toString('utf-8');
+
+  const result: DesktopFileDto = {
+    path: targetPath,
+    name: basename(targetPath),
+    content,
+    size: raw.length,
+    updatedAt: fileStats.mtime.toISOString(),
+    isBinary,
+    truncated,
+  };
+
+  return c.json<DesktopFileDto>(result);
+});
+
+/** GET /api/desktop/file/raw?path=... — Stream raw Desktop file bytes for media previews. */
+desktopRoutes.get('/desktop/file/raw', async (c) => {
+  const queryValidation = validateSchema(
+    c,
+    DesktopFileQuerySchema,
+    c.req.query(),
+    INVALID_QUERY_MESSAGE
+  );
+  if (!queryValidation.ok) {
+    return queryValidation.response;
+  }
+
+  const queryParams = queryValidation.value as DesktopFileQuery;
+  const targetPath = resolveRequestedPath(queryParams.path);
+
+  if (!queryParams.path?.trim()) {
+    return c.json({ error: PATH_QUERY_REQUIRED_MESSAGE }, 400);
+  }
+  if (!isWithinDesktop(targetPath)) {
+    return c.json({ error: PATH_OUT_OF_BOUNDS_MESSAGE }, 400);
+  }
+
+  let fileStats;
+  try {
+    fileStats = await stat(targetPath);
+  } catch {
+    return c.json({ error: PATH_NOT_FOUND_MESSAGE }, 404);
+  }
+
+  if (!fileStats.isFile()) {
+    return c.json({ error: PATH_NOT_FILE_MESSAGE }, 400);
+  }
+
+  const raw = await readFile(targetPath);
+  return new Response(new Uint8Array(raw), {
+    status: 200,
+    headers: {
+      'Content-Type': inferContentType(targetPath),
+      'Content-Length': `${raw.length}`,
+      'Cache-Control': 'no-store',
+      'X-Desktop-Path': targetPath,
+    },
+  });
 });
