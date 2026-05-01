@@ -10,11 +10,12 @@ const execFileAsync = promisify(execFile);
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const packageRoot = resolve(scriptDirectory, '..');
 const stageRoot = resolve(packageRoot, '.package');
+const pnpmExecutable = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
 
 await rm(stageRoot, { recursive: true, force: true });
 
 await execFileAsync(
-  'pnpm',
+  pnpmExecutable,
   ['--filter', '@ank1015/llm-desktop-app', 'deploy', '--prod', stageRoot],
   {
     cwd: resolve(packageRoot, '../..'),
