@@ -7,13 +7,13 @@
   "main": "./dist/main/main.js",
   "scripts": {
     "dev": "pnpm run build && electron .",
-    "build": "pnpm --filter @ank1015/llm-server build && pnpm --filter @ank1015/llm-web-app build && node ../../scripts/remove-paths.mjs dist release vendor --tsbuildinfo && tsc && node scripts/copy-renderer.mjs && node scripts/assemble-web.mjs",
+    "build": "pnpm --filter @ank1015/llm-core build && pnpm --filter @ank1015/llm-sdk build && pnpm --filter @ank1015/llm-agents build && pnpm --filter @ank1015/llm-server build && pnpm --filter @ank1015/llm-web-app build && node ../../scripts/remove-paths.mjs dist release vendor --tsbuildinfo && tsc && node scripts/copy-renderer.mjs && node scripts/assemble-web.mjs",
     "start": "electron .",
     "package": "pnpm run build && node scripts/stage-package.mjs && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --projectDir .package --dir --config.directories.output=../release",
     "dist": "pnpm run build && node scripts/stage-package.mjs && electron-builder --projectDir .package --config.directories.output=../release",
     "test": "echo \"No tests configured for desktop app yet\"",
     "test:unit": "echo \"No unit tests configured for desktop app yet\"",
-    "typecheck": "pnpm --filter @ank1015/llm-server build && tsc --noEmit",
+    "typecheck": "pnpm --filter @ank1015/llm-core build && pnpm --filter @ank1015/llm-sdk build && pnpm --filter @ank1015/llm-agents build && pnpm --filter @ank1015/llm-server build && tsc --noEmit",
     "lint": "eslint src scripts",
     "clean": "node ../../scripts/remove-paths.mjs .package dist release vendor --tsbuildinfo"
   },
