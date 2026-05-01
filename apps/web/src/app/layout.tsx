@@ -1,28 +1,17 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import Script from "next/script";
-import "@xterm/xterm/css/xterm.css";
-import "katex/dist/katex.min.css";
+import type { Metadata } from 'next';
+import Script from 'next/script';
+import '@xterm/xterm/css/xterm.css';
+import 'katex/dist/katex.min.css';
 
-import { QueryProvider } from "@/components/query-provider";
-import { ThemeInit } from "@/components/theme-init";
-import { Toaster } from "@/components/toaster";
+import { QueryProvider } from '@/components/query-provider';
+import { ThemeInit } from '@/components/theme-init';
+import { Toaster } from '@/components/toaster';
 
-import "./globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+import './globals.css';
 
 export const metadata: Metadata = {
-  title: "LLM Stack",
-  description: "Refactored web client for the LLM stack",
+  title: 'LLM Stack',
+  description: 'Refactored web client for the LLM stack',
 };
 
 const themeInitScript = `
@@ -51,11 +40,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} h-full`}
-    >
+    <html lang="en" suppressHydrationWarning className="h-full">
       <head>
         <Script id="theme-init" strategy="beforeInteractive">
           {themeInitScript}
