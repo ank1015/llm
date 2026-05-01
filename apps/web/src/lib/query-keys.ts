@@ -21,6 +21,12 @@ const terminalScope = (ctx: ArtifactContext, terminalId: string) =>
   [...artifactScope(ctx), 'terminals', terminalId] as const;
 
 export const queryKeys = {
+  gateway: {
+    session: () => ['gateway', 'session'] as const,
+  },
+  setup: {
+    status: () => ['setup', 'status'] as const,
+  },
   skills: {
     list: () => ['skills', 'list'] as const,
   },

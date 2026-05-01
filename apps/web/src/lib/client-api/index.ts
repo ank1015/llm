@@ -21,6 +21,10 @@ export type {
   StreamRetryRequest,
   TurnSettings,
 } from './conversation';
+export { getGatewaySession, loginGateway } from './gateway';
+export type { GatewayLoginInput } from './gateway';
+export { cancelSetupAgentRun, completeSetup, getSetupStatus, startSetupAgent, streamSetupAgentRun } from './setup';
+export type { SetupAgentStreamEventMap, SetupAgentStreamHandlers } from './setup';
 export { listModels } from './models';
 export {
   createArtifactCheckpoint,
@@ -114,6 +118,19 @@ export type {
   InstallArtifactSkillRequest,
   DeleteSessionResponse,
   DeleteTerminalResponse,
+  GatewayLoginResult,
+  GatewaySession,
+  SetupCheck,
+  SetupCheckName,
+  SetupCompleteResult,
+  SetupAgentCancelResponse,
+  SetupAgentDoneEventData,
+  SetupAgentErrorEventData,
+  SetupAgentEventData,
+  SetupAgentReadyEventData,
+  SetupAgentRunSummary,
+  SetupAgentStartResponse,
+  SetupStatus,
   LiveRunSummaryDto,
   ModelOptionDto,
   ModelProviderDto,

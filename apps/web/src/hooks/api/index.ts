@@ -1,5 +1,12 @@
 'use client';
 
+export { useGatewayLoginMutation, useGatewaySessionQuery } from './gateway';
+export {
+  useCancelSetupAgentMutation,
+  useCompleteSetupMutation,
+  useSetupStatusQuery,
+  useStartSetupAgentMutation,
+} from './setup';
 export {
   useArtifactCheckpointDiffQuery,
   useArtifactCheckpointsQuery,
