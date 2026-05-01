@@ -1,6 +1,6 @@
 # @ank1015/llm-sdk
 
-Opinionated SDK package for credential-backed `llm()` calls, path-first `image()` generation, stateful `agent()` runs, and JSONL session helpers.
+Opinionated SDK package for gateway-backed `llm()` calls, path-first `image()` generation, stateful `agent()` runs, direct-key opt-out, and JSONL session helpers.
 
 ## Commands
 
@@ -21,7 +21,8 @@ pnpm --filter @ank1015/llm-sdk release:check
 - `src/llm.ts` - one-off model-call wrapper over core streaming
 - `src/agent.ts` - multi-turn agent runner with persisted session history
 - `src/model-input.ts` - curated model IDs and provider-option resolution
-- `src/config.ts` - default keys/session paths plus runtime overrides
+- `src/config.ts` - default gateway/keys/session paths plus runtime overrides
+- `src/gateway.ts` - gateway credentials, token refresh, SSE parsing, and proxy transport helpers
 - `src/keys.ts` - keys-file parsing, credential lookup, and credential writers
 - `src/session.ts` - JSONL session creation, traversal, and append helpers
 - `src/messages.ts`, `src/response.ts`, `src/tool.ts` - authoring and response utilities
@@ -32,7 +33,7 @@ pnpm --filter @ank1015/llm-sdk release:check
 
 ## Conventions
 
-- Keep sdk opinionated but predictable: curated `modelId` strings should map cleanly to core models and provider credentials.
+- Keep sdk opinionated but predictable: curated `modelId` strings should map cleanly to gateway/core models and provider options. `openai/...` routes to the OpenAI provider; `azure-openai/...` routes to the Azure OpenAI provider.
 - Treat `README.md`, `docs/`, and `CHANGELOG.md` as part of the public package surface.
 - When adding provider support, update `model-input.ts`, keys-file docs, and tests together.
 - Preserve the documented subpath exports for `config`, `keys`, and `session`; if they change, update the docs in the same change.

@@ -22,7 +22,7 @@ console.log(result.paths);
 console.log(result.text);
 ```
 
-`image()` resolves credentials, reads any local input images, saves generated images to disk, and returns the saved paths plus the normalized result.
+`image()` uses the SDK gateway by default, reads any local input images, saves generated images to disk, and returns the saved paths plus the normalized result.
 
 ---
 
@@ -105,7 +105,7 @@ Notes:
 
 ### `keysFilePath`
 
-Optional custom keys file path. If omitted, the SDK uses the default central keystore.
+Optional custom keys file path. It is only used when the SDK is configured with `modelTransport: 'direct'`; the normal path uses `~/.llm/gateway.json`.
 
 ### `requestId`
 

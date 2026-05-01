@@ -1,6 +1,6 @@
 ---
 name: image-gen
-description: Use when you want to create or edit images with `image()` from `@ank1015/llm-sdk`. Covers model choice across `nano-banana`, `nano-banana-pro`, and `gpt-image`, path-first output handling, central-keystore-first key selection, and provider-specific settings guidance.
+description: Use when you want to create or edit images with `image()` from `@ank1015/llm-sdk`. Covers model choice across `nano-banana`, `nano-banana-pro`, and `gpt-image`, path-first output handling, gateway-first transport, and provider-specific settings guidance.
 ---
 
 # Image Gen
@@ -19,8 +19,8 @@ Read [references/recommandation.md](./references/recommandation.md) for the full
 ## Follow These Defaults
 
 - Import `image` from `@ank1015/llm-sdk`.
-- Check the central keystore first with `getAvailableKeyProviders()` from `@ank1015/llm-sdk/keys`.
-- If `google` or `openai` is already available centrally, omit `keysFilePath` and let the SDK use the default keys file.
+- Use the default gateway credentials file unless the code explicitly opts into direct provider mode.
+- Omit `keysFilePath` in the normal gateway path.
 - Always pass an `output` base path and read `result.paths` after the call finishes.
 - Use `imagePaths` for reference-image and edit flows.
 - Use `maskPath` only with `gpt-image`.

@@ -24,7 +24,9 @@ The live integration suite is separate because it calls real providers.
 pnpm --filter @ank1015/llm-sdk test:integration
 ```
 
-Today the integration coverage is focused on the OpenAI-backed `llm()` and `agent()` flows. The suite reads `OPENAI_API_KEY`, writes a temporary keys file, and skips when the credential is not available.
+Gateway integration coverage reads `~/.llm/gateway.json` by default, refreshes the gateway access token, and verifies real `llm()` responses through both `openai/...` and `azure-openai/...` model routes. Set `LLM_GATEWAY_CREDENTIALS_PATH` to point at a different gateway credential file.
+
+Direct-provider integration coverage is still available for provider-key paths. Those tests set `modelTransport: 'direct'`, read provider env vars such as `OPENAI_API_KEY`, write temporary keys files, and skip when the required credential is not available.
 
 ## Packaging
 

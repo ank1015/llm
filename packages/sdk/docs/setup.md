@@ -6,6 +6,7 @@
 
 The SDK defaults are:
 
+- gateway credentials file: `~/.llm/gateway.json`
 - keys file: `~/.llm-sdk/keys.env`
 - sessions directory: `~/.llm-sdk/sessions`
 
@@ -13,6 +14,7 @@ They come from `@ank1015/llm-sdk/config`:
 
 ```ts
 import {
+  DEFAULT_GATEWAY_CREDENTIALS_PATH,
   DEFAULT_KEYS_FILE_PATH,
   DEFAULT_SESSIONS_BASE_DIR,
   getSdkConfig,
@@ -20,11 +22,14 @@ import {
   setSdkConfig,
 } from '@ank1015/llm-sdk/config';
 
+console.log(DEFAULT_GATEWAY_CREDENTIALS_PATH);
 console.log(DEFAULT_KEYS_FILE_PATH);
 console.log(DEFAULT_SESSIONS_BASE_DIR);
 
 setSdkConfig({
+  gatewayCredentialsPath: '/tmp/llm/gateway.json',
   keysFilePath: '/tmp/llm-sdk/keys.env',
+  modelTransport: 'gateway',
   sessionsBaseDir: '/tmp/llm-sdk/sessions',
 });
 
@@ -32,9 +37,22 @@ console.log(getSdkConfig());
 resetSdkConfig();
 ```
 
+## Gateway And Direct-Key Mode
+
+By default `llm()`, `agent()`, and `image()` use `~/.llm/gateway.json` and send requests through the gateway. Access tokens are refreshed with the stored refresh token and written back to the same file.
+
+For chat models, the curated model prefix selects the gateway provider:
+
+- `openai/...` sends `api: 'openai'`
+- `azure-openai/...` sends `api: 'azure-openai'`
+- `anthropic/...` sends `api: 'anthropic'`
+- `google/...` sends `api: 'google'`
+
+Set `modelTransport: 'direct'` only when you want the SDK to call providers directly with a local `keys.env` file.
+
 ## Keys File Helpers
 
-Use `@ank1015/llm-sdk/keys` to read, write, or seed credentials:
+Use `@ank1015/llm-sdk/keys` to read, write, or seed direct-mode credentials:
 
 ```ts
 import {
@@ -59,20 +77,19 @@ console.log(values, availableProviders, resolved, spec);
 
 Credential fields used by the curated providers:
 
-| Provider      | Required fields in `keys.env`                                                    |
-| ------------- | -------------------------------------------------------------------------------- |
-| `openai`      | `OPENAI_API_KEY`                                                                 |
-| `codex`       | `CODEX_API_KEY`, `CODEX_CHATGPT_ACCOUNT_ID`                                      |
-| `anthropic`   | `ANTHROPIC_API_KEY`                                                              |
-| `claude-code` | `CLAUDE_CODE_OAUTH_TOKEN`, `CLAUDE_CODE_BETA_FLAG`, `CLAUDE_CODE_BILLING_HEADER` |
-| `google`      | `GOOGLE_API_KEY`                                                                 |
+| Provider       | Required fields in `keys.env`                                                    |
+| -------------- | -------------------------------------------------------------------------------- |
+| `azure-openai` | `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_DEPLOYMENT_URL`                            |
+| `openai`       | `OPENAI_API_KEY`                                                                 |
+| `anthropic`    | `ANTHROPIC_API_KEY`                                                              |
+| `google`       | `GOOGLE_API_KEY`                                                                 |
 
 Notes:
 
 - `getAvailableKeyProviders()` lets callers inspect which providers are configured without reading or returning the secret values themselves.
 - `setProviderCredentials()` writes the canonical env names for the provider.
 - `resolveProviderCredentials()` returns a structured error instead of throwing when the file is missing or required fields are absent.
-- `ANTHROPIC_API_KEYS` and `CHATGPT_ACCOUNT_ID` are still recognized as aliases when resolving existing files.
+- `ANTHROPIC_API_KEYS`, `AZURE_OPENAI_TARGET_URI`, and `AZURE_OPENAI_BASE_URL` are still recognized as aliases when resolving existing files.
 
 ## Session Helpers
 
@@ -118,7 +135,7 @@ Useful session exports:
 
 `agent()` uses these same helpers internally:
 
-1. resolve the configured keys file and curated model input
+1. resolve the configured gateway credentials or direct keys file and curated model input
 2. create or load a session
 3. load existing messages from the chosen branch/head
 4. append new messages and tool results as the run progresses

@@ -474,17 +474,15 @@ type CuratedModelId =
   | 'openai/gpt-5.4-mini'
   | 'openai/gpt-5.4-nano'
   | 'openai/gpt-5.3-codex'
-  // Codex
-  | 'codex/gpt-5.4'
-  | 'codex/gpt-5.4-mini'
-  | 'codex/gpt-5.3-codex'
-  | 'codex/gpt-5.3-codex-spark'
+  // Azure OpenAI
+  | 'azure-openai/gpt-5.4'
+  | 'azure-openai/gpt-5.4-pro'
+  | 'azure-openai/gpt-5.4-mini'
+  | 'azure-openai/gpt-5.4-nano'
+  | 'azure-openai/gpt-5.3-codex'
   // Anthropic
   | 'anthropic/claude-opus-4-6'
   | 'anthropic/claude-sonnet-4-6'
-  // Claude Code
-  | 'claude-code/claude-opus-4-6'
-  | 'claude-code/claude-sonnet-4-6'
   // Google
   | 'google/gemini-3.1-pro-preview'
   | 'google/gemini-3-flash-preview'
@@ -503,8 +501,8 @@ type ReasoningEffort = 'low' | 'medium' | 'high' | 'xhigh';
 
 Provider behavior in this SDK:
 
-- `openai` and `codex`: omitted means no standardized reasoning option is added.
-- `anthropic` and `claude-code`: adaptive thinking and `cache_control: { type: 'ephemeral' }` are enabled by default for the supported Claude 4.6 models. `ReasoningEffort` adjusts the adaptive effort level.
+- `openai`: omitted means no standardized reasoning option is added.
+- `anthropic`: adaptive thinking and `cache_control: { type: 'ephemeral' }` are enabled by default for the supported Claude 4.6 models. `ReasoningEffort` adjusts the adaptive effort level.
 - `google`: omitted means the provider default thinking behavior is used.
 
 ---

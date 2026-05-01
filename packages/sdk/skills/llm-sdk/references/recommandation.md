@@ -2,26 +2,24 @@
 
 Use `@ank1015/llm-sdk` in the most boring way possible:
 
-- Prefer the central sdk keystore first.
+- Prefer the default gateway credentials first.
 - Prefer the default session behavior first.
-- Only create a local `keys.env` or custom session path when the central defaults are not enough.
+- Only create a local `keys.env` or custom session path when the defaults are not enough.
 
 ## Keys
 
-Check the central keystore first:
+Use the gateway first:
 
 ```ts
-import { getAvailableKeyProviders } from '@ank1015/llm-sdk/keys';
-
-const availableProviders = await getAvailableKeyProviders();
+// Normal calls use ~/.llm/gateway.json automatically.
 ```
 
-This reads the default sdk keys file at `~/.llm-sdk/keys.env` and returns only provider names with complete credentials. It does not reveal the secret values.
+This reads `~/.llm/gateway.json`, refreshes tokens when needed, and sends model calls through the gateway.
 
-If you need to inspect a different keys file, pass a path:
+If you need direct provider calls instead, opt in first:
 
 ```ts
-const availableProviders = await getAvailableKeyProviders('/tmp/project-keys.env');
+setSdkConfig({ modelTransport: 'direct' });
 ```
 
 ## Provider And Model Choice
@@ -30,22 +28,24 @@ Ask the user which provider/model they want when the choice affects behavior, co
 
 If the user does not care, use this preference order:
 
-1. Prefer `codex/*` over `openai/*` when both `codex` and `openai` are available.
-2. Prefer `claude-code/*` over `anthropic/*` when both `claude-code` and `anthropic` are available.
-3. Use another available provider only when those preferred pairs are not available or the task clearly needs another provider.
+1. Use `openai/gpt-5.4-mini` for general-purpose work.
+2. Use `anthropic/claude-sonnet-4-6` when the user asks for Claude or the task benefits from Anthropic behavior.
+3. Use a Google model when the user asks for Gemini or Google-specific behavior.
 
 Examples:
 
-- choose `codex/gpt-5.4-mini` before `openai/gpt-5.4-mini`
-- choose `claude-code/claude-sonnet-4-6` before `anthropic/claude-sonnet-4-6`
+- choose `openai/gpt-5.4-mini` for normal chat
+- choose `azure-openai/gpt-5.4-mini` when the user explicitly wants the Azure OpenAI provider
+- choose `anthropic/claude-sonnet-4-6` for Claude-specific runs
 
-## When The Central Keystore Is Enough
+## When The Gateway Is Enough
 
-If the provider you want is already available in the central keystore:
+If `~/.llm/gateway.json` exists:
 
 - call `llm()` or `agent()` normally
+- use `openai/...` for the OpenAI gateway provider and `azure-openai/...` for the Azure OpenAI gateway provider
 - do not pass `keysFilePath`
-- let the sdk use the default keys file automatically
+- let the sdk use the gateway automatically
 
 Example:
 
@@ -53,19 +53,20 @@ Example:
 import { llm, userMessage } from '@ank1015/llm-sdk';
 
 const message = await llm({
-  modelId: 'codex/gpt-5.4-mini',
+  modelId: 'openai/gpt-5.4-mini',
   messages: [userMessage('Summarize this file.')],
 });
 ```
 
 ## When You Need Your Own `keys.env`
 
-If the needed provider is not available centrally:
+If you explicitly need direct provider calls:
 
-1. Ask the user for the missing keys.
-2. Create a local `keys.env`.
-3. Write only the credentials you need.
-4. Pass that file through `keysFilePath`.
+1. Call `setSdkConfig({ modelTransport: 'direct' })`.
+2. Ask the user for the missing keys.
+3. Create a local `keys.env`.
+4. Write only the credentials you need.
+5. Pass that file through `keysFilePath`.
 
 Use `setProviderCredentials()` when you want to write the file safely:
 
@@ -106,7 +107,7 @@ For one-off `llm()` calls, there is no session file unless your code creates one
 
 ## Practical Rule
 
-- Use the central keystore when it already has what you need.
+- Use the gateway when it already has what you need.
 - Use the default agent session path unless you need explicit control.
 - Ask for provider/model choice when it matters.
-- If the user does not care, prefer `codex` over `openai` and `claude-code` over `anthropic`.
+- If the user does not care, use `openai/gpt-5.4-mini` for general work.
