@@ -4,6 +4,7 @@ import { basename, dirname, join, parse } from 'node:path';
 import { generateImage as coreGenerateImage, getImageModel } from '@ank1015/llm-core';
 
 import { getSdkConfig } from './config.js';
+import { GatewayTransportError, runGatewayImageRequest } from './gateway.js';
 import { resolveProviderCredentials } from './keys.js';
 
 import type { ResolveProviderCredentialsError } from './keys.js';
@@ -184,6 +185,14 @@ interface ResolvedImageInputSuccess<TApi extends ImageApi = ImageApi> {
   apiKey: string;
 }
 
+interface ResolvedGatewayImageInputSuccess<TApi extends ImageApi = ImageApi> {
+  ok: true;
+  modelId: ImageModelId;
+  api: TApi;
+  providerModelId: string;
+  model: ImageModel<TApi>;
+}
+
 interface ResolveImageInputFailure {
   ok: false;
   model: string;
@@ -192,6 +201,9 @@ interface ResolveImageInputFailure {
 }
 
 type ResolveImageInputResult = ResolvedImageInputSuccess | ResolveImageInputFailure;
+type ResolveGatewayImageInputResult =
+  | ResolvedGatewayImageInputSuccess
+  | ResolveImageInputFailure;
 
 export function isImageModelId(value: string): value is ImageModelId {
   return ImageModelIds.includes(value as ImageModelId);
@@ -200,6 +212,10 @@ export function isImageModelId(value: string): value is ImageModelId {
 export async function image<TInput extends ImageInput>(
   input: TInput
 ): Promise<ImageResultForInput<TInput>> {
+  if (getSdkConfig().modelTransport !== 'direct') {
+    return imageViaGateway(input);
+  }
+
   const resolved = await resolveImageInput(
     input.keysFilePath !== undefined
       ? {
@@ -227,6 +243,50 @@ export async function image<TInput extends ImageInput>(
     providerOptions as never,
     input.requestId
   );
+
+  if (result.images.length === 0) {
+    throw new Error(buildNoImagesGeneratedMessage(result));
+  }
+
+  const paths = await saveGeneratedImages(result.images, input.output);
+
+  return {
+    model: input.model,
+    api: resolved.api,
+    providerModelId: resolved.providerModelId,
+    ...(paths.length === 1 ? { path: paths[0] } : {}),
+    paths,
+    text: getImageResultText(result),
+    usage: result.usage,
+    result,
+  } as ImageResultForInput<TInput>;
+}
+
+async function imageViaGateway<TInput extends ImageInput>(
+  input: TInput
+): Promise<ImageResultForInput<TInput>> {
+  const resolved = resolveGatewayImageInput(input.model);
+
+  if (!resolved.ok) {
+    throw new GatewayTransportError('gateway_request_failed', resolved.error.message, {
+      details: resolved.error,
+    });
+  }
+
+  const context = await buildImageContext(input);
+  const providerOptions =
+    resolved.api === 'google'
+      ? buildGoogleImageProviderOptions(input as NanoBananaInput)
+      : buildOpenAIImageProviderOptions(input as GptImageInput);
+
+  const result = await runGatewayImageRequest({
+    api: resolved.api,
+    modelId: resolved.providerModelId,
+    context,
+    providerOptions: providerOptions as unknown as Record<string, unknown>,
+    ...(input.requestId !== undefined ? { requestId: input.requestId } : {}),
+    ...(input.signal !== undefined ? { signal: input.signal } : {}),
+  });
 
   if (result.images.length === 0) {
     throw new Error(buildNoImagesGeneratedMessage(result));
@@ -305,6 +365,48 @@ async function resolveImageInput(input: {
   } as ResolvedImageInputSuccess;
 }
 
+function resolveGatewayImageInput(modelId: string): ResolveGatewayImageInputResult {
+  if (!isImageModelId(modelId)) {
+    return {
+      ok: false,
+      model: modelId,
+      keysFilePath: getSdkConfig().gatewayCredentialsPath,
+      error: {
+        code: 'unsupported_image_model',
+        message: `Unsupported image model "${modelId}". Available models: ${ImageModelIds.join(', ')}`,
+        model: modelId,
+        supportedModels: [...ImageModelIds],
+      },
+    };
+  }
+
+  const entry = SDK_IMAGE_MODEL_CATALOG[modelId];
+  const model = getImageModel(entry.api, entry.providerModelId);
+
+  if (!model) {
+    return {
+      ok: false,
+      model: modelId,
+      keysFilePath: getSdkConfig().gatewayCredentialsPath,
+      error: {
+        code: 'core_model_not_found',
+        message: `Core image model "${entry.providerModelId}" was not found for ${modelId}`,
+        model: modelId,
+        api: entry.api,
+        providerModelId: entry.providerModelId,
+      },
+    };
+  }
+
+  return {
+    ok: true,
+    modelId,
+    api: entry.api,
+    providerModelId: entry.providerModelId,
+    model,
+  } as ResolvedGatewayImageInputSuccess;
+}
+
 async function buildImageContext(input: ImageInput): Promise<{
   prompt: string;
   images?: ImageContent[];
@@ -332,7 +434,7 @@ async function buildImageContext(input: ImageInput): Promise<{
 
 function buildGoogleImageProviderOptions(
   input: NanoBananaInput,
-  apiKey: string
+  apiKey?: string
 ): GoogleImageProviderOptions {
   const settings = input.settings;
   const imageConfig = compactObject({
@@ -353,7 +455,7 @@ function buildGoogleImageProviderOptions(
 
 function buildOpenAIImageProviderOptions(
   input: GptImageInput,
-  apiKey: string
+  apiKey?: string
 ): OpenAIImageProviderOptions {
   const settings = input.settings;
 

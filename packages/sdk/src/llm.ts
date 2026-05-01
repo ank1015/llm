@@ -2,12 +2,13 @@ import { randomUUID } from 'node:crypto';
 
 import { stream } from '@ank1015/llm-core';
 
-import { resolveModelInput } from './model-input.js';
+import { getSdkConfig } from './config.js';
+import { createGatewayLlmStream, GatewayTransportError } from './gateway.js';
+import { resolveGatewayModelInput, resolveModelInput } from './model-input.js';
 
 import type {
   AnthropicModelId,
-  ClaudeCodeModelId,
-  CodexModelId,
+  AzureOpenAIModelId,
   CuratedModelId,
   GoogleModelId,
   OpenAIModelId,
@@ -38,15 +39,13 @@ type RunConsumptionState = 'none' | 'active' | 'closed' | 'completed';
 
 export type ApiForModelId<TModelId extends CuratedModelId> = TModelId extends OpenAIModelId
   ? 'openai'
-  : TModelId extends CodexModelId
-    ? 'codex'
+  : TModelId extends AzureOpenAIModelId
+    ? 'azure-openai'
     : TModelId extends AnthropicModelId
       ? 'anthropic'
-      : TModelId extends ClaudeCodeModelId
-        ? 'claude-code'
-        : TModelId extends GoogleModelId
-          ? 'google'
-          : never;
+      : TModelId extends GoogleModelId
+        ? 'google'
+        : never;
 
 export interface LlmInput<TModelId extends CuratedModelId = CuratedModelId> {
   modelId: TModelId;
@@ -170,6 +169,16 @@ export function llm<TModelId extends CuratedModelId>(
 async function createLlmStream<TModelId extends CuratedModelId>(
   input: LlmInput<TModelId>
 ): Promise<StreamLike<ApiForModelId<TModelId>>> {
+  if (getSdkConfig().modelTransport !== 'direct') {
+    return createGatewayLlmStreamForInput(input);
+  }
+
+  return createDirectLlmStream(input);
+}
+
+async function createDirectLlmStream<TModelId extends CuratedModelId>(
+  input: LlmInput<TModelId>
+): Promise<StreamLike<ApiForModelId<TModelId>>> {
   const resolved = await resolveModelInput({
     modelId: input.modelId,
     ...(input.reasoningEffort !== undefined ? { reasoningEffort: input.reasoningEffort } : {}),
@@ -203,6 +212,37 @@ async function createLlmStream<TModelId extends CuratedModelId>(
     providerOptions as never,
     input.requestId ?? randomUUID()
   ) as StreamLike<ApiForModelId<TModelId>>;
+}
+
+async function createGatewayLlmStreamForInput<TModelId extends CuratedModelId>(
+  input: LlmInput<TModelId>
+): Promise<StreamLike<ApiForModelId<TModelId>>> {
+  const resolved = resolveGatewayModelInput({
+    modelId: input.modelId,
+    ...(input.reasoningEffort !== undefined ? { reasoningEffort: input.reasoningEffort } : {}),
+    ...(input.overrideProviderSetting !== undefined
+      ? { overrideProviderSetting: input.overrideProviderSetting }
+      : {}),
+  });
+
+  if (!resolved.ok) {
+    throw new GatewayTransportError(
+      'gateway_request_failed',
+      resolved.error.message,
+      { details: resolved.error }
+    );
+  }
+
+  return createGatewayLlmStream({
+    api: resolved.api,
+    modelId: resolved.providerModelId,
+    messages: [...input.messages],
+    ...(input.system !== undefined ? { systemPrompt: input.system } : {}),
+    ...(input.tools !== undefined ? { tools: [...input.tools] } : {}),
+    providerOptions: resolved.providerOptions,
+    requestId: input.requestId ?? randomUUID(),
+    ...(input.signal !== undefined ? { signal: input.signal } : {}),
+  }) as StreamLike<ApiForModelId<TModelId>>;
 }
 
 function withSignal<TProviderOptions extends object>(

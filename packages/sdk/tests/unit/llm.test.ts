@@ -1,6 +1,7 @@
 import { stream } from '@ank1015/llm-core';
-import { describe, expect, it, vi, afterEach } from 'vitest';
+import { describe, expect, it, vi, afterEach, beforeEach } from 'vitest';
 
+import { resetSdkConfig, setSdkConfig } from '../../src/config.js';
 import { llm, LlmInputError, LlmRunConsumptionError } from '../../src/llm.js';
 import { resolveModelInput } from '../../src/model-input.js';
 
@@ -19,6 +20,11 @@ const mockedStream = vi.mocked(stream);
 
 afterEach(() => {
   vi.clearAllMocks();
+  resetSdkConfig();
+});
+
+beforeEach(() => {
+  setSdkConfig({ modelTransport: 'direct' });
 });
 
 describe('llm', () => {

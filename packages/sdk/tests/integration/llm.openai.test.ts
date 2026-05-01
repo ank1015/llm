@@ -9,6 +9,7 @@ import {
   describeIfAvailable,
   getIntegrationEnv,
 } from '../../../core/tests/integration/helpers/live.js';
+import { resetSdkConfig, setSdkConfig } from '../../src/config.js';
 import { getText, llm, userMessage } from '../../src/index.js';
 import { setProviderCredentials } from '../../src/keys.js';
 
@@ -24,6 +25,7 @@ describeIfOpenAI('SDK llm() OpenAI integration', () => {
   beforeAll(async () => {
     tempDirectory = await mkdtemp(join(tmpdir(), 'llm-sdk-openai-'));
     keysFilePath = join(tempDirectory, 'keys.env');
+    setSdkConfig({ modelTransport: 'direct' });
 
     await setProviderCredentials(keysFilePath, 'openai', {
       apiKey: openAiApiKey!,
@@ -31,6 +33,8 @@ describeIfOpenAI('SDK llm() OpenAI integration', () => {
   });
 
   afterAll(async () => {
+    resetSdkConfig();
+
     if (tempDirectory) {
       await rm(tempDirectory, { recursive: true, force: true });
     }

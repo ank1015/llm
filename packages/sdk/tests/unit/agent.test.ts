@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { createEventAdapter } from '@ank1015/llm-core';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { resetSdkConfig, setSdkConfig } from '../../src/config.js';
 import { toDeterministicUuidV7 } from '../../src/conversation-id.js';
@@ -39,6 +39,10 @@ afterEach(async () => {
   await Promise.all(
     tempDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true }))
   );
+});
+
+beforeEach(() => {
+  setSdkConfig({ modelTransport: 'direct' });
 });
 
 async function createTempDirectory(): Promise<string> {

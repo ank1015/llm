@@ -6,11 +6,9 @@ import { getSdkConfig } from './config.js';
 export const KnownKeyProviders = [
   'openai',
   'azure-openai',
-  'codex',
   'google',
   'deepseek',
   'anthropic',
-  'claude-code',
   'zai',
   'kimi',
   'minimax',
@@ -30,18 +28,9 @@ export interface ProviderCredentialsMap {
     apiKey: string;
     azureDeploymentUrl: string;
   };
-  codex: {
-    apiKey: string;
-    'chatgpt-account-id': string;
-  };
   google: ApiKeyCredentials;
   deepseek: ApiKeyCredentials;
   anthropic: ApiKeyCredentials;
-  'claude-code': {
-    oauthToken: string;
-    betaFlag: string;
-    billingHeader: string;
-  };
   zai: ApiKeyCredentials;
   kimi: ApiKeyCredentials;
   minimax: ApiKeyCredentials;
@@ -118,14 +107,6 @@ const providerCredentialSpecs: {
       aliases: ['AZURE_OPENAI_TARGET_URI', 'AZURE_OPENAI_BASE_URL'],
     },
   ],
-  codex: [
-    { option: 'apiKey', env: 'CODEX_API_KEY', aliases: [] },
-    {
-      option: 'chatgpt-account-id',
-      env: 'CODEX_CHATGPT_ACCOUNT_ID',
-      aliases: ['CHATGPT_ACCOUNT_ID'],
-    },
-  ],
   google: [{ option: 'apiKey', env: 'GOOGLE_API_KEY', aliases: [] }],
   deepseek: [{ option: 'apiKey', env: 'DEEPSEEK_API_KEY', aliases: [] }],
   anthropic: [
@@ -133,23 +114,6 @@ const providerCredentialSpecs: {
       option: 'apiKey',
       env: 'ANTHROPIC_API_KEY',
       aliases: ['ANTHROPIC_API_KEYS'],
-    },
-  ],
-  'claude-code': [
-    {
-      option: 'oauthToken',
-      env: 'CLAUDE_CODE_OAUTH_TOKEN',
-      aliases: [],
-    },
-    {
-      option: 'betaFlag',
-      env: 'CLAUDE_CODE_BETA_FLAG',
-      aliases: [],
-    },
-    {
-      option: 'billingHeader',
-      env: 'CLAUDE_CODE_BILLING_HEADER',
-      aliases: [],
     },
   ],
   zai: [{ option: 'apiKey', env: 'ZAI_API_KEY', aliases: [] }],

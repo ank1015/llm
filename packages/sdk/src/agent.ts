@@ -2,8 +2,10 @@ import { randomUUID } from 'node:crypto';
 
 import { agentEngine, createEventAdapter, defaultModelInvoker } from '@ank1015/llm-core';
 
+import { getSdkConfig } from './config.js';
 import { toDeterministicUuidV7 } from './conversation-id.js';
-import { resolveModelInput } from './model-input.js';
+import { gatewayModelInvoker, GatewayTransportError } from './gateway.js';
+import { resolveGatewayModelInput, resolveModelInput } from './model-input.js';
 import {
   createSessionPath,
   createSessionAppender,
@@ -23,11 +25,13 @@ import type {
   AgentEngineConfig,
   AgentError,
   AgentEvent,
+  AgentModelInvoker,
   AgentRunState,
   AgentTool,
   Api,
   BaseAssistantMessage,
   Message,
+  Provider,
 } from '@ank1015/llm-core';
 
 export const DEFAULT_AGENT_MAX_TURNS = 20;
@@ -118,6 +122,17 @@ type AgentSessionState = {
   historyMessages: Message[];
   appender: SessionAppender;
 };
+
+type ResolvedAgentModelInput =
+  | {
+      ok: true;
+      provider: Provider<Api>;
+      modelInvoker: AgentModelInvoker;
+    }
+  | {
+      ok: false;
+      error: Error;
+    };
 
 export class AgentRunConsumptionError extends Error {
   constructor(message: string) {
@@ -361,18 +376,9 @@ async function executeAgent<TModelId extends CuratedModelId>(
       return;
     }
 
-    const resolved = await resolveModelInput({
-      modelId: input.modelId,
-      ...(input.reasoningEffort !== undefined ? { reasoningEffort: input.reasoningEffort } : {}),
-      conversationId: toDeterministicUuidV7(sessionId),
-      ...(input.overrideProviderSetting !== undefined
-        ? { overrideProviderSetting: input.overrideProviderSetting }
-        : {}),
-      ...(input.keysFilePath !== undefined ? { keysFilePath: input.keysFilePath } : {}),
-    });
-
+    const resolved = await resolveAgentModelInput(input, sessionId);
     if (!resolved.ok) {
-      run.fail(new AgentInputError(resolved));
+      run.fail(resolved.error);
       return;
     }
 
@@ -412,7 +418,7 @@ async function executeAgent<TModelId extends CuratedModelId>(
 
     const config: AgentEngineConfig = {
       provider: resolved.provider,
-      modelInvoker: defaultModelInvoker,
+      modelInvoker: resolved.modelInvoker,
       tools: input.tools ?? [],
       limits: {
         maxTurns: input.maxTurns ?? DEFAULT_AGENT_MAX_TURNS,
@@ -584,6 +590,64 @@ async function resolveAgentSession(
     headId: appender.headId,
     historyMessages,
     appender,
+  };
+}
+
+async function resolveAgentModelInput<TModelId extends CuratedModelId>(
+  input: AgentInput<TModelId>,
+  sessionId: string
+): Promise<ResolvedAgentModelInput> {
+  const conversationId = toDeterministicUuidV7(sessionId);
+
+  if (getSdkConfig().modelTransport !== 'direct') {
+    const resolved = resolveGatewayModelInput({
+      modelId: input.modelId,
+      ...(input.reasoningEffort !== undefined ? { reasoningEffort: input.reasoningEffort } : {}),
+      conversationId,
+      ...(input.overrideProviderSetting !== undefined
+        ? { overrideProviderSetting: input.overrideProviderSetting }
+        : {}),
+    });
+
+    if (!resolved.ok) {
+      return {
+        ok: false,
+        error: new GatewayTransportError(
+          'gateway_request_failed',
+          resolved.error.message,
+          { details: resolved.error }
+        ),
+      };
+    }
+
+    return {
+      ok: true,
+      provider: resolved.provider,
+      modelInvoker: gatewayModelInvoker,
+    };
+  }
+
+  const resolved = await resolveModelInput({
+    modelId: input.modelId,
+    ...(input.reasoningEffort !== undefined ? { reasoningEffort: input.reasoningEffort } : {}),
+    conversationId,
+    ...(input.overrideProviderSetting !== undefined
+      ? { overrideProviderSetting: input.overrideProviderSetting }
+      : {}),
+    ...(input.keysFilePath !== undefined ? { keysFilePath: input.keysFilePath } : {}),
+  });
+
+  if (!resolved.ok) {
+    return {
+      ok: false,
+      error: new AgentInputError(resolved),
+    };
+  }
+
+  return {
+    ok: true,
+    provider: resolved.provider,
+    modelInvoker: defaultModelInvoker,
   };
 }
 

@@ -6,9 +6,8 @@ import { resolveProviderCredentials } from './keys.js';
 import type { ResolveProviderCredentialsError } from './keys.js';
 import type {
   AnthropicProviderOptions,
+  Api,
   AzureOpenAIProviderOptions,
-  ClaudeCodeProviderOptions,
-  CodexProviderOptions,
   GoogleProviderOptions,
   Model,
   OpenAIProviderOptions,
@@ -19,7 +18,7 @@ export const ReasoningEfforts = ['low', 'medium', 'high', 'xhigh'] as const;
 
 export type ReasoningEffort = (typeof ReasoningEfforts)[number];
 
-const CLAUDE_CODE_API = 'claude-code' as const;
+const OPENAI_API = 'openai' as const;
 const AZURE_OPENAI_API = 'azure-openai' as const;
 
 const OPENAI_MODEL_CATALOG = {
@@ -30,21 +29,17 @@ const OPENAI_MODEL_CATALOG = {
   'openai/gpt-5.4-nano': 'gpt-5.4-nano',
 } as const;
 
-const CODEX_MODEL_CATALOG = {
-  'codex/gpt-5.4': 'gpt-5.4',
-  'codex/gpt-5.4-mini': 'gpt-5.4-mini',
-  'codex/gpt-5.3-codex': 'gpt-5.3-codex',
-  'codex/gpt-5.3-codex-spark': 'gpt-5.3-codex-spark',
+const AZURE_OPENAI_MODEL_CATALOG = {
+  'azure-openai/gpt-5.4': 'gpt-5.4',
+  'azure-openai/gpt-5.3-codex': 'gpt-5.3-codex',
+  'azure-openai/gpt-5.4-pro': 'gpt-5.4-pro',
+  'azure-openai/gpt-5.4-mini': 'gpt-5.4-mini',
+  'azure-openai/gpt-5.4-nano': 'gpt-5.4-nano',
 } as const;
 
 const ANTHROPIC_MODEL_CATALOG = {
   'anthropic/claude-opus-4-6': 'claude-opus-4-6',
   'anthropic/claude-sonnet-4-6': 'claude-sonnet-4-6',
-} as const;
-
-const CLAUDE_CODE_MODEL_CATALOG = {
-  'claude-code/claude-opus-4-6': 'claude-opus-4-6',
-  'claude-code/claude-sonnet-4-6': 'claude-sonnet-4-6',
 } as const;
 
 const GOOGLE_MODEL_CATALOG = {
@@ -54,31 +49,26 @@ const GOOGLE_MODEL_CATALOG = {
 } as const;
 
 export type OpenAIModelId = keyof typeof OPENAI_MODEL_CATALOG;
-export type CodexModelId = keyof typeof CODEX_MODEL_CATALOG;
+export type AzureOpenAIModelId = keyof typeof AZURE_OPENAI_MODEL_CATALOG;
 export type AnthropicModelId = keyof typeof ANTHROPIC_MODEL_CATALOG;
-export type ClaudeCodeModelId = keyof typeof CLAUDE_CODE_MODEL_CATALOG;
 export type GoogleModelId = keyof typeof GOOGLE_MODEL_CATALOG;
 export type CuratedModelId =
   | OpenAIModelId
-  | CodexModelId
+  | AzureOpenAIModelId
   | AnthropicModelId
-  | ClaudeCodeModelId
   | GoogleModelId;
 
 export const CuratedModelIds = [
   ...Object.keys(OPENAI_MODEL_CATALOG),
-  ...Object.keys(CODEX_MODEL_CATALOG),
+  ...Object.keys(AZURE_OPENAI_MODEL_CATALOG),
   ...Object.keys(ANTHROPIC_MODEL_CATALOG),
-  ...Object.keys(CLAUDE_CODE_MODEL_CATALOG),
   ...Object.keys(GOOGLE_MODEL_CATALOG),
 ] as CuratedModelId[];
 
 export interface SupportedProviderOptionsByApi {
   openai: OpenAIProviderOptions;
   [AZURE_OPENAI_API]: AzureOpenAIProviderOptions;
-  codex: CodexProviderOptions;
   anthropic: AnthropicProviderOptions;
-  [CLAUDE_CODE_API]: ClaudeCodeProviderOptions;
   google: GoogleProviderOptions;
 }
 
@@ -89,16 +79,14 @@ export type SupportedProviderOptions =
   SupportedProviderOptionsByApi[keyof SupportedProviderOptionsByApi];
 
 export type ProviderOptionsForModelId<TModelId extends string> = TModelId extends OpenAIModelId
-  ? AzureOpenAIProviderOptions
-  : TModelId extends CodexModelId
-    ? CodexProviderOptions
+  ? OpenAIProviderOptions
+  : TModelId extends AzureOpenAIModelId
+    ? AzureOpenAIProviderOptions
     : TModelId extends AnthropicModelId
       ? AnthropicProviderOptions
-      : TModelId extends ClaudeCodeModelId
-        ? ClaudeCodeProviderOptions
-        : TModelId extends GoogleModelId
-          ? GoogleProviderOptions
-          : SupportedProviderOptions;
+      : TModelId extends GoogleModelId
+        ? GoogleProviderOptions
+        : SupportedProviderOptions;
 
 export interface ResolveModelInputInput<TModelId extends string = string> {
   modelId: TModelId;
@@ -106,6 +94,13 @@ export interface ResolveModelInputInput<TModelId extends string = string> {
   conversationId?: string;
   overrideProviderSetting?: Partial<ProviderOptionsForModelId<TModelId>>;
   keysFilePath?: string;
+}
+
+export interface ResolveGatewayModelInputInput<TModelId extends string = string> {
+  modelId: TModelId;
+  reasoningEffort?: ReasoningEffort;
+  conversationId?: string;
+  overrideProviderSetting?: Partial<ProviderOptionsForModelId<TModelId>>;
 }
 
 export interface UnsupportedModelIdError {
@@ -120,48 +115,44 @@ export interface CoreModelNotFoundError {
   message: string;
   modelId: CuratedModelId;
   api:
-    | 'openai'
+    | typeof OPENAI_API
     | typeof AZURE_OPENAI_API
-    | 'codex'
     | 'anthropic'
-    | typeof CLAUDE_CODE_API
     | 'google';
   providerModelId: string;
 }
 
+type OpenAICredentialsError = ResolveProviderCredentialsError<typeof OPENAI_API>;
 type AzureOpenAICredentialsError = ResolveProviderCredentialsError<typeof AZURE_OPENAI_API>;
-type CodexCredentialsError = ResolveProviderCredentialsError<'codex'>;
 type AnthropicCredentialsError = ResolveProviderCredentialsError<'anthropic'>;
-type ClaudeCodeCredentialsError = ResolveProviderCredentialsError<typeof CLAUDE_CODE_API>;
 type GoogleCredentialsError = ResolveProviderCredentialsError<'google'>;
 
 export type ResolveModelInputError =
   | UnsupportedModelIdError
   | CoreModelNotFoundError
+  | OpenAICredentialsError
   | AzureOpenAICredentialsError
-  | CodexCredentialsError
   | AnthropicCredentialsError
-  | ClaudeCodeCredentialsError
   | GoogleCredentialsError;
 
 export interface ResolvedOpenAIModelInput {
   ok: true;
-  api: typeof AZURE_OPENAI_API;
+  api: typeof OPENAI_API;
   modelId: OpenAIModelId;
+  keysFilePath: string;
+  model: Model<typeof OPENAI_API>;
+  providerOptions: OpenAIProviderOptions;
+  provider: Provider<typeof OPENAI_API>;
+}
+
+export interface ResolvedAzureOpenAIModelInput {
+  ok: true;
+  api: typeof AZURE_OPENAI_API;
+  modelId: AzureOpenAIModelId;
   keysFilePath: string;
   model: Model<typeof AZURE_OPENAI_API>;
   providerOptions: AzureOpenAIProviderOptions;
   provider: Provider<typeof AZURE_OPENAI_API>;
-}
-
-export interface ResolvedCodexModelInput {
-  ok: true;
-  api: 'codex';
-  modelId: CodexModelId;
-  keysFilePath: string;
-  model: Model<'codex'>;
-  providerOptions: CodexProviderOptions;
-  provider: Provider<'codex'>;
 }
 
 export interface ResolvedAnthropicModelInput {
@@ -172,16 +163,6 @@ export interface ResolvedAnthropicModelInput {
   model: Model<'anthropic'>;
   providerOptions: AnthropicProviderOptions;
   provider: Provider<'anthropic'>;
-}
-
-export interface ResolvedClaudeCodeModelInput {
-  ok: true;
-  api: typeof CLAUDE_CODE_API;
-  modelId: ClaudeCodeModelId;
-  keysFilePath: string;
-  model: Model<typeof CLAUDE_CODE_API>;
-  providerOptions: ClaudeCodeProviderOptions;
-  provider: Provider<typeof CLAUDE_CODE_API>;
 }
 
 export interface ResolvedGoogleModelInput {
@@ -203,11 +184,34 @@ export interface ResolveModelInputFailure {
 
 export type ResolveModelInputResult =
   | ResolvedOpenAIModelInput
-  | ResolvedCodexModelInput
+  | ResolvedAzureOpenAIModelInput
   | ResolvedAnthropicModelInput
-  | ResolvedClaudeCodeModelInput
   | ResolvedGoogleModelInput
   | ResolveModelInputFailure;
+
+export type ResolveGatewayModelInputError =
+  | UnsupportedModelIdError
+  | CoreModelNotFoundError;
+
+export interface ResolvedGatewayModelInput<TApi extends Api = Api> {
+  ok: true;
+  api: TApi;
+  modelId: CuratedModelId;
+  providerModelId: string;
+  model: Model<TApi>;
+  providerOptions: Record<string, unknown>;
+  provider: Provider<TApi>;
+}
+
+export interface ResolveGatewayModelInputFailure {
+  ok: false;
+  modelId: string;
+  error: ResolveGatewayModelInputError;
+}
+
+export type ResolveGatewayModelInputResult =
+  | ResolvedGatewayModelInput
+  | ResolveGatewayModelInputFailure;
 
 export function isCuratedModelId(value: string): value is CuratedModelId {
   return CuratedModelIds.includes(value as CuratedModelId);
@@ -222,17 +226,16 @@ export async function resolveModelInput<TModelId extends string>(
     return resolveOpenAIModelInput(
       input.modelId,
       input.reasoningEffort,
-      input.overrideProviderSetting as Partial<AzureOpenAIProviderOptions> | undefined,
+      input.overrideProviderSetting as Partial<OpenAIProviderOptions> | undefined,
       keysFilePath
     );
   }
 
-  if (isCodexModelId(input.modelId)) {
-    return resolveCodexModelInput(
+  if (isAzureOpenAIModelId(input.modelId)) {
+    return resolveAzureOpenAIModelInput(
       input.modelId,
       input.reasoningEffort,
-      input.conversationId,
-      input.overrideProviderSetting as Partial<CodexProviderOptions> | undefined,
+      input.overrideProviderSetting as Partial<AzureOpenAIProviderOptions> | undefined,
       keysFilePath
     );
   }
@@ -242,15 +245,6 @@ export async function resolveModelInput<TModelId extends string>(
       input.modelId,
       input.reasoningEffort,
       input.overrideProviderSetting as Partial<AnthropicProviderOptions> | undefined,
-      keysFilePath
-    );
-  }
-
-  if (isClaudeCodeModelId(input.modelId)) {
-    return resolveClaudeCodeModelInput(
-      input.modelId,
-      input.reasoningEffort,
-      input.overrideProviderSetting as Partial<ClaudeCodeProviderOptions> | undefined,
       keysFilePath
     );
   }
@@ -277,33 +271,269 @@ export async function resolveModelInput<TModelId extends string>(
   };
 }
 
+export function resolveGatewayModelInput<TModelId extends string>(
+  input: ResolveGatewayModelInputInput<TModelId>
+): ResolveGatewayModelInputResult {
+  if (isOpenAIModelId(input.modelId)) {
+    return resolveOpenAIGatewayModelInput(
+      input.modelId,
+      input.reasoningEffort,
+      input.overrideProviderSetting as Partial<OpenAIProviderOptions> | undefined
+    );
+  }
+
+  if (isAzureOpenAIModelId(input.modelId)) {
+    return resolveAzureOpenAIGatewayModelInput(
+      input.modelId,
+      input.reasoningEffort,
+      input.overrideProviderSetting as Partial<AzureOpenAIProviderOptions> | undefined
+    );
+  }
+
+  if (isAnthropicModelId(input.modelId)) {
+    return resolveAnthropicGatewayModelInput(
+      input.modelId,
+      input.reasoningEffort,
+      input.overrideProviderSetting as Partial<AnthropicProviderOptions> | undefined
+    );
+  }
+
+  if (isGoogleModelId(input.modelId)) {
+    return resolveGoogleGatewayModelInput(
+      input.modelId,
+      input.reasoningEffort,
+      input.overrideProviderSetting as Partial<GoogleProviderOptions> | undefined
+    );
+  }
+
+  return {
+    ok: false,
+    modelId: input.modelId,
+    error: {
+      code: 'unsupported_model_id',
+      message: `Unsupported modelId "${input.modelId}". Available models: ${CuratedModelIds.join(', ')}`,
+      modelId: input.modelId,
+      supportedModelIds: [...CuratedModelIds],
+    },
+  };
+}
+
 function isOpenAIModelId(value: string): value is OpenAIModelId {
   return value in OPENAI_MODEL_CATALOG;
 }
 
-function isCodexModelId(value: string): value is CodexModelId {
-  return value in CODEX_MODEL_CATALOG;
+function isAzureOpenAIModelId(value: string): value is AzureOpenAIModelId {
+  return value in AZURE_OPENAI_MODEL_CATALOG;
 }
 
 function isAnthropicModelId(value: string): value is AnthropicModelId {
   return value in ANTHROPIC_MODEL_CATALOG;
 }
 
-function isClaudeCodeModelId(value: string): value is ClaudeCodeModelId {
-  return value in CLAUDE_CODE_MODEL_CATALOG;
-}
-
 function isGoogleModelId(value: string): value is GoogleModelId {
   return value in GOOGLE_MODEL_CATALOG;
+}
+
+function resolveOpenAIGatewayModelInput(
+  modelId: OpenAIModelId,
+  reasoningEffort: ReasoningEffort | undefined,
+  overrideProviderSetting: Partial<OpenAIProviderOptions> | undefined
+): ResolveGatewayModelInputResult {
+  const providerModelId = OPENAI_MODEL_CATALOG[modelId];
+  const model = getModel(OPENAI_API, providerModelId);
+
+  if (!model) {
+    return coreModelNotFound(modelId, OPENAI_API, providerModelId);
+  }
+
+  const providerOptions = sanitizeGatewayProviderOptions(
+    mergeProviderOptions(buildOpenAICompatibleReasoning(reasoningEffort), overrideProviderSetting)
+  );
+
+  return createResolvedGatewayModelInput({
+    api: OPENAI_API,
+    modelId,
+    providerModelId,
+    model,
+    providerOptions,
+  });
+}
+
+function resolveAzureOpenAIGatewayModelInput(
+  modelId: AzureOpenAIModelId,
+  reasoningEffort: ReasoningEffort | undefined,
+  overrideProviderSetting: Partial<AzureOpenAIProviderOptions> | undefined
+): ResolveGatewayModelInputResult {
+  const providerModelId = AZURE_OPENAI_MODEL_CATALOG[modelId];
+  const model = getModel(AZURE_OPENAI_API, providerModelId);
+
+  if (!model) {
+    return coreModelNotFound(modelId, AZURE_OPENAI_API, providerModelId);
+  }
+
+  const providerOptions = sanitizeGatewayProviderOptions(
+    mergeProviderOptions(buildOpenAICompatibleReasoning(reasoningEffort), overrideProviderSetting)
+  );
+
+  return createResolvedGatewayModelInput({
+    api: AZURE_OPENAI_API,
+    modelId,
+    providerModelId,
+    model,
+    providerOptions,
+  });
+}
+
+function resolveAnthropicGatewayModelInput(
+  modelId: AnthropicModelId,
+  reasoningEffort: ReasoningEffort | undefined,
+  overrideProviderSetting: Partial<AnthropicProviderOptions> | undefined
+): ResolveGatewayModelInputResult {
+  const providerModelId = ANTHROPIC_MODEL_CATALOG[modelId];
+  const model = getModel('anthropic', providerModelId);
+
+  if (!model) {
+    return coreModelNotFound(modelId, 'anthropic', providerModelId);
+  }
+
+  const providerOptions = sanitizeGatewayProviderOptions(
+    mergeProviderOptions(buildAnthropicAdaptiveThinking(model.id, reasoningEffort), overrideProviderSetting)
+  );
+
+  return createResolvedGatewayModelInput({
+    api: 'anthropic',
+    modelId,
+    providerModelId,
+    model,
+    providerOptions,
+  });
+}
+
+function resolveGoogleGatewayModelInput(
+  modelId: GoogleModelId,
+  reasoningEffort: ReasoningEffort | undefined,
+  overrideProviderSetting: Partial<GoogleProviderOptions> | undefined
+): ResolveGatewayModelInputResult {
+  const providerModelId = GOOGLE_MODEL_CATALOG[modelId];
+  const model = getModel('google', providerModelId);
+
+  if (!model) {
+    return coreModelNotFound(modelId, 'google', providerModelId);
+  }
+
+  const providerOptions = sanitizeGatewayProviderOptions(
+    mergeProviderOptions(buildGoogleThinkingConfig(model.id, reasoningEffort), overrideProviderSetting)
+  );
+
+  return createResolvedGatewayModelInput({
+    api: 'google',
+    modelId,
+    providerModelId,
+    model,
+    providerOptions,
+  });
+}
+
+function createResolvedGatewayModelInput<TApi extends Api>(input: {
+  api: TApi;
+  modelId: CuratedModelId;
+  providerModelId: string;
+  model: Model<TApi>;
+  providerOptions: Record<string, unknown>;
+}): ResolvedGatewayModelInput<TApi> {
+  return {
+    ok: true,
+    api: input.api,
+    modelId: input.modelId,
+    providerModelId: input.providerModelId,
+    model: input.model,
+    providerOptions: input.providerOptions,
+    provider: {
+      model: input.model,
+      providerOptions: input.providerOptions as never,
+    },
+  };
+}
+
+function coreModelNotFound(
+  modelId: CuratedModelId,
+  api: CoreModelNotFoundError['api'],
+  providerModelId: string
+): ResolveGatewayModelInputFailure {
+  return {
+    ok: false,
+    modelId,
+    error: {
+      code: 'core_model_not_found',
+      message: `Core model "${providerModelId}" was not found for ${modelId}`,
+      modelId,
+      api,
+      providerModelId,
+    },
+  };
 }
 
 async function resolveOpenAIModelInput(
   modelId: OpenAIModelId,
   reasoningEffort: ReasoningEffort | undefined,
-  overrideProviderSetting: Partial<AzureOpenAIProviderOptions> | undefined,
+  overrideProviderSetting: Partial<OpenAIProviderOptions> | undefined,
   keysFilePath: string
 ): Promise<ResolveModelInputResult> {
   const providerModelId = OPENAI_MODEL_CATALOG[modelId];
+  const model = getModel(OPENAI_API, providerModelId);
+
+  if (!model) {
+    return {
+      ok: false,
+      modelId,
+      keysFilePath,
+      error: {
+        code: 'core_model_not_found',
+        message: `Core OpenAI model "${providerModelId}" was not found for ${modelId}`,
+        modelId,
+        api: OPENAI_API,
+        providerModelId,
+      },
+    };
+  }
+
+  const credentialsResult = await resolveProviderCredentials(keysFilePath, OPENAI_API);
+  if (!credentialsResult.ok) {
+    return {
+      ok: false,
+      modelId,
+      keysFilePath,
+      error: credentialsResult.error,
+    };
+  }
+
+  const baseProviderOptions: OpenAIProviderOptions = {
+    apiKey: credentialsResult.credentials.apiKey,
+    ...buildOpenAICompatibleReasoning(reasoningEffort),
+  };
+  const providerOptions = mergeProviderOptions(baseProviderOptions, overrideProviderSetting);
+
+  return {
+    ok: true,
+    api: OPENAI_API,
+    modelId,
+    keysFilePath,
+    model,
+    providerOptions,
+    provider: {
+      model,
+      providerOptions,
+    },
+  };
+}
+
+async function resolveAzureOpenAIModelInput(
+  modelId: AzureOpenAIModelId,
+  reasoningEffort: ReasoningEffort | undefined,
+  overrideProviderSetting: Partial<AzureOpenAIProviderOptions> | undefined,
+  keysFilePath: string
+): Promise<ResolveModelInputResult> {
+  const providerModelId = AZURE_OPENAI_MODEL_CATALOG[modelId];
   const model = getModel(AZURE_OPENAI_API, providerModelId);
 
   if (!model) {
@@ -344,62 +574,6 @@ async function resolveOpenAIModelInput(
   return {
     ok: true,
     api: AZURE_OPENAI_API,
-    modelId,
-    keysFilePath,
-    model,
-    providerOptions,
-    provider: {
-      model,
-      providerOptions,
-    },
-  };
-}
-
-async function resolveCodexModelInput(
-  modelId: CodexModelId,
-  reasoningEffort: ReasoningEffort | undefined,
-  conversationId: string | undefined,
-  overrideProviderSetting: Partial<CodexProviderOptions> | undefined,
-  keysFilePath: string
-): Promise<ResolveModelInputResult> {
-  const providerModelId = CODEX_MODEL_CATALOG[modelId];
-  const model = getModel('codex', providerModelId);
-
-  if (!model) {
-    return {
-      ok: false,
-      modelId,
-      keysFilePath,
-      error: {
-        code: 'core_model_not_found',
-        message: `Core model "${providerModelId}" was not found for ${modelId}`,
-        modelId,
-        api: 'codex',
-        providerModelId,
-      },
-    };
-  }
-
-  const credentialsResult = await resolveProviderCredentials(keysFilePath, 'codex');
-  if (!credentialsResult.ok) {
-    return {
-      ok: false,
-      modelId,
-      keysFilePath,
-      error: credentialsResult.error,
-    };
-  }
-
-  const baseProviderOptions: CodexProviderOptions = {
-    ...credentialsResult.credentials,
-    ...buildOpenAICompatibleReasoning(reasoningEffort),
-    ...(conversationId !== undefined ? { conversationId } : {}),
-  };
-  const providerOptions = mergeProviderOptions(baseProviderOptions, overrideProviderSetting);
-
-  return {
-    ok: true,
-    api: 'codex',
     modelId,
     keysFilePath,
     model,
@@ -454,60 +628,6 @@ async function resolveAnthropicModelInput(
   return {
     ok: true,
     api: 'anthropic',
-    modelId,
-    keysFilePath,
-    model,
-    providerOptions,
-    provider: {
-      model,
-      providerOptions,
-    },
-  };
-}
-
-async function resolveClaudeCodeModelInput(
-  modelId: ClaudeCodeModelId,
-  reasoningEffort: ReasoningEffort | undefined,
-  overrideProviderSetting: Partial<ClaudeCodeProviderOptions> | undefined,
-  keysFilePath: string
-): Promise<ResolveModelInputResult> {
-  const providerModelId = CLAUDE_CODE_MODEL_CATALOG[modelId];
-  const model = getModel(CLAUDE_CODE_API, providerModelId);
-
-  if (!model) {
-    return {
-      ok: false,
-      modelId,
-      keysFilePath,
-      error: {
-        code: 'core_model_not_found',
-        message: `Core model "${providerModelId}" was not found for ${modelId}`,
-        modelId,
-        api: CLAUDE_CODE_API,
-        providerModelId,
-      },
-    };
-  }
-
-  const credentialsResult = await resolveProviderCredentials(keysFilePath, CLAUDE_CODE_API);
-  if (!credentialsResult.ok) {
-    return {
-      ok: false,
-      modelId,
-      keysFilePath,
-      error: credentialsResult.error,
-    };
-  }
-
-  const baseProviderOptions: ClaudeCodeProviderOptions = {
-    ...credentialsResult.credentials,
-    ...buildAnthropicAdaptiveThinking(model.id, reasoningEffort),
-  };
-  const providerOptions = mergeProviderOptions(baseProviderOptions, overrideProviderSetting);
-
-  return {
-    ok: true,
-    api: CLAUDE_CODE_API,
     modelId,
     keysFilePath,
     model,
@@ -575,7 +695,7 @@ async function resolveGoogleModelInput(
 
 function buildOpenAICompatibleReasoning(
   reasoningEffort: ReasoningEffort | undefined
-): Pick<AzureOpenAIProviderOptions, 'reasoning'> | {} {
+): Pick<OpenAIProviderOptions, 'reasoning'> | {} {
   if (!reasoningEffort) {
     return {};
   }
@@ -612,11 +732,7 @@ type AnthropicAdaptiveEffort = 'low' | 'medium' | 'high' | 'max';
 const ANTHROPIC_EPHEMERAL_CACHE_CONTROL = { type: 'ephemeral' } as const;
 
 function buildAnthropicAdaptiveThinking(
-  modelId:
-    | AnthropicModelId
-    | ClaudeCodeModelId
-    | Model<'anthropic'>['id']
-    | Model<typeof CLAUDE_CODE_API>['id'],
+  modelId: AnthropicModelId | Model<'anthropic'>['id'],
   reasoningEffort: ReasoningEffort | undefined
 ): Pick<AnthropicProviderOptions, 'thinking' | 'output_config' | 'cache_control'> {
   const effort = mapAnthropicEffort(modelId, reasoningEffort);
@@ -642,11 +758,7 @@ function buildAnthropicAdaptiveThinking(
 }
 
 function mapAnthropicEffort(
-  modelId:
-    | AnthropicModelId
-    | ClaudeCodeModelId
-    | Model<'anthropic'>['id']
-    | Model<typeof CLAUDE_CODE_API>['id'],
+  modelId: AnthropicModelId | Model<'anthropic'>['id'],
   reasoningEffort: ReasoningEffort | undefined
 ): AnthropicAdaptiveEffort | undefined {
   if (!reasoningEffort) {
@@ -729,6 +841,20 @@ function getSupportedGoogleThinkingLevels(
 
 type PlainObject = Record<string, unknown>;
 
+const GATEWAY_FORBIDDEN_PROVIDER_OPTION_KEYS = new Set([
+  'accessToken',
+  'adminToken',
+  'apiKey',
+  'authorization',
+  'billingHeader',
+  'cookie',
+  'fetch',
+  'headers',
+  'oauthToken',
+  'refreshToken',
+  'signal',
+]);
+
 function mergeProviderOptions<T extends object>(base: T, override?: Partial<T>): T {
   if (!override) {
     return { ...base };
@@ -758,6 +884,36 @@ function mergePlainObjects(base: PlainObject, override: PlainObject): PlainObjec
   }
 
   return merged;
+}
+
+function sanitizeGatewayProviderOptions(input: object): Record<string, unknown> {
+  return sanitizeGatewayProviderOptionObject(input as Record<string, unknown>);
+}
+
+function sanitizeGatewayProviderOptionObject(input: Record<string, unknown>): Record<string, unknown> {
+  const output: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(input)) {
+    if (GATEWAY_FORBIDDEN_PROVIDER_OPTION_KEYS.has(key) || value === undefined) {
+      continue;
+    }
+
+    if (Array.isArray(value)) {
+      output[key] = value.map((item) =>
+        isPlainObject(item) ? sanitizeGatewayProviderOptionObject(item) : item
+      );
+      continue;
+    }
+
+    if (isPlainObject(value)) {
+      output[key] = sanitizeGatewayProviderOptionObject(value);
+      continue;
+    }
+
+    output[key] = value;
+  }
+
+  return output;
 }
 
 function isPlainObject(value: unknown): value is PlainObject {
