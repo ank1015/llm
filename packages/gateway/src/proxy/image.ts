@@ -2,6 +2,7 @@ import { sanitizeProviderOptions } from '../logging/sanitize.js';
 import { isGatewayImageApi } from '../vault/provider-key-vault.js';
 
 import { GatewayProxyError } from './error.js';
+import { buildStoredProviderOptions } from './llm.js';
 
 import type { GatewayEnv } from '../context.js';
 import type { ImageGenerateRequest } from '../contracts/index.js';
@@ -39,10 +40,10 @@ export async function runImageProxy(
     );
   }
 
-  const apiKey = services.vault.getApiKey(body.api);
-  if (!apiKey) {
+  const providerCredentials = services.vault.getProviderCredentials(body.api);
+  if (!providerCredentials) {
     throw new GatewayProxyError(
-      `No provider key is configured for "${body.api}".`,
+      `No provider credentials are configured for "${body.api}".`,
       'provider_key_missing',
       503
     );
@@ -78,7 +79,7 @@ export async function runImageProxy(
   };
   const providerOptions = {
     ...(sanitizeProviderOptions(body.providerOptions) ?? {}),
-    apiKey,
+    ...buildStoredProviderOptions(body.api, providerCredentials),
     signal: signalController.signal,
   };
 
