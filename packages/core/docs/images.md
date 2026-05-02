@@ -11,10 +11,11 @@
 
 ## Built-In Image Providers
 
-| Provider | Models                                                         | `getImageModel()` API key | Notes                                                 |
-| -------- | -------------------------------------------------------------- | ------------------------- | ----------------------------------------------------- |
-| OpenAI   | `gpt-image-1.5`                                                | `openai`                  | Uses the OpenAI Images API for generate/edit flows    |
-| Google   | `gemini-3.1-flash-image-preview`, `gemini-3-pro-image-preview` | `google`                  | Uses Gemini `generateContent()` with image modalities |
+| Provider     | Models                                                         | `getImageModel()` API key | Notes                                                 |
+| ------------ | -------------------------------------------------------------- | ------------------------- | ----------------------------------------------------- |
+| OpenAI       | `gpt-image-1.5`                                                | `openai`                  | Uses the OpenAI Images API for generate/edit flows    |
+| Azure OpenAI | `gpt-image-2`                                                  | `azure-openai`            | Uses the Azure OpenAI Images API                      |
+| Google       | `gemini-3.1-flash-image-preview`, `gemini-3-pro-image-preview` | `google`                  | Uses Gemini `generateContent()` with image modalities |
 
 ## Common Result Shape
 
@@ -25,7 +26,7 @@
 - `usage` - normalized token accounting with text/image splits and computed `usage.cost`
 - `response` - provider-native response preserved for advanced access
 
-Google image responses may include both text and image blocks in `content`. OpenAI image responses currently normalize to image blocks only.
+Google image responses may include both text and image blocks in `content`. OpenAI and Azure OpenAI image responses currently normalize to image blocks only.
 
 ## Context Shape
 
@@ -39,14 +40,15 @@ The shared image context is:
 }
 ```
 
-- `prompt` is required for both providers
+- `prompt` is required for all built-in image providers
 - `images` enables edit/reference-image flows
-- `mask` is currently supported for OpenAI image edits
+- `mask` is currently supported for OpenAI and Azure OpenAI image edits
 
 ## Notes
 
 - The image runtime is intentionally non-streaming for now.
 - OpenAI uses the dedicated Images API instead of the Responses API.
+- Azure OpenAI uses the deployment-based Images API. If callers pass a Responses URI like `/openai/responses?api-version=...`, the provider normalizes it to the matching `/openai` base URL and API version.
 - Google always forces `IMAGE` output in the underlying `responseModalities` config.
 - Usage comes from the provider-native response payload.
 - Cost is computed locally from the image model catalog pricing via `calculateImageCost()`.

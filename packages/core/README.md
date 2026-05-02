@@ -43,6 +43,7 @@ Provider auth notes and integration-test env vars are documented in [docs/provid
 ## Supported Image Providers
 
 - OpenAI Images API: `gpt-image-1.5`
+- Azure OpenAI Images API: `gpt-image-2`
 - Google Gemini native image generation: `gemini-3.1-flash-image-preview`, `gemini-3-pro-image-preview`
 
 Image-provider notes and the image runtime surface are documented in [docs/images.md](./docs/images.md).
@@ -197,7 +198,7 @@ console.log(result.usage.cost.total);
 console.log(result.response);
 ```
 
-Google image generation uses the same `generateImage()` surface, but may return both text and image blocks in `result.content`.
+Azure OpenAI image generation uses the same `generateImage()` surface with Azure endpoint/API-version options. Google image generation also uses this surface, but may return both text and image blocks in `result.content`.
 
 Image usage comes from the provider-native response. Image cost is derived locally from the built-in image model pricing with `calculateImageCost()`.
 
