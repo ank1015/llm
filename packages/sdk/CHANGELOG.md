@@ -6,6 +6,11 @@ The format is based on Keep a Changelog and this package follows SemVer once its
 
 ## [Unreleased]
 
+### Changed
+
+- Simplified `image()` so callers no longer choose an image provider or model.
+- Reworked the public `image()` input so image options are top-level (`inputImages`, `mask`, `size`, `quality`, `format`, `compression`, `background`, `moderation`, `count`) instead of nested settings.
+
 ## [0.0.7] - 2026-04-16
 
 ### Added
@@ -16,7 +21,7 @@ The format is based on Keep a Changelog and this package follows SemVer once its
 
 ### Added
 
-- Added package docs for the new `image()` SDK entrypoint, including path-first output behavior, SDK image aliases, and model-specific settings guidance.
+- Added package docs for the new `image()` SDK entrypoint, including path-first output behavior and output option guidance.
 
 ## [0.0.5] - 2026-04-13
 

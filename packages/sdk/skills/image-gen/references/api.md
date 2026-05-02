@@ -1,163 +1,91 @@
 # `image()`
 
-The function for simple image generation and editing with saved output files.
+The function for image generation and editing with saved output files.
 
 ```ts
 import { image } from '@ank1015/llm-sdk';
 ```
 
----
-
-## Basic usage
-
-```ts
-const result = await image({
-  model: 'nano-banana',
-  prompt: 'Create a polished travel sticker of a floating tea cart.',
-  output: './artifacts/tea-cart.png',
-});
-
-console.log(result.path);
-console.log(result.paths);
-console.log(result.text);
-```
-
-`image()` uses the SDK gateway by default, reads any local input images, saves generated images to disk, and returns the saved paths plus the normalized result.
-
----
-
 ## Input
 
 ```ts
-type ImageInput =
-  | {
-      model: 'nano-banana' | 'nano-banana-pro';
-      prompt: string;
-      output: string;
-      imagePaths?: string[];
-      settings?: NanoBananaSettings;
-      keysFilePath?: string;
-      requestId?: string;
-      signal?: AbortSignal;
-    }
-  | {
-      model: 'gpt-image';
-      prompt: string;
-      output: string;
-      imagePaths?: string[];
-      maskPath?: string;
-      settings?: GptImageSettings;
-      keysFilePath?: string;
-      requestId?: string;
-      signal?: AbortSignal;
-    };
+type ImageInput = {
+  prompt: string;
+  output: string;
+  inputImages?: string[];
+  mask?: string;
+  count?: number;
+  size?: 'auto' | `${number}x${number}`;
+  quality?: 'auto' | 'low' | 'medium' | 'high';
+  format?: 'png' | 'jpeg' | 'webp';
+  compression?: number;
+  background?: 'auto' | 'opaque';
+  moderation?: 'auto' | 'low';
+  requestId?: string;
+  signal?: AbortSignal;
+};
 ```
 
-### `model`
-
-Pick one of these SDK aliases:
-
-- `nano-banana`
-- `nano-banana-pro`
-- `gpt-image`
-
-### `prompt`
-
-The text instruction for the generation or edit.
-
-### `output`
-
-The base output file path.
-
-Rules:
-
-- If one image is generated, the SDK saves it to the same base name with the actual returned extension.
-- If multiple images are generated, the SDK saves suffixed files like `poster-1.png`, `poster-2.jpg`.
-- The extension in `output` is treated as a base-name hint, not a guaranteed final extension.
-
-Examples:
+## Output
 
 ```ts
-output: './artifacts/poster.png';
-output: './artifacts/icons';
-```
-
-### `imagePaths`
-
-Optional local source images for reference-image and edit flows.
-
-```ts
-imagePaths: ['./inputs/source.png'];
-```
-
-### `maskPath`
-
-OpenAI-only mask input for localized edits.
-
-```ts
-maskPath: './inputs/mask.png';
-```
-
-Notes:
-
-- `maskPath` only works with `gpt-image`
-- a mask requires at least one `imagePaths` entry
-
-### `keysFilePath`
-
-Optional custom keys file path. It is only used when the SDK is configured with `modelTransport: 'direct'`; the normal path uses `~/.llm/gateway.json`.
-
-### `requestId`
-
-Optional request id forwarded to the runtime.
-
-### `signal`
-
-Abort signal for cancelling the request.
-
----
-
-## Return value
-
-```ts
-interface ImageResult {
-  model: 'nano-banana' | 'nano-banana-pro' | 'gpt-image';
-  api: 'google' | 'openai';
-  providerModelId: string;
+type ImageResult = {
   path?: string;
   paths: string[];
   text: string;
   usage: ImageUsage;
-  result: BaseImageResult;
-}
+  raw: unknown;
+};
 ```
-
-### `path` and `paths`
 
 - `paths` always contains every saved output path.
 - `path` is only present when exactly one image was generated.
+- The saved file extension follows the generated image format.
 
-### `text`
+## Examples
 
-Provider text output, if any.
-
-### `usage`
-
-Normalized usage and cost.
-
-### `result`
-
-The full normalized result for advanced access.
-
----
-
-## Good default pattern
+Text to image:
 
 ```ts
 const result = await image({
-  model: 'nano-banana',
-  prompt: 'Create a cinematic badge icon with soft highlights.',
-  imagePaths: ['./inputs/source.png'],
+  prompt: 'Create a bold sticker of a cobalt kite. No text.',
+  output: './artifacts/kite.png',
+  size: '1024x1024',
+  quality: 'low',
+  format: 'png',
+});
+```
+
+Reference edit:
+
+```ts
+const result = await image({
+  prompt: 'Use this as a base and turn it into a premium emerald badge icon.',
+  inputImages: ['./inputs/source.png'],
   output: './artifacts/badge.png',
+  quality: 'high',
+});
+```
+
+Masked edit:
+
+```ts
+const result = await image({
+  prompt: 'Replace the center area with a green approval badge and keep everything else unchanged.',
+  inputImages: ['./inputs/source.png'],
+  mask: './inputs/mask.png',
+  output: './artifacts/approval.png',
+  quality: 'high',
+});
+```
+
+Multiple drafts:
+
+```ts
+const result = await image({
+  prompt: 'Create three rough logo directions for a quiet productivity app.',
+  output: './artifacts/logo.png',
+  count: 3,
+  quality: 'low',
 });
 ```

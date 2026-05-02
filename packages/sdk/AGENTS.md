@@ -1,6 +1,6 @@
 # @ank1015/llm-sdk
 
-Opinionated SDK package for gateway-backed `llm()` calls, path-first `image()` generation, stateful `agent()` runs, direct-key opt-out, and JSONL session helpers.
+Opinionated SDK package for gateway-backed `llm()` calls, simple path-first `image()` generation, stateful `agent()` runs, direct-key opt-out for chat models, and JSONL session helpers.
 
 ## Commands
 
@@ -17,7 +17,7 @@ pnpm --filter @ank1015/llm-sdk release:check
 ## Module Map
 
 - `src/index.ts` - package root exports for `llm()`, `image()`, `agent()`, helpers, and shared types
-- `src/image.ts` - path-first image generation/editing wrapper over the core image runtime
+- `src/image.ts` - path-first image generation/editing wrapper over the gateway
 - `src/llm.ts` - one-off model-call wrapper over core streaming
 - `src/agent.ts` - multi-turn agent runner with persisted session history
 - `src/model-input.ts` - curated model IDs and provider-option resolution
