@@ -1,289 +1,71 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, parse } from 'node:path';
 
-import { generateImage as coreGenerateImage, getImageModel } from '@ank1015/llm-core';
+import { runGatewayImageRequest } from './gateway.js';
 
-import { getSdkConfig } from './config.js';
-import { GatewayTransportError, runGatewayImageRequest } from './gateway.js';
-import { resolveProviderCredentials } from './keys.js';
-
-import type { ResolveProviderCredentialsError } from './keys.js';
 import type {
+  AzureOpenAIImageProviderOptions,
+  AnyImageResult,
   BaseImageResult,
-  GoogleImageProviderOptions,
-  ImageApi,
   ImageContent,
-  ImageModel,
   ImageUsage,
-  OpenAIImageProviderOptions,
 } from '@ank1015/llm-core';
 
-const SDK_IMAGE_MODEL_CATALOG = {
-  'nano-banana': {
-    api: 'google',
-    providerModelId: 'gemini-3.1-flash-image-preview',
-  },
-  'nano-banana-pro': {
-    api: 'google',
-    providerModelId: 'gemini-3-pro-image-preview',
-  },
-  'gpt-image': {
-    api: 'openai',
-    providerModelId: 'gpt-image-1.5',
-  },
-} as const;
+const SDK_IMAGE_API = 'azure-openai' as const;
+const SDK_IMAGE_MODEL_ID = 'gpt-image-2' as const;
+type AzureOpenAIImageNativeSize = NonNullable<AzureOpenAIImageProviderOptions['size']>;
 
-export const ImageModelIds = Object.keys(SDK_IMAGE_MODEL_CATALOG) as ImageModelId[];
+export type ImageSize = 'auto' | `${number}x${number}`;
+export type ImageQuality = 'auto' | 'low' | 'medium' | 'high';
+export type ImageFormat = 'png' | 'jpeg' | 'webp';
+export type ImageBackground = 'auto' | 'opaque';
+export type ImageModeration = 'auto' | 'low';
 
-export type ImageModelId = keyof typeof SDK_IMAGE_MODEL_CATALOG;
-
-type GoogleImageModelId = Extract<ImageModelId, 'nano-banana' | 'nano-banana-pro'>;
-type OpenAIImageModelId = Extract<ImageModelId, 'gpt-image'>;
-
-type ApiForImageModelId<TModelId extends ImageModelId> = TModelId extends OpenAIImageModelId
-  ? 'openai'
-  : 'google';
-
-type ImageResultForInput<TInput extends ImageInput> = ImageResult<
-  ApiForImageModelId<TInput['model']>,
-  TInput['model']
->;
-
-type GoogleImageAspectRatio = NonNullable<
-  NonNullable<GoogleImageProviderOptions['imageConfig']>['aspectRatio']
->;
-type GoogleImageSize = NonNullable<
-  NonNullable<GoogleImageProviderOptions['imageConfig']>['imageSize']
->;
-type GoogleImagePersonGeneration = NonNullable<
-  NonNullable<GoogleImageProviderOptions['imageConfig']>['personGeneration']
->;
-type GoogleProminentPeople = NonNullable<
-  NonNullable<GoogleImageProviderOptions['imageConfig']>['prominentPeople']
->;
-
-type OpenAIImageSize = NonNullable<OpenAIImageProviderOptions['size']>;
-type OpenAIImageQuality = NonNullable<OpenAIImageProviderOptions['quality']>;
-type OpenAIImageBackground = NonNullable<OpenAIImageProviderOptions['background']>;
-type OpenAIImageFormat = NonNullable<OpenAIImageProviderOptions['output_format']>;
-type OpenAIImageCompression = NonNullable<OpenAIImageProviderOptions['output_compression']>;
-type OpenAIImageModeration = NonNullable<OpenAIImageProviderOptions['moderation']>;
-type OpenAIImageCount = NonNullable<OpenAIImageProviderOptions['n']>;
-type OpenAIImageFidelity = NonNullable<OpenAIImageProviderOptions['input_fidelity']>;
-
-export interface NanoBananaSettings {
-  aspectRatio?: GoogleImageAspectRatio;
-  imageSize?: GoogleImageSize;
-  personGeneration?: GoogleImagePersonGeneration;
-  prominentPeople?: GoogleProminentPeople;
-  googleSearch?: boolean;
-  includeText?: boolean;
-}
-
-export interface GptImageSettings {
-  size?: OpenAIImageSize;
-  quality?: OpenAIImageQuality;
-  background?: OpenAIImageBackground;
-  format?: OpenAIImageFormat;
-  compression?: OpenAIImageCompression;
-  moderation?: OpenAIImageModeration;
-  count?: OpenAIImageCount;
-  fidelity?: OpenAIImageFidelity;
-}
-
-interface BaseSdkImageInput<TModelId extends ImageModelId> {
-  model: TModelId;
+export interface ImageInput {
   prompt: string;
   output: string;
-  keysFilePath?: string;
+  inputImages?: string[];
+  mask?: string;
+  count?: number;
+  size?: ImageSize;
+  quality?: ImageQuality;
+  format?: ImageFormat;
+  compression?: number;
+  background?: ImageBackground;
+  moderation?: ImageModeration;
   requestId?: string;
   signal?: AbortSignal;
 }
 
-export interface NanoBananaInput<
-  TModelId extends GoogleImageModelId = GoogleImageModelId,
-> extends BaseSdkImageInput<TModelId> {
-  imagePaths?: string[];
-  settings?: NanoBananaSettings;
-}
-
-export interface GptImageInput extends BaseSdkImageInput<'gpt-image'> {
-  imagePaths?: string[];
-  maskPath?: string;
-  settings?: GptImageSettings;
-}
-
-export type ImageInput = NanoBananaInput | GptImageInput;
-
-export interface ImageResult<
-  TApi extends ImageApi = ImageApi,
-  TModelId extends ImageModelId = ImageModelId,
-> {
-  model: TModelId;
-  api: TApi;
-  providerModelId: string;
+export interface ImageResult {
   path?: string;
   paths: string[];
   text: string;
   usage: ImageUsage;
-  result: BaseImageResult<TApi>;
+  raw: AnyImageResult;
 }
-
-export interface UnsupportedImageModelError {
-  code: 'unsupported_image_model';
-  message: string;
-  model: string;
-  supportedModels: ImageModelId[];
-}
-
-export interface CoreImageModelNotFoundError {
-  code: 'core_model_not_found';
-  message: string;
-  model: ImageModelId;
-  api: ImageApi;
-  providerModelId: string;
-}
-
-type OpenAICredentialsError = ResolveProviderCredentialsError<'openai'>;
-type GoogleCredentialsError = ResolveProviderCredentialsError<'google'>;
-
-export type ResolveImageInputError =
-  | UnsupportedImageModelError
-  | CoreImageModelNotFoundError
-  | OpenAICredentialsError
-  | GoogleCredentialsError;
-
-type SetupFailure = {
-  model: string;
-  keysFilePath: string;
-  error: ResolveImageInputError;
-};
 
 export class ImageInputError extends Error {
-  readonly code: ResolveImageInputError['code'];
-  readonly details: ResolveImageInputError;
-  readonly model: string;
-  readonly keysFilePath: string;
+  readonly code: 'invalid_image_input';
 
-  constructor(failure: SetupFailure) {
-    super(failure.error.message);
+  constructor(message: string) {
+    super(message);
     this.name = 'ImageInputError';
-    this.code = failure.error.code;
-    this.details = failure.error;
-    this.model = failure.model;
-    this.keysFilePath = failure.keysFilePath;
+    this.code = 'invalid_image_input';
   }
 }
 
-interface ResolvedImageInputSuccess<TApi extends ImageApi = ImageApi> {
-  ok: true;
-  modelId: ImageModelId;
-  api: TApi;
-  keysFilePath: string;
-  providerModelId: string;
-  model: ImageModel<TApi>;
-  apiKey: string;
-}
-
-interface ResolvedGatewayImageInputSuccess<TApi extends ImageApi = ImageApi> {
-  ok: true;
-  modelId: ImageModelId;
-  api: TApi;
-  providerModelId: string;
-  model: ImageModel<TApi>;
-}
-
-interface ResolveImageInputFailure {
-  ok: false;
-  model: string;
-  keysFilePath: string;
-  error: ResolveImageInputError;
-}
-
-type ResolveImageInputResult = ResolvedImageInputSuccess | ResolveImageInputFailure;
-type ResolveGatewayImageInputResult =
-  | ResolvedGatewayImageInputSuccess
-  | ResolveImageInputFailure;
-
-export function isImageModelId(value: string): value is ImageModelId {
-  return ImageModelIds.includes(value as ImageModelId);
-}
-
-export async function image<TInput extends ImageInput>(
-  input: TInput
-): Promise<ImageResultForInput<TInput>> {
-  if (getSdkConfig().modelTransport !== 'direct') {
-    return imageViaGateway(input);
-  }
-
-  const resolved = await resolveImageInput(
-    input.keysFilePath !== undefined
-      ? {
-          model: input.model,
-          keysFilePath: input.keysFilePath,
-        }
-      : {
-          model: input.model,
-        }
-  );
-
-  if (!resolved.ok) {
-    throw new ImageInputError(resolved);
-  }
+export async function image(input: ImageInput): Promise<ImageResult> {
+  validateImageInput(input);
 
   const context = await buildImageContext(input);
-  const providerOptions =
-    resolved.api === 'google'
-      ? buildGoogleImageProviderOptions(input as NanoBananaInput, resolved.apiKey)
-      : buildOpenAIImageProviderOptions(input as GptImageInput, resolved.apiKey);
+  const providerOptions = buildAzureOpenAIImageProviderOptions(input);
 
-  const result = await coreGenerateImage(
-    resolved.model as never,
+  const result = await runGatewayImageRequest<typeof SDK_IMAGE_API>({
+    api: SDK_IMAGE_API,
+    modelId: SDK_IMAGE_MODEL_ID,
     context,
-    providerOptions as never,
-    input.requestId
-  );
-
-  if (result.images.length === 0) {
-    throw new Error(buildNoImagesGeneratedMessage(result));
-  }
-
-  const paths = await saveGeneratedImages(result.images, input.output);
-
-  return {
-    model: input.model,
-    api: resolved.api,
-    providerModelId: resolved.providerModelId,
-    ...(paths.length === 1 ? { path: paths[0] } : {}),
-    paths,
-    text: getImageResultText(result),
-    usage: result.usage,
-    result,
-  } as ImageResultForInput<TInput>;
-}
-
-async function imageViaGateway<TInput extends ImageInput>(
-  input: TInput
-): Promise<ImageResultForInput<TInput>> {
-  const resolved = resolveGatewayImageInput(input.model);
-
-  if (!resolved.ok) {
-    throw new GatewayTransportError('gateway_request_failed', resolved.error.message, {
-      details: resolved.error,
-    });
-  }
-
-  const context = await buildImageContext(input);
-  const providerOptions =
-    resolved.api === 'google'
-      ? buildGoogleImageProviderOptions(input as NanoBananaInput)
-      : buildOpenAIImageProviderOptions(input as GptImageInput);
-
-  const result = await runGatewayImageRequest({
-    api: resolved.api,
-    modelId: resolved.providerModelId,
-    context,
-    providerOptions: providerOptions as unknown as Record<string, unknown>,
+    providerOptions: providerOptions as Record<string, unknown>,
     ...(input.requestId !== undefined ? { requestId: input.requestId } : {}),
     ...(input.signal !== undefined ? { signal: input.signal } : {}),
   });
@@ -295,116 +77,12 @@ async function imageViaGateway<TInput extends ImageInput>(
   const paths = await saveGeneratedImages(result.images, input.output);
 
   return {
-    model: input.model,
-    api: resolved.api,
-    providerModelId: resolved.providerModelId,
     ...(paths.length === 1 ? { path: paths[0] } : {}),
     paths,
     text: getImageResultText(result),
     usage: result.usage,
-    result,
-  } as ImageResultForInput<TInput>;
-}
-
-async function resolveImageInput(input: {
-  model: string;
-  keysFilePath?: string;
-}): Promise<ResolveImageInputResult> {
-  const keysFilePath = input.keysFilePath ?? getSdkConfig().keysFilePath;
-
-  if (!isImageModelId(input.model)) {
-    return {
-      ok: false,
-      model: input.model,
-      keysFilePath,
-      error: {
-        code: 'unsupported_image_model',
-        message: `Unsupported image model "${input.model}". Available models: ${ImageModelIds.join(', ')}`,
-        model: input.model,
-        supportedModels: [...ImageModelIds],
-      },
-    };
-  }
-
-  const entry = SDK_IMAGE_MODEL_CATALOG[input.model];
-  const model = getImageModel(entry.api, entry.providerModelId);
-
-  if (!model) {
-    return {
-      ok: false,
-      model: input.model,
-      keysFilePath,
-      error: {
-        code: 'core_model_not_found',
-        message: `Core image model "${entry.providerModelId}" was not found for ${input.model}`,
-        model: input.model,
-        api: entry.api,
-        providerModelId: entry.providerModelId,
-      },
-    };
-  }
-
-  const credentialsResult = await resolveProviderCredentials(keysFilePath, entry.api);
-  if (!credentialsResult.ok) {
-    return {
-      ok: false,
-      model: input.model,
-      keysFilePath,
-      error: credentialsResult.error,
-    };
-  }
-
-  return {
-    ok: true,
-    modelId: input.model,
-    api: entry.api,
-    keysFilePath,
-    providerModelId: entry.providerModelId,
-    model,
-    apiKey: credentialsResult.credentials.apiKey,
-  } as ResolvedImageInputSuccess;
-}
-
-function resolveGatewayImageInput(modelId: string): ResolveGatewayImageInputResult {
-  if (!isImageModelId(modelId)) {
-    return {
-      ok: false,
-      model: modelId,
-      keysFilePath: getSdkConfig().gatewayCredentialsPath,
-      error: {
-        code: 'unsupported_image_model',
-        message: `Unsupported image model "${modelId}". Available models: ${ImageModelIds.join(', ')}`,
-        model: modelId,
-        supportedModels: [...ImageModelIds],
-      },
-    };
-  }
-
-  const entry = SDK_IMAGE_MODEL_CATALOG[modelId];
-  const model = getImageModel(entry.api, entry.providerModelId);
-
-  if (!model) {
-    return {
-      ok: false,
-      model: modelId,
-      keysFilePath: getSdkConfig().gatewayCredentialsPath,
-      error: {
-        code: 'core_model_not_found',
-        message: `Core image model "${entry.providerModelId}" was not found for ${modelId}`,
-        model: modelId,
-        api: entry.api,
-        providerModelId: entry.providerModelId,
-      },
-    };
-  }
-
-  return {
-    ok: true,
-    modelId,
-    api: entry.api,
-    providerModelId: entry.providerModelId,
-    model,
-  } as ResolvedGatewayImageInputSuccess;
+    raw: result,
+  };
 }
 
 async function buildImageContext(input: ImageInput): Promise<{
@@ -412,17 +90,19 @@ async function buildImageContext(input: ImageInput): Promise<{
   images?: ImageContent[];
   mask?: ImageContent;
 }> {
-  const images = input.imagePaths ? await Promise.all(input.imagePaths.map(readImageFromPath)) : [];
+  const images = input.inputImages
+    ? await Promise.all(input.inputImages.map(readImageFromPath))
+    : [];
 
-  if (input.model === 'gpt-image' && input.maskPath) {
+  if (input.mask) {
     if (images.length === 0) {
-      throw new Error('gpt-image mask editing requires at least one imagePaths entry.');
+      throw new ImageInputError('Mask editing requires at least one inputImages entry.');
     }
 
     return {
       prompt: input.prompt,
-      ...(images.length > 0 ? { images } : {}),
-      mask: await readImageFromPath(input.maskPath),
+      images,
+      mask: await readImageFromPath(input.mask),
     };
   }
 
@@ -432,45 +112,43 @@ async function buildImageContext(input: ImageInput): Promise<{
   };
 }
 
-function buildGoogleImageProviderOptions(
-  input: NanoBananaInput,
-  apiKey?: string
-): GoogleImageProviderOptions {
-  const settings = input.settings;
-  const imageConfig = compactObject({
-    aspectRatio: settings?.aspectRatio,
-    imageSize: settings?.imageSize,
-    personGeneration: settings?.personGeneration,
-    prominentPeople: settings?.prominentPeople,
-  });
+function buildAzureOpenAIImageProviderOptions(
+  input: ImageInput
+): Partial<AzureOpenAIImageProviderOptions> {
+  const providerOptions: Partial<AzureOpenAIImageProviderOptions> = {};
 
-  return compactObject({
-    apiKey,
-    signal: input.signal,
-    responseModalities: settings?.includeText === false ? ['IMAGE'] : ['TEXT', 'IMAGE'],
-    ...(Object.keys(imageConfig).length > 0 ? { imageConfig } : {}),
-    ...(settings?.googleSearch ? { tools: [{ googleSearch: {} }] } : {}),
-  }) as GoogleImageProviderOptions;
+  if (input.size !== undefined) {
+    providerOptions.size = input.size as AzureOpenAIImageNativeSize;
+  }
+  if (input.quality !== undefined) providerOptions.quality = input.quality;
+  if (input.background !== undefined) providerOptions.background = input.background;
+  if (input.format !== undefined) providerOptions.output_format = input.format;
+  if (input.compression !== undefined) providerOptions.output_compression = input.compression;
+  if (input.moderation !== undefined) providerOptions.moderation = input.moderation;
+  if (input.count !== undefined) providerOptions.n = input.count;
+
+  return providerOptions;
 }
 
-function buildOpenAIImageProviderOptions(
-  input: GptImageInput,
-  apiKey?: string
-): OpenAIImageProviderOptions {
-  const settings = input.settings;
+function validateImageInput(input: ImageInput): void {
+  if (input.mask && (!input.inputImages || input.inputImages.length === 0)) {
+    throw new ImageInputError('Mask editing requires at least one inputImages entry.');
+  }
 
-  return compactObject({
-    apiKey,
-    signal: input.signal,
-    size: settings?.size,
-    quality: settings?.quality,
-    background: settings?.background,
-    output_format: settings?.format,
-    output_compression: settings?.compression,
-    moderation: settings?.moderation,
-    n: settings?.count,
-    input_fidelity: settings?.fidelity,
-  }) as OpenAIImageProviderOptions;
+  if (input.count !== undefined && (!Number.isInteger(input.count) || input.count < 1)) {
+    throw new ImageInputError('count must be a positive integer.');
+  }
+
+  if (
+    input.compression !== undefined &&
+    (!Number.isInteger(input.compression) || input.compression < 0 || input.compression > 100)
+  ) {
+    throw new ImageInputError('compression must be an integer from 0 to 100.');
+  }
+
+  if (input.compression !== undefined && input.format !== 'jpeg' && input.format !== 'webp') {
+    throw new ImageInputError('compression can only be used with format: "jpeg" or "webp".');
+  }
 }
 
 async function readImageFromPath(filePath: string): Promise<ImageContent> {
@@ -492,10 +170,10 @@ async function saveGeneratedImages(images: ImageContent[], output: string): Prom
   const paths = buildOutputPaths(images, output);
 
   await Promise.all(
-    images.map(async (image, index) => {
+    images.map(async (generatedImage, index) => {
       const filePath = paths[index]!;
       await mkdir(dirname(filePath), { recursive: true });
-      await writeFile(filePath, Buffer.from(image.data, 'base64'));
+      await writeFile(filePath, Buffer.from(generatedImage.data, 'base64'));
     })
   );
 
@@ -507,20 +185,20 @@ function buildOutputPaths(images: ImageContent[], output: string): string[] {
   const hasBaseName = parsed.base.length > 0 || parsed.name.length > 0;
 
   if (!hasBaseName) {
-    throw new Error(`Output path "${output}" must include a file name.`);
+    throw new ImageInputError(`Output path "${output}" must include a file name.`);
   }
 
   const baseName = parsed.name || parsed.base;
 
-  return images.map((image, index) => {
-    const extension = `.${getFileExtensionForMimeType(image.mimeType)}`;
+  return images.map((generatedImage, index) => {
+    const extension = `.${getFileExtensionForMimeType(generatedImage.mimeType)}`;
     const fileName =
       images.length === 1 ? `${baseName}${extension}` : `${baseName}-${index + 1}${extension}`;
     return parsed.dir ? join(parsed.dir, fileName) : fileName;
   });
 }
 
-function getImageResultText(result: BaseImageResult<ImageApi>): string {
+function getImageResultText(result: BaseImageResult<typeof SDK_IMAGE_API>): string {
   let text = '';
 
   for (const content of result.content) {
@@ -532,7 +210,7 @@ function getImageResultText(result: BaseImageResult<ImageApi>): string {
   return text;
 }
 
-function buildNoImagesGeneratedMessage(result: BaseImageResult<ImageApi>): string {
+function buildNoImagesGeneratedMessage(result: BaseImageResult<typeof SDK_IMAGE_API>): string {
   const text = getImageResultText(result).trim();
   return text.length > 0
     ? `No images were generated. Provider text: ${text}`
@@ -555,7 +233,7 @@ function getMimeTypeForPath(filePath: string): string {
     case '.heif':
       return 'image/heif';
     default:
-      throw new Error(
+      throw new ImageInputError(
         `Unsupported image file extension for "${filePath}". Supported extensions: .png, .jpg, .jpeg, .webp, .gif, .heic, .heif`
       );
   }
@@ -577,10 +255,4 @@ function getFileExtensionForMimeType(mimeType: string): string {
     default:
       return 'png';
   }
-}
-
-function compactObject<T extends Record<string, unknown>>(value: T): Partial<T> {
-  return Object.fromEntries(
-    Object.entries(value).filter(([, entryValue]) => entryValue !== undefined)
-  ) as Partial<T>;
 }

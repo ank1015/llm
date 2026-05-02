@@ -1,5 +1,5 @@
 export { agent, AgentInputError, AgentRunConsumptionError } from './agent.js';
-export { image, ImageInputError, ImageModelIds, isImageModelId } from './image.js';
+export { image, ImageInputError } from './image.js';
 export { llm, LlmInputError, LlmRunConsumptionError } from './llm.js';
 export { GatewayTransportError } from './gateway.js';
 export { toolResultMessage, userMessage } from './messages.js';
@@ -16,15 +16,13 @@ export type {
   AgentSessionInput,
 } from './agent.js';
 export type {
-  GptImageInput,
-  GptImageSettings,
+  ImageBackground,
+  ImageFormat,
   ImageInput,
-  ImageModelId,
+  ImageModeration,
+  ImageQuality,
   ImageResult,
-  NanoBananaInput,
-  NanoBananaSettings,
-  ResolveImageInputError,
-  UnsupportedImageModelError,
+  ImageSize,
 } from './image.js';
 export type { GatewayCredentials, GatewayErrorCode } from './gateway.js';
 export type { LlmInput, LlmRun } from './llm.js';
@@ -50,11 +48,13 @@ export type {
   AssistantResponseContent,
   AssistantThinkingContent,
   AssistantToolCall,
+  AnyImageResult,
   BaseAssistantEvent,
   BaseAssistantMessage,
   BaseImageResult,
   Content,
   ImageContent,
+  ImageApi,
   ImageUsage,
   Message,
   Tool,
