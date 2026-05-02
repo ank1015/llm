@@ -53,8 +53,8 @@ Request body:
 
 ```ts
 {
-  api: string;
-  modelId: string;
+  api: 'azure-openai';
+  modelId: 'gpt-image-2';
   prompt: string;
   images?: Array<{ type: 'image'; data: string; mimeType: string }>;
   mask?: { type: 'image'; data: string; mimeType: string };
