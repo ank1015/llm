@@ -102,8 +102,8 @@ describe('gateway credentials', () => {
 
     const imageResult = {
       id: 'image-result',
-      api: 'openai',
-      model: { api: 'openai', id: 'gpt-image-1.5' },
+      api: 'azure-openai',
+      model: { api: 'azure-openai', id: 'gpt-image-2' },
       response: {},
       content: [],
       images: [],
@@ -128,8 +128,8 @@ describe('gateway credentials', () => {
 
     await expect(
       runGatewayImageRequest({
-        api: 'openai',
-        modelId: 'gpt-image-1.5',
+        api: 'azure-openai',
+        modelId: 'gpt-image-2',
         context: { prompt: 'draw a tile' },
       })
     ).resolves.toEqual(imageResult);
