@@ -16,6 +16,7 @@ import {
 import { getPathBasename, getPathExtension } from '../lib/path-utils';
 
 import { ArtifactCodeViewer } from './artifact-code-viewer';
+import { RightPromptComposer } from './right-prompt-composer';
 import { ThemeToggle } from './theme-toggle';
 
 import type { DesktopEntryDto, DesktopFileDto, DesktopListResult } from '@shared/api-contract';
@@ -496,13 +497,20 @@ const DesktopSplitPane = ({
         <div className="split-resizer-handle" />
       </div>
 
-      <aside className="split-preview" aria-label="Desktop preview panel" />
+      <aside className="split-preview" aria-label="Desktop prompt panel">
+        <div className="right-prompt-surface">
+          <div className="right-prompt-spacer" />
+          <div className="right-prompt-composer-wrap">
+            <RightPromptComposer />
+          </div>
+        </div>
+      </aside>
     </div>
   );
 };
 
 // Preview selection mirrors the web redesign and necessarily fans out by file kind.
- 
+
 const DesktopFileViewerContent = ({
   entry,
 }: {
