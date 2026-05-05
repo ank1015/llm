@@ -2,7 +2,7 @@ import type { Api } from './api.js';
 import type { Content, ImageContent } from './content.js';
 import type { ImageNativeResponseForApi, ImageOptionsForApi } from './image-providers/index.js';
 
-export const KnownImageApis = ['openai', 'google'] as const;
+export const KnownImageApis = ['openai', 'azure-openai', 'google'] as const;
 
 export type ImageApi = (typeof KnownImageApis)[number];
 

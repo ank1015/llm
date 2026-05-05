@@ -281,7 +281,9 @@ describe('Z.AI Utils', () => {
           timestamp: Date.now(),
           duration: 100,
           stopReason: 'stop',
-          content: [{ type: 'response', response: [{ type: 'text', content: 'Hello from Z.AI!' }] }],
+          content: [
+            { type: 'response', response: [{ type: 'text', content: 'Hello from Z.AI!' }] },
+          ],
           usage: {
             input: 10,
             output: 5,
@@ -757,6 +759,18 @@ describe('Z.AI Utils', () => {
       expect(result.length).toBe(2);
       expect((result[0] as any).function.name).toBe('tool1');
       expect((result[1] as any).function.name).toBe('tool2');
+    });
+
+    it('should skip custom freeform tools', () => {
+      const tool: Tool = {
+        name: 'apply_patch',
+        description: 'Apply patch',
+        parameters: Type.Object({ input: Type.String() }),
+        type: 'custom',
+        format: { type: 'grammar', syntax: 'lark', definition: 'start: "x"' },
+      };
+
+      expect(convertTools([tool])).toEqual([]);
     });
   });
 

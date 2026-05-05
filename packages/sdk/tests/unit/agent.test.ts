@@ -41,8 +41,9 @@ afterEach(async () => {
   );
 });
 
-beforeEach(() => {
-  setSdkConfig({ modelTransport: 'direct' });
+beforeEach(async () => {
+  const baseDir = await createTempDirectory();
+  setSdkConfig({ modelTransport: 'direct', sessionsBaseDir: baseDir });
 });
 
 async function createTempDirectory(): Promise<string> {

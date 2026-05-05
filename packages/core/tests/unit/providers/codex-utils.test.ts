@@ -193,6 +193,42 @@ describe('Codex Utils', () => {
       expect((result.tools?.[0] as any).name).toBe('search');
     });
 
+    it('should preserve strict false when converting function tools', () => {
+      const tool: Tool = {
+        name: 'exec_command',
+        description: 'Run command',
+        parameters: Type.Object({ cmd: Type.String() }, { additionalProperties: false }),
+        strict: false,
+      };
+      const context: Context = { messages: [], tools: [tool] };
+      const result = buildParams(mockModel, context, defaultOptions);
+
+      expect(result.tools?.[0]).toMatchObject({
+        type: 'function',
+        name: 'exec_command',
+        strict: false,
+      });
+    });
+
+    it('should include custom grammar tools when function_calling is supported', () => {
+      const tool: Tool = {
+        name: 'apply_patch',
+        description: 'Apply patch',
+        parameters: Type.Object({ input: Type.String() }),
+        type: 'custom',
+        format: { type: 'grammar', syntax: 'lark', definition: 'start: "x"' },
+      };
+      const context: Context = { messages: [], tools: [tool] };
+      const result = buildParams(mockModel, context, defaultOptions);
+
+      expect(result.tools?.[0]).toEqual({
+        type: 'custom',
+        name: 'apply_patch',
+        description: 'Apply patch',
+        format: { type: 'grammar', syntax: 'lark', definition: 'start: "x"' },
+      });
+    });
+
     it('should map context systemPrompt to instructions', () => {
       const context: Context = {
         systemPrompt: 'Follow only Python style guidelines.',

@@ -5,6 +5,7 @@ import './providers/cerebras/index.js';
 import './providers/claude-code/index.js';
 import './providers/codex/index.js';
 import './providers/deepseek/index.js';
+import './images/providers/azure-openai/index.js';
 import './images/providers/google/index.js';
 import './images/providers/openai/index.js';
 import './music/providers/google/index.js';

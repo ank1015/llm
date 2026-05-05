@@ -21,6 +21,12 @@ import type {
 import type { EasyInputMessage, Response } from 'openai/resources/responses/responses.js';
 
 describe('OpenAI Utils', () => {
+  const customToolFormat = {
+    type: 'grammar' as const,
+    syntax: 'lark' as const,
+    definition: 'start: "x"',
+  };
+
   describe('createClient', () => {
     const originalEnv = { ...process.env };
 
@@ -250,6 +256,33 @@ describe('OpenAI Utils', () => {
         });
       });
 
+      it('should convert custom tool results to custom_tool_call_output', () => {
+        const customTool: Tool = {
+          name: 'apply_patch',
+          description: 'Apply patch',
+          parameters: Type.Object({ input: Type.String() }),
+          type: 'custom',
+          format: customToolFormat,
+        };
+        const toolResult: ToolResultMessage = {
+          role: 'toolResult',
+          id: 'result-custom',
+          toolCallId: 'call-custom',
+          toolName: 'apply_patch',
+          content: [{ type: 'text', content: 'ok' }],
+          isError: false,
+          timestamp: Date.now(),
+        };
+        const context: Context = { messages: [toolResult], tools: [customTool] };
+
+        const result = buildOpenAIMessages(mockModel, context);
+        expect(result[0]).toEqual({
+          type: 'custom_tool_call_output',
+          call_id: 'call-custom',
+          output: [{ type: 'input_text', text: 'ok' }],
+        });
+      });
+
       it('should prefix error tool results with [TOOL ERROR]', () => {
         const toolResult: ToolResultMessage = {
           role: 'toolResult',
@@ -411,6 +444,46 @@ describe('OpenAI Utils', () => {
           call_id: 'call-1',
           name: 'search',
           arguments: '{"query": "test"}',
+        });
+      });
+
+      it('should preserve native custom tool calls in assistant messages', () => {
+        const assistantMessage: BaseAssistantMessage<'openai'> = {
+          role: 'assistant',
+          id: 'msg-custom-native',
+          api: 'openai',
+          model: mockModel,
+          timestamp: Date.now(),
+          duration: 100,
+          stopReason: 'toolUse',
+          content: [],
+          usage: {
+            input: 10,
+            output: 20,
+            cacheRead: 0,
+            cacheWrite: 0,
+            totalTokens: 30,
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+          },
+          message: {
+            output: [
+              {
+                type: 'custom_tool_call',
+                call_id: 'call-custom',
+                name: 'apply_patch',
+                input: '*** Begin Patch\n*** End Patch',
+              },
+            ],
+          } as Response,
+        };
+        const context: Context = { messages: [assistantMessage] };
+
+        const result = buildOpenAIMessages(mockModel, context);
+        expect(result[0]).toEqual({
+          type: 'custom_tool_call',
+          call_id: 'call-custom',
+          name: 'apply_patch',
+          input: '*** Begin Patch\n*** End Patch',
         });
       });
 
@@ -673,6 +746,51 @@ describe('OpenAI Utils', () => {
           });
         });
 
+        it('should convert cross-provider custom tool calls to OpenAI custom format', () => {
+          const customTool: Tool = {
+            name: 'apply_patch',
+            description: 'Apply patch',
+            parameters: Type.Object({ input: Type.String() }),
+            type: 'custom',
+            format: customToolFormat,
+          };
+          const assistantMessage: BaseAssistantMessage<'google'> = {
+            role: 'assistant',
+            id: 'msg-custom-handoff',
+            api: 'google',
+            model: { id: 'gemini-2.0-flash', api: 'google' } as any,
+            timestamp: Date.now(),
+            duration: 100,
+            stopReason: 'toolUse',
+            content: [
+              {
+                type: 'toolCall',
+                toolCallId: 'call-custom',
+                name: 'apply_patch',
+                arguments: { input: '*** Begin Patch\n*** End Patch' },
+              },
+            ],
+            usage: {
+              input: 10,
+              output: 20,
+              cacheRead: 0,
+              cacheWrite: 0,
+              totalTokens: 30,
+              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+            },
+            message: {} as any,
+          };
+          const context: Context = { messages: [assistantMessage as any], tools: [customTool] };
+
+          const result = buildOpenAIMessages(mockModel, context);
+          expect(result[0]).toEqual({
+            type: 'custom_tool_call',
+            call_id: 'call-custom',
+            name: 'apply_patch',
+            input: '*** Begin Patch\n*** End Patch',
+          });
+        });
+
         it('should handle mixed content from cross-provider messages', () => {
           const assistantMessage: BaseAssistantMessage<'google'> = {
             role: 'assistant',
@@ -904,6 +1022,21 @@ describe('OpenAI Utils', () => {
       });
     });
 
+    it('should preserve explicit strict settings for function tools', () => {
+      const tool: Tool = {
+        name: 'exec_command',
+        description: 'Run command',
+        parameters: Type.Object({ cmd: Type.String() }, { additionalProperties: false }),
+        strict: false,
+      };
+
+      expect(convertTools([tool])[0]).toMatchObject({
+        type: 'function',
+        name: 'exec_command',
+        strict: false,
+      });
+    });
+
     it('should convert multiple tools', () => {
       const tools: Tool[] = [
         { name: 'tool1', description: 'First', parameters: Type.Object({}) },
@@ -914,6 +1047,25 @@ describe('OpenAI Utils', () => {
       expect(result.length).toBe(2);
       expect((result[0] as any).name).toBe('tool1');
       expect((result[1] as any).name).toBe('tool2');
+    });
+
+    it('should convert custom grammar tools to OpenAI custom tools', () => {
+      const tool: Tool = {
+        name: 'apply_patch',
+        description: 'Apply patch',
+        parameters: Type.Object({ input: Type.String() }),
+        type: 'custom',
+        format: customToolFormat,
+      };
+
+      expect(convertTools([tool])).toEqual([
+        {
+          type: 'custom',
+          name: 'apply_patch',
+          description: 'Apply patch',
+          format: customToolFormat,
+        },
+      ]);
     });
   });
 

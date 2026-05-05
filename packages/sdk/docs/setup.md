@@ -48,7 +48,7 @@ For chat models, the curated model prefix selects the gateway provider:
 - `anthropic/...` sends `api: 'anthropic'`
 - `google/...` sends `api: 'google'`
 
-Set `modelTransport: 'direct'` only when you want the SDK to call providers directly with a local `keys.env` file.
+Set `modelTransport: 'direct'` only when you want chat and agent calls to reach providers directly with a local `keys.env` file. `image()` uses the gateway path.
 
 ## Keys File Helpers
 
@@ -77,12 +77,12 @@ console.log(values, availableProviders, resolved, spec);
 
 Credential fields used by the curated providers:
 
-| Provider       | Required fields in `keys.env`                                                    |
-| -------------- | -------------------------------------------------------------------------------- |
-| `azure-openai` | `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_DEPLOYMENT_URL`                            |
-| `openai`       | `OPENAI_API_KEY`                                                                 |
-| `anthropic`    | `ANTHROPIC_API_KEY`                                                              |
-| `google`       | `GOOGLE_API_KEY`                                                                 |
+| Provider       | Required fields in `keys.env`                         |
+| -------------- | ----------------------------------------------------- |
+| `azure-openai` | `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_DEPLOYMENT_URL` |
+| `openai`       | `OPENAI_API_KEY`                                      |
+| `anthropic`    | `ANTHROPIC_API_KEY`                                   |
+| `google`       | `GOOGLE_API_KEY`                                      |
 
 Notes:
 

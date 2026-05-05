@@ -1,12 +1,12 @@
 # @ank1015/llm-sdk
 
-Opinionated SDK over `@ank1015/llm-core` with curated model IDs, gateway-backed `llm()`/`agent()`/`image()` helpers, direct-key opt-out, and JSONL session tooling.
+Opinionated SDK over `@ank1015/llm-core` with curated chat model IDs, gateway-backed `llm()`/`agent()`/`image()` helpers, direct-key opt-out for chat models, and JSONL session tooling.
 
 ## What You Get
 
 - `llm()` for one-off model calls through the configured gateway and curated `modelId` strings
 - `agent()` for multi-turn runs with tool execution and persisted session history
-- `image()` for simple path-first image generation and editing with saved output files
+- `image()` for generation and editing with saved output files
 - Helpers like `userMessage()`, `toolResultMessage()`, `getText()`, `getThinking()`, and `getToolCalls()`
 - Subpath modules for runtime config, keys-file management, and session inspection
 
@@ -72,9 +72,10 @@ console.log(getText(result.finalAssistantMessage));
 import { image } from '@ank1015/llm-sdk';
 
 const result = await image({
-  model: 'nano-banana',
   prompt: 'Create a polished travel sticker of a floating tea cart.',
   output: './artifacts/tea-cart.png',
+  size: '1024x1024',
+  quality: 'low',
 });
 
 console.log(result.path);
@@ -101,7 +102,7 @@ See [docs/setup.md](./docs/setup.md) for the full setup, keys-file, and session-
 
 ## Docs
 
-- [docs/image.md](./docs/image.md) - `image()` usage, saved output paths, and model-specific settings
+- [docs/image.md](./docs/image.md) - `image()` usage, saved output paths, editing inputs, and output options
 - [docs/llm.md](./docs/llm.md) - `llm()` usage, streaming, and response handling
 - [docs/agent.md](./docs/agent.md) - `agent()` runs, tools, and failure modes
 - [docs/types.md](./docs/types.md) - exported message, tool, and runtime types

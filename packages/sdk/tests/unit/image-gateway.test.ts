@@ -2,21 +2,12 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { resetSdkConfig, setSdkConfig } from '../../src/config.js';
 import { image } from '../../src/image.js';
 
 import type { BaseImageResult, ImageContent, ImageModel } from '@ank1015/llm-core';
-
-vi.mock('@ank1015/llm-core', () => ({
-  generateImage: vi.fn(),
-  getImageModel: vi.fn(),
-}));
-
-const { generateImage, getImageModel } = await import('@ank1015/llm-core');
-const mockedCoreGenerateImage = vi.mocked(generateImage);
-const mockedGetImageModel = vi.mocked(getImageModel);
 
 const tempDirectories: string[] = [];
 const originalFetch = globalThis.fetch;
@@ -24,7 +15,6 @@ const originalFetch = globalThis.fetch;
 afterEach(async () => {
   globalThis.fetch = originalFetch;
   resetSdkConfig();
-  vi.clearAllMocks();
   await Promise.all(
     tempDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true }))
   );
@@ -36,7 +26,6 @@ describe('image gateway transport', () => {
     const gatewayCredentialsPath = join(directory, 'gateway.json');
     const referencePath = join(directory, 'reference.png');
     const outputPath = join(directory, 'badge.png');
-    const model = createImageModel('google', 'gemini-3.1-flash-image-preview');
     const generated = createGeneratedImage('generated-image', 'image/png');
 
     await writeFile(
@@ -53,11 +42,10 @@ describe('image gateway transport', () => {
     await writeFile(referencePath, Buffer.from('reference-image'));
     setSdkConfig({ gatewayCredentialsPath });
 
-    mockedGetImageModel.mockReturnValue(model as never);
     const fetchMock = vi.fn(async () =>
       jsonResponse({
-        result: createImageResult('google', model, {
-          text: 'Generated badge',
+        result: createImageResult({
+          text: '',
           images: [generated],
         }),
       })
@@ -65,24 +53,20 @@ describe('image gateway transport', () => {
     globalThis.fetch = fetchMock as typeof fetch;
 
     const result = await image({
-      model: 'nano-banana',
       prompt: 'Turn this into a badge',
       output: outputPath,
-      imagePaths: [referencePath],
-      settings: {
-        aspectRatio: '16:9',
-        googleSearch: true,
-        includeText: false,
-      },
+      inputImages: [referencePath],
+      background: 'opaque',
+      quality: 'low',
+      size: '1024x1024',
     });
 
-    expect(mockedCoreGenerateImage).not.toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledOnce();
     const [, init] = fetchMock.mock.calls[0]!;
     const body = JSON.parse(String((init as RequestInit).body)) as Record<string, unknown>;
     expect(body).toEqual({
-      api: 'google',
-      modelId: 'gemini-3.1-flash-image-preview',
+      api: 'azure-openai',
+      modelId: 'gpt-image-2',
       prompt: 'Turn this into a badge',
       images: [
         {
@@ -96,11 +80,9 @@ describe('image gateway transport', () => {
         },
       ],
       providerOptions: {
-        responseModalities: ['IMAGE'],
-        imageConfig: {
-          aspectRatio: '16:9',
-        },
-        tools: [{ googleSearch: {} }],
+        background: 'opaque',
+        quality: 'low',
+        size: '1024x1024',
       },
     });
 
@@ -131,15 +113,12 @@ function createGeneratedImage(data: string, mimeType: string): ImageContent {
   };
 }
 
-function createImageModel<TApi extends 'openai' | 'google'>(
-  api: TApi,
-  id: string
-): ImageModel<TApi> {
+function createImageModel(): ImageModel<'azure-openai'> {
   return {
-    api,
-    id,
-    name: id,
-    baseUrl: `https://${api}.example.com`,
+    api: 'azure-openai',
+    id: 'gpt-image-2',
+    name: 'GPT Image 2',
+    baseUrl: 'https://azure.example.com/openai',
     input: ['text', 'image'],
     output: ['image'],
     cost: {
@@ -152,19 +131,15 @@ function createImageModel<TApi extends 'openai' | 'google'>(
   };
 }
 
-function createImageResult<TApi extends 'openai' | 'google'>(
-  api: TApi,
-  model: ImageModel<TApi>,
-  input: {
-    text: string;
-    images: ImageContent[];
-  }
-): BaseImageResult<TApi> {
+function createImageResult(input: {
+  text: string;
+  images: ImageContent[];
+}): BaseImageResult<'azure-openai'> {
   return {
-    id: `${api}-image-result`,
-    api,
-    model,
-    response: { ok: true } as BaseImageResult<TApi>['response'],
+    id: 'azure-openai-image-result',
+    api: 'azure-openai',
+    model: createImageModel(),
+    response: { ok: true } as BaseImageResult<'azure-openai'>['response'],
     content: [
       ...(input.text ? [{ type: 'text' as const, content: input.text }] : []),
       ...input.images,

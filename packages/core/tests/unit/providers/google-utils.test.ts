@@ -885,6 +885,18 @@ describe('Google Utils', () => {
       const result = convertTools(tools);
       expect((result[0] as any).functionDeclarations.length).toBe(2);
     });
+
+    it('should skip custom freeform tools', () => {
+      const tool: Tool = {
+        name: 'apply_patch',
+        description: 'Apply patch',
+        parameters: Type.Object({ input: Type.String() }),
+        type: 'custom',
+        format: { type: 'grammar', syntax: 'lark', definition: 'start: "x"' },
+      };
+
+      expect(convertTools([tool])).toEqual([]);
+    });
   });
 
   describe('mapStopReason', () => {

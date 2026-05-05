@@ -5,7 +5,7 @@ Thin Hono gateway that keeps provider API keys server-side and proxies `@ank1015
 ## What You Get
 
 - `POST /v1/llm/stream` for raw `BaseAssistantEvent` SSE proxying
-- `POST /v1/image/generate` for normalized `BaseImageResult` JSON responses
+- `POST /v1/image/generate` for Azure OpenAI `gpt-image-2` normalized `BaseImageResult` JSON responses
 - access-token + refresh-token auth for callers
 - optional admin username/password login and a built-in admin dashboard
 - username/password user login for approved senders

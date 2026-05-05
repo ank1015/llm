@@ -4,6 +4,7 @@ All types used with `@ank1015/llm-sdk`. Import any of them directly from the SDK
 
 ```ts
 import type {
+  AnyImageResult,
   BaseImageResult,
   Message,
   UserMessage,
@@ -20,13 +21,13 @@ import type {
   ToolDefinition,
   ToolContext,
   ToolResult,
-  ImageModelId,
+  ImageBackground,
+  ImageFormat,
   ImageInput,
-  NanoBananaInput,
-  GptImageInput,
+  ImageModeration,
+  ImageQuality,
   ImageResult,
-  NanoBananaSettings,
-  GptImageSettings,
+  ImageSize,
   CuratedModelId,
   ReasoningEffort,
   LlmInput,
@@ -49,84 +50,44 @@ import type {
 
 ## Image generation
 
-The SDK image surface is separate from chat and agent runs.
+The SDK image surface is separate from chat and agent runs. Callers describe the image task and where to save the result.
 
 ```ts
-type ImageModelId = 'nano-banana' | 'nano-banana-pro' | 'gpt-image';
-
-type ImageInput = NanoBananaInput | GptImageInput;
+interface ImageInput {
+  prompt: string;
+  output: string;
+  inputImages?: string[];
+  mask?: string;
+  count?: number;
+  size?: ImageSize;
+  quality?: ImageQuality;
+  format?: ImageFormat;
+  compression?: number;
+  background?: ImageBackground;
+  moderation?: ImageModeration;
+  requestId?: string;
+  signal?: AbortSignal;
+}
 
 interface ImageResult {
-  model: ImageModelId;
-  api: 'google' | 'openai';
-  providerModelId: string;
   path?: string;
   paths: string[];
   text: string;
   usage: ImageUsage;
-  result: BaseImageResult;
+  raw: AnyImageResult;
 }
 ```
 
-Use [image.md](./image.md) for the full input and settings guide.
+Use [image.md](./image.md) for the full input guide.
 
-### `NanoBananaInput`
-
-```ts
-interface NanoBananaInput {
-  model: 'nano-banana' | 'nano-banana-pro';
-  prompt: string;
-  output: string;
-  imagePaths?: string[];
-  settings?: NanoBananaSettings;
-  keysFilePath?: string;
-  requestId?: string;
-  signal?: AbortSignal;
-}
-```
-
-### `GptImageInput`
+### Image option types
 
 ```ts
-interface GptImageInput {
-  model: 'gpt-image';
-  prompt: string;
-  output: string;
-  imagePaths?: string[];
-  maskPath?: string;
-  settings?: GptImageSettings;
-  keysFilePath?: string;
-  requestId?: string;
-  signal?: AbortSignal;
-}
-```
-
-### `NanoBananaSettings`
-
-```ts
-interface NanoBananaSettings {
-  aspectRatio?: string;
-  imageSize?: string;
-  personGeneration?: string;
-  prominentPeople?: string;
-  googleSearch?: boolean;
-  includeText?: boolean;
-}
-```
-
-### `GptImageSettings`
-
-```ts
-interface GptImageSettings {
-  size?: string;
-  quality?: string;
-  background?: string;
-  format?: string;
-  compression?: number;
-  moderation?: string;
-  count?: number;
-  fidelity?: string;
-}
+type ImageSize = 'auto' | `${number}x${number}`;
+type ImageQuality = 'auto' | 'low' | 'medium' | 'high';
+type ImageFormat = 'png' | 'jpeg' | 'webp';
+type ImageBackground = 'auto' | 'opaque';
+type ImageModeration = 'auto' | 'low';
 ```
 
 ### `ImageContent`, `ImageUsage`, and `BaseImageResult`

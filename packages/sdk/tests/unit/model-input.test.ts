@@ -33,11 +33,13 @@ describe('model input', () => {
   it('exposes curated model ids for the first supported providers', () => {
     expect(CuratedModelIds).toEqual([
       'openai/gpt-5.4',
+      'openai/gpt-5.5',
       'openai/gpt-5.3-codex',
       'openai/gpt-5.4-pro',
       'openai/gpt-5.4-mini',
       'openai/gpt-5.4-nano',
       'azure-openai/gpt-5.4',
+      'azure-openai/gpt-5.5',
       'azure-openai/gpt-5.3-codex',
       'azure-openai/gpt-5.4-pro',
       'azure-openai/gpt-5.4-mini',

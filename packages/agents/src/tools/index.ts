@@ -7,6 +7,15 @@ import { createReadTool, type ReadToolOptions, readTool } from './read.js';
 import { createWriteTool, writeTool } from './write.js';
 
 export {
+  APPLY_PATCH_LARK_GRAMMAR,
+  type ApplyPatchOperations,
+  type ApplyPatchToolDetails,
+  type ApplyPatchToolInput,
+  type ApplyPatchToolOptions,
+  applyPatchTool,
+  createApplyPatchTool,
+} from './apply-patch.js';
+export {
   type BashOperations,
   type BashSpawnContext,
   type BashSpawnHook,
@@ -56,6 +65,25 @@ export {
   type ReadToolOptions,
   readTool,
 } from './read.js';
+export {
+  createExecCommandTool,
+  createUnifiedExecProcessManager,
+  createUnifiedExecTools,
+  createWriteStdinTool,
+  execCommandTool,
+  type ExecCommandToolInput,
+  type ExecCommandToolOptions,
+  type UnifiedExecCommandLine,
+  type UnifiedExecManagerOptions,
+  type UnifiedExecOperations,
+  type UnifiedExecPtyProcess,
+  UnifiedExecProcessManager,
+  type UnifiedExecToolDetails,
+  writeStdinTool,
+  type WriteStdinToolInput,
+  type WriteStdinToolOptions,
+  resolveUnifiedExecCommand,
+} from './unified-exec.js';
 export {
   DEFAULT_MAX_BYTES,
   DEFAULT_MAX_LINES,

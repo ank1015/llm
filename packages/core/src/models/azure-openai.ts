@@ -21,6 +21,23 @@ export const azureOpenAIModels = {
     maxTokens: 128000,
     tools: ['function_calling'],
   } satisfies Model<typeof azureOpenAIApi>,
+  'gpt-5.5': {
+    id: 'gpt-5.5',
+    name: 'GPT-5.5',
+    api: azureOpenAIApi,
+    baseUrl: azureOpenAIBaseUrl,
+    reasoning: true,
+    input: ['text', 'image', 'file'],
+    cost: {
+      input: 5,
+      output: 30,
+      cacheRead: 0.5,
+      cacheWrite: 0,
+    },
+    contextWindow: 272000,
+    maxTokens: 128000,
+    tools: ['function_calling'],
+  } satisfies Model<typeof azureOpenAIApi>,
   'gpt-5.3-codex': {
     id: 'gpt-5.3-codex',
     name: 'GPT-5.3 Codex',

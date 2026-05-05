@@ -32,6 +32,7 @@ pnpm start:web-app    # Start the built web client
 apps/
   web/                # @ank1015/llm-web-app - Next.js client for the server
   desktop/            # @ank1015/llm-desktop-app - Electron app for embedded server and frontend
+  electron-redesign/  # @ank1015/llm-electron-redesign - Full-stack Electron scaffold (React renderer + Hono backend)
 
 packages/
   core/               # @ank1015/llm-core - Stateless provider runtime and model catalog
@@ -57,6 +58,8 @@ packages/
    Private Next.js client for browsing projects and artifacts, streaming sessions, and terminal interaction.
 7. `@ank1015/llm-desktop-app`
    Private Electron desktop app shell for the embedded server and frontend runtime.
+8. `@ank1015/llm-electron-redesign`
+   Private full-stack Electron scaffold (React renderer + embedded Hono backend) — successor to `@ank1015/llm-desktop-app`.
 
 ## Conventions
 
@@ -90,6 +93,7 @@ packages/
 - [packages/server/AGENTS.md](packages/server/AGENTS.md) - Backend routes, storage, sessions, and terminals
 - [apps/web/AGENTS.md](apps/web/AGENTS.md) - Next.js web client for projects, artifacts, sessions, and terminals
 - [apps/desktop/AGENTS.md](apps/desktop/AGENTS.md) - Electron desktop app shell for embedded server and frontend runtime
+- [apps/electron-redesign/AGENTS.md](apps/electron-redesign/AGENTS.md) - Full-stack Electron scaffold (React + Hono backend)
 
 ## Boundaries
 

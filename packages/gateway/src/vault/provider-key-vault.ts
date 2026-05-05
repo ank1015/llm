@@ -16,7 +16,7 @@ export const SupportedGatewayApis = [
   'openrouter',
 ] as const;
 
-export const SupportedGatewayImageApis = ['openai', 'google'] as const;
+export const SupportedGatewayImageApis = ['azure-openai'] as const;
 
 export type GatewayApi = (typeof SupportedGatewayApis)[number];
 export type GatewayImageApi = (typeof SupportedGatewayImageApis)[number];

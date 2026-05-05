@@ -3,11 +3,7 @@
 import type { Api, CuratedModelId, ReasoningEffort } from '@ank1015/llm-sdk';
 
 export const CURATED_MODEL_IDS = [
-  'azure-openai/gpt-5.4',
-  'azure-openai/gpt-5.3-codex',
-  'azure-openai/gpt-5.4-pro',
-  'azure-openai/gpt-5.4-mini',
-  'azure-openai/gpt-5.4-nano',
+  'azure-openai/gpt-5.5',
 ] as const satisfies readonly CuratedModelId[];
 
 export const REASONING_EFFORTS = [

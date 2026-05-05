@@ -53,8 +53,8 @@ describe('gateway app integration', () => {
           : undefined
     );
     mockState.getImageModel.mockImplementation((api: string, modelId: string) =>
-      api === 'openai' && modelId === 'gpt-image-1.5'
-        ? createImageModel('openai', 'gpt-image-1.5')
+      api === 'azure-openai' && modelId === 'gpt-image-2'
+        ? createImageModel('azure-openai', 'gpt-image-2')
         : undefined
     );
   });
@@ -84,8 +84,8 @@ describe('gateway app integration', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        api: 'openai',
-        modelId: 'gpt-image-1.5',
+        api: 'azure-openai',
+        modelId: 'gpt-image-2',
         prompt: 'Draw a kite',
       }),
     });
@@ -119,13 +119,18 @@ describe('gateway app integration', () => {
     expect(unauthenticatedResponse?.status).toBe(429);
 
     const tokens = await issueSenderTokens(fixture.app, fixture.adminHeaders);
-    await jsonRequest(
+    const storeProviderResponse = await jsonRequest(
       fixture.app,
-      '/admin/providers/openai/key',
+      '/admin/providers/azure-openai/key',
       'PUT',
-      { apiKey: 'server-openai-key' },
+      {
+        apiKey: 'server-azure-openai-key',
+        azureDeploymentUrl:
+          'https://resource.cognitiveservices.azure.com/openai/responses?api-version=2025-04-01-preview',
+      },
       fixture.adminHeaders
     );
+    expect(storeProviderResponse.status).toBe(200);
 
     const imageResult = createImageResult();
     mockState.generateImage.mockResolvedValue(imageResult);
@@ -135,8 +140,8 @@ describe('gateway app integration', () => {
       '/v1/image/generate',
       'POST',
       {
-        api: 'openai',
-        modelId: 'gpt-image-1.5',
+        api: 'azure-openai',
+        modelId: 'gpt-image-2',
         prompt: 'Draw a kite',
       },
       {
@@ -145,6 +150,25 @@ describe('gateway app integration', () => {
     );
 
     expect(authenticatedResponse.status).toBe(200);
+
+    let repeatedAuthenticatedResponse: Response | undefined;
+    for (let i = 0; i < 130; i += 1) {
+      repeatedAuthenticatedResponse = await jsonRequest(
+        fixture.app,
+        '/v1/image/generate',
+        'POST',
+        {
+          api: 'azure-openai',
+          modelId: 'gpt-image-2',
+          prompt: `Draw a kite ${i}`,
+        },
+        {
+          Authorization: `Bearer ${tokens.accessToken}`,
+        }
+      );
+    }
+
+    expect(repeatedAuthenticatedResponse?.status).toBe(200);
   });
 
   it('sets secure admin cookies only when configured or behind trusted https proxy', async () => {
@@ -239,13 +263,14 @@ describe('gateway app integration', () => {
 
   it('proxies llm streams, strips forbidden provider options, and persists sanitized logs', async () => {
     const tokens = await issueSenderTokens(fixture.app, fixture.adminHeaders);
-    await jsonRequest(
+    const storeProviderResponse = await jsonRequest(
       fixture.app,
       '/admin/providers/openai/key',
       'PUT',
       { apiKey: 'server-openai-key' },
       fixture.adminHeaders
     );
+    expect(storeProviderResponse.status).toBe(200);
 
     const finalMessage = createAssistantMessage();
     const events: BaseAssistantEvent<'openai'>[] = [
@@ -344,6 +369,116 @@ describe('gateway app integration', () => {
     expect(detailBody.request.status).toBe('ok');
     expect(detailBody.events).toHaveLength(3);
     expect(detailBody.request.input.providerOptions.apiKey).toBe('[REDACTED]');
+
+    const loginResponse = await formRequest(fixture.app, '/admin/login', {
+      username: 'admin',
+      password: 'admin-password',
+    });
+    const cookie = loginResponse.headers.get('set-cookie');
+    const dashboardDetailResponse = await fixture.app.request(
+      `/admin/dashboard/requests/${listBody.requests[0]!.id}`,
+      {
+        headers: {
+          Cookie: cookie ?? '',
+        },
+      }
+    );
+    const dashboardHtml = await dashboardDetailResponse.text();
+
+    expect(dashboardDetailResponse.status).toBe(200);
+    expect(dashboardHtml).toContain('Request metadata');
+    expect(dashboardHtml).toContain('Provider settings');
+    expect(dashboardHtml).toContain('# User');
+    expect(dashboardHtml).toContain('Hello');
+    expect(dashboardHtml).toContain('# Assistant');
+    expect(dashboardHtml).toContain('Hello world');
+    expect(dashboardHtml).toContain('Usage');
+  });
+
+  it('can store request input and output without storing stream events', async () => {
+    await fixture.cleanup();
+    fixture = await createGatewayTestApp({ logEvents: false });
+
+    const tokens = await issueSenderTokens(fixture.app, fixture.adminHeaders);
+    await jsonRequest(
+      fixture.app,
+      '/admin/providers/openai/key',
+      'PUT',
+      { apiKey: 'server-openai-key' },
+      fixture.adminHeaders
+    );
+
+    const finalMessage = createAssistantMessage();
+    const events: BaseAssistantEvent<'openai'>[] = [
+      { type: 'start', message: finalMessage },
+      {
+        type: 'text_delta',
+        contentIndex: 0,
+        delta: 'Hello',
+        message: finalMessage,
+      },
+      { type: 'done', reason: 'stop', message: finalMessage },
+    ];
+    mockState.stream.mockReturnValue(createStream(events, finalMessage));
+
+    const response = await jsonRequest(
+      fixture.app,
+      '/v1/llm/stream',
+      'POST',
+      {
+        api: 'openai',
+        modelId: 'gpt-5.4-mini',
+        requestId: 'client-run-no-events',
+        messages: [
+          {
+            role: 'user',
+            id: 'user-1',
+            content: [{ type: 'text', content: 'Hello without event logs' }],
+          },
+        ],
+      },
+      {
+        Authorization: `Bearer ${tokens.accessToken}`,
+      }
+    );
+
+    expect(response.status).toBe(200);
+    expect(await readSseDataFrames(response)).toEqual(events);
+
+    const listResponse = await jsonRequest(
+      fixture.app,
+      '/admin/requests',
+      'GET',
+      undefined,
+      fixture.adminHeaders
+    );
+    const listBody = (await listResponse.json()) as {
+      requests: Array<{ id: string; clientRequestId: string | null }>;
+    };
+    const request = listBody.requests.find(
+      (item) => item.clientRequestId === 'client-run-no-events'
+    );
+
+    expect(request).toBeTruthy();
+
+    const detailResponse = await jsonRequest(
+      fixture.app,
+      `/admin/requests/${request!.id}`,
+      'GET',
+      undefined,
+      fixture.adminHeaders
+    );
+    const detailBody = (await detailResponse.json()) as {
+      events: unknown[];
+      request: {
+        input: unknown;
+        output: unknown;
+      };
+    };
+
+    expect(detailBody.request.input).toBeTruthy();
+    expect(detailBody.request.output).toBeTruthy();
+    expect(detailBody.events).toEqual([]);
   });
 
   it('proxies Azure OpenAI with stored deployment URL settings', async () => {
@@ -413,18 +548,25 @@ describe('gateway app integration', () => {
 
   it('proxies image generation and stores sanitized payloads', async () => {
     const tokens = await issueSenderTokens(fixture.app, fixture.adminHeaders);
-    await jsonRequest(
+    const storeProviderResponse = await jsonRequest(
       fixture.app,
-      '/admin/providers/openai/key',
+      '/admin/providers/azure-openai/key',
       'PUT',
-      { apiKey: 'server-openai-key' },
+      {
+        apiKey: 'server-azure-openai-key',
+        azureDeploymentUrl:
+          'https://resource.cognitiveservices.azure.com/openai/responses?api-version=2025-04-01-preview',
+      },
       fixture.adminHeaders
     );
+    expect(storeProviderResponse.status).toBe(200);
 
     const imageResult = createImageResult();
     mockState.generateImage.mockImplementation((_model, _context, options) => {
       expect(options).toMatchObject({
-        apiKey: 'server-openai-key',
+        apiKey: 'server-azure-openai-key',
+        azureApiVersion: '2025-04-01-preview',
+        azureBaseURL: 'https://resource.cognitiveservices.azure.com/openai',
         quality: 'high',
       });
       expect(options).not.toHaveProperty('headers');
@@ -436,8 +578,8 @@ describe('gateway app integration', () => {
       '/v1/image/generate',
       'POST',
       {
-        api: 'openai',
-        modelId: 'gpt-image-1.5',
+        api: 'azure-openai',
+        modelId: 'gpt-image-2',
         prompt: 'Draw a glossy sticker',
         images: [
           {
@@ -459,7 +601,7 @@ describe('gateway app integration', () => {
     );
 
     expect(response.status).toBe(200);
-    const body = (await response.json()) as { result: BaseImageResult<'openai'> };
+    const body = (await response.json()) as { result: BaseImageResult<'azure-openai'> };
     expect(body.result.id).toBe(imageResult.id);
 
     const listResponse = await jsonRequest(
@@ -564,8 +706,8 @@ describe('gateway app integration', () => {
       '/v1/image/generate',
       'POST',
       {
-        api: 'openai',
-        modelId: 'gpt-image-1.5',
+        api: 'azure-openai',
+        modelId: 'gpt-image-2',
         prompt: 'Draw a kite',
       },
       {
@@ -719,7 +861,7 @@ function createAssistantMessage<TApi extends 'openai' | 'azure-openai'>(
   };
 }
 
-function createImageModel(api: 'openai', id: string) {
+function createImageModel(api: 'azure-openai', id: string) {
   return {
     api,
     id,
@@ -737,15 +879,15 @@ function createImageModel(api: 'openai', id: string) {
   };
 }
 
-function createImageResult(): BaseImageResult<'openai'> {
-  const model = createImageModel('openai', 'gpt-image-1.5');
+function createImageResult(): BaseImageResult<'azure-openai'> {
+  const model = createImageModel('azure-openai', 'gpt-image-2');
   const image = createGeneratedImage('generated-image');
 
   return {
     id: 'image-result-1',
-    api: 'openai',
+    api: 'azure-openai',
     model,
-    response: { ok: true } as BaseImageResult<'openai'>['response'],
+    response: { ok: true } as BaseImageResult<'azure-openai'>['response'],
     content: [image],
     images: [image],
     usage: {

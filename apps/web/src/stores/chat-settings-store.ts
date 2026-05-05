@@ -5,7 +5,6 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 
 import type { Api, CuratedModelId, ReasoningEffort } from '@ank1015/llm-sdk';
 
-
 import {
   CURATED_MODEL_IDS,
   REASONING_EFFORTS,
@@ -72,7 +71,7 @@ export const REASONING_OPTIONS: readonly ReasoningOption[] = REASONING_EFFORTS.m
 }));
 
 const DEFAULT_MODEL =
-  CHAT_MODEL_OPTIONS.find((option) => option.modelId === 'azure-openai/gpt-5.4') ??
+  CHAT_MODEL_OPTIONS.find((option) => option.modelId === 'azure-openai/gpt-5.5') ??
   CHAT_MODEL_OPTIONS[0];
 const DEFAULT_REASONING: ReasoningEffort = 'xhigh';
 const MODEL_IDS_BY_PROVIDER = CHAT_MODEL_OPTIONS.reduce(
@@ -166,7 +165,15 @@ function normalizePersistedState(
     >
   >
 ) {
-  const enabledModels = state.enabledModels ?? initialState.enabledModels;
+  const enabledModels = Object.fromEntries(
+    CHAT_MODEL_OPTIONS.map((option) => [
+      option.modelId,
+      state.enabledModels?.[option.modelId] === true,
+    ])
+  ) as Partial<Record<CuratedModelId, boolean>>;
+  if (getActiveModelIds(enabledModels).length === 0) {
+    enabledModels[DEFAULT_MODEL.modelId] = true;
+  }
   const enabledProviders = buildEnabledProvidersFromModels(enabledModels);
   const selectedModelId = getNextSelectedModel({
     enabledModels,
@@ -332,7 +339,7 @@ export const useChatSettingsStore = create<ChatSettingsStoreState>()(
     }),
     {
       name: CHAT_SETTINGS_STORAGE_KEY,
-      version: 1,
+      version: 2,
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         api: state.api,

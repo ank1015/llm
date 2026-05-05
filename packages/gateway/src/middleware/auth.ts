@@ -42,14 +42,6 @@ export function authMiddleware(): MiddlewareHandler<GatewayEnv> {
         return c.json({ error: 'Access token session is no longer active.' }, 401);
       }
 
-      const rateLimit = services.rateLimiter.check({
-        group: 'authenticated',
-        identifier: sender.id,
-      });
-      if (!rateLimit.allowed) {
-        return rateLimitJsonResponse(c, rateLimit);
-      }
-
       c.set('senderId', sender.id);
       return next();
     } catch (error) {

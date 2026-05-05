@@ -21,9 +21,17 @@ export type {
   StreamRetryRequest,
   TurnSettings,
 } from './conversation';
+export { getDesktopFile, getDesktopListing, getDesktopRawFileUrl } from './desktop';
+export type { DesktopFileInput, DesktopListInput } from './desktop';
 export { getGatewaySession, loginGateway } from './gateway';
 export type { GatewayLoginInput } from './gateway';
-export { cancelSetupAgentRun, completeSetup, getSetupStatus, startSetupAgent, streamSetupAgentRun } from './setup';
+export {
+  cancelSetupAgentRun,
+  completeSetup,
+  getSetupStatus,
+  startSetupAgent,
+  streamSetupAgentRun,
+} from './setup';
 export type { SetupAgentStreamEventMap, SetupAgentStreamHandlers } from './setup';
 export { listModels } from './models';
 export {
@@ -118,6 +126,10 @@ export type {
   InstallArtifactSkillRequest,
   DeleteSessionResponse,
   DeleteTerminalResponse,
+  DesktopEntryDto,
+  DesktopEntryTypeDto,
+  DesktopFileDto,
+  DesktopListResult,
   GatewayLoginResult,
   GatewaySession,
   SetupCheck,

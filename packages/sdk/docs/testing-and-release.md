@@ -26,6 +26,8 @@ pnpm --filter @ank1015/llm-sdk test:integration
 
 Gateway integration coverage reads `~/.llm/gateway.json` by default, refreshes the gateway access token, and verifies real `llm()` responses through both `openai/...` and `azure-openai/...` model routes. Set `LLM_GATEWAY_CREDENTIALS_PATH` to point at a different gateway credential file.
 
+Image gateway integration is opt-in because it creates real image output. Set `LLM_SDK_IMAGE_GATEWAY_INTEGRATION=1` to run the live image test.
+
 Direct-provider integration coverage is still available for provider-key paths. Those tests set `modelTransport: 'direct'`, read provider env vars such as `OPENAI_API_KEY`, write temporary keys files, and skip when the required credential is not available.
 
 ## Packaging

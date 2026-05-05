@@ -48,6 +48,10 @@ apps/desktop/release/
 apps/desktop/vendor/
 packages/app/vendor/
 
+# Electron redesign build artifacts
+apps/electron-redesign/out/
+apps/electron-redesign/release/
+
 # Local deployment secrets
 gateway-deployment.txt
 gateway-deployment-key.pem

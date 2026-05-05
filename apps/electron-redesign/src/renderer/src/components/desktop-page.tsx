@@ -1,0 +1,1774 @@
+import { FolderAddIcon } from '@hugeicons/core-free-icons';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+
+import fileIconSrc from '../assets/macos/File.png';
+import folderIconSrc from '../assets/macos/Folder.png';
+import {
+  createDesktopFolder,
+  getDesktopFile,
+  getDesktopListing,
+  getDesktopRawFileUrl,
+  renameDesktopEntry,
+  trashDesktopEntry,
+  updateDesktopContext,
+} from '../lib/api-client';
+import { getPathBasename, getPathExtension } from '../lib/path-utils';
+
+import { ArtifactCodeViewer } from './artifact-code-viewer';
+import { RightPromptComposer } from './right-prompt-composer';
+import { ThemeToggle } from './theme-toggle';
+
+import type { DesktopEntryDto, DesktopFileDto, DesktopListResult } from '@shared/api-contract';
+
+const HISTORY_LIMIT = 64;
+const DEFAULT_LEFT_PANE_RATIO = 0.6;
+const MIN_PANE_RATIO = 0.25;
+const MAX_PANE_RATIO = 0.75;
+const VIEWER_MAX_BYTES = 1024 * 1024;
+const MAX_TABLE_ROWS = 300;
+const MAX_TABLE_COLUMNS = 32;
+const CONTEXT_MENU_WIDTH = 200;
+const CONTEXT_MENU_VIEWPORT_MARGIN = 8;
+const BACKGROUND_CONTEXT_MENU_HEIGHT = 268;
+const ENTRY_CONTEXT_MENU_HEIGHT = 268;
+
+type ViewerKind = 'code' | 'csv' | 'image' | 'pdf' | 'audio' | 'video' | 'text' | 'binary';
+type SelectionRect = {
+  readonly originX: number;
+  readonly originY: number;
+  readonly currentX: number;
+  readonly currentY: number;
+};
+type SelectionBox = {
+  readonly left: number;
+  readonly top: number;
+  readonly right: number;
+  readonly bottom: number;
+  readonly width: number;
+  readonly height: number;
+};
+type ContextMenuState =
+  | {
+      readonly kind: 'background';
+      readonly x: number;
+      readonly y: number;
+    }
+  | {
+      readonly kind: 'entry';
+      readonly x: number;
+      readonly y: number;
+      readonly entry: DesktopEntryDto;
+    };
+
+const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico']);
+const PDF_EXTENSIONS = new Set(['pdf']);
+const AUDIO_EXTENSIONS = new Set(['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac']);
+const VIDEO_EXTENSIONS = new Set(['mp4', 'webm', 'mov', 'mkv']);
+const CSV_EXTENSIONS = new Set(['csv', 'tsv']);
+const CODE_EXTENSIONS = new Set([
+  'ts',
+  'tsx',
+  'js',
+  'jsx',
+  'json',
+  'py',
+  'go',
+  'rs',
+  'java',
+  'kt',
+  'rb',
+  'php',
+  'swift',
+  'c',
+  'h',
+  'cpp',
+  'hpp',
+  'cs',
+  'sh',
+  'bash',
+  'zsh',
+  'yaml',
+  'yml',
+  'toml',
+  'xml',
+  'html',
+  'css',
+  'scss',
+  'sql',
+  'graphql',
+  'proto',
+  'ini',
+  'env',
+  'md',
+  'markdown',
+  'mdx',
+  'txt',
+]);
+const CODE_BASENAMES = new Set([
+  '.editorconfig',
+  '.gitattributes',
+  '.gitignore',
+  '.npmrc',
+  '.prettierignore',
+  '.prettierrc',
+]);
+
+export const DesktopPage = (): React.ReactElement => {
+  const [history, setHistory] = useState<string[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const [pathOverride, setPathOverride] = useState<string | undefined>(undefined);
+  const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
+  const [leftPaneRatio, setLeftPaneRatio] = useState(DEFAULT_LEFT_PANE_RATIO);
+  const [fileTabs, setFileTabs] = useState<DesktopEntryDto[]>([]);
+  const [activeFilePath, setActiveFilePath] = useState<string | null>(null);
+  const [listing, setListing] = useState<DesktopListResult | null>(null);
+  const [listingError, setListingError] = useState<string | null>(null);
+  const [isFetching, setIsFetching] = useState(false);
+  const [renamingPath, setRenamingPath] = useState<string | null>(null);
+  const [selectionAnchorPath, setSelectionAnchorPath] = useState<string | null>(null);
+  const currentPath = listing?.path;
+
+  const loadListing = useCallback(async (path?: string): Promise<void> => {
+    setIsFetching(true);
+    setListingError(null);
+
+    try {
+      setListing(await getDesktopListing(path === undefined ? undefined : { path }));
+    } catch (error) {
+      setListingError(error instanceof Error ? error.message : 'Failed to load folder.');
+    } finally {
+      setIsFetching(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadListing(pathOverride);
+  }, [loadListing, pathOverride]);
+
+  useEffect(() => {
+    void updateDesktopContext({
+      currentDirectory: currentPath ?? null,
+      openFiles: fileTabs,
+      activeFilePath,
+    }).catch(() => undefined);
+  }, [activeFilePath, currentPath, fileTabs]);
+
+  const navigateTo = useCallback(
+    (nextPath: string) => {
+      setSelectedPaths([]);
+      setSelectionAnchorPath(null);
+      setPathOverride(nextPath);
+      setHistory((prev) => {
+        const trimmed =
+          historyIndex >= 0 ? prev.slice(0, historyIndex + 1) : currentPath ? [currentPath] : [];
+
+        if (trimmed[trimmed.length - 1] === nextPath) {
+          setHistoryIndex(trimmed.length - 1);
+          return trimmed;
+        }
+
+        const next = [...trimmed, nextPath];
+        const overflow = Math.max(0, next.length - HISTORY_LIMIT);
+        const bounded = next.slice(overflow);
+        setHistoryIndex(bounded.length - 1);
+
+        return bounded;
+      });
+    },
+    [currentPath, historyIndex]
+  );
+
+  const openFileTab = useCallback((entry: DesktopEntryDto) => {
+    setFileTabs((prev) => (prev.some((tab) => tab.path === entry.path) ? prev : [...prev, entry]));
+    setActiveFilePath(entry.path);
+  }, []);
+
+  const closeFileTab = useCallback(
+    (path: string) => {
+      const nextTabs = fileTabs.filter((tab) => tab.path !== path);
+      setFileTabs(nextTabs);
+      setActiveFilePath((activePath) => {
+        if (activePath !== path) {
+          return activePath;
+        }
+
+        return nextTabs[nextTabs.length - 1]?.path ?? null;
+      });
+    },
+    [fileTabs]
+  );
+
+  const handleEntryDoubleClick = useCallback(
+    (entry: DesktopEntryDto) => {
+      if (entry.type === 'directory') {
+        navigateTo(entry.path);
+        return;
+      }
+
+      openFileTab(entry);
+    },
+    [navigateTo, openFileTab]
+  );
+
+  const onBack = useCallback(() => {
+    if (historyIndex <= 0) {
+      return;
+    }
+
+    const nextIndex = historyIndex - 1;
+    setHistoryIndex(nextIndex);
+    setSelectedPaths([]);
+    setSelectionAnchorPath(null);
+    setActiveFilePath(null);
+    setPathOverride(history[nextIndex]);
+  }, [history, historyIndex]);
+
+  const onForward = useCallback(() => {
+    if (historyIndex >= history.length - 1) {
+      return;
+    }
+
+    const nextIndex = historyIndex + 1;
+    setHistoryIndex(nextIndex);
+    setSelectedPaths([]);
+    setSelectionAnchorPath(null);
+    setActiveFilePath(null);
+    setPathOverride(history[nextIndex]);
+  }, [history, historyIndex]);
+
+  const createNewFolder = useCallback(async (): Promise<void> => {
+    if (currentPath === undefined) {
+      return;
+    }
+
+    try {
+      const entry = await createDesktopFolder({ directoryPath: currentPath });
+      setListing((currentListing) => {
+        if (currentListing === null || currentListing.path !== currentPath) {
+          return currentListing;
+        }
+
+        return {
+          ...currentListing,
+          entries: sortDesktopEntries([...currentListing.entries, entry]),
+        };
+      });
+      setActiveFilePath(null);
+      setSelectedPaths([entry.path]);
+      setSelectionAnchorPath(entry.path);
+      setRenamingPath(entry.path);
+    } catch (error) {
+      setListingError(error instanceof Error ? error.message : 'Failed to create folder.');
+    }
+  }, [currentPath]);
+
+  const commitRename = useCallback(
+    async (entry: DesktopEntryDto, nextName: string): Promise<void> => {
+      if (currentPath === undefined) {
+        return;
+      }
+
+      const cleanName = nextName.trim();
+
+      if (cleanName.length === 0 || cleanName === entry.name) {
+        setRenamingPath(null);
+        return;
+      }
+
+      try {
+        const renamed = await renameDesktopEntry({ path: entry.path, newName: cleanName });
+        setListing(await getDesktopListing({ path: currentPath }));
+        setSelectedPaths([renamed.path]);
+        setRenamingPath(null);
+      } catch (error) {
+        setListingError(error instanceof Error ? error.message : 'Failed to rename item.');
+      }
+    },
+    [currentPath]
+  );
+
+  const moveEntryToTrash = useCallback(
+    async (entriesToTrash: readonly DesktopEntryDto[]): Promise<void> => {
+      if (currentPath === undefined) {
+        return;
+      }
+
+      const pathsToTrash = entriesToTrash.map((entry) => entry.path);
+
+      if (pathsToTrash.length === 0) {
+        return;
+      }
+
+      try {
+        await Promise.all(pathsToTrash.map((path) => trashDesktopEntry(path)));
+        setListing((currentListing) => {
+          if (currentListing === null || currentListing.path !== currentPath) {
+            return currentListing;
+          }
+
+          return {
+            ...currentListing,
+            entries: currentListing.entries.filter(
+              (currentEntry) => !pathsToTrash.includes(currentEntry.path)
+            ),
+          };
+        });
+        setFileTabs((currentTabs) =>
+          currentTabs.filter((tab) => !isSameOrDescendantAnyPath(tab.path, pathsToTrash))
+        );
+        setActiveFilePath((currentActivePath) =>
+          currentActivePath !== null && isSameOrDescendantAnyPath(currentActivePath, pathsToTrash)
+            ? null
+            : currentActivePath
+        );
+        setSelectedPaths((currentPaths) =>
+          currentPaths.filter((path) => !pathsToTrash.includes(path))
+        );
+        setSelectionAnchorPath((currentAnchorPath) =>
+          currentAnchorPath !== null && pathsToTrash.includes(currentAnchorPath)
+            ? null
+            : currentAnchorPath
+        );
+        setRenamingPath((currentRenamingPath) =>
+          currentRenamingPath !== null && pathsToTrash.includes(currentRenamingPath)
+            ? null
+            : currentRenamingPath
+        );
+      } catch (error) {
+        setListingError(error instanceof Error ? error.message : 'Failed to move items to Trash.');
+      }
+    },
+    [currentPath]
+  );
+
+  const selectEntry = useCallback(
+    (entry: DesktopEntryDto, event: React.MouseEvent): void => {
+      if (event.type === 'contextmenu') {
+        setSelectedPaths([entry.path]);
+        setSelectionAnchorPath(entry.path);
+        return;
+      }
+
+      const anchorPath = selectionAnchorPath ?? selectedPaths[0] ?? entry.path;
+
+      if (event.shiftKey) {
+        setSelectedPaths(getSelectionRangePaths(listing?.entries ?? [], anchorPath, entry.path));
+        return;
+      }
+
+      if (event.metaKey || event.ctrlKey) {
+        setSelectedPaths((currentPaths) =>
+          currentPaths.includes(entry.path)
+            ? currentPaths.filter((path) => path !== entry.path)
+            : [...currentPaths, entry.path]
+        );
+        setSelectionAnchorPath(entry.path);
+        return;
+      }
+
+      setSelectedPaths([entry.path]);
+      setSelectionAnchorPath(entry.path);
+    },
+    [listing?.entries, selectedPaths, selectionAnchorPath]
+  );
+
+  const activeFileTab =
+    activeFilePath === null ? null : (fileTabs.find((tab) => tab.path === activeFilePath) ?? null);
+
+  return (
+    <main className="finder-shell">
+      <FinderToolbar
+        canGoBack={historyIndex > 0}
+        canGoForward={historyIndex >= 0 && historyIndex < history.length - 1}
+        onBack={onBack}
+        onForward={onForward}
+        title={listing?.name ?? 'Desktop'}
+        fileTabs={fileTabs}
+        activeFilePath={activeFilePath}
+        onSelectDirectory={() => setActiveFilePath(null)}
+        onSelectFileTab={setActiveFilePath}
+        onCloseFileTab={closeFileTab}
+        isFetching={isFetching}
+      />
+
+      <DesktopSplitPane leftPaneRatio={leftPaneRatio} onLeftPaneRatioChange={setLeftPaneRatio}>
+        {activeFileTab ? (
+          <DesktopFileViewerContent entry={activeFileTab} />
+        ) : (
+          <FinderBody
+            error={listingError}
+            isLoading={isFetching && listing === null}
+            entries={listing?.entries ?? []}
+            selectedPaths={selectedPaths}
+            renamingPath={renamingPath}
+            onSelect={selectEntry}
+            onSelectionChange={(paths) => {
+              setSelectedPaths(paths);
+              setSelectionAnchorPath(paths[0] ?? null);
+            }}
+            onActivate={handleEntryDoubleClick}
+            onBackgroundClick={() => {
+              setSelectedPaths([]);
+              setSelectionAnchorPath(null);
+            }}
+            onCreateNewFolder={() => void createNewFolder()}
+            onRenameStart={(entry) => {
+              setSelectedPaths([entry.path]);
+              setSelectionAnchorPath(entry.path);
+              setRenamingPath(entry.path);
+            }}
+            onRenameCommit={(entry, nextName) => void commitRename(entry, nextName)}
+            onRenameCancel={() => setRenamingPath(null)}
+            onTrashEntries={(entriesToTrash) => void moveEntryToTrash(entriesToTrash)}
+          />
+        )}
+      </DesktopSplitPane>
+    </main>
+  );
+};
+
+const DesktopSplitPane = ({
+  children,
+  leftPaneRatio,
+  onLeftPaneRatioChange,
+}: {
+  readonly children: React.ReactNode;
+  readonly leftPaneRatio: number;
+  readonly onLeftPaneRatioChange: (ratio: number) => void;
+}): React.ReactElement => {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [isResizing, setIsResizing] = useState(false);
+
+  useEffect(() => {
+    if (!isResizing) {
+      return;
+    }
+
+    const handleMouseMove = (event: MouseEvent): void => {
+      const container = containerRef.current;
+
+      if (container === null) {
+        return;
+      }
+
+      const rect = container.getBoundingClientRect();
+      const nextRatio = (event.clientX - rect.left) / rect.width;
+      onLeftPaneRatioChange(Math.min(MAX_PANE_RATIO, Math.max(MIN_PANE_RATIO, nextRatio)));
+    };
+
+    const handleMouseUp = (): void => {
+      setIsResizing(false);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    };
+  }, [isResizing, onLeftPaneRatioChange]);
+
+  return (
+    <div ref={containerRef} className="split-pane">
+      <section className="split-left" style={{ flexBasis: `${leftPaneRatio * 100}%` }}>
+        {children}
+      </section>
+
+      <div
+        role="separator"
+        aria-label="Resize desktop panels"
+        aria-orientation="vertical"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(leftPaneRatio * 100)}
+        onMouseDown={(event) => {
+          event.preventDefault();
+          setIsResizing(true);
+        }}
+        className="split-resizer"
+      >
+        <div className="split-resizer-line" />
+        <div className="split-resizer-handle" />
+      </div>
+
+      <aside className="split-preview" aria-label="Desktop prompt panel">
+        <div className="right-prompt-surface">
+          <div className="right-prompt-spacer" />
+          <div className="right-prompt-composer-wrap">
+            <RightPromptComposer />
+          </div>
+        </div>
+      </aside>
+    </div>
+  );
+};
+
+// Preview selection mirrors the web redesign and necessarily fans out by file kind.
+
+const DesktopFileViewerContent = ({
+  entry,
+}: {
+  readonly entry: DesktopEntryDto;
+}): React.ReactElement => {
+  const [file, setFile] = useState<DesktopFileDto | null>(null);
+  const [rawFileUrl, setRawFileUrl] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setIsLoading(true);
+    setError(null);
+    setFile(null);
+    setRawFileUrl(null);
+
+    Promise.all([
+      getDesktopFile({ path: entry.path, maxBytes: VIEWER_MAX_BYTES }),
+      getDesktopRawFileUrl(entry.path),
+    ])
+      .then(([nextFile, nextRawFileUrl]) => {
+        if (!cancelled) {
+          setFile(nextFile);
+          setRawFileUrl(nextRawFileUrl);
+        }
+      })
+      .catch((reason: unknown) => {
+        if (!cancelled) {
+          setError(reason instanceof Error ? reason.message : 'Failed to load this file.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [entry.path]);
+
+  if (isLoading) {
+    return <FinderEmptyState message="Loading preview..." />;
+  }
+
+  if (error !== null) {
+    return <FinderEmptyState message={error} variant="error" />;
+  }
+
+  if (file === null) {
+    return <FinderEmptyState message="Could not load this file." />;
+  }
+
+  const viewerKind = getViewerKind(entry.path, file);
+  const tableData =
+    viewerKind === 'csv'
+      ? parseDelimitedTable(file.content, getPathExtension(entry.path) === 'tsv' ? '\t' : ',')
+      : null;
+
+  return (
+    <div className="file-viewer">
+      {viewerKind === 'image' && rawFileUrl !== null ? (
+        <div className="media-viewer">
+          <img src={rawFileUrl} alt={entry.name} className="image-preview" />
+        </div>
+      ) : viewerKind === 'pdf' && rawFileUrl !== null ? (
+        <iframe title={entry.name} src={rawFileUrl} className="iframe-preview" />
+      ) : viewerKind === 'audio' && rawFileUrl !== null ? (
+        <div className="media-viewer">
+          <audio controls src={rawFileUrl} className="audio-preview" />
+        </div>
+      ) : viewerKind === 'video' && rawFileUrl !== null ? (
+        <div className="media-viewer">
+          <video controls src={rawFileUrl} className="video-preview" />
+        </div>
+      ) : viewerKind === 'code' ? (
+        <ArtifactCodeViewer path={entry.path} content={file.content} />
+      ) : viewerKind === 'csv' && tableData !== null && tableData.rows.length > 0 ? (
+        <CsvPreview tableData={tableData} />
+      ) : viewerKind === 'binary' ? (
+        <FinderEmptyState message="This file is binary and cannot be previewed inline." />
+      ) : (
+        <pre className="text-preview">{file.content}</pre>
+      )}
+
+      {file.truncated ? (
+        <div className="truncated-banner">
+          Preview truncated after {VIEWER_MAX_BYTES.toLocaleString()} bytes.
+        </div>
+      ) : null}
+    </div>
+  );
+};
+
+const FinderToolbar = ({
+  canGoBack,
+  canGoForward,
+  onBack,
+  onForward,
+  title,
+  fileTabs,
+  activeFilePath,
+  onSelectDirectory,
+  onSelectFileTab,
+  onCloseFileTab,
+  isFetching,
+}: {
+  readonly canGoBack: boolean;
+  readonly canGoForward: boolean;
+  readonly onBack: () => void;
+  readonly onForward: () => void;
+  readonly title: string;
+  readonly fileTabs: DesktopEntryDto[];
+  readonly activeFilePath: string | null;
+  readonly onSelectDirectory: () => void;
+  readonly onSelectFileTab: (path: string) => void;
+  readonly onCloseFileTab: (path: string) => void;
+  readonly isFetching: boolean;
+}): React.ReactElement => {
+  return (
+    <div className="finder-toolbar">
+      <div className="toolbar-inner">
+        <div className="nav-pill">
+          <ToolbarButton onClick={onBack} disabled={!canGoBack} ariaLabel="Back">
+            <ChevronIcon direction="left" />
+          </ToolbarButton>
+          <ToolbarButton onClick={onForward} disabled={!canGoForward} ariaLabel="Forward">
+            <ChevronIcon direction="right" />
+          </ToolbarButton>
+        </div>
+
+        <div className="tab-strip-wrap">
+          <button
+            type="button"
+            onClick={onSelectDirectory}
+            title={`${title} - Local`}
+            className={activeFilePath === null ? 'directory-tab active' : 'directory-tab'}
+          >
+            {title} <span>- Local</span>
+          </button>
+
+          <div className="tab-strip">
+            {fileTabs.map((tab) => (
+              <FinderTab
+                key={tab.path}
+                label={tab.name}
+                isActive={activeFilePath === tab.path}
+                onClick={() => onSelectFileTab(tab.path)}
+                onClose={() => onCloseFileTab(tab.path)}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="toolbar-spinner">{isFetching ? <Spinner /> : null}</div>
+        <ThemeToggle />
+      </div>
+    </div>
+  );
+};
+
+const ToolbarButton = ({
+  children,
+  disabled,
+  onClick,
+  ariaLabel,
+}: {
+  readonly children: React.ReactNode;
+  readonly disabled?: boolean;
+  readonly onClick: () => void;
+  readonly ariaLabel: string;
+}): React.ReactElement => {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={ariaLabel}
+      className="toolbar-button"
+    >
+      {children}
+    </button>
+  );
+};
+
+const FinderTab = ({
+  label,
+  isActive,
+  onClick,
+  onClose,
+}: {
+  readonly label: string;
+  readonly isActive: boolean;
+  readonly onClick: () => void;
+  readonly onClose: () => void;
+}): React.ReactElement => {
+  return (
+    <div title={label} className={isActive ? 'finder-tab active' : 'finder-tab'}>
+      <button type="button" onClick={onClick} className="finder-tab-label">
+        {label}
+      </button>
+      <button
+        type="button"
+        aria-label={`Close ${label}`}
+        onClick={onClose}
+        className="finder-tab-close"
+      >
+        x
+      </button>
+    </div>
+  );
+};
+
+const ChevronIcon = ({
+  direction,
+}: {
+  readonly direction: 'left' | 'right';
+}): React.ReactElement => {
+  const rotate = direction === 'left' ? 90 : -90;
+
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 16 16"
+      fill="none"
+      style={{ transform: `rotate(${rotate}deg)` }}
+      aria-hidden="true"
+    >
+      <path
+        d="M4 6l4 4 4-4"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+};
+
+const Spinner = (): React.ReactElement => (
+  <span className="spinner" role="status" aria-label="Loading" />
+);
+
+const FinderBody = ({
+  error,
+  isLoading,
+  entries,
+  selectedPaths,
+  renamingPath,
+  onSelect,
+  onSelectionChange,
+  onActivate,
+  onBackgroundClick,
+  onCreateNewFolder,
+  onRenameStart,
+  onRenameCommit,
+  onRenameCancel,
+  onTrashEntries,
+}: {
+  readonly error: string | null;
+  readonly isLoading: boolean;
+  readonly entries: DesktopEntryDto[];
+  readonly selectedPaths: string[];
+  readonly renamingPath: string | null;
+  readonly onSelect: (entry: DesktopEntryDto, event: React.MouseEvent) => void;
+  readonly onSelectionChange: (paths: string[]) => void;
+  readonly onActivate: (entry: DesktopEntryDto) => void;
+  readonly onBackgroundClick: () => void;
+  readonly onCreateNewFolder: () => void;
+  readonly onRenameStart: (entry: DesktopEntryDto) => void;
+  readonly onRenameCommit: (entry: DesktopEntryDto, nextName: string) => void;
+  readonly onRenameCancel: () => void;
+  readonly onTrashEntries: (entries: readonly DesktopEntryDto[]) => void;
+}): React.ReactElement => {
+  const bodyRef = useRef<HTMLDivElement | null>(null);
+  const didDragSelectRef = useRef(false);
+  const [selectionRect, setSelectionRect] = useState<SelectionRect | null>(null);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const selectionBox = selectionRect === null ? null : getNormalizedSelectionBox(selectionRect);
+
+  useEffect(() => {
+    if (contextMenu === null) {
+      return;
+    }
+
+    const closeMenu = (): void => {
+      setContextMenu(null);
+    };
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') {
+        closeMenu();
+      }
+    };
+
+    window.addEventListener('click', closeMenu);
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('click', closeMenu);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [contextMenu]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (
+        selectedPaths.length === 0 ||
+        renamingPath !== null ||
+        (event.key !== 'Delete' && event.key !== 'Backspace') ||
+        isEditableKeyboardTarget(event.target)
+      ) {
+        return;
+      }
+
+      const selectedEntries = entries.filter((entry) => selectedPaths.includes(entry.path));
+
+      if (selectedEntries.length === 0) {
+        return;
+      }
+
+      event.preventDefault();
+      setContextMenu(null);
+      onTrashEntries(selectedEntries);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [entries, onTrashEntries, renamingPath, selectedPaths]);
+
+  if (isLoading) {
+    return <FinderEmptyState message="Loading folder..." />;
+  }
+
+  if (error !== null) {
+    return <FinderEmptyState message={error} variant="error" />;
+  }
+
+  const isEmpty = entries.length === 0;
+
+  return (
+    <div
+      ref={bodyRef}
+      className={isEmpty ? 'finder-body tiles empty' : 'finder-body tiles'}
+      onPointerDown={(event) => {
+        if (event.button !== 0) {
+          return;
+        }
+
+        const target = event.target;
+
+        if (target instanceof Element && target.closest('.finder-item')) {
+          return;
+        }
+
+        const body = bodyRef.current;
+
+        if (body === null) {
+          return;
+        }
+
+        event.preventDefault();
+        event.currentTarget.setPointerCapture(event.pointerId);
+        const point = getContentPoint(event, body);
+        setSelectionRect({
+          originX: point.x,
+          originY: point.y,
+          currentX: point.x,
+          currentY: point.y,
+        });
+        didDragSelectRef.current = false;
+        onSelectionChange([]);
+      }}
+      onPointerMove={(event) => {
+        const body = bodyRef.current;
+
+        if (selectionRect === null || body === null) {
+          return;
+        }
+
+        const point = getContentPoint(event, body);
+        const nextRect = {
+          ...selectionRect,
+          currentX: point.x,
+          currentY: point.y,
+        };
+
+        setSelectionRect(nextRect);
+        didDragSelectRef.current =
+          Math.abs(nextRect.currentX - nextRect.originX) > 3 ||
+          Math.abs(nextRect.currentY - nextRect.originY) > 3;
+        onSelectionChange(getIntersectingEntryPaths(body, getNormalizedSelectionBox(nextRect)));
+      }}
+      onPointerUp={(event) => {
+        if (selectionRect === null) {
+          return;
+        }
+
+        event.currentTarget.releasePointerCapture(event.pointerId);
+        setSelectionRect(null);
+      }}
+      onPointerCancel={() => {
+        setSelectionRect(null);
+      }}
+      onContextMenu={(event) => {
+        const target = event.target;
+
+        if (target instanceof Element && target.closest('.finder-item')) {
+          return;
+        }
+
+        event.preventDefault();
+        setContextMenu({
+          kind: 'background',
+          ...getContextMenuPosition(event.clientX, event.clientY, BACKGROUND_CONTEXT_MENU_HEIGHT),
+        });
+        onBackgroundClick();
+      }}
+      onClick={(event) => {
+        if (didDragSelectRef.current) {
+          didDragSelectRef.current = false;
+          return;
+        }
+
+        if (event.target === event.currentTarget) {
+          onBackgroundClick();
+        }
+      }}
+    >
+      {isEmpty ? (
+        <div className="finder-empty-inline">
+          <p>This folder is empty.</p>
+        </div>
+      ) : (
+        <FinderTiles
+          entries={entries}
+          selectedPaths={selectedPaths}
+          renamingPath={renamingPath}
+          onSelect={onSelect}
+          onContextMenu={(entry, event) => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            if (selectedPaths.length > 1) {
+              setContextMenu(null);
+              return;
+            }
+
+            onSelect(entry, event);
+            setContextMenu({
+              kind: 'entry',
+              ...getContextMenuPosition(event.clientX, event.clientY, ENTRY_CONTEXT_MENU_HEIGHT),
+              entry,
+            });
+          }}
+          onActivate={onActivate}
+          onRenameCommit={onRenameCommit}
+          onRenameCancel={onRenameCancel}
+        />
+      )}
+      {contextMenu === null ? null : contextMenu.kind === 'background' ? (
+        <DesktopContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onCreateNewFolder={() => {
+            setContextMenu(null);
+            onCreateNewFolder();
+          }}
+        />
+      ) : (
+        <DesktopEntryContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          entry={contextMenu.entry}
+          onView={(entry) => {
+            setContextMenu(null);
+            onActivate(entry);
+          }}
+          onRename={(entry) => {
+            setContextMenu(null);
+            onRenameStart(entry);
+          }}
+          onTrash={(entry) => {
+            setContextMenu(null);
+            onTrashEntries([entry]);
+          }}
+        />
+      )}
+      {selectionBox === null ? null : (
+        <div
+          className="selection-rectangle"
+          style={{
+            left: selectionBox.left,
+            top: selectionBox.top,
+            width: selectionBox.width,
+            height: selectionBox.height,
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
+const FinderTiles = ({
+  entries,
+  selectedPaths,
+  renamingPath,
+  onSelect,
+  onContextMenu,
+  onActivate,
+  onRenameCommit,
+  onRenameCancel,
+}: {
+  readonly entries: DesktopEntryDto[];
+  readonly selectedPaths: string[];
+  readonly renamingPath: string | null;
+  readonly onSelect: (entry: DesktopEntryDto, event: React.MouseEvent) => void;
+  readonly onContextMenu: (entry: DesktopEntryDto, event: React.MouseEvent) => void;
+  readonly onActivate: (entry: DesktopEntryDto) => void;
+  readonly onRenameCommit: (entry: DesktopEntryDto, nextName: string) => void;
+  readonly onRenameCancel: () => void;
+}): React.ReactElement => {
+  return (
+    <div className="finder-tiles">
+      {entries.map((entry) => (
+        <FinderItem
+          key={entry.path}
+          entry={entry}
+          isSelected={selectedPaths.includes(entry.path)}
+          isRenaming={entry.path === renamingPath}
+          onSelect={(event) => onSelect(entry, event)}
+          onContextMenu={(event) => onContextMenu(entry, event)}
+          onActivate={() => onActivate(entry)}
+          onRenameCommit={(nextName) => onRenameCommit(entry, nextName)}
+          onRenameCancel={onRenameCancel}
+        />
+      ))}
+    </div>
+  );
+};
+
+const FinderEmptyState = ({
+  message,
+  variant = 'info',
+}: {
+  readonly message: string;
+  readonly variant?: 'info' | 'error';
+}): React.ReactElement => {
+  return (
+    <div className="finder-empty">
+      <p className={variant === 'error' ? 'error' : ''}>{message}</p>
+    </div>
+  );
+};
+
+const FinderItem = ({
+  entry,
+  isSelected,
+  isRenaming,
+  onSelect,
+  onContextMenu,
+  onActivate,
+  onRenameCommit,
+  onRenameCancel,
+}: {
+  readonly entry: DesktopEntryDto;
+  readonly isSelected: boolean;
+  readonly isRenaming: boolean;
+  readonly onSelect: (event: React.MouseEvent) => void;
+  readonly onContextMenu: (event: React.MouseEvent) => void;
+  readonly onActivate: () => void;
+  readonly onRenameCommit: (nextName: string) => void;
+  readonly onRenameCancel: () => void;
+}): React.ReactElement => {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const hasCommittedRef = useRef(false);
+  const [draftName, setDraftName] = useState(entry.name);
+
+  useEffect(() => {
+    setDraftName(entry.name);
+    hasCommittedRef.current = false;
+  }, [entry.name, isRenaming]);
+
+  useEffect(() => {
+    if (!isRenaming) {
+      return;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [isRenaming]);
+
+  const commitRename = (): void => {
+    if (hasCommittedRef.current) {
+      return;
+    }
+
+    hasCommittedRef.current = true;
+    onRenameCommit(draftName);
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={(event) => {
+        if (!isRenaming) {
+          onSelect(event);
+        }
+      }}
+      onDoubleClick={() => {
+        if (!isRenaming) {
+          onActivate();
+        }
+      }}
+      onContextMenu={(event) => {
+        if (!isRenaming) {
+          onContextMenu(event);
+        }
+      }}
+      onKeyDown={(event) => {
+        if (isRenaming) {
+          return;
+        }
+
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          onActivate();
+        }
+      }}
+      className={isSelected ? 'finder-item selected' : 'finder-item'}
+      data-entry-path={entry.path}
+    >
+      <div className="finder-item-icon">
+        <EntryIcon entry={entry} />
+      </div>
+      {isRenaming ? (
+        <input
+          ref={inputRef}
+          className="finder-rename-input"
+          value={draftName}
+          onChange={(event) => setDraftName(event.target.value)}
+          onClick={(event) => event.stopPropagation()}
+          onDoubleClick={(event) => event.stopPropagation()}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              commitRename();
+            }
+            if (event.key === 'Escape') {
+              event.preventDefault();
+              hasCommittedRef.current = true;
+              onRenameCancel();
+            }
+          }}
+          onBlur={commitRename}
+        />
+      ) : (
+        <span className="finder-item-label" title={entry.name}>
+          {entry.name}
+        </span>
+      )}
+    </button>
+  );
+};
+
+const DesktopContextMenu = ({
+  x,
+  y,
+  onCreateNewFolder,
+}: {
+  readonly x: number;
+  readonly y: number;
+  readonly onCreateNewFolder: () => void;
+}): React.ReactElement => {
+  return (
+    <div
+      className="desktop-context-menu"
+      style={{ left: x, top: y }}
+      role="menu"
+      onClick={(event) => event.stopPropagation()}
+      onContextMenu={(event) => event.preventDefault()}
+    >
+      <button
+        type="button"
+        className="context-menu-item"
+        role="menuitem"
+        onPointerDown={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onCreateNewFolder();
+        }}
+      >
+        <HugeiconsIcon icon={FolderAddIcon} size={16} color="currentColor" strokeWidth={1.8} />
+        <span>New Folder</span>
+      </button>
+      <div className="context-menu-separator" />
+      <ContextMenuDummyItem icon={<InfoIcon />} label="Get Info" />
+      <ContextMenuDummyItem label="Change Wallpaper..." inset />
+      <ContextMenuDummyItem label="Edit Widgets..." inset />
+      <div className="context-menu-separator" />
+      <ContextMenuDummyItem icon={<StacksIcon />} label="Use Stacks" />
+      <ContextMenuDummyItem icon={<SortIcon />} label="Sort By" arrow />
+      <ContextMenuDummyItem icon={<GridIcon />} label="Clean Up" />
+      <ContextMenuDummyItem label="Clean Up By" arrow inset />
+      <ContextMenuDummyItem icon={<SettingsIcon />} label="Show View Options" />
+    </div>
+  );
+};
+
+const DesktopEntryContextMenu = ({
+  x,
+  y,
+  entry,
+  onView,
+  onRename,
+  onTrash,
+}: {
+  readonly x: number;
+  readonly y: number;
+  readonly entry: DesktopEntryDto;
+  readonly onView: (entry: DesktopEntryDto) => void;
+  readonly onRename: (entry: DesktopEntryDto) => void;
+  readonly onTrash: (entry: DesktopEntryDto) => void;
+}): React.ReactElement => {
+  return (
+    <div
+      className="desktop-context-menu"
+      style={{ left: x, top: y }}
+      role="menu"
+      onClick={(event) => event.stopPropagation()}
+      onContextMenu={(event) => event.preventDefault()}
+    >
+      <ContextMenuActionItem icon={<ViewIcon />} label="View" onSelect={() => onView(entry)} />
+      <ContextMenuActionItem
+        icon={<RenameIcon />}
+        label="Rename"
+        onSelect={() => onRename(entry)}
+      />
+      <ContextMenuDummyItem icon={<InfoIcon />} label="Get Info" />
+      <ContextMenuDummyItem icon={<DuplicateIcon />} label="Duplicate" />
+      <ContextMenuDummyItem icon={<AliasIcon />} label="Make Alias" />
+      <div className="context-menu-separator" />
+      <ContextMenuActionItem icon={<TrashIcon />} label="Trash" onSelect={() => onTrash(entry)} />
+      <div className="context-menu-separator" />
+      <ContextMenuDummyItem icon={<ViewIcon />} label={`Quick Look "${entry.name}"`} />
+      <ContextMenuDummyItem icon={<ShareIcon />} label="Share" arrow />
+      <ContextMenuDummyItem icon={<TagsIcon />} label="Tags..." />
+    </div>
+  );
+};
+
+const ContextMenuActionItem = ({
+  icon,
+  label,
+  onSelect,
+}: {
+  readonly icon: React.ReactNode;
+  readonly label: string;
+  readonly onSelect: () => void;
+}): React.ReactElement => (
+  <button
+    type="button"
+    className="context-menu-item"
+    role="menuitem"
+    onPointerDown={(event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onSelect();
+    }}
+  >
+    <span className="context-menu-icon" aria-hidden="true">
+      {icon}
+    </span>
+    <span className="context-menu-label">{label}</span>
+  </button>
+);
+
+const ContextMenuDummyItem = ({
+  icon,
+  label,
+  arrow = false,
+  inset = false,
+}: {
+  readonly icon?: React.ReactNode;
+  readonly label: string;
+  readonly arrow?: boolean;
+  readonly inset?: boolean;
+}): React.ReactElement => (
+  <button type="button" className="context-menu-item disabled" role="menuitem" disabled>
+    <span className="context-menu-icon" aria-hidden="true">
+      {icon}
+    </span>
+    <span className={inset ? 'context-menu-label inset' : 'context-menu-label'}>{label}</span>
+    {arrow ? <span className="context-menu-arrow">›</span> : null}
+  </button>
+);
+
+const ViewIcon = (): React.ReactElement => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+    <path
+      d="M3.5 12s3-5.5 8.5-5.5S20.5 12 20.5 12s-3 5.5-8.5 5.5S3.5 12 3.5 12Z"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M12 14.6a2.6 2.6 0 1 0 0-5.2 2.6 2.6 0 0 0 0 5.2Z"
+      stroke="currentColor"
+      strokeWidth="1.7"
+    />
+  </svg>
+);
+
+const RenameIcon = (): React.ReactElement => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+    <path d="M4 17.5h7" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    <path
+      d="M5 15.5 15.7 4.8a2.1 2.1 0 0 1 3 3L8 18.5l-4 .9 1-3.9Z"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const TrashIcon = (): React.ReactElement => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+    <path d="M5 7h14" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    <path
+      d="M9.5 7V5.5A1.5 1.5 0 0 1 11 4h2a1.5 1.5 0 0 1 1.5 1.5V7"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+    />
+    <path
+      d="M7 7.5 8 19a2 2 0 0 0 2 1.8h4a2 2 0 0 0 2-1.8l1-11.5"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M10.5 11v5.5M13.5 11v5.5"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
+const DuplicateIcon = (): React.ReactElement => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+    <path
+      d="M8 8.5V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-2.5"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M5 9h7a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2Z"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const AliasIcon = (): React.ReactElement => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+    <path
+      d="M9 7H6.5A3.5 3.5 0 0 0 3 10.5v0A3.5 3.5 0 0 0 6.5 14H12"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+    />
+    <path
+      d="M15 17h2.5A3.5 3.5 0 0 0 21 13.5v0a3.5 3.5 0 0 0-3.5-3.5H12"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+    />
+    <path
+      d="M15 4v6h6"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const ShareIcon = (): React.ReactElement => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+    <path d="M12 15V4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    <path
+      d="m8 8 4-4 4 4"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M6 11v7a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-7"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const TagsIcon = (): React.ReactElement => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+    <path
+      d="M4.5 5.5h6.6a2 2 0 0 1 1.4.6l6.3 6.3a2 2 0 0 1 0 2.8l-3.6 3.6a2 2 0 0 1-2.8 0L6.1 12.5a2 2 0 0 1-.6-1.4V5.5Z"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinejoin="round"
+    />
+    <path d="M8.5 8.5h.01" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" />
+  </svg>
+);
+
+const InfoIcon = (): React.ReactElement => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+    <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.8" />
+    <path d="M12 11v5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    <path d="M12 8h.01" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
+  </svg>
+);
+
+const StacksIcon = (): React.ReactElement => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+    <path
+      d="M5 7h14M5 12h14M5 17h14"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+    />
+    <path
+      d="M8 5v4M12 5v4M16 5v4M8 10v4M12 10v4M16 10v4M8 15v4M12 15v4M16 15v4"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
+const SortIcon = (): React.ReactElement => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+    <path
+      d="M8 4v16M8 20l-3-3M8 20l3-3"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M16 20V4M16 4l-3 3M16 4l3 3"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const GridIcon = (): React.ReactElement => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+    <path
+      d="M5 5h3v3H5zM10.5 5h3v3h-3zM16 5h3v3h-3zM5 10.5h3v3H5zM10.5 10.5h3v3h-3zM16 10.5h3v3h-3zM5 16h3v3H5zM10.5 16h3v3h-3zM16 16h3v3h-3z"
+      stroke="currentColor"
+      strokeWidth="1.5"
+    />
+  </svg>
+);
+
+const SettingsIcon = (): React.ReactElement => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+    <path
+      d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"
+      stroke="currentColor"
+      strokeWidth="1.7"
+    />
+    <path
+      d="M19 13.4v-2.8l-2.1-.7a5.8 5.8 0 0 0-.5-1.2l1-2-2-2-2 .9c-.4-.2-.8-.4-1.3-.5L11.4 3H8.6L8 5.1c-.5.1-.9.3-1.3.5l-2-.9-2 2 1 2c-.2.4-.4.8-.5 1.2L1 10.6v2.8l2.1.7c.1.4.3.8.5 1.2l-1 2 2 2 2-.9c.4.2.8.4 1.3.5l.7 2.1h2.8l.7-2.1c.5-.1.9-.3 1.3-.5l2 .9 2-2-1-2c.2-.4.4-.8.5-1.2l2.1-.7Z"
+      stroke="currentColor"
+      strokeWidth="1.3"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const EntryIcon = ({
+  entry,
+  size = 52,
+}: {
+  readonly entry: DesktopEntryDto;
+  readonly size?: number;
+}): React.ReactElement => {
+  const src = entry.type === 'directory' ? folderIconSrc : fileIconSrc;
+
+  return (
+    <img
+      src={src}
+      alt=""
+      draggable={false}
+      className="entry-icon"
+      style={{
+        width: entry.type === 'directory' ? 1.15 * size : 0.75 * size,
+        height: size,
+      }}
+    />
+  );
+};
+
+const getContentPoint = (
+  event: React.PointerEvent<HTMLElement>,
+  container: HTMLElement
+): { readonly x: number; readonly y: number } => {
+  const rect = container.getBoundingClientRect();
+
+  return {
+    x: event.clientX - rect.left + container.scrollLeft,
+    y: event.clientY - rect.top + container.scrollTop,
+  };
+};
+
+const getContextMenuPosition = (
+  x: number,
+  y: number,
+  estimatedHeight: number
+): { readonly x: number; readonly y: number } => {
+  const maxX = window.innerWidth - CONTEXT_MENU_WIDTH - CONTEXT_MENU_VIEWPORT_MARGIN;
+  const maxY = window.innerHeight - estimatedHeight - CONTEXT_MENU_VIEWPORT_MARGIN;
+  const shouldOpenUpward = y + estimatedHeight > window.innerHeight - CONTEXT_MENU_VIEWPORT_MARGIN;
+  const nextX = Math.min(
+    Math.max(CONTEXT_MENU_VIEWPORT_MARGIN, x),
+    Math.max(CONTEXT_MENU_VIEWPORT_MARGIN, maxX)
+  );
+  const preferredY = shouldOpenUpward ? y - estimatedHeight : y;
+  const nextY = Math.min(
+    Math.max(CONTEXT_MENU_VIEWPORT_MARGIN, preferredY),
+    Math.max(CONTEXT_MENU_VIEWPORT_MARGIN, maxY)
+  );
+
+  return { x: nextX, y: nextY };
+};
+
+const isEditableKeyboardTarget = (target: EventTarget | null): boolean => {
+  return (
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    (target instanceof HTMLElement && target.isContentEditable)
+  );
+};
+
+const getNormalizedSelectionBox = (rect: SelectionRect): SelectionBox => {
+  const left = Math.min(rect.originX, rect.currentX);
+  const top = Math.min(rect.originY, rect.currentY);
+  const right = Math.max(rect.originX, rect.currentX);
+  const bottom = Math.max(rect.originY, rect.currentY);
+
+  return {
+    left,
+    top,
+    right,
+    bottom,
+    width: right - left,
+    height: bottom - top,
+  };
+};
+
+const getIntersectingEntryPaths = (
+  container: HTMLElement,
+  selectionBox: SelectionBox
+): string[] => {
+  const containerRect = container.getBoundingClientRect();
+
+  return [...container.querySelectorAll<HTMLElement>('.finder-item[data-entry-path]')]
+    .filter((item) => {
+      const itemRect = item.getBoundingClientRect();
+      const itemBox = {
+        left: itemRect.left - containerRect.left + container.scrollLeft,
+        top: itemRect.top - containerRect.top + container.scrollTop,
+        right: itemRect.right - containerRect.left + container.scrollLeft,
+        bottom: itemRect.bottom - containerRect.top + container.scrollTop,
+      };
+
+      return intersects(selectionBox, itemBox);
+    })
+    .map((item) => item.dataset['entryPath'])
+    .filter((path): path is string => typeof path === 'string');
+};
+
+const intersects = (
+  selectionBox: SelectionBox,
+  itemBox: Pick<SelectionBox, 'left' | 'top' | 'right' | 'bottom'>
+): boolean => {
+  return (
+    selectionBox.left <= itemBox.right &&
+    selectionBox.right >= itemBox.left &&
+    selectionBox.top <= itemBox.bottom &&
+    selectionBox.bottom >= itemBox.top
+  );
+};
+
+const sortDesktopEntries = (entries: DesktopEntryDto[]): DesktopEntryDto[] => {
+  return [...entries].sort((a, b) => {
+    if (a.type !== b.type) {
+      return a.type === 'directory' ? -1 : 1;
+    }
+
+    return a.name.localeCompare(b.name);
+  });
+};
+
+const getSelectionRangePaths = (
+  entries: readonly DesktopEntryDto[],
+  anchorPath: string,
+  targetPath: string
+): string[] => {
+  const anchorIndex = entries.findIndex((entry) => entry.path === anchorPath);
+  const targetIndex = entries.findIndex((entry) => entry.path === targetPath);
+
+  if (anchorIndex === -1 || targetIndex === -1) {
+    return [targetPath];
+  }
+
+  const start = Math.min(anchorIndex, targetIndex);
+  const end = Math.max(anchorIndex, targetIndex);
+
+  return entries.slice(start, end + 1).map((entry) => entry.path);
+};
+
+const isSameOrDescendantPath = (path: string, parentPath: string): boolean => {
+  return path === parentPath || path.startsWith(`${parentPath}/`);
+};
+
+const isSameOrDescendantAnyPath = (path: string, parentPaths: readonly string[]): boolean => {
+  return parentPaths.some((parentPath) => isSameOrDescendantPath(path, parentPath));
+};
+
+const getViewerKind = (path: string, file: Pick<DesktopFileDto, 'isBinary'> | null): ViewerKind => {
+  const extension = getPathExtension(path);
+
+  if (IMAGE_EXTENSIONS.has(extension)) return 'image';
+  if (PDF_EXTENSIONS.has(extension)) return 'pdf';
+  if (AUDIO_EXTENSIONS.has(extension)) return 'audio';
+  if (VIDEO_EXTENSIONS.has(extension)) return 'video';
+  if (CSV_EXTENSIONS.has(extension)) return 'csv';
+  if (file?.isBinary) return 'binary';
+  if (isCodeLikePath(path)) return 'code';
+
+  return 'text';
+};
+
+const isCodeLikePath = (path: string): boolean => {
+  const basename = getPathBasename(path).toLowerCase();
+  const extension = getPathExtension(path);
+
+  return (
+    CODE_EXTENSIONS.has(extension) ||
+    CODE_BASENAMES.has(basename) ||
+    basename === '.env' ||
+    basename.startsWith('.env.')
+  );
+};
+
+const parseDelimitedLine = (line: string, delimiter: string): string[] => {
+  const cells: string[] = [];
+  let value = '';
+  let inQuotes = false;
+
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    const next = line[index + 1];
+
+    if (char === '"') {
+      if (inQuotes && next === '"') {
+        value += '"';
+        index += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+
+    if (char === delimiter && !inQuotes) {
+      cells.push(value);
+      value = '';
+      continue;
+    }
+
+    value += char;
+  }
+
+  cells.push(value);
+  return cells;
+};
+
+const parseDelimitedTable = (
+  content: string,
+  delimiter: string
+): { readonly rows: string[][]; readonly truncatedRows: boolean } => {
+  const lines = content.replace(/\r\n/g, '\n').split('\n');
+  const rows = lines.slice(0, MAX_TABLE_ROWS).map((line) => {
+    const parsed = parseDelimitedLine(line, delimiter);
+
+    return parsed.slice(0, MAX_TABLE_COLUMNS);
+  });
+
+  return {
+    rows,
+    truncatedRows: lines.length > MAX_TABLE_ROWS,
+  };
+};
+
+const CsvPreview = ({
+  tableData,
+}: {
+  readonly tableData: { readonly rows: string[][]; readonly truncatedRows: boolean };
+}): React.ReactElement => (
+  <div className="csv-preview">
+    <table>
+      <thead>
+        <tr>
+          {tableData.rows[0]?.map((cell, index) => (
+            <th key={`header-${index}`}>{cell || `Column ${String(index + 1)}`}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {tableData.rows.slice(1).map((row, rowIndex) => (
+          <tr key={`row-${rowIndex}`}>
+            {row.map((cell, cellIndex) => (
+              <td key={`cell-${rowIndex}-${cellIndex}`}>{cell}</td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+
+    {tableData.truncatedRows ? (
+      <p className="table-truncated">Showing the first {MAX_TABLE_ROWS} rows.</p>
+    ) : null}
+  </div>
+);

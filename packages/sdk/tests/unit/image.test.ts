@@ -2,103 +2,66 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { resetSdkConfig, setSdkConfig } from '../../src/config.js';
+import { runGatewayImageRequest } from '../../src/gateway.js';
 import { ImageInputError, image } from '../../src/image.js';
-import { resolveProviderCredentials } from '../../src/keys.js';
 
 import type { BaseImageResult, ImageContent, ImageModel } from '@ank1015/llm-core';
 
-vi.mock('../../src/keys.js', () => ({
-  resolveProviderCredentials: vi.fn(),
+vi.mock('../../src/gateway.js', () => ({
+  runGatewayImageRequest: vi.fn(),
 }));
 
-vi.mock('@ank1015/llm-core', () => ({
-  generateImage: vi.fn(),
-  getImageModel: vi.fn(),
-}));
-
-const mockedResolveProviderCredentials = vi.mocked(resolveProviderCredentials);
-
-const { generateImage, getImageModel } = await import('@ank1015/llm-core');
-const mockedCoreGenerateImage = vi.mocked(generateImage);
-const mockedGetImageModel = vi.mocked(getImageModel);
-
+const mockedRunGatewayImageRequest = vi.mocked(runGatewayImageRequest);
 const tempDirectories: string[] = [];
 
 afterEach(async () => {
   vi.clearAllMocks();
-  resetSdkConfig();
   await Promise.all(
     tempDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true }))
   );
 });
 
-async function createTempDirectory(): Promise<string> {
-  const directory = await mkdtemp(join(tmpdir(), 'llm-sdk-image-'));
-  tempDirectories.push(directory);
-  return directory;
-}
-
 describe('image', () => {
-  beforeEach(() => {
-    setSdkConfig({ modelTransport: 'direct' });
-  });
-
-  it('maps gpt-image to the OpenAI core model and saves the generated file using the real mime-type extension', async () => {
+  it('sends top-level image options through the gateway and saves the returned file', async () => {
     const directory = await createTempDirectory();
-    const model = createImageModel('openai', 'gpt-image-1.5');
-    const imageBase64 = Buffer.from('openai-image').toString('base64');
+    const imageBase64 = Buffer.from('azure-image').toString('base64');
 
-    mockedResolveProviderCredentials.mockResolvedValue({
-      ok: true,
-      provider: 'openai',
-      credentials: {
-        apiKey: 'openai-key',
-      },
-    });
-    mockedGetImageModel.mockReturnValue(model as never);
-    mockedCoreGenerateImage.mockResolvedValue(
-      createImageResult('openai', model, {
-        text: '',
+    mockedRunGatewayImageRequest.mockResolvedValue(
+      createImageResult({
         images: [
           {
             type: 'image',
             data: imageBase64,
             mimeType: 'image/webp',
             metadata: {
-              generationProvider: 'openai',
+              generationProvider: 'azure-openai',
             },
           },
         ],
-      }) as never
+      })
     );
 
     const result = await image({
-      model: 'gpt-image',
       prompt: 'Draw a glossy otter sticker',
       output: join(directory, 'otter.png'),
-      keysFilePath: '/tmp/openai-keys.env',
-      settings: {
-        background: 'transparent',
-        compression: 55,
-        count: 1,
-        format: 'webp',
-        moderation: 'low',
-        quality: 'high',
-        size: '1024x1024',
-      },
+      background: 'opaque',
+      compression: 55,
+      count: 1,
+      format: 'webp',
+      moderation: 'low',
+      quality: 'high',
+      size: '1024x1024',
+      requestId: 'image-request-1',
     });
 
-    expect(mockedResolveProviderCredentials).toHaveBeenCalledWith('/tmp/openai-keys.env', 'openai');
-    expect(mockedGetImageModel).toHaveBeenCalledWith('openai', 'gpt-image-1.5');
-    expect(mockedCoreGenerateImage).toHaveBeenCalledWith(
-      model,
-      { prompt: 'Draw a glossy otter sticker' },
-      {
-        apiKey: 'openai-key',
-        background: 'transparent',
+    expect(mockedRunGatewayImageRequest).toHaveBeenCalledWith({
+      api: 'azure-openai',
+      modelId: 'gpt-image-2',
+      context: { prompt: 'Draw a glossy otter sticker' },
+      providerOptions: {
+        background: 'opaque',
         output_compression: 55,
         n: 1,
         output_format: 'webp',
@@ -106,53 +69,36 @@ describe('image', () => {
         quality: 'high',
         size: '1024x1024',
       },
-      undefined
-    );
+      requestId: 'image-request-1',
+    });
 
     const expectedPath = join(directory, 'otter.webp');
     expect(result).toEqual(
       expect.objectContaining({
-        model: 'gpt-image',
-        api: 'openai',
-        providerModelId: 'gpt-image-1.5',
         path: expectedPath,
         paths: [expectedPath],
         text: '',
       })
     );
-    await expect(readFile(expectedPath)).resolves.toEqual(Buffer.from('openai-image'));
+    await expect(readFile(expectedPath)).resolves.toEqual(Buffer.from('azure-image'));
   });
 
-  it('adds numeric suffixes when the provider returns multiple images', async () => {
+  it('adds numeric suffixes when the gateway returns multiple images', async () => {
     const directory = await createTempDirectory();
-    const model = createImageModel('openai', 'gpt-image-1.5');
 
-    mockedResolveProviderCredentials.mockResolvedValue({
-      ok: true,
-      provider: 'openai',
-      credentials: {
-        apiKey: 'openai-key',
-      },
-    });
-    mockedGetImageModel.mockReturnValue(model as never);
-    mockedCoreGenerateImage.mockResolvedValue(
-      createImageResult('openai', model, {
-        text: '',
+    mockedRunGatewayImageRequest.mockResolvedValue(
+      createImageResult({
         images: [
           createGeneratedImage('image-1', 'image/png'),
           createGeneratedImage('image-2', 'image/jpeg'),
         ],
-      }) as never
+      })
     );
 
     const result = await image({
-      model: 'gpt-image',
       prompt: 'Create two icons',
       output: join(directory, 'icons.webp'),
-      keysFilePath: '/tmp/openai-keys.env',
-      settings: {
-        count: 2,
-      },
+      count: 2,
     });
 
     const firstPath = join(directory, 'icons-1.png');
@@ -164,48 +110,32 @@ describe('image', () => {
     await expect(readFile(secondPath)).resolves.toEqual(Buffer.from('image-2'));
   });
 
-  it('maps nano-banana settings to the Google image runtime and reads reference images from local paths', async () => {
+  it('reads reference and mask images from local paths', async () => {
     const directory = await createTempDirectory();
     const inputPath = join(directory, 'reference.png');
+    const maskPath = join(directory, 'mask.png');
     const inputBytes = Buffer.from('reference-image');
-    const model = createImageModel('google', 'gemini-3.1-flash-image-preview');
+    const maskBytes = Buffer.from('mask-image');
 
     await writeFile(inputPath, inputBytes);
-
-    mockedResolveProviderCredentials.mockResolvedValue({
-      ok: true,
-      provider: 'google',
-      credentials: {
-        apiKey: 'google-key',
-      },
-    });
-    mockedGetImageModel.mockReturnValue(model as never);
-    mockedCoreGenerateImage.mockResolvedValue(
-      createImageResult('google', model, {
-        text: 'Generated with a bright accent color.',
-        images: [createGeneratedImage('google-image', 'image/png')],
-      }) as never
+    await writeFile(maskPath, maskBytes);
+    mockedRunGatewayImageRequest.mockResolvedValue(
+      createImageResult({
+        images: [createGeneratedImage('edited-image', 'image/png')],
+      })
     );
 
     const result = await image({
-      model: 'nano-banana',
       prompt: 'Turn this into an emerald badge',
       output: join(directory, 'badge'),
-      imagePaths: [inputPath],
-      keysFilePath: '/tmp/google-keys.env',
-      settings: {
-        aspectRatio: '16:9',
-        imageSize: '2K',
-        googleSearch: true,
-        includeText: false,
-      },
+      inputImages: [inputPath],
+      mask: maskPath,
     });
 
-    expect(mockedResolveProviderCredentials).toHaveBeenCalledWith('/tmp/google-keys.env', 'google');
-    expect(mockedGetImageModel).toHaveBeenCalledWith('google', 'gemini-3.1-flash-image-preview');
-    expect(mockedCoreGenerateImage).toHaveBeenCalledWith(
-      model,
-      {
+    expect(mockedRunGatewayImageRequest).toHaveBeenCalledWith({
+      api: 'azure-openai',
+      modelId: 'gpt-image-2',
+      context: {
         prompt: 'Turn this into an emerald badge',
         images: [
           {
@@ -218,75 +148,79 @@ describe('image', () => {
             },
           },
         ],
-      },
-      {
-        apiKey: 'google-key',
-        responseModalities: ['IMAGE'],
-        imageConfig: {
-          aspectRatio: '16:9',
-          imageSize: '2K',
+        mask: {
+          type: 'image',
+          data: maskBytes.toString('base64'),
+          mimeType: 'image/png',
+          metadata: {
+            fileName: 'mask.png',
+            path: maskPath,
+          },
         },
-        tools: [{ googleSearch: {} }],
       },
-      undefined
-    );
+      providerOptions: {},
+    });
 
     expect(result.path).toBe(join(directory, 'badge.png'));
-    expect(result.text).toBe('Generated with a bright accent color.');
     await expect(readFile(join(directory, 'badge.png'))).resolves.toEqual(
-      Buffer.from('google-image')
+      Buffer.from('edited-image')
     );
   });
 
-  it('throws ImageInputError when provider credentials are unavailable', async () => {
-    const model = createImageModel('openai', 'gpt-image-1.5');
-
-    mockedGetImageModel.mockReturnValue(model as never);
-    mockedResolveProviderCredentials.mockResolvedValue({
-      ok: false,
-      provider: 'openai',
-      error: {
-        code: 'missing_provider_credentials',
-        message: 'Missing credentials for provider openai: OPENAI_API_KEY',
-        provider: 'openai',
-        path: '/tmp/openai-keys.env',
-        missing: [
-          {
-            option: 'apiKey',
-            env: 'OPENAI_API_KEY',
-            aliases: [],
-          },
-        ],
-      },
-    });
-
+  it('throws ImageInputError when mask is provided without inputImages', async () => {
     await expect(
       image({
-        model: 'gpt-image',
-        prompt: 'Draw a ship',
-        output: '/tmp/ship.png',
-        keysFilePath: '/tmp/openai-keys.env',
+        prompt: 'Edit this',
+        output: '/tmp/edit.png',
+        mask: '/tmp/mask.png',
       })
     ).rejects.toEqual(
       expect.objectContaining({
         name: 'ImageInputError',
-        code: 'missing_provider_credentials',
-        model: 'gpt-image',
-        keysFilePath: '/tmp/openai-keys.env',
+        code: 'invalid_image_input',
+      })
+    );
+
+    expect(mockedRunGatewayImageRequest).not.toHaveBeenCalled();
+  });
+
+  it('validates count and compression before sending the request', async () => {
+    await expect(
+      image({
+        prompt: 'Create an icon',
+        output: '/tmp/icon.png',
+        count: 0,
+      })
+    ).rejects.toEqual(
+      expect.objectContaining({
+        name: 'ImageInputError',
+        message: 'count must be a positive integer.',
       })
     );
 
     await expect(
       image({
-        model: 'gpt-image',
-        prompt: 'Draw a ship',
-        output: '/tmp/ship.png',
-        keysFilePath: '/tmp/openai-keys.env',
+        prompt: 'Create an icon',
+        output: '/tmp/icon.png',
+        compression: 50,
+        format: 'png',
       })
-    ).rejects.toBeInstanceOf(ImageInputError);
-    expect(mockedCoreGenerateImage).not.toHaveBeenCalled();
+    ).rejects.toEqual(
+      expect.objectContaining({
+        name: 'ImageInputError',
+        message: 'compression can only be used with format: "jpeg" or "webp".',
+      })
+    );
+
+    expect(mockedRunGatewayImageRequest).not.toHaveBeenCalled();
   });
 });
+
+async function createTempDirectory(): Promise<string> {
+  const directory = await mkdtemp(join(tmpdir(), 'llm-sdk-image-'));
+  tempDirectories.push(directory);
+  return directory;
+}
 
 function createGeneratedImage(data: string, mimeType: string): ImageContent {
   return {
@@ -296,15 +230,12 @@ function createGeneratedImage(data: string, mimeType: string): ImageContent {
   };
 }
 
-function createImageModel<TApi extends 'openai' | 'google'>(
-  api: TApi,
-  id: string
-): ImageModel<TApi> {
+function createImageModel(): ImageModel<'azure-openai'> {
   return {
-    api,
-    id,
-    name: id,
-    baseUrl: `https://${api}.example.com`,
+    api: 'azure-openai',
+    id: 'gpt-image-2',
+    name: 'GPT Image 2',
+    baseUrl: 'https://azure.example.com/openai',
     input: ['text', 'image'],
     output: ['image'],
     cost: {
@@ -317,19 +248,15 @@ function createImageModel<TApi extends 'openai' | 'google'>(
   };
 }
 
-function createImageResult<TApi extends 'openai' | 'google'>(
-  api: TApi,
-  model: ImageModel<TApi>,
-  input: {
-    text: string;
-    images: ImageContent[];
-  }
-): BaseImageResult<TApi> {
+function createImageResult(input: {
+  text?: string;
+  images: ImageContent[];
+}): BaseImageResult<'azure-openai'> {
   return {
-    id: `${api}-image-result`,
-    api,
-    model,
-    response: { ok: true } as BaseImageResult<TApi>['response'],
+    id: 'azure-openai-image-result',
+    api: 'azure-openai',
+    model: createImageModel(),
+    response: { ok: true } as BaseImageResult<'azure-openai'>['response'],
     content: [
       ...(input.text ? [{ type: 'text' as const, content: input.text }] : []),
       ...input.images,

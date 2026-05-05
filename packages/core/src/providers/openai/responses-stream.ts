@@ -21,6 +21,7 @@ import type {
   Response,
   ResponseCreateParamsNonStreaming,
   ResponseCreateParamsStreaming,
+  ResponseCustomToolCall,
   ResponseFunctionToolCall,
   ResponseOutputMessage,
   ResponseReasoningItem,
@@ -154,11 +155,16 @@ export function streamOpenAIResponses<
         | ResponseReasoningItem
         | ResponseOutputMessage
         | ResponseFunctionToolCall
+        | ResponseCustomToolCall
         | null = null;
       let currentBlock:
         | AssistantThinkingContent
         | AssistantResponseContent
-        | (AssistantToolCall & { partialJson: string })
+        | (AssistantToolCall & {
+            partialJson?: string;
+            partialInput?: string;
+            toolCallKind: 'function' | 'custom';
+          })
         | null = null;
       let currentBlockIndex: number | null = null;
 
@@ -216,6 +222,24 @@ export function streamOpenAIResponses<
               name: item.name,
               arguments: {},
               partialJson: item.arguments || '',
+              toolCallKind: 'function',
+            };
+            blocks.push(currentBlock);
+            currentBlockIndex = blockIndex();
+            stream.push({
+              type: 'toolcall_start',
+              contentIndex: currentBlockIndex,
+              message: output,
+            });
+          } else if (item.type === 'custom_tool_call') {
+            currentItem = item;
+            currentBlock = {
+              type: 'toolCall',
+              toolCallId: item.call_id,
+              name: item.name,
+              arguments: { input: item.input || '' },
+              partialInput: item.input || '',
+              toolCallKind: 'custom',
             };
             blocks.push(currentBlock);
             currentBlockIndex = blockIndex();
@@ -335,8 +359,25 @@ export function streamOpenAIResponses<
             currentBlock.type === 'toolCall' &&
             currentBlockIndex !== null
           ) {
-            currentBlock.partialJson += event.delta;
+            currentBlock.partialJson = (currentBlock.partialJson || '') + event.delta;
             currentBlock.arguments = parseStreamingJson(currentBlock.partialJson);
+            stream.push({
+              type: 'toolcall_delta',
+              contentIndex: currentBlockIndex,
+              delta: event.delta,
+              message: output,
+            });
+          }
+        } else if (event.type === 'response.custom_tool_call_input.delta') {
+          if (
+            currentItem &&
+            currentItem.type === 'custom_tool_call' &&
+            currentBlock &&
+            currentBlock.type === 'toolCall' &&
+            currentBlockIndex !== null
+          ) {
+            currentBlock.partialInput = (currentBlock.partialInput || '') + event.delta;
+            currentBlock.arguments = { input: currentBlock.partialInput };
             stream.push({
               type: 'toolcall_delta',
               contentIndex: currentBlockIndex,
@@ -412,6 +453,40 @@ export function streamOpenAIResponses<
             if (currentBlockIndex !== null) {
               blocks[currentBlockIndex] = toolCall;
             }
+            stream.push({
+              type: 'toolcall_end',
+              contentIndex: currentBlockIndex,
+              toolCall,
+              message: output,
+            });
+            currentBlock = null;
+            currentBlockIndex = null;
+            currentItem = null;
+          } else if (item.type === 'custom_tool_call' && currentBlockIndex !== null) {
+            const toolCall: AssistantToolCall = {
+              type: 'toolCall',
+              toolCallId: item.call_id,
+              name: item.name,
+              arguments: { input: item.input },
+            };
+
+            if (context.tools) {
+              const tool = context.tools.find(
+                (registeredTool) => registeredTool.name === toolCall.name
+              );
+              if (tool) {
+                try {
+                  toolCall.arguments = validateToolArguments(tool, toolCall) as Record<
+                    string,
+                    unknown
+                  >;
+                } catch {
+                  // Keep the parsed arguments. Validation errors are handled downstream.
+                }
+              }
+            }
+
+            blocks[currentBlockIndex] = toolCall;
             stream.push({
               type: 'toolcall_end',
               contentIndex: currentBlockIndex,

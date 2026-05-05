@@ -23,6 +23,7 @@ const AZURE_OPENAI_API = 'azure-openai' as const;
 
 const OPENAI_MODEL_CATALOG = {
   'openai/gpt-5.4': 'gpt-5.4',
+  'openai/gpt-5.5': 'gpt-5.5',
   'openai/gpt-5.3-codex': 'gpt-5.3-codex',
   'openai/gpt-5.4-pro': 'gpt-5.4-pro',
   'openai/gpt-5.4-mini': 'gpt-5.4-mini',
@@ -31,6 +32,7 @@ const OPENAI_MODEL_CATALOG = {
 
 const AZURE_OPENAI_MODEL_CATALOG = {
   'azure-openai/gpt-5.4': 'gpt-5.4',
+  'azure-openai/gpt-5.5': 'gpt-5.5',
   'azure-openai/gpt-5.3-codex': 'gpt-5.3-codex',
   'azure-openai/gpt-5.4-pro': 'gpt-5.4-pro',
   'azure-openai/gpt-5.4-mini': 'gpt-5.4-mini',
@@ -52,11 +54,7 @@ export type OpenAIModelId = keyof typeof OPENAI_MODEL_CATALOG;
 export type AzureOpenAIModelId = keyof typeof AZURE_OPENAI_MODEL_CATALOG;
 export type AnthropicModelId = keyof typeof ANTHROPIC_MODEL_CATALOG;
 export type GoogleModelId = keyof typeof GOOGLE_MODEL_CATALOG;
-export type CuratedModelId =
-  | OpenAIModelId
-  | AzureOpenAIModelId
-  | AnthropicModelId
-  | GoogleModelId;
+export type CuratedModelId = OpenAIModelId | AzureOpenAIModelId | AnthropicModelId | GoogleModelId;
 
 export const CuratedModelIds = [
   ...Object.keys(OPENAI_MODEL_CATALOG),
@@ -114,11 +112,7 @@ export interface CoreModelNotFoundError {
   code: 'core_model_not_found';
   message: string;
   modelId: CuratedModelId;
-  api:
-    | typeof OPENAI_API
-    | typeof AZURE_OPENAI_API
-    | 'anthropic'
-    | 'google';
+  api: typeof OPENAI_API | typeof AZURE_OPENAI_API | 'anthropic' | 'google';
   providerModelId: string;
 }
 
@@ -189,9 +183,7 @@ export type ResolveModelInputResult =
   | ResolvedGoogleModelInput
   | ResolveModelInputFailure;
 
-export type ResolveGatewayModelInputError =
-  | UnsupportedModelIdError
-  | CoreModelNotFoundError;
+export type ResolveGatewayModelInputError = UnsupportedModelIdError | CoreModelNotFoundError;
 
 export interface ResolvedGatewayModelInput<TApi extends Api = Api> {
   ok: true;
@@ -397,7 +389,10 @@ function resolveAnthropicGatewayModelInput(
   }
 
   const providerOptions = sanitizeGatewayProviderOptions(
-    mergeProviderOptions(buildAnthropicAdaptiveThinking(model.id, reasoningEffort), overrideProviderSetting)
+    mergeProviderOptions(
+      buildAnthropicAdaptiveThinking(model.id, reasoningEffort),
+      overrideProviderSetting
+    )
   );
 
   return createResolvedGatewayModelInput({
@@ -422,7 +417,10 @@ function resolveGoogleGatewayModelInput(
   }
 
   const providerOptions = sanitizeGatewayProviderOptions(
-    mergeProviderOptions(buildGoogleThinkingConfig(model.id, reasoningEffort), overrideProviderSetting)
+    mergeProviderOptions(
+      buildGoogleThinkingConfig(model.id, reasoningEffort),
+      overrideProviderSetting
+    )
   );
 
   return createResolvedGatewayModelInput({
@@ -890,7 +888,9 @@ function sanitizeGatewayProviderOptions(input: object): Record<string, unknown> 
   return sanitizeGatewayProviderOptionObject(input as Record<string, unknown>);
 }
 
-function sanitizeGatewayProviderOptionObject(input: Record<string, unknown>): Record<string, unknown> {
+function sanitizeGatewayProviderOptionObject(
+  input: Record<string, unknown>
+): Record<string, unknown> {
   const output: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(input)) {

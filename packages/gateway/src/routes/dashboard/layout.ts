@@ -909,6 +909,50 @@ const BASE_STYLES = `
     background: var(--background);
   }
 
+  .payload-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+
+  details.payload-panel {
+    background: var(--background);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+
+  details.payload-panel > summary {
+    padding: 0.65rem 0.85rem;
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--muted-foreground);
+  }
+
+  details.payload-panel[open] > summary {
+    color: var(--foreground);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .payload-panel-body {
+    padding: 0.8rem 0.85rem;
+  }
+
+  .payload-panel-body details.json {
+    border-color: var(--border);
+  }
+
+  .payload-panel-body details.json pre {
+    max-height: 24rem;
+  }
+
+  .markdown-view {
+    background: var(--subtle);
+    border-color: var(--border);
+    line-height: 1.6;
+  }
+
   .kv {
     display: grid;
     grid-template-columns: minmax(140px, 200px) minmax(0, 1fr);

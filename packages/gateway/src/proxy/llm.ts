@@ -273,7 +273,7 @@ function createSyntheticErrorEvent(
   };
 }
 
-function buildStoredProviderOptions(
+export function buildStoredProviderOptions(
   api: GatewayApi,
   credentials: GatewayProviderCredentials
 ): Record<string, unknown> {

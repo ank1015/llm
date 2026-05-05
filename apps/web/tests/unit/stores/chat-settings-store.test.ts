@@ -75,7 +75,7 @@ describe('chat settings store', () => {
     expect(state.isModelEnabled(firstModelId)).toBe(true);
   });
 
-  it('switches selection when the selected model is disabled', () => {
+  it('prevents disabling the selected model when it is the only active model', () => {
     const { api, modelId } = useChatSettingsStore.getState();
 
     const result = useChatSettingsStore.getState().setModelEnabled({
@@ -84,11 +84,14 @@ describe('chat settings store', () => {
       enabled: false,
     });
 
-    expect(result).toEqual({ ok: true });
+    expect(result).toEqual({
+      ok: false,
+      reason: 'At least one active model must remain enabled.',
+    });
 
     const state = useChatSettingsStore.getState();
-    expect(state.modelId).not.toBe(modelId);
-    expect(state.isModelEnabled(state.modelId)).toBe(true);
+    expect(state.modelId).toBe(modelId);
+    expect(state.isModelEnabled(modelId)).toBe(true);
   });
 
   it('prevents disabling the last active model', () => {

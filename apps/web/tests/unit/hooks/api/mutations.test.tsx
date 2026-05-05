@@ -66,7 +66,7 @@ describe('api hook mutations', () => {
         JSON.stringify({
           id: 'session-1',
           name: 'New chat',
-          modelId: 'gpt-5.4',
+          modelId: 'gpt-5.5',
           createdAt: '2026-03-30T00:00:00.000Z',
           activeBranch: 'branch-1',
         }),
@@ -88,7 +88,7 @@ describe('api hook mutations', () => {
     const { result } = renderHook(() => useCreateSessionMutation(ctx), { wrapper });
 
     await act(async () => {
-      await result.current.mutateAsync({ modelId: 'gpt-5.4' });
+      await result.current.mutateAsync({ modelId: 'gpt-5.5' });
     });
 
     expect(invalidateSpy).toHaveBeenCalledWith({

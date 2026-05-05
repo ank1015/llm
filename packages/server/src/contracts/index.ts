@@ -1,5 +1,6 @@
 export * from './common.js';
 export * from './artifacts.js';
+export * from './desktop.js';
 export * from './gateway.js';
 export * from './models.js';
 export * from './projects.js';

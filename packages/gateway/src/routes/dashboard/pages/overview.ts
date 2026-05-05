@@ -130,6 +130,7 @@ function renderStatusStrip(c: Context<GatewayEnv>): string {
   const items = [
     `<span class="pill soft"><span class="dot" style="color:var(--success)"></span>Online</span>`,
     `<span class="pill pill-${logKind}">log: ${escapeHtml(logMode)}</span>`,
+    `<span class="pill soft">events: ${services.config.logEvents ? 'on' : 'off'}</span>`,
     `<span class="pill soft">${providers.length} provider${providers.length === 1 ? '' : 's'} configured</span>`,
   ];
   return `<div class="row">${items.join('')}</div>`;

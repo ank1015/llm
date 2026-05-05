@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 
+import { isCustomTool } from '../../types/index.js';
 import { sanitizeSurrogates } from '../../utils/sanitize-unicode.js';
 
 import type {
@@ -334,19 +335,21 @@ export function buildAnthropicMessages(
 function convertTools(tools: Tool[]): Anthropic.Messages.Tool[] {
   if (!tools) return [];
 
-  return tools.map((tool) => {
-    const jsonSchema = tool.parameters as any; // TypeBox already generates JSON Schema
+  return tools
+    .filter((tool) => !isCustomTool(tool))
+    .map((tool) => {
+      const jsonSchema = tool.parameters as any; // TypeBox already generates JSON Schema
 
-    return {
-      name: tool.name,
-      description: tool.description,
-      input_schema: {
-        type: 'object' as const,
-        properties: jsonSchema.properties || {},
-        required: jsonSchema.required || [],
-      },
-    };
-  });
+      return {
+        name: tool.name,
+        description: tool.description,
+        input_schema: {
+          type: 'object' as const,
+          properties: jsonSchema.properties || {},
+          required: jsonSchema.required || [],
+        },
+      };
+    });
 }
 
 export function mapStopReason(reason: Anthropic.Messages.StopReason): StopReason {

@@ -1,52 +1,34 @@
 import { describe, expect, it } from 'vitest';
 
-import type { GptImageInput, NanoBananaInput } from '../../src/image.js';
+import type { ImageInput } from '../../src/image.js';
 
-const _nanoBananaInput: NanoBananaInput<'nano-banana'> = {
-  model: 'nano-banana',
-  prompt: 'Create a sticker',
-  output: './sticker.png',
-  settings: {
-    aspectRatio: '1:1',
-    googleSearch: true,
-    imageSize: '2K',
-  },
+const _imageInput: ImageInput = {
+  prompt: 'Create an icon',
+  output: './icon.png',
+  inputImages: ['./source.png'],
+  mask: './mask.png',
+  format: 'webp',
+  size: '1024x1024',
 };
 
-const _gptImageInput: GptImageInput = {
+// @ts-expect-error callers should not pass a model/provider to image()
+const _invalidModelInput: ImageInput = {
   model: 'gpt-image',
   prompt: 'Create an icon',
   output: './icon.png',
-  maskPath: './mask.png',
+};
+
+// @ts-expect-error settings are top-level on the image input
+const _invalidNestedSettingsInput: ImageInput = {
+  prompt: 'Create a sticker',
+  output: './sticker.png',
   settings: {
-    fidelity: 'high',
-    format: 'webp',
     size: '1024x1024',
   },
 };
 
-// @ts-expect-error OpenAI image settings should not be accepted for nano-banana inputs
-const _invalidNanoBananaInput: NanoBananaInput = {
-  model: 'nano-banana',
-  prompt: 'Create a sticker',
-  output: './sticker.png',
-  settings: {
-    format: 'webp',
-  },
-};
-
-// @ts-expect-error Google image settings should not be accepted for gpt-image inputs
-const _invalidGptImageInput: GptImageInput = {
-  model: 'gpt-image',
-  prompt: 'Create an icon',
-  output: './icon.png',
-  settings: {
-    aspectRatio: '16:9',
-  },
-};
-
 describe('image typing', () => {
-  it('keeps model-specific settings compile-safe', () => {
+  it('keeps image input model-free with top-level settings', () => {
     expect(true).toBe(true);
   });
 });

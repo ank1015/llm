@@ -1,5 +1,7 @@
 'use client';
 
+export { useDesktopFileQuery, useDesktopListingQuery } from './desktop';
+export type { UseDesktopFileInput, UseDesktopListingInput } from './desktop';
 export { useGatewayLoginMutation, useGatewaySessionQuery } from './gateway';
 export {
   useCancelSetupAgentMutation,

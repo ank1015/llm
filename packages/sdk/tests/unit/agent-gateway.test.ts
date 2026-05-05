@@ -36,7 +36,8 @@ afterEach(async () => {
 describe('agent gateway transport', () => {
   it('keeps the local agent/session flow while invoking the model through the gateway', async () => {
     const gatewayCredentialsPath = await createGatewayCredentialsFile();
-    setSdkConfig({ gatewayCredentialsPath });
+    const sessionsBaseDir = await createTempDirectory();
+    setSdkConfig({ gatewayCredentialsPath, sessionsBaseDir });
 
     const finalMessage = createAssistantMessage();
     mockedGetModel.mockReturnValue(finalMessage.model as never);
@@ -123,7 +124,15 @@ async function createGatewayCredentialsFile(): Promise<string> {
   return filePath;
 }
 
-function sseResponse(events: Array<{ type: string; reason?: string; message: BaseAssistantMessage<'openai'> }>): Response {
+async function createTempDirectory(): Promise<string> {
+  const directory = await mkdtemp(join(tmpdir(), 'llm-sdk-agent-gateway-sessions-'));
+  tempDirectories.push(directory);
+  return directory;
+}
+
+function sseResponse(
+  events: Array<{ type: string; reason?: string; message: BaseAssistantMessage<'openai'> }>
+): Response {
   const body = events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join('');
   return new Response(body, {
     headers: {

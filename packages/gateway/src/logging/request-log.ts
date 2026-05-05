@@ -27,10 +27,14 @@ export interface RequestLog {
   }): void;
 }
 
-export function createRequestLog(db: GatewayDatabase, logMode: GatewayLogMode): RequestLog {
+export function createRequestLog(
+  db: GatewayDatabase,
+  logMode: GatewayLogMode,
+  logEvents: boolean
+): RequestLog {
   return {
     appendEvent(requestId, seq, event) {
-      if (logMode !== 'full') {
+      if (logMode !== 'full' || !logEvents) {
         return;
       }
 

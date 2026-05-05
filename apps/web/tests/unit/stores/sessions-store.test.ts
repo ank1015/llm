@@ -5,7 +5,6 @@ import type { SessionSummaryDto } from '@/lib/client-api';
 import { getBrowserQueryClient } from '@/lib/query-client';
 import { useSessionsStore } from '@/stores/sessions-store';
 
-
 const { createSessionMock, listSessionsMock, renameSessionMock, deleteSessionMock } = vi.hoisted(
   () => ({
     createSessionMock: vi.fn(),
@@ -105,7 +104,7 @@ describe('sessions store', () => {
     createSessionMock.mockResolvedValue({
       id: 'session-new',
       name: 'Session New',
-      modelId: 'azure-openai/gpt-5.4',
+      modelId: 'azure-openai/gpt-5.5',
       createdAt: '2026-03-16T02:00:00.000Z',
       activeBranch: 'main',
     });
@@ -113,12 +112,12 @@ describe('sessions store', () => {
 
     const result = await useSessionsStore.getState().createSession(ctx, {
       sessionName: 'Session New',
-      modelId: 'azure-openai/gpt-5.4',
+      modelId: 'azure-openai/gpt-5.5',
     });
 
     expect(createSessionMock).toHaveBeenCalledWith(ctx, {
       name: 'Session New',
-      modelId: 'azure-openai/gpt-5.4',
+      modelId: 'azure-openai/gpt-5.5',
     });
     expect(result).toEqual({ sessionId: 'session-new' });
   });
