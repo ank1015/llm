@@ -6,6 +6,8 @@
 
 import OpenAI from 'openai';
 
+import { isCustomTool } from '../../types/index.js';
+
 import type { Api, Model, StopReason, Tool } from '../../types/index.js';
 import type { ChatCompletion, ChatCompletionTool } from 'openai/resources/chat/completions.js';
 
@@ -32,14 +34,16 @@ export function createChatCompletionClient<TApi extends Api>(
  * Converts Tool[] to ChatCompletionTool[] for OpenAI Chat Completions API.
  */
 export function convertChatTools(tools: readonly Tool[]): ChatCompletionTool[] {
-  return tools.map((tool) => ({
-    type: 'function' as const,
-    function: {
-      name: tool.name,
-      description: tool.description,
-      parameters: tool.parameters as Record<string, unknown>,
-    },
-  }));
+  return tools
+    .filter((tool) => !isCustomTool(tool))
+    .map((tool) => ({
+      type: 'function' as const,
+      function: {
+        name: tool.name,
+        description: tool.description,
+        parameters: tool.parameters as Record<string, unknown>,
+      },
+    }));
 }
 
 /**

@@ -20,6 +20,7 @@ import type { StreamFunction } from '../../utils/types.js';
 import type {
   Response,
   ResponseCreateParamsStreaming,
+  ResponseCustomToolCall,
   ResponseFunctionToolCall,
   ResponseOutputMessage,
   ResponseReasoningItem,
@@ -96,11 +97,16 @@ export const streamCodex: StreamFunction<'codex'> = (
         | ResponseReasoningItem
         | ResponseOutputMessage
         | ResponseFunctionToolCall
+        | ResponseCustomToolCall
         | null = null;
       let currentBlock:
         | AssistantThinkingContent
         | AssistantResponseContent
-        | (AssistantToolCall & { partialJson: string })
+        | (AssistantToolCall & {
+            partialJson?: string;
+            partialInput?: string;
+            toolCallKind: 'function' | 'custom';
+          })
         | null = null;
       const blocks = output.content;
       const blockIndex = () => blocks.length - 1;
@@ -135,6 +141,23 @@ export const streamCodex: StreamFunction<'codex'> = (
               name: item.name,
               arguments: {},
               partialJson: item.arguments || '',
+              toolCallKind: 'function',
+            };
+            output.content.push(currentBlock);
+            stream.push({
+              type: 'toolcall_start',
+              contentIndex: blockIndex(),
+              message: output,
+            });
+          } else if (item.type === 'custom_tool_call') {
+            currentItem = item;
+            currentBlock = {
+              type: 'toolCall',
+              toolCallId: item.call_id,
+              name: item.name,
+              arguments: { input: item.input || '' },
+              partialInput: item.input || '',
+              toolCallKind: 'custom',
             };
             output.content.push(currentBlock);
             stream.push({
@@ -252,8 +275,24 @@ export const streamCodex: StreamFunction<'codex'> = (
             currentBlock &&
             currentBlock.type === 'toolCall'
           ) {
-            currentBlock.partialJson += event.delta;
+            currentBlock.partialJson = (currentBlock.partialJson || '') + event.delta;
             currentBlock.arguments = parseStreamingJson(currentBlock.partialJson);
+            stream.push({
+              type: 'toolcall_delta',
+              contentIndex: blockIndex(),
+              delta: event.delta,
+              message: output,
+            });
+          }
+        } else if (event.type === 'response.custom_tool_call_input.delta') {
+          if (
+            currentItem &&
+            currentItem.type === 'custom_tool_call' &&
+            currentBlock &&
+            currentBlock.type === 'toolCall'
+          ) {
+            currentBlock.partialInput = (currentBlock.partialInput || '') + event.delta;
+            currentBlock.arguments = { input: currentBlock.partialInput };
             stream.push({
               type: 'toolcall_delta',
               contentIndex: blockIndex(),
@@ -314,6 +353,38 @@ export const streamCodex: StreamFunction<'codex'> = (
             }
 
             // Sync finalized tool call back into output.content
+            output.content[blockIndex()] = toolCall;
+
+            stream.push({
+              type: 'toolcall_end',
+              contentIndex: blockIndex(),
+              toolCall,
+              message: output,
+            });
+            currentBlock = null;
+          } else if (item.type === 'custom_tool_call') {
+            const toolCall: AssistantToolCall = {
+              type: 'toolCall',
+              toolCallId: item.call_id,
+              name: item.name,
+              arguments: { input: item.input },
+            };
+
+            if (context.tools) {
+              const tool = context.tools.find((t) => t.name === toolCall.name);
+              if (tool) {
+                try {
+                  toolCall.arguments = validateToolArguments(tool, toolCall) as Record<
+                    string,
+                    unknown
+                  >;
+                } catch {
+                  // Keep the parsed arguments — validation errors are handled
+                  // downstream by the agent runner, which sends them back to the LLM
+                }
+              }
+            }
+
             output.content[blockIndex()] = toolCall;
 
             stream.push({

@@ -10,6 +10,7 @@ import {
 } from '@aws-sdk/client-bedrock-runtime';
 import { fromIni } from '@aws-sdk/credential-providers';
 
+import { isCustomTool } from '../../types/index.js';
 import { sanitizeSurrogates } from '../../utils/sanitize-unicode.js';
 
 import type {
@@ -363,13 +364,15 @@ export function buildToolConfig(
   if (toolChoice === 'none') return undefined;
 
   const convertedTools: BedrockTool[] =
-    tools?.map((tool) => ({
-      toolSpec: {
-        name: tool.name,
-        description: tool.description,
-        inputSchema: { json: tool.parameters },
-      },
-    })) ?? [];
+    tools
+      ?.filter((tool) => !isCustomTool(tool))
+      .map((tool) => ({
+        toolSpec: {
+          name: tool.name,
+          description: tool.description,
+          inputSchema: { json: tool.parameters },
+        },
+      })) ?? [];
 
   const mergedTools = [...convertedTools, ...(optionToolConfig?.tools ?? [])];
   if (mergedTools.length === 0) return undefined;

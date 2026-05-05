@@ -9,6 +9,7 @@ import {
   type ToolListUnion,
 } from '@google/genai';
 
+import { isCustomTool } from '../../types/index.js';
 import { sanitizeSurrogates } from '../../utils/sanitize-unicode.js';
 
 import type {
@@ -333,9 +334,14 @@ export function transformSchemaForGoogle(schema: JSONSchemaValue): JSONSchemaVal
 }
 
 export function convertTools(tools: readonly Tool[]): ToolListUnion {
+  const functionTools = tools.filter((tool) => !isCustomTool(tool));
+  if (functionTools.length === 0) {
+    return [];
+  }
+
   return [
     {
-      functionDeclarations: tools.map((tool) => ({
+      functionDeclarations: functionTools.map((tool) => ({
         name: tool.name,
         description: tool.description,
         parameters: transformSchemaForGoogle(tool.parameters) as Record<string, unknown>,

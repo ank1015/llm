@@ -7,6 +7,12 @@
 import type { Message } from './message.js';
 import type { TSchema } from '@sinclair/typebox';
 
+export interface CustomToolFormat {
+  type: 'grammar';
+  syntax: 'lark';
+  definition: string;
+}
+
 /**
  * Tool definition with TypeBox schema for parameters.
  *
@@ -20,6 +26,18 @@ export interface Tool<TParameters extends TSchema = TSchema, TName extends strin
   description: string;
   /** TypeBox schema defining the tool's parameters */
   parameters: TParameters;
+  /** Tool transport type. Defaults to function calling. */
+  type?: 'function' | 'custom';
+  /** Custom/freeform tool input format. */
+  format?: CustomToolFormat;
+  /** Provider strict-schema setting for function tools. Defaults to provider behavior. */
+  strict?: boolean | null;
+}
+
+export function isCustomTool(
+  tool: Tool
+): tool is Tool & { type: 'custom'; format: CustomToolFormat } {
+  return tool.type === 'custom' && tool.format !== undefined;
 }
 
 /**

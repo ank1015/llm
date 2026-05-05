@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 
+import { isCustomTool } from '../../types/index.js';
 import { sanitizeSurrogates } from '../../utils/sanitize-unicode.js';
 
 import type {
@@ -16,6 +17,8 @@ import type {
   Tool as OpenAITool,
   Response,
   ResponseCreateParamsNonStreaming,
+  ResponseCustomToolCall,
+  ResponseCustomToolCallOutput,
   ResponseFunctionCallOutputItemList,
   ResponseFunctionToolCall,
   ResponseInput,
@@ -111,6 +114,16 @@ function buildImageGenerationReferenceItem(providerItemId: string): ResponseInpu
   } as ResponseInputItem;
 }
 
+function getToolByName(context: Context, toolName: string): Tool | undefined {
+  return context.tools?.find((tool) => tool.name === toolName);
+}
+
+function buildCustomToolInput(argumentsValue: Record<string, unknown>): string {
+  return typeof argumentsValue.input === 'string'
+    ? argumentsValue.input
+    : JSON.stringify(argumentsValue);
+}
+
 function buildFileDataUrl(data: string, mimeType: string): string {
   return `data:${mimeType};base64,${data}`;
 }
@@ -158,6 +171,7 @@ export function buildOpenAIMessages<TApi extends OpenAIResponsesApi>(
 
     // normalize for tool results
     if (message.role === 'toolResult') {
+      const tool = getToolByName(context, message.toolName);
       const toolOutputs: ResponseFunctionCallOutputItemList = [];
       let hasText = false;
       let hasImg = false;
@@ -195,6 +209,15 @@ export function buildOpenAIMessages<TApi extends OpenAIResponsesApi>(
           text: message.isError ? '[TOOL ERROR] (see attached)' : '(see attached)',
         });
       }
+      if (tool && isCustomTool(tool)) {
+        const customToolResultInput: ResponseCustomToolCallOutput = {
+          call_id: message.toolCallId,
+          output: toolOutputs as ResponseCustomToolCallOutput['output'],
+          type: 'custom_tool_call_output',
+        };
+        openAIMessages.push(customToolResultInput as ResponseInputItem);
+        continue;
+      }
       const toolResultInput: ResponseInputItem.FunctionCallOutput = {
         call_id: message.toolCallId,
         output: toolOutputs,
@@ -210,6 +233,7 @@ export function buildOpenAIMessages<TApi extends OpenAIResponsesApi>(
         for (const outputPart of baseMessage.message.output) {
           if (
             outputPart.type === 'function_call' ||
+            outputPart.type === 'custom_tool_call' ||
             outputPart.type === 'message' ||
             outputPart.type === 'reasoning'
           ) {
@@ -257,13 +281,23 @@ export function buildOpenAIMessages<TApi extends OpenAIResponsesApi>(
             }
           } else if (contentBlock.type === 'toolCall') {
             flushTextBuffer();
-            // Convert tool call to function_call
-            openAIMessages.push({
-              type: 'function_call',
-              call_id: contentBlock.toolCallId,
-              name: contentBlock.name,
-              arguments: JSON.stringify(contentBlock.arguments),
-            } as ResponseFunctionToolCall);
+            const tool = getToolByName(context, contentBlock.name);
+            if (tool && isCustomTool(tool)) {
+              openAIMessages.push({
+                type: 'custom_tool_call',
+                call_id: contentBlock.toolCallId,
+                name: contentBlock.name,
+                input: buildCustomToolInput(contentBlock.arguments),
+              } as ResponseCustomToolCall);
+            } else {
+              // Convert tool call to function_call
+              openAIMessages.push({
+                type: 'function_call',
+                call_id: contentBlock.toolCallId,
+                name: contentBlock.name,
+                arguments: JSON.stringify(contentBlock.arguments),
+              } as ResponseFunctionToolCall);
+            }
           }
         }
 
@@ -276,13 +310,24 @@ export function buildOpenAIMessages<TApi extends OpenAIResponsesApi>(
 }
 
 export function convertTools(tools: readonly Tool[]): OpenAITool[] {
-  return tools.map((tool) => ({
-    type: 'function',
-    name: tool.name,
-    description: tool.description,
-    parameters: tool.parameters, // TypeBox already generates JSON Schema
-    strict: null,
-  }));
+  return tools.map((tool) => {
+    if (isCustomTool(tool)) {
+      return {
+        type: 'custom',
+        name: tool.name,
+        description: tool.description,
+        format: tool.format,
+      };
+    }
+
+    return {
+      type: 'function',
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.parameters, // TypeBox already generates JSON Schema
+      strict: tool.strict ?? null,
+    };
+  });
 }
 
 export function mapStopReason(status: OpenAI.Responses.ResponseStatus | undefined): StopReason {
