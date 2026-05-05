@@ -30,7 +30,7 @@ function createUserNode(input: {
       content: [{ type: 'text', content: input.text }, ...(input.attachments ?? [])],
     },
     metadata: {
-      modelId: 'azure-openai/gpt-5.4',
+      modelId: 'azure-openai/gpt-5.5',
     },
   };
 }
@@ -45,9 +45,9 @@ function createAssistantMessage(input: {
     api: 'azure-openai',
     message: {} as BaseAssistantMessage<'azure-openai'>['message'],
     model: {
-      id: 'gpt-5.4',
+      id: 'gpt-5.5',
       api: 'azure-openai',
-      name: 'GPT-5.4',
+      name: 'GPT-5.5',
       baseUrl: 'https://example.com',
       reasoning: true,
       input: ['text'],
@@ -98,7 +98,7 @@ function createAssistantNode(input: {
       content: input.content,
     }),
     metadata: {
-      modelId: 'azure-openai/gpt-5.4',
+      modelId: 'azure-openai/gpt-5.5',
     },
   };
 }

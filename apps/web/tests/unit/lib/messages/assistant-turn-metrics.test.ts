@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from 'vitest';
 
-import { getAssistantTurnMetrics } from "@/lib/messages/assistant-turn-metrics";
+import type { BaseAssistantMessage, Message } from '@ank1015/llm-sdk';
 
-import type { BaseAssistantMessage, Message } from "@ank1015/llm-sdk";
+import { getAssistantTurnMetrics } from '@/lib/messages/assistant-turn-metrics';
+
 
 function createAssistantMessage(input: {
   id: string;
@@ -19,18 +20,18 @@ function createAssistantMessage(input: {
     cacheRead: number;
     cacheWrite: number;
   };
-}): BaseAssistantMessage<"codex"> {
+}): BaseAssistantMessage<'codex'> {
   return {
-    role: "assistant",
+    role: 'assistant',
     id: input.id,
-    api: "codex",
+    api: 'codex',
     model: {
-      id: "gpt-5.4",
-      api: "codex",
-      name: "GPT-5.4",
-      baseUrl: "https://example.com",
+      id: 'gpt-5.5',
+      api: 'codex',
+      name: 'GPT-5.5',
+      baseUrl: 'https://example.com',
       reasoning: true,
-      input: ["text"],
+      input: ['text'],
       cost: input.pricing ?? {
         input: 1,
         output: 2,
@@ -43,7 +44,7 @@ function createAssistantMessage(input: {
     },
     timestamp: Date.now(),
     duration: 100,
-    stopReason: "stop",
+    stopReason: 'stop',
     content: [],
     usage: {
       input: input.inputTokens ?? 0,
@@ -59,14 +60,14 @@ function createAssistantMessage(input: {
         total: input.actualCost,
       },
     },
-    message: {} as BaseAssistantMessage<"codex">["message"],
+    message: {} as BaseAssistantMessage<'codex'>['message'],
   };
 }
 
-describe("getAssistantTurnMetrics", () => {
-  it("derives context usage, actual cost, and cache hit percent for a single assistant turn", () => {
+describe('getAssistantTurnMetrics', () => {
+  it('derives context usage, actual cost, and cache hit percent for a single assistant turn', () => {
     const assistant = createAssistantMessage({
-      id: "assistant-1",
+      id: 'assistant-1',
       totalTokens: 3000,
       inputTokens: 1000,
       outputTokens: 500,
@@ -89,9 +90,9 @@ describe("getAssistantTurnMetrics", () => {
     expect(metrics.cacheHitPercent).toBeCloseTo(1 - 0.0016 / 0.0025, 8);
   });
 
-  it("sums multiple assistant messages in the same turn and falls back to the latest positive token usage", () => {
+  it('sums multiple assistant messages in the same turn and falls back to the latest positive token usage', () => {
     const toolAssistant = createAssistantMessage({
-      id: "assistant-tool",
+      id: 'assistant-tool',
       totalTokens: 1200,
       inputTokens: 600,
       outputTokens: 200,
@@ -100,7 +101,7 @@ describe("getAssistantTurnMetrics", () => {
       contextWindow: 8000,
     });
     const finalAssistant = createAssistantMessage({
-      id: "assistant-final",
+      id: 'assistant-final',
       totalTokens: 0,
       inputTokens: 500,
       outputTokens: 300,
@@ -120,9 +121,9 @@ describe("getAssistantTurnMetrics", () => {
     expect(metrics.noCacheCost).toBeCloseTo(0.0024, 8);
   });
 
-  it("clamps cache hit percent at zero when actual cost exceeds uncached baseline", () => {
+  it('clamps cache hit percent at zero when actual cost exceeds uncached baseline', () => {
     const assistant = createAssistantMessage({
-      id: "assistant-1",
+      id: 'assistant-1',
       totalTokens: 1500,
       inputTokens: 100,
       outputTokens: 100,
@@ -147,7 +148,7 @@ describe("getAssistantTurnMetrics", () => {
     expect(metrics.cacheHitPercent).toBe(0);
   });
 
-  it("hides metrics cleanly when assistant data is missing", () => {
+  it('hides metrics cleanly when assistant data is missing', () => {
     const metrics = getAssistantTurnMetrics({
       cotMessages: [],
       assistantMessage: null,

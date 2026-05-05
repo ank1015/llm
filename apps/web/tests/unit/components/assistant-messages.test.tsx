@@ -72,7 +72,7 @@ describe('AssistantMessages', () => {
               role: 'assistant',
               id: 'assistant-message-1',
               api: 'codex',
-              model: 'gpt-5.4',
+              model: 'gpt-5.5',
               message: {},
               timestamp: Date.parse('2026-04-17T00:00:01.000Z'),
               duration: 1200,

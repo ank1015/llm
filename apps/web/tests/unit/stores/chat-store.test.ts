@@ -61,7 +61,7 @@ const persistedUserNode = {
     timestamp: Date.now(),
     content: [{ type: 'text' as const, content: 'Hello' }],
   },
-  metadata: { modelId: 'azure-openai/gpt-5.4' },
+  metadata: { modelId: 'azure-openai/gpt-5.5' },
 } as SessionTreeResponse['nodes'][number];
 
 const persistedAssistantNode = {
@@ -75,9 +75,9 @@ const persistedAssistantNode = {
     id: 'message-assistant',
     api: 'azure-openai' as const,
     model: {
-      id: 'gpt-5.4',
+      id: 'gpt-5.5',
       api: 'azure-openai' as const,
-      name: 'GPT-5.4',
+      name: 'GPT-5.5',
       baseUrl: 'https://example.com',
       reasoning: true,
       input: ['text'],
@@ -100,7 +100,7 @@ const persistedAssistantNode = {
     },
     message: {} as BaseAssistantMessage<'azure-openai'>['message'],
   },
-  metadata: { modelId: 'azure-openai/gpt-5.4' },
+  metadata: { modelId: 'azure-openai/gpt-5.5' },
 } as SessionTreeResponse['nodes'][number];
 
 describe('chat store', () => {
@@ -120,7 +120,7 @@ describe('chat store', () => {
     getSessionMock.mockResolvedValue({
       id: session.sessionId,
       name: 'Session',
-      modelId: 'azure-openai/gpt-5.4',
+      modelId: 'azure-openai/gpt-5.5',
       createdAt: '2026-03-30T09:59:00.000Z',
       activeBranch: 'main',
     });
@@ -165,13 +165,13 @@ describe('chat store', () => {
       ...ctx,
       sessionId: session.sessionId,
       prompt: 'Hello',
-      modelId: 'azure-openai/gpt-5.4',
+      modelId: 'azure-openai/gpt-5.5',
       reasoningEffort: 'high',
     });
 
     expect(streamConversationMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        modelId: 'azure-openai/gpt-5.4',
+        modelId: 'azure-openai/gpt-5.5',
         reasoningEffort: 'high',
       }),
       expect.any(Object),
@@ -209,7 +209,7 @@ describe('chat store', () => {
       ...ctx,
       sessionId: session.sessionId,
       nodeId: persistedUserNode.id,
-      modelId: 'azure-openai/gpt-5.4',
+      modelId: 'azure-openai/gpt-5.5',
       reasoningEffort: 'medium',
     });
 
@@ -218,7 +218,7 @@ describe('chat store', () => {
       sessionId: session.sessionId,
       nodeId: persistedUserNode.id,
       prompt: 'Edited',
-      modelId: 'azure-openai/gpt-5.4',
+      modelId: 'azure-openai/gpt-5.5',
       reasoningEffort: 'low',
     });
 

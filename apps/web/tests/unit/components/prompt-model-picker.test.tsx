@@ -21,12 +21,12 @@ describe('PromptModelPicker', () => {
           {
             api: 'openai',
             label: 'OpenAI',
-            models: [{ modelId: 'openai/gpt-5.4', label: 'GPT-5.4' }],
+            models: [{ modelId: 'openai/gpt-5.5', label: 'GPT-5.5' }],
           },
           {
             api: 'azure-openai',
             label: 'Azure OpenAI',
-            models: [{ modelId: 'azure-openai/gpt-5.4', label: 'GPT-5.4' }],
+            models: [{ modelId: 'azure-openai/gpt-5.5', label: 'GPT-5.5' }],
           },
         ],
       },
