@@ -19,6 +19,7 @@ export interface GatewayConfig {
   refreshTtlSeconds: number;
   corsOrigins: string[];
   logMode: GatewayLogMode;
+  logEvents: boolean;
   rateLimitEnabled: boolean;
   rateLimitWindowSeconds: number;
   rateLimitMax: number;
@@ -46,6 +47,7 @@ export interface GatewayConfigInput {
   refreshTtlSeconds?: number | string;
   corsOrigins?: string[] | string;
   logMode?: GatewayLogMode;
+  logEvents?: boolean | string;
   rateLimitEnabled?: boolean | string;
   rateLimitWindowSeconds?: number | string;
   rateLimitMax?: number | string;
@@ -102,6 +104,12 @@ export function getGatewayConfig(overrides: Partial<GatewayConfigInput> = {}): G
   );
   const corsOrigins = readOrigins(overrides.corsOrigins, process.env['GATEWAY_CORS_ORIGINS']);
   const logMode = readLogMode(overrides.logMode, process.env['GATEWAY_LOG_MODE']);
+  const logEvents = readBoolean(
+    overrides.logEvents,
+    process.env['GATEWAY_LOG_EVENTS'],
+    true,
+    'GATEWAY_LOG_EVENTS'
+  );
   const rateLimitEnabled = readBoolean(
     overrides.rateLimitEnabled,
     process.env['GATEWAY_RATE_LIMIT_ENABLED'],
@@ -186,6 +194,7 @@ export function getGatewayConfig(overrides: Partial<GatewayConfigInput> = {}): G
     refreshTtlSeconds,
     corsOrigins,
     logMode,
+    logEvents,
     rateLimitEnabled,
     rateLimitWindowSeconds,
     rateLimitMax,

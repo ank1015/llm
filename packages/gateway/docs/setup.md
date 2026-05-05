@@ -17,6 +17,7 @@ Optional environment variables:
 - `GATEWAY_REFRESH_TTL_SECONDS` - default `2592000`
 - `GATEWAY_CORS_ORIGINS` - comma-separated, default `*`
 - `GATEWAY_LOG_MODE` - `off`, `summary`, or `full`; default `full`
+- `GATEWAY_LOG_EVENTS` - `true` or `false`; when `false`, `GATEWAY_LOG_MODE=full` still stores input/output payloads but skips stream event rows; default `true`
 - `GATEWAY_RATE_LIMIT_ENABLED` - `true` or `false`; default `true`
 - `GATEWAY_RATE_LIMIT_WINDOW_SECONDS` - unauthenticated non-login window; default `60`
 - `GATEWAY_RATE_LIMIT_MAX` - unauthenticated non-login requests per window; default `60`

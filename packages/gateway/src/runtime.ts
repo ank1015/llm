@@ -20,7 +20,7 @@ export function createGatewayServices(
     db,
     auth: createGatewayAuth(db, config),
     rateLimiter: createInMemoryRateLimiter(config),
-    requestLog: createRequestLog(db, config.logMode),
+    requestLog: createRequestLog(db, config.logMode, config.logEvents),
     runtime: gatewayRuntime,
     vault: createProviderKeyVault(db, config),
   };

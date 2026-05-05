@@ -17,6 +17,7 @@ describe('gateway config', () => {
     expect(config.refreshTtlSeconds).toBe(2_592_000);
     expect(config.corsOrigins).toEqual(['*']);
     expect(config.logMode).toBe('full');
+    expect(config.logEvents).toBe(true);
     expect(config.rateLimitEnabled).toBe(true);
     expect(config.rateLimitWindowSeconds).toBe(60);
     expect(config.rateLimitMax).toBe(60);
@@ -37,6 +38,7 @@ describe('gateway config', () => {
       jwtSecret: 'jwt-secret',
       encryptionKey: Buffer.alloc(32, 3).toString('base64'),
       adminToken: 'admin-token',
+      logEvents: 'false',
       rateLimitEnabled: 'false',
       rateLimitWindowSeconds: '30',
       rateLimitMax: '12',
@@ -51,6 +53,7 @@ describe('gateway config', () => {
       cookieSecure: 'true',
     });
 
+    expect(config.logEvents).toBe(false);
     expect(config.rateLimitEnabled).toBe(false);
     expect(config.rateLimitWindowSeconds).toBe(30);
     expect(config.rateLimitMax).toBe(12);
@@ -76,6 +79,15 @@ describe('gateway config', () => {
   });
 
   it('throws when boolean hardening options are invalid', () => {
+    expect(() =>
+      getGatewayConfig({
+        jwtSecret: 'jwt-secret',
+        encryptionKey: Buffer.alloc(32, 3).toString('base64'),
+        adminToken: 'admin-token',
+        logEvents: 'perhaps',
+      })
+    ).toThrow('GATEWAY_LOG_EVENTS must be true or false.');
+
     expect(() =>
       getGatewayConfig({
         jwtSecret: 'jwt-secret',
